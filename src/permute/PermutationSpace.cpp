@@ -208,19 +208,13 @@ CookResult<std::vector<PermutationAssignment>> PermutationSpace::EnumerateActive
 // same length, and allows us to compute a unique index for each assignment.
 CanonicalAssignment PermutationSpace::CanonicalizeAssignment(const PermutationAssignment& assignment) const
 {
-    PermutationAssignment canonical;
-    canonical.reserve(axes.size());
-    // So, as mentioned above: step through each axis.
-    for (const PermutationAxis& axis : axes)
+    auto findBinding = [&assignment](const PermutationAxis& axis) -> PermutationBinding
     {
-        // Get the binding (concrete instantiation) of the current axis for *this* assignment.
-        const PermutationBinding* binding = FindBindingForAxis(assignment, &axis);
-        // Now check: did we fail to find the binding? That means it was folded out of the assignment,
-        // because one of it's dependent axes values was not set as needed. Thus, default value assigned.
-        const PermutationValue value = binding != nullptr ? binding->Value : axis.GetDefault();
-        canonical.emplace_back(&axis, value);
-    }
-    // And bam, the canonical assignment is just a fully "concrete" instance of the *actual* active assignment
+        auto foundIter = std::ranges::find(assignment, &axis, &PermutationBinding::Axis);
+        const PermutationValue value = foundIter != assignment.end() ? foundIter->Value : axis.GetDefault();
+        return PermutationBinding{ .Axis=&axis, .Value=value };
+    };
+    auto canonical = axes | std::views::transform(findBinding) | std::ranges::to<PermutationAssignment>();
     return CanonicalAssignment{ std::move(canonical) };
 }
 
@@ -244,7 +238,8 @@ int32_t PermutationSpace::ComputeVariantIndex(const CanonicalAssignment& canonic
 int32_t PermutationSpace::ComputeVariantSpaceSize() const noexcept
 {
     return std::ranges::fold_left(
-        axes | std::views::transform(&PermutationAxis::NumValues), int32_t{ 1 }, std::multiplies<int32_t>{});
+        axes | std::views::transform(&PermutationAxis::NumValues),
+        int32_t{ 1 }, std::multiplies<int32_t>{});
 }
 
 CookResult<VariantSet> PermutationSpace::EnumerateVariants() const
