@@ -80,11 +80,16 @@ set(LODESTONE_COMPILE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/Diagnostics.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/RawLibrary.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/SlangCompiler.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/SlangDiagnosticParser.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangCompilerImpl.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangCompilerImpl.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/SlangDiagnosticParser.cpp")
+
+set(LODESTONE_COMPILE_IMPL_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangCompilerTypes.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangModuleContext.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangModuleContext.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangReflector.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangReflector.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangVariantCompiler.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangVariantCompiler.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/ThreadPool.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/ThreadPool.cpp")
 
@@ -146,7 +151,7 @@ set(LODESTONE_TARGET_SOURCES
 # performance analysis only, and it needs WINDOWS_EXPORT_ALL_SYMBOLS to link at all.
 add_library(lodestone STATIC ${LODESTONE_COMMON_SOURCES} ${LODESTONE_COMPILE_SOURCES} ${LODESTONE_DRIVER_SOURCES}
                              ${LODESTONE_EMIT_SOURCES} ${LODESTONE_MODEL_SOURCES} ${LODESTONE_PERMUTE_SOURCES}
-                             ${LODESTONE_TARGET_SOURCES})
+                             ${LODESTONE_TARGET_SOURCES} ${LODESTONE_COMPILE_IMPL_SOURCES})
 add_library(lodestone::lodestone ALIAS lodestone)
 set_target_properties(lodestone PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
 # The engine include path carries shader/ShaderLibraryTypes.hpp and resource/ResourceFlags.hpp. The
@@ -170,6 +175,7 @@ endif()
 
 source_group("common" FILES ${LODESTONE_COMMON_SOURCES})
 source_group("compile" FILES ${LODESTONE_COMPILE_SOURCES})
+source_group("compile/impl" FILES ${LODESTONE_COMPILE_IMPL_SOURCES})
 source_group("driver" FILES ${LODESTONE_DRIVER_SOURCES})
 source_group("emit" FILES ${LODESTONE_EMIT_SOURCES})
 source_group("model" FILES ${LODESTONE_MODEL_SOURCES})

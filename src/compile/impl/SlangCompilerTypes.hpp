@@ -294,7 +294,7 @@ struct CompilerOptionRow
 constexpr const char* k_AllWarningsAsErrors = "all";
 constexpr const char* k_DisabledWarnings = "31010";
 // Order reaches Slang, and the two warning level rows must stay in this order.
-constexpr std::array<CompilerOptionRow, 7u> k_CompilerOptionRows{
+constexpr std::array<CompilerOptionRow, 8u> k_CompilerOptionRows{
     CompilerOptionRow{ .Name = slang::CompilerOptionName::WarningLevel,
                        .Kind = slang::CompilerOptionValueKind::Int,
                        .IntValue = SLANG_WARNING_LEVEL_PEDANTIC },
@@ -314,6 +314,9 @@ constexpr std::array<CompilerOptionRow, 7u> k_CompilerOptionRows{
                        .Kind = slang::CompilerOptionValueKind::Int,
                        .IntValue = SLANG_DEBUG_INFO_LEVEL_NONE },
     CompilerOptionRow{ .Name = slang::CompilerOptionName::EnableMachineReadableDiagnostics,
+                       .Kind = slang::CompilerOptionValueKind::Int,
+                       .IntValue = 1 },
+    CompilerOptionRow{ .Name = slang::CompilerOptionName::UseUpToDateBinaryModule,
                        .Kind = slang::CompilerOptionValueKind::Int,
                        .IntValue = 1 }
 };

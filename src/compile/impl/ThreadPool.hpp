@@ -48,7 +48,7 @@ public:
     ThreadPool& operator=(const ThreadPool&) = delete;
     ThreadPool(ThreadPool&&) = delete;
     ThreadPool& operator=(ThreadPool&&) = delete;
-
+    // Results of initialize can be reused for multiple batches, but likely won't be
     [[nodiscard]] CookError Initialize(SlangCompilerCreateInfo create_info, size_t num_threads_override = 0u);
     [[nodiscard]] SlangCompiler::CompileResultList Compile(const std::vector<VariantDescriptor>& variants,
                                                            DiagnosticSink& diagnostic_sink);
@@ -77,6 +77,7 @@ private:
     SlangCompilerCreateInfo createInfo;
     void workerFunction(const std::stop_token& stop_token,
                         const Slang::ComPtr<slang::IGlobalSession>& global_session,
+                        const Slang::ComPtr<slang::ISession>& session,
                         size_t thread_idx);
     std::mutex mutex;
     std::condition_variable_any condition;

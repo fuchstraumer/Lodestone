@@ -1,4 +1,4 @@
-#include "SlangCompilerImpl.hpp"
+#include "SlangVariantCompiler.hpp"
 #include "CookerErrors.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "SlangCompilerTypes.hpp"
@@ -132,7 +132,7 @@ namespace
 namespace lodestone
 {
 
-CookError SlangCompilerImpl::loadRootModule()
+CookError SlangVariantCompiler::loadRootModule()
 {
     Slang::ComPtr<slang::IBlob> diagnostics;
     rootModule = session->loadModule(moduleName.c_str(), diagnostics.writeRef());
@@ -153,7 +153,7 @@ CookError SlangCompilerImpl::loadRootModule()
 
 /** Slang reports every file the module pulled in, transitively. That set is what the axis-name check
  * searches, and it is also the right input for a future content hash driving live reload. */
-void SlangCompilerImpl::readDependencySourceTexts()
+void SlangVariantCompiler::readDependencySourceTexts()
 {
     const SlangInt32 dependencyCount = rootModule->getDependencyFileCount();
     moduleSourceTexts.clear();
@@ -179,7 +179,7 @@ void SlangCompilerImpl::readDependencySourceTexts()
     }
 }
 
-CookError SlangCompilerImpl::collectEntryPoints()
+CookError SlangVariantCompiler::collectEntryPoints()
 {
     const SlangInt32 entryPointCount = rootModule->getDefinedEntryPointCount();
     entryPointNames.clear();
@@ -203,7 +203,7 @@ CookError SlangCompilerImpl::collectEntryPoints()
     return CookError::Success;
 }
 
-CookResult<Slang::ComPtr<slang::IComponentType>> SlangCompilerImpl::linkVariant(
+CookResult<Slang::ComPtr<slang::IComponentType>> SlangVariantCompiler::linkVariant(
     const PermutationAssignment& assignment) const
 {
     std::vector<slang::IComponentType*> components = baseComponents;
@@ -253,7 +253,7 @@ CookResult<Slang::ComPtr<slang::IComponentType>> SlangCompilerImpl::linkVariant(
     return linked;
 }
 
-std::vector<std::string> SlangCompilerImpl::generateEntryPointCode(
+std::vector<std::string> SlangVariantCompiler::generateEntryPointCode(
     slang::IComponentType* linked_program) const
 {
     const size_t entryPointCount = entryPointNames.size();
@@ -276,7 +276,7 @@ std::vector<std::string> SlangCompilerImpl::generateEntryPointCode(
  *
  * Slang wraps a resource type around the type it carries, so the useful facts sit one level down.
  * A structured buffer reports its element layout. A texture reports the type it returns. */
-void SlangCompilerImpl::applyLeafTypeLayout(slang::TypeLayoutReflection* containing_layout,
+void SlangVariantCompiler::applyLeafTypeLayout(slang::TypeLayoutReflection* containing_layout,
                                               SlangInt range_index,
                                               slang::BindingType binding_type,
                                               RawBinding& binding)
@@ -344,7 +344,7 @@ void SlangCompilerImpl::applyLeafTypeLayout(slang::TypeLayoutReflection* contain
 
 /** Reads one `[vx_*]` annotation into its argument strings. Stage 3 never evaluates one, so a
  * malformed argument is caught here only when it is not a string at all. */
-CookError SlangCompilerImpl::CollectRawSizeAttributes(slang::VariableReflection* leaf_variable,
+CookError SlangVariantCompiler::CollectRawSizeAttributes(slang::VariableReflection* leaf_variable,
                                                         std::string_view binding_name,
                                                         std::vector<RawSizeAttribute>& out_attributes) const
 {
@@ -386,7 +386,7 @@ CookError SlangCompilerImpl::CollectRawSizeAttributes(slang::VariableReflection*
 }
 
 /** Walks the binding ranges of one scope, and drafts a binding for each one. */
-CookError SlangCompilerImpl::CollectBindingRangeDrafts(slang::TypeLayoutReflection* containing_layout,
+CookError SlangVariantCompiler::CollectBindingRangeDrafts(slang::TypeLayoutReflection* containing_layout,
                                                          const BindingScope& scope,
                                                          std::vector<RawBindingDraft>& out_drafts) const
 {
@@ -463,7 +463,7 @@ CookError SlangCompilerImpl::CollectBindingRangeDrafts(slang::TypeLayoutReflecti
  * carries a descriptor set index of -1 and the range walk drops it. The contents live in a sub-object
  * range instead, and this is the only walk that reaches them. `ReadParameterBlock` reads one range,
  * and `ReadBlockContainer` reads the slot Slang adds to hold the ordinary data. */
-CookError SlangCompilerImpl::CollectSubObjectDrafts(slang::TypeLayoutReflection* containing_layout,
+CookError SlangVariantCompiler::CollectSubObjectDrafts(slang::TypeLayoutReflection* containing_layout,
                                                       const BindingScope& scope,
                                                       std::vector<RawBindingDraft>& out_drafts) const
 {
@@ -508,7 +508,7 @@ CookError SlangCompilerImpl::CollectSubObjectDrafts(slang::TypeLayoutReflection*
  * The scope name is the parameter's own name when the entry point declares one parameter of a struct
  * type. Slang collects loose `uniform` parameters into a synthetic struct instead, and names that
  * `entryPointParams`. Both answers come from the same call, so neither is a special case here. */
-CookResult<BindingScope> SlangCompilerImpl::entryPointScope(slang::EntryPointReflection* entry_point_layout,
+CookResult<BindingScope> SlangVariantCompiler::entryPointScope(slang::EntryPointReflection* entry_point_layout,
                                                               std::string_view entry_point_name) const
 {
     slang::VariableLayoutReflection* varLayout = entry_point_layout->getVarLayout();
@@ -539,7 +539,7 @@ CookResult<BindingScope> SlangCompilerImpl::entryPointScope(slang::EntryPointRef
                          .Name = std::string{ k_EntryPointScopeName } };
 }
 
-CookError SlangCompilerImpl::ExtractRawBindings(slang::ProgramLayout* program_layout,
+CookError SlangVariantCompiler::ExtractRawBindings(slang::ProgramLayout* program_layout,
                                                   std::vector<RawBinding>& out_bindings,
                                                   std::vector<RawSizeAttribute>& out_attributes) const
 {
@@ -568,7 +568,7 @@ CookError SlangCompilerImpl::ExtractRawBindings(slang::ProgramLayout* program_la
  * `global_bindings` holds the global scope alone. Slang generates each entry point as its own
  * artifact, so two entry points can place different resources at one group and binding. A placement
  * query over the entry point rows would then let one entry point claim the parameter of another. */
-void SlangCompilerImpl::CollectUsedBindingIndices(slang::IComponentType* linked_program,
+void SlangVariantCompiler::CollectUsedBindingIndices(slang::IComponentType* linked_program,
                                                     SlangInt entry_point_index,
                                                     std::span<const RawBinding> global_bindings,
                                                     std::vector<uint32_t>& out_used_indices) const
@@ -612,7 +612,7 @@ void SlangCompilerImpl::CollectUsedBindingIndices(slang::IComponentType* linked_
                                       }));
 }
 
-CookResult<RawEntryPoint> SlangCompilerImpl::ExtractRawEntryPoint(
+CookResult<RawEntryPoint> SlangVariantCompiler::ExtractRawEntryPoint(
     slang::IComponentType* linked_program,
     slang::ProgramLayout* program_layout,
     SlangInt entry_point_index,
@@ -663,7 +663,7 @@ CookResult<RawEntryPoint> SlangCompilerImpl::ExtractRawEntryPoint(
     return rawEntryPoint;
 }
 
-void SlangCompilerImpl::extractRasterState(slang::EntryPointReflection* entry_point_layout,
+void SlangVariantCompiler::extractRasterState(slang::EntryPointReflection* entry_point_layout,
                                              ShaderStageKind stage,
                                              ReflectedRasterState& raster)
 {
