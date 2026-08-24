@@ -1,15 +1,13 @@
 #include "permute/PermutationSpace.hpp"
 #include "CookerErrors.hpp"
+#include "permute/ExternConstantScanner.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
-#include "permute/PermutationPolicy.hpp"
 #include "permute/PermutationValue.hpp"
-#include "permute/ExternConstantScanner.hpp"
 #include "permute/SizeExpression.hpp"
 
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -20,6 +18,7 @@
 #include <iterator>
 #include <memory>
 #include <print>
+#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
@@ -56,19 +55,10 @@ namespace
 
         for (const ExternConstantDefault& entry : defaults)
         {
-            symbols.push_back(SizeSymbol{ .Name = entry.Name, .Value = entry.Value });
+            symbols.emplace_back(entry.Name, entry.Value);
         }
 
         return symbols;
-    }
-
-    bool SpaceDrivesAxisNamed(const PermutationSpace& space, std::string_view name) noexcept
-    {
-        return std::ranges::any_of(space.Axes(),
-                                   [name](const PermutationAxis& axis)
-                                   {
-                                       return axis.Name == name;
-                                   });
     }
 
     [[nodiscard]] CookError VerifyVariantIndicesAreUnique(const std::vector<VariantDescriptor>& variants)
@@ -228,7 +218,7 @@ CanonicalAssignment PermutationSpace::CanonicalizeAssignment(const PermutationAs
         // Now check: did we fail to find the binding? That means it was folded out of the assignment,
         // because one of it's dependent axes values was not set as needed. Thus, default value assigned.
         const PermutationValue value = binding != nullptr ? binding->Value : axis.GetDefault();
-        canonical.push_back(PermutationBinding{ .Axis = &axis, .Value = value });
+        canonical.emplace_back(&axis, value);
     }
     // And bam, the canonical assignment is just a fully "concrete" instance of the *actual* active assignment
     return CanonicalAssignment{ std::move(canonical) };
@@ -253,14 +243,8 @@ int32_t PermutationSpace::ComputeVariantIndex(const CanonicalAssignment& canonic
 
 int32_t PermutationSpace::ComputeVariantSpaceSize() const noexcept
 {
-    int32_t size = 1;
-
-    for (const PermutationAxis& axis : axes)
-    {
-        size *= static_cast<int32_t>(axis.NumValues());
-    }
-
-    return size;
+    return std::ranges::fold_left(
+        axes | std::views::transform(&PermutationAxis::NumValues), int32_t{ 1 }, std::multiplies<int32_t>{});
 }
 
 CookResult<VariantSet> PermutationSpace::EnumerateVariants() const
@@ -337,23 +321,31 @@ CookError PermutationSpace::VerifyAxisNamesAreDeclared(std::span<const std::stri
 void PermutationSpace::ReportUndrivenExternConstants(std::span<const std::string_view> source_texts,
                                                      std::string_view module_name) const
 {
+    auto axesView = axes | std::views::transform(&PermutationAxis::Name);
+    std::unordered_set<std::string_view> axesNames(axesView.begin(), axesView.end());
+    std::vector<ExternConstantDeclaration> undriven;
+    auto filterUndriven = [&axesNames](const ExternConstantDeclaration& decl)
+    {
+        return !axesNames.contains(decl.Name);
+    };
+
     for (const std::string_view source : source_texts)
     {
-        for (const ExternConstantDeclaration& declared : ScanExternConstants(source))
-        {
-            if (SpaceDrivesAxisNamed(*this, declared.Name))
-            {
-                continue;
-            }
-
-            std::println(stderr,
-                         "[shader_cooker] '{}' in module {} is declared extern but no axis drives it. "
-                         "It keeps its declared default in every variant.",
-                         declared.Name,
-                         module_name);
-        }
+        auto declared = ScanExternConstants(source);
+        undriven.append_range(declared | std::views::filter(filterUndriven) | std::views::as_rvalue);
     }
 
+    // build report string
+    std::string report;
+    for (const ExternConstantDeclaration& decl : undriven)
+    {
+        report += std::format("[shader_cooker] '{}' in module {} is declared extern but no axis "
+                              "drives it. It keeps its declared default in every variant.\n",
+                              decl.Name,
+                              module_name);
+    }
+
+    std::println(stderr, "{}", report);
 }
 
 CookResult<std::vector<ExternConstantDefault>> PermutationSpace::CollectUndrivenExternDefaults(
@@ -361,36 +353,44 @@ CookResult<std::vector<ExternConstantDefault>> PermutationSpace::CollectUndriven
 {
     std::vector<ExternConstantDefault> defaults;
 
+    auto axesView = axes | std::views::transform(&PermutationAxis::Name);
+    std::unordered_set<std::string_view> axesNames(axesView.begin(), axesView.end());
+
+    std::vector<ExternConstantDeclaration> undriven;
+    auto filterUndriven = [&axesNames](const ExternConstantDeclaration& decl)
+    {
+        return !axesNames.contains(decl.Name);
+    };
     for (const std::string_view source : source_texts)
     {
-        for (const auto& [constName, valueText] : ScanExternConstants(source))
+        auto declared = ScanExternConstants(source);
+        undriven.append_range(declared | std::views::filter(filterUndriven) | std::views::as_rvalue);
+    }
+
+    defaults.reserve(undriven.size());
+
+    for (const auto& [constName, valueText] : undriven)
+    {
+        const std::string_view trimmed = TrimWhitespace(valueText);
+        if (trimmed == "true" || trimmed == "false")
         {
-            if (SpaceDrivesAxisNamed(*this, constName))
-            {
-                continue;
-            }
-
-            const std::string_view trimmed = TrimWhitespace(valueText);
-            if (trimmed == "true" || trimmed == "false")
-            {
-                defaults.emplace_back(std::string{ constName }, trimmed == "true" ? 1 : 0);
-                continue;
-            }
-
-            const std::vector<SizeSymbol> known = AsSizeSymbols(defaults);
-            const CookResult<int64_t> value = EvaluateSizeExpression(trimmed, known);
-            if (!value)
-            {
-                std::println(stderr,
-                             "[shader_cooker] could not read the default of extern constant '{}' from "
-                             "'{}'. A size expression naming it would silently disagree with the shader.",
-                             constName,
-                             trimmed);
-                return std::unexpected(value.error());
-            }
-
-            defaults.emplace_back(std::string{ constName }, value.value());
+            defaults.emplace_back(std::string{ constName }, trimmed == "true" ? 1 : 0);
+            continue;
         }
+
+        const std::vector<SizeSymbol> known = AsSizeSymbols(defaults);
+        const CookResult<int64_t> value = EvaluateSizeExpression(trimmed, known);
+        if (!value)
+        {
+            std::println(stderr,
+                         "[shader_cooker] could not read the default of extern constant '{}' from "
+                         "'{}'. A size expression naming it would silently disagree with the shader.",
+                         constName,
+                         trimmed);
+            return std::unexpected(value.error());
+        }
+
+        defaults.emplace_back(std::string{ constName }, value.value());
     }
 
     return defaults;

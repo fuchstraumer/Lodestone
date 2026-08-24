@@ -93,9 +93,8 @@ std::vector<ExternConstantDeclaration> ScanExternConstants(std::string_view sour
         {
             valueEnd = line.size();
         }
-
-        declarations.push_back(ExternConstantDeclaration{
-            .Name = name, .ValueText = line.substr(valueStart, valueEnd - valueStart) });
+        
+        declarations.emplace_back(name, line.substr(valueStart, valueEnd - valueStart));
     }
 
     return declarations;
