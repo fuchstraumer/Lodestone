@@ -1,10 +1,13 @@
 #include "compile/Diagnostics.hpp"
 
+#include <cstdint>
 #include <cstdio>
+#include <format>
 #include <print>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace lodestone
 {
@@ -103,14 +106,40 @@ int32_t StderrDiagnosticSink::FailureCount() const noexcept
     return failureCount;
 }
 
+RecordingDiagnosticSink::RecordingDiagnosticSink(RecordingDiagnosticSink&& other) noexcept
+    : records(std::move(other.records))
+{
+}
+
+RecordingDiagnosticSink& RecordingDiagnosticSink::operator=(RecordingDiagnosticSink&& other) noexcept
+{
+    records = std::move(other.records);
+    return *this;
+}
+
 void RecordingDiagnosticSink::Report(const Diagnostic& diagnostic)
 {
     records.push_back(diagnostic);
 }
 
+void RecordingDiagnosticSink::Report(Diagnostic&& diagnostic)
+{
+    records.emplace_back(std::move(diagnostic));
+}
+
 const std::vector<Diagnostic>& RecordingDiagnosticSink::Records() const noexcept
 {
     return records;
+}
+
+std::vector<Diagnostic>&& RecordingDiagnosticSink::Records() noexcept
+{
+    return std::move(records);
+}
+
+void RecordingDiagnosticSink::Reset() noexcept
+{
+    records.clear();
 }
 
 } // namespace lodestone

@@ -80,7 +80,13 @@ set(LODESTONE_COMPILE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/Diagnostics.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/RawLibrary.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/SlangCompiler.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/SlangDiagnosticParser.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/SlangDiagnosticParser.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangCompilerImpl.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangCompilerImpl.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangReflector.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangReflector.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/ThreadPool.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/ThreadPool.cpp")
 
 set(LODESTONE_DRIVER_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/CookerDriver.hpp"

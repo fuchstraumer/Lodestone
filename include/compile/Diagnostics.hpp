@@ -86,14 +86,15 @@ struct Diagnostic
 class DiagnosticSink
 {
 public:
-    DiagnosticSink() = default;
+    DiagnosticSink() noexcept = default;
     virtual ~DiagnosticSink() = default;
     DiagnosticSink(const DiagnosticSink&) = delete;
     DiagnosticSink& operator=(const DiagnosticSink&) = delete;
-    DiagnosticSink(DiagnosticSink&&) = delete;
-    DiagnosticSink& operator=(DiagnosticSink&&) = delete;
+    DiagnosticSink(DiagnosticSink&&) noexcept = default;
+    DiagnosticSink& operator=(DiagnosticSink&&) noexcept = default;
 
     virtual void Report(const Diagnostic& diagnostic) = 0;
+    virtual void Report(Diagnostic&& diagnostic) = 0;
 };
 
 /**@brief Writes each record to `stderr`.
@@ -104,9 +105,10 @@ class StderrDiagnosticSink final : public DiagnosticSink
 {
 public:
     void Report(const Diagnostic& diagnostic) override;
+    void Report(Diagnostic&& diagnostic) override;
 
     /**@brief Cumulative failure count over the whole cook */
-    int32_t FailureCount() const noexcept;
+    [[nodiscard]] int32_t FailureCount() const noexcept;
 
 private:
     int32_t failureCount{ 0 };
@@ -116,9 +118,16 @@ private:
 class RecordingDiagnosticSink final : public DiagnosticSink
 {
 public:
+    RecordingDiagnosticSink() noexcept = default;
+    RecordingDiagnosticSink(RecordingDiagnosticSink&& other) noexcept;
+    RecordingDiagnosticSink& operator=(RecordingDiagnosticSink&& other) noexcept;
     void Report(const Diagnostic& diagnostic) override;
+    void Report(Diagnostic&& diagnostic) override;
 
-    const std::vector<Diagnostic>& Records() const noexcept;
+    [[nodiscard]] const std::vector<Diagnostic>& Records() const noexcept;
+    [[nodiscard]] std::vector<Diagnostic>&& Records() noexcept;
+
+    void Reset() noexcept;
 
 private:
     std::vector<Diagnostic> records;
