@@ -14,9 +14,22 @@
 #include <ios>
 #include <iterator>
 #include <ranges>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
+
+namespace
+{
+    std::string BuildCachedModulePath(std::string_view cache_directory, std::string_view module_name)
+    {
+        std::string result{ cache_directory };
+        result += "/";
+        result += module_name;
+        result += ".slang-module";
+        return result;
+    }
+}
 
 namespace lodestone
 {
@@ -40,7 +53,7 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
     // The shared modules a shader imports -- VeloxAttributes among them -- sit one level above the
     // per-stage directory, so the asset root resolves without a command-line switch.
     const std::string sharedDirectory = canonicalModulePath.parent_path().parent_path().string();
-    const std::string cacheDirectory = create_info.ModuleCacheDirectory.string();
+    cacheDirectory = create_info.ModuleCacheDirectory.string();
     const std::array<const char*, 4> searchPaths{
         sourceDirectory.c_str(), sharedDirectory.c_str(), cacheDirectory.c_str(), attributesPathStr.c_str()
     };
@@ -70,25 +83,7 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
     // extract module name from module path
     moduleName = canonicalModulePath.stem().string();
 
-    CookError result = loadRootModule();
-    if (result != CookError::Success)
-    {
-        return result;
-    }
-
-    result = readDependencySourceStrings();
-    if (result != CookError::Success)
-    {
-        return result;
-    }
-
-    result = enumerateEntryPoints();
-    if (result != CookError::Success)
-    {
-        return result;
-    }
-
-    return result;
+    return CookError::Success;
 }
 
 CookError SlangModuleContext::RunBootstrap()
@@ -146,8 +141,66 @@ const std::vector<std::string>& SlangModuleContext::ModuleSourceStrings() const 
 
 std::vector<std::string_view> SlangModuleContext::ModuleSourceStringViews() const noexcept
 {
-    auto asViews = moduleSourceStrings | std::views::transform([](const std::string& str) { return std::string_view(str); });
-    return asViews | std::ranges::to<std::vector<std::string_view>>();
+    return moduleSourceStrings |
+           std::views::transform([](const std::string& str) { return std::string_view(str); }) |
+           std::ranges::to<std::vector<std::string_view>>();
+}
+
+std::vector<SerializedModule> SlangModuleContext::SerializeModules() const
+{
+    const auto moduleCount = static_cast<int64_t>(session->getLoadedModuleCount());
+    std::vector<SerializedModule> serializedModules;
+    serializedModules.reserve(static_cast<size_t>(moduleCount));
+    for (int64_t i = 0; i < moduleCount; ++i)
+    {
+        Slang::ComPtr<slang::IBlob> blob;
+        slang::IModule* module = session->getLoadedModule(i);
+        const SlangResult result = module->serialize(blob.writeRef());
+        const char* moduleNameStr = module->getName();
+        const std::string modulePath = BuildCachedModulePath(cacheDirectory, moduleNameStr);
+        serializedModules.emplace_back(moduleNameStr, modulePath, result < 0 ? nullptr : blob);
+    }
+    return serializedModules;
+}
+
+CookError SlangModuleContext::WriteModuleCache() const
+{
+    const auto moduleCount = static_cast<int64_t>(session->getLoadedModuleCount());
+    for (int64_t i = 0; i < moduleCount; ++i)
+    {
+        slang::IModule* module = session->getLoadedModule(i);
+        const char* moduleNameStr = module->getName();
+        const std::string modulePath = BuildCachedModulePath(cacheDirectory, moduleNameStr);
+        if (SLANG_FAILED(module->writeToFile(modulePath.c_str())))
+        {
+            return CookError::FilesystemError;
+        }
+    }
+
+    return CookError::Success;
+}
+
+CookError SlangModuleContext::RunWorkerSetup(std::span<const SerializedModule> serialized_modules)
+{
+    CookError error = loadSerializedModules(serialized_modules);
+    if (error != CookError::Success)
+    {
+        return error;
+    }
+
+    error = loadRootModule();
+    if (error != CookError::Success)
+    {
+        return error;
+    }
+
+    error = enumerateEntryPoints();
+    if (error != CookError::Success)
+    {
+        return error;
+    }
+
+    return error;
 }
 
 CookError SlangModuleContext::loadRootModule()
@@ -156,11 +209,34 @@ CookError SlangModuleContext::loadRootModule()
     rootModule = session->loadModule(moduleName.c_str(), diagnosticsBlob.writeRef());
     if (rootModule == nullptr)
     {
+        ReportDiagnostics(*diagnosticSink, "SlangModuleContext::loadRootModule", diagnosticsBlob);
         return CookError::ModuleLoadFailed;
     }
 
     baseComponents.reserve(8u + static_cast<size_t>(rootModule->getDefinedEntryPointCount()));
     baseComponents.push_back(rootModule);
+    return CookError::Success;
+}
+
+CookError SlangModuleContext::loadSerializedModules(std::span<const SerializedModule> serialized_modules)
+{
+    for (const SerializedModule& serializedModule : serialized_modules)
+    {
+        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+        slang::IModule* module = session->loadModuleFromIRBlob(serializedModule.Name.c_str(),
+                                                         serializedModule.Path.c_str(),
+                                                         serializedModule.Blob,
+                                                         diagnosticsBlob.writeRef());
+
+        if (module == nullptr)
+        {
+            ReportDiagnostics(*diagnosticSink, "SlangModuleContext::loadSerializedModules", diagnosticsBlob);
+            return CookError::ModuleLoadFailed;
+        }
+
+        baseComponents.push_back(module);
+    }
+
     return CookError::Success;
 }
 
