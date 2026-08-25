@@ -1,6 +1,5 @@
 #include "emit/OutputSink.hpp"
 #include "CookerErrors.hpp"
-#include <expected>
 #include <filesystem>
 #include <fstream>
 #include <ios>
@@ -23,7 +22,7 @@ FileOutputSink::FileOutputSink(std::filesystem::path _path) :
 
 FileOutputSink::~FileOutputSink() = default;
 
-CookResult<void> FileOutputSink::WriteArtifact(std::string_view artifact_name, std::string_view content)
+CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::string_view content)
 {
     const std::filesystem::path artifactPath = path.parent_path() / std::filesystem::path{ artifact_name };
     FileOutputSink companion{ artifactPath };
@@ -35,7 +34,7 @@ std::string_view FileOutputSink::PrimaryName() const noexcept
     return primaryName;
 }
 
-CookResult<void> FileOutputSink::Write(std::string_view content)
+CookError FileOutputSink::Write(std::string_view content)
 {
     const std::filesystem::path parentDirectory = path.parent_path();
     if (!parentDirectory.empty() && !std::filesystem::exists(parentDirectory))
@@ -45,22 +44,22 @@ CookResult<void> FileOutputSink::Write(std::string_view content)
 
     if (!parentDirectory.empty() && !std::filesystem::is_directory(parentDirectory))
     {
-        return std::unexpected(CookError::OutputPathInvalid);
+        return CookError::OutputPathInvalid;
     }
 
     std::ofstream stream{ path, std::ios::binary | std::ios::trunc };
     if (!stream.is_open())
     {
-        return std::unexpected(CookError::OutputWriteFailed);
+        return CookError::OutputFileOpenFailed;
     }
 
     stream.write(content.data(), static_cast<std::streamsize>(content.size()));
     if (!stream.good())
     {
-        return std::unexpected(CookError::OutputWriteFailed);
+        return CookError::OutputWriteFailed;
     }
 
-    return {};
+    return CookError::Success;
 }
 
 std::string_view FileOutputSink::Describe() const noexcept
@@ -80,16 +79,16 @@ MemoryOutputSink::MemoryOutputSink(std::string_view primary_name) :
 
 MemoryOutputSink::~MemoryOutputSink() = default;
 
-CookResult<void> MemoryOutputSink::Write(std::string_view new_content)
+CookError MemoryOutputSink::Write(std::string_view new_content)
 {
     content.assign(new_content);
-    return {};
+    return CookError::Success;
 }
 
-CookResult<void> MemoryOutputSink::WriteArtifact(std::string_view artifact_name, std::string_view content)
+CookError MemoryOutputSink::WriteArtifact(std::string_view artifact_name, std::string_view _content)
 {
-    artifacts[std::string{ artifact_name }] = std::string{ content };
-    return {};
+    auto [iter, inserted] = artifacts.try_emplace(std::string{ artifact_name }, std::string{ _content });
+    return inserted ? CookError::Success : CookError::ArtifactAlreadyWritten;
 }
 
 std::string_view MemoryOutputSink::Describe() const noexcept

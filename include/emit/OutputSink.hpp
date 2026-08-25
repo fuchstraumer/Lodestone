@@ -23,10 +23,10 @@ public:
     OutputSink& operator=(OutputSink&&) noexcept = default;
 
     /** Writes the primary artifact, which is the generated header. */
-    virtual CookResult<void> Write(std::string_view content) = 0;
+    virtual CookError Write(std::string_view content) = 0;
     /** Writes a companion artifact beside the primary one. The name is a file name, not a path. */
-    virtual CookResult<void> WriteArtifact(std::string_view artifact_name,
-                                           std::string_view content) = 0;
+    virtual CookError WriteArtifact(std::string_view artifact_name,
+                                    std::string_view content) = 0;
     [[nodiscard]] virtual std::string_view Describe() const noexcept = 0;
     /** File name of the primary artifact, so a companion can include it. */
     [[nodiscard]] virtual std::string_view PrimaryName() const noexcept = 0;
@@ -40,8 +40,8 @@ public:
     FileOutputSink(FileOutputSink&&) noexcept = default;
     FileOutputSink& operator=(FileOutputSink&&) noexcept = default;
 
-    [[nodiscard]] CookResult<void> Write(std::string_view content) override;
-    [[nodiscard]] CookResult<void> WriteArtifact(std::string_view artifact_name, std::string_view content) override;
+    [[nodiscard]] CookError Write(std::string_view content) override;
+    [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::string_view content) override;
     [[nodiscard]] std::string_view Describe() const noexcept override;
     [[nodiscard]] std::string_view PrimaryName() const noexcept override;
 
@@ -58,8 +58,8 @@ public:
     explicit MemoryOutputSink(std::string_view primary_name);
     ~MemoryOutputSink() override;
 
-    [[nodiscard]] CookResult<void> Write(std::string_view content) override;
-    [[nodiscard]] CookResult<void> WriteArtifact(std::string_view artifact_name, std::string_view content) override;
+    [[nodiscard]] CookError Write(std::string_view content) override;
+    [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::string_view content) override;
     [[nodiscard]] std::string_view Describe() const noexcept override;
     [[nodiscard]] std::string_view PrimaryName() const noexcept override;
     [[nodiscard]] std::string_view GetContent() const noexcept;
