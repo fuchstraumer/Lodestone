@@ -127,10 +127,9 @@ namespace
         auto [beginDuplicates, endDuplicates] = std::ranges::unique(allUsedBindingIndices);
         allUsedBindingIndices.erase(beginDuplicates, endDuplicates);
         std::vector<uint32_t> unusedBindingIndices;
-        std::ranges::set_difference(
-            std::views::iota(0u, static_cast<uint32_t>(variant.Bindings.size())),
-            allUsedBindingIndices,
-            std::back_inserter(unusedBindingIndices));
+        std::ranges::set_difference(std::views::iota(0u, static_cast<uint32_t>(variant.Bindings.size())),
+                                    allUsedBindingIndices,
+                                    std::back_inserter(unusedBindingIndices));
 
         for (const auto& unusedIndex : unusedBindingIndices)
         {
@@ -200,8 +199,8 @@ namespace
     {
         // `compiled` is sorted in ascending order already: we can use lower_bound to find variant idx in
         // log2(n)
-        auto candidateIter =
-            std::ranges::lower_bound(compiled, variant_index, std::less{}, &CompiledVariant::VariantIndex);
+        auto candidateIter = std::ranges::lower_bound(
+            compiled, variant_index, std::less<uint32_t>{}, &CompiledVariant::VariantIndex);
         if (candidateIter != compiled.end() && candidateIter->VariantIndex == variant_index)
         {
             return std::to_address(candidateIter);
@@ -487,14 +486,14 @@ namespace
     /** @brief Runs Slang compiler on each variant (which contains multiple entry points, remember),
      * and then takes that result and "resolves" it by evaluating our custom meta-language for sizes
      * and resource descriptors etc. This is also when the index tables are built as well. */
-    CookResult<void> CompileModuleVariants(const CookerOptions& options,
-                                           const TargetProfile& target,
-                                           SlangCompiler& compiler,
-                                           const VariantSet& variant_set,
-                                           InternedModule& interned_module,
-                                           RawModule& raw_module,
-                                           std::vector<CompiledVariant>& out_module_variants,
-                                           CookStatistics& statistics)
+    [[nodiscard]] CookError CompileModuleVariants(const CookerOptions& options,
+                                                  const TargetProfile& target,
+                                                  SlangCompiler& compiler,
+                                                  const VariantSet& variant_set,
+                                                  InternedModule& interned_module,
+                                                  RawModule& raw_module,
+                                                  std::vector<CompiledVariant>& out_module_variants,
+                                                  CookStatistics& statistics)
     {
         const bool keepRawVariants = IsStageDumpRequested(options, StageDumpKind::Raw);
 
@@ -507,7 +506,7 @@ namespace
                              "[shader_cooker] variant [{}] failed: {}",
                              DescribeAssignment(descriptor.Canonical),
                              ToString(rawResult.error()));
-                return std::unexpected(rawResult.error());
+                return rawResult.error();
             }
 
             const ResolveContext context =
@@ -519,7 +518,7 @@ namespace
                              "[shader_cooker] variant [{}] failed: {}",
                              DescribeAssignment(descriptor.Canonical),
                              ToString(variantResult.error()));
-                return std::unexpected(variantResult.error());
+                return variantResult.error();
             }
 
             if (keepRawVariants)
@@ -543,9 +542,9 @@ namespace
 
             CaptureEntryPointsOnce(interned_module, variant);
 
-            if (CookResult<void> appendResult =
-                    AppendVariantToModule(interned_module, variant, descriptor.Canonical);
-                !appendResult)
+            const CookError appendResult =
+                AppendVariantToModule(interned_module, variant, descriptor.Canonical);
+            if (appendResult != CookError::Success)
             {
                 return appendResult;
             }
@@ -553,7 +552,7 @@ namespace
             out_module_variants.emplace_back(std::move(variant));
         }
 
-        return {};
+        return CookError::Success;
     }
 
     /**@brief Take `InternedModule` and package it into `CookedModule`. */

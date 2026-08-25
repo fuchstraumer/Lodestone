@@ -2,6 +2,7 @@
 #include "model/ContentHash.hpp"
 #include "model/ContentInterner.hpp"
 #include "CookerErrors.hpp"
+#include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "model/ShaderDataSchema.hpp"
 
@@ -91,9 +92,9 @@ void DisableDedupe(InternedModule& module) noexcept
     module.RasterInterner.Disable();
 }
 
-CookResult<void> AppendVariantToModule(InternedModule& module,
-                                       const CompiledVariant& variant,
-                                       const CanonicalAssignment& canonical)
+CookError AppendVariantToModule(InternedModule& module,
+                                const CompiledVariant& variant,
+                                const CanonicalAssignment& canonical)
 {
     if (variant.EntryPoints.size() != module.EntryPoints.size())
     {
@@ -103,7 +104,7 @@ CookResult<void> AppendVariantToModule(InternedModule& module,
                      variant.EntryPoints.size(),
                      module.Name,
                      module.EntryPoints.size());
-        return std::unexpected(CookError::ReflectionMismatch);
+        return CookError::ReflectionMismatch;
     }
 
     const ProvenanceRecord variantOrigin{ .EntryPointName = {},
@@ -155,7 +156,8 @@ CookResult<void> AppendVariantToModule(InternedModule& module,
     }
 
     module.Variants.emplace_back(std::move(record));
-    return {};
+
+    return CookError::Success;
 }
 
 namespace

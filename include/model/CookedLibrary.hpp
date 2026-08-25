@@ -1,16 +1,18 @@
 #pragma once
+#include "permute/PermutationAssignment.hpp"
 #ifndef LODESTONE_COOKED_LIBRARY_HPP
 #define LODESTONE_COOKED_LIBRARY_HPP
 #include "ContentHash.hpp"
 #include "ContentInterner.hpp"
 #include "CookerErrors.hpp"
-#include "permute/PermutationSpace.hpp"
 #include "ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "permute/PermutationSpace.hpp"
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
+
 
 /** The frozen model every emitter reads.
  *
@@ -137,9 +139,9 @@ struct CookedLibrary
 void DisableDedupe(InternedModule& module) noexcept;
 
 /** Adds one compiled variant to the module, interning each source, layout, and raster state. */
-CookResult<void> AppendVariantToModule(InternedModule& module,
-                                       const CompiledVariant& variant,
-                                       const CanonicalAssignment& canonical);
+CookError AppendVariantToModule(InternedModule& module,
+                                const CompiledVariant& variant,
+                                const CanonicalAssignment& canonical);
 
 /**@brief "Freezes" the module by *consuming* `InternedModule`. CookedModule takes the results, gathering
  * all the data so far in one place. The intent was that CookedModule is a bundle of data, it doesn't hold
@@ -157,7 +159,6 @@ std::string_view ResolveSource(const CookedModule& module,
 ShaderLayout ResolveLayout(const CookedModule& module,
                            const LibraryVariant& variant,
                            size_t entry_point_index);
-
 
 ShaderLayoutView ResolveLayoutView(const CookedModule& module,
                                    const LibraryVariant& variant,
