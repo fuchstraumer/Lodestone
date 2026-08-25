@@ -554,7 +554,7 @@ std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_vari
 namespace lodestone
 {
 
-SlangReflector::SlangReflector(std::span<const std::string_view> entry_point_names,
+SlangReflector::SlangReflector(std::span<const std::string> entry_point_names,
                                DiagnosticSink* _sink,
                                slang::IGlobalSession* global_session) noexcept
     : entryPointNames(entry_point_names),
@@ -580,10 +580,12 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
         return std::unexpected(bindingExtrResult);
     }
 
+    const size_t globalBindingCount = rawVariant.Bindings.size();
     for (int64_t i = 0; i < std::ssize(linked_variant.EntryPointStrings); ++i)
     {
         std::vector<RawBindingDraft> entryPointDrafts;
-        CookResult<RawEntryPoint> entryPointResult = extractRawEntryPoint(linked_variant, i, rawVariant.Bindings, entryPointDrafts);
+        const std::span<const RawBinding> globalBindings = std::span{ rawVariant.Bindings }.first(globalBindingCount);
+        CookResult<RawEntryPoint> entryPointResult = extractRawEntryPoint(linked_variant, i, globalBindings, entryPointDrafts);
         if (!entryPointResult) [[unlikely]]
         {
             return std::unexpected(entryPointResult.error());

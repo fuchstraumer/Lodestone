@@ -10,6 +10,7 @@
 #include "slang.h"
 #include <cstdint>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -21,7 +22,7 @@ class SlangReflector
 {
 public:
     // Since we need to propagate errors/results, ctor is just defaulted
-    SlangReflector(std::span<const std::string_view> entry_point_names,
+    SlangReflector(std::span<const std::string> entry_point_names,
                    DiagnosticSink* sink,
                    slang::IGlobalSession* global_session) noexcept;
     ~SlangReflector() noexcept = default;
@@ -60,7 +61,7 @@ private:
                                    ShaderStageKind stage,
                                    ReflectedRasterState& raster);
 
-    std::span<const std::string_view> entryPointNames;
+    std::span<const std::string> entryPointNames;
     DiagnosticSink* sink{ nullptr };
     slang::IGlobalSession* globalSession;
 };
