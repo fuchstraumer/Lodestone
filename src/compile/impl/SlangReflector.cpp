@@ -2,16 +2,20 @@
 #include "CookerErrors.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "SlangCompilerTypes.hpp"
+#include "SlangVariantCompiler.hpp"
 #include "compile/Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
+#include "permute/PermutationSpace.hpp"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <expected>
+#include <format>
 #include <optional>
 #include <print>
 #include <ranges>
@@ -20,7 +24,6 @@
 #include <string_view>
 #include <utility>
 #include <vector>
-
 
 namespace
 {
@@ -123,7 +126,7 @@ struct LeafVisit
  * Slang states each field's offset against its parent, so the offset accumulates down the tree,
  * and `category` selects which offset that is. A caller that wants no offset ignores the one it
  * gets. */
-template<typename LeafVisitor>
+template<typename LeafVisitor> // NOLINTNEXTLINE(misc-no-recursion)
 void VisitLeaves(slang::VariableLayoutReflection* var_layout,
                  SlangParameterCategory category,
                  uint32_t base_offset,
@@ -177,20 +180,21 @@ void WalkVaryingTree(slang::VariableLayoutReflection* var_layout,
  * caller that needs a full name can refuse a partial one. */
 std::string JoinFieldNames(std::span<slang::VariableLayoutReflection* const> path)
 {
-    std::string joined;
-    for (slang::VariableLayoutReflection* field : path)
+    auto toStrView = [](const char* name) -> std::string_view
     {
-        const char* name = field->getName();
-        if (name == nullptr)
-        {
-            return {};
-        }
+        return name ? std::string_view{ name } : std::string_view{};
+    };
 
-        joined += joined.empty() ? "" : ".";
-        joined += name;
+    auto fieldNames = path |
+                      std::views::transform(&slang::VariableLayoutReflection::getName) |
+                      std::views::transform(toStrView);
+    if (std::ranges::any_of(fieldNames, [](std::string_view name) { return name.empty(); }))
+    {
+        return std::string{};
     }
 
-    return joined;
+    auto joinedView = fieldNames | std::views::join_with(std::string_view("."));
+    return std::ranges::to<std::string>(joinedView);
 }
 
 /**Flattens one uniform block into rows of name, offset, and size. Nested fields take
@@ -231,35 +235,29 @@ void CollectUniformMembers(slang::TypeLayoutReflection* struct_layout,
 std::string_view ReadSemanticName(slang::VariableLayoutReflection* var_layout) noexcept
 {
     const char* name = var_layout->getSemanticName();
-    if (name == nullptr)
-    {
-        return {};
-    }
-
-    return std::string_view{ name };
+    return name == nullptr ? std::string_view{} : std::string_view{ name };
 }
 
 /** Records every attribute a vertex buffer must supply. */
 void CollectVertexInputs(slang::VariableLayoutReflection* var_layout, ReflectedRasterState& raster)
 {
-    WalkVaryingTree(var_layout,
-                    SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
-                    [&raster](const LeafVisit& leaf)
-                    {
-                        const std::string_view semantic = ReadSemanticName(leaf.Var);
-                        if (semantic.empty() || IsSystemSemantic(semantic))
-                        {
-                            return;
-                        }
+    auto vertexInputVisitor = [&raster](const LeafVisit& leaf)
+    {
+        const std::string_view semantic = ReadSemanticName(leaf.Var);
+        if (semantic.empty() || IsSystemSemantic(semantic))
+        {
+            return;
+        }
 
-                        ReflectedVertexInput input;
-                        input.SemanticName = std::string{ semantic };
-                        input.Data.SemanticIndex = static_cast<uint32_t>(leaf.Var->getSemanticIndex());
-                        input.Data.Location = leaf.Offset;
-                        ReadVaryingShape(leaf.Type, input.Data.ScalarType, input.Data.ComponentCount);
+        ReflectedVertexInput input;
+        input.SemanticName = std::string{ semantic };
+        input.Data.SemanticIndex = static_cast<uint32_t>(leaf.Var->getSemanticIndex());
+        input.Data.Location = leaf.Offset;
+        ReadVaryingShape(leaf.Type, input.Data.ScalarType, input.Data.ComponentCount);
 
-                        raster.VertexInputs.emplace_back(std::move(input));
-                    });
+        raster.VertexInputs.emplace_back(std::move(input));
+    };
+    WalkVaryingTree(var_layout, SLANG_PARAMETER_CATEGORY_VARYING_INPUT, vertexInputVisitor);
 }
 
 /** Records every color target the fragment result declares, and whether it writes depth itself. */
@@ -353,6 +351,7 @@ std::string JoinScopeName(std::string_view prefix, const char* name)
     return joined;
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
 void CollectScopeNames(slang::TypeLayoutReflection* layout,
                        const std::string& prefix,
                        SlangInt base,
@@ -390,23 +389,20 @@ void CollectScopeNames(slang::TypeLayoutReflection* layout,
     }
 }
 
-/** Reads one sub-object range as a parameter block, or refuses it.
+/**@brief Reads one subobject range as a parameter block, or returns `std::nullopt` if it can't manage that.
  *
- * Two numbers come from places that are not the obvious ones, and probe modules measured both.
- * **The space of the block** is the sub-element space offset of the sub-object range, added to
- * the space base of the scope that holds it. `getSubObjectRangeSpaceOffset` is not that number:
- * it reported 0 for a block that took space 1. **The contents start at binding zero**, because
- * their own descriptor range offsets already count from the start of the space and already step
- * over the container. A block of two resources reported 0 and 1, and the same block with a
- * `float4` added reported 1 and 2, with the container at 0.
+ * @param containing_layout The layout of the type containing the sub-object range.
+ * @param sub_object_index The index of the sub-object range within the containing layout.
+ * @param scope The binding scope in which the parameter block resides.
+ * @return An optional `ParameterBlockInfo` describing the parameter block, or `std::nullopt` if it cannot be
+ * read.
  *
- * The two walks partition the ranges on one test, so no range is drafted twice and none is
- * dropped. The range walk keeps every range the parent placed itself. This one keeps the rest,
- * which are the ranges the parent describes with descriptor ranges alone.
- *
- * A global `ConstantBuffer<T>` is the case that proves the test is needed. The parent places it,
- * so it is an ordinary binding, and it also reports a sub-object range. Reading it here as well
- * drafts it a second time at the wrong location, and `OceanFft` failed exactly so. */
+ * @note Expanding on this, two numbers had to come from places one wouldn't expect. First, the *bindable*
+ * contents of every block always start at binding zero because their own range offsets count from the start
+ * of the space, and step over the container. A block of two resources gave bindings 0 and 1, but when we
+ * added a float4 that became 1 and 2.... and now the root container was at 0, because the raw float4 isn't
+ * itself a binding.
+ */
 std::optional<ParameterBlockInfo> ReadParameterBlock(slang::TypeLayoutReflection* containing_layout,
                                                      SlangInt sub_object_index,
                                                      const BindingScope& scope)
@@ -526,6 +522,11 @@ SlangReflector::SlangReflector(std::span<const std::string_view> entry_point_nam
 {
 }
 
+CookResult<RawVariant> SlangReflector::Reflect(const LinkedVariant& linked_variant,
+                                               const VariantDescriptor& descriptor)
+{
+}
+
 /** Reads the size, shape, and type facts off one binding range's leaf type layout.
  *
  * Slang wraps a resource type around the type it carries, so the useful facts sit one level down.
@@ -611,8 +612,7 @@ CookError SlangReflector::collectRawSizeAttributes(slang::VariableReflection* le
     for (const RawSizeAttributeKind kind : k_SizeAttributeKinds)
     {
         const std::string attributeName{ ToString(kind) };
-        slang::Attribute* found =
-            leaf_variable->findAttributeByName(globalSession, attributeName.c_str());
+        slang::Attribute* found = leaf_variable->findAttributeByName(globalSession, attributeName.c_str());
         if (found == nullptr)
         {
             continue;
@@ -638,6 +638,11 @@ CookError SlangReflector::collectRawSizeAttributes(slang::VariableReflection* le
 
     return CookError::Success;
 }
+
+// clang-tidy whines about no recursion, and normally while I am indeed an anti-recursion zealot, in this
+// case recursion is by far the best way to handle this (and slang damn near requires it)
+// todo-ship: add a depth counter, just so we can break out if it gets beyond our max depth
+// NOLINTBEGIN(misc-no-recursion)
 
 /** Walks the binding ranges of one scope, and drafts a binding for each one. */
 CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection* containing_layout,
@@ -711,12 +716,12 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
     return collectSubObjectDrafts(containing_layout, scope, out_drafts);
 }
 
-/** Walks the parameter blocks of one scope, and drafts the container and the contents of each.
+/**@brief Walks the parameter blocks of one scope, and drafts the container and the contents of each.
  *
- * Slang gives a parent scope only descriptor ranges for a block, so the binding range of the block
+ * @note Slang gives a parent scope only descriptor ranges for a block, so the binding range of the block
  * carries a descriptor set index of -1 and the range walk drops it. The contents live in a sub-object
- * range instead, and this is the only walk that reaches them. `ReadParameterBlock` reads one range,
- * and `ReadBlockContainer` reads the slot Slang adds to hold the ordinary data. */
+ * range instead, and this is the only walk that reaches them. `ReadParameterBlock` reads one range, and
+ * `ReadBlockContainer` reads the slot Slang adds to hold the ordinary data. */
 CookError SlangReflector::collectSubObjectDrafts(slang::TypeLayoutReflection* containing_layout,
                                                  const BindingScope& scope,
                                                  std::vector<RawBindingDraft>& out_drafts) const
@@ -753,6 +758,8 @@ CookError SlangReflector::collectSubObjectDrafts(slang::TypeLayoutReflection* co
 
     return CookError::Success;
 }
+
+// NOLINTEND(misc-no-recursion)
 
 /** The parameter scope of one entry point: where it starts, and the name Slang emits around it.
  *
@@ -853,6 +860,7 @@ void SlangReflector::collectUsedBindingIndices(slang::IComponentType* linked_pro
         return isUsed;
     };
 
+    // this wouldn't be nearly as ugly if std::pair wasn't ruining everything
     out_used_indices.append_range(std::views::enumerate(global_bindings) |
                                   std::views::filter(
                                       [&](const auto& pair)
@@ -920,19 +928,19 @@ void SlangReflector::extractRasterState(slang::EntryPointReflection* entry_point
                                         ShaderStageKind stage,
                                         ReflectedRasterState& raster)
 {
-    if (stage == ShaderStageKind::Vertex)
+    switch (stage)
     {
+    case ShaderStageKind::Vertex:
         CollectVertexInputs(entry_point_layout->getVarLayout(), raster);
-        return;
+        break;
+    case ShaderStageKind::Fragment:
+        CollectColorTargets(entry_point_layout->getResultVarLayout(), raster);
+        CollectDepthWrites(entry_point_layout->getVarLayout(), raster);
+        break;
+    default:
+        std::println(stderr, "Unsupported shader stage in extractRasterState: {}", static_cast<int>(stage));
+        break;
     }
-
-    if (stage != ShaderStageKind::Fragment)
-    {
-        return;
-    }
-
-    CollectColorTargets(entry_point_layout->getResultVarLayout(), raster);
-    CollectDepthWrites(entry_point_layout->getVarLayout(), raster);
 }
 
 } // namespace lodestone

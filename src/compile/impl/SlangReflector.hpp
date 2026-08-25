@@ -6,12 +6,12 @@
 #include "SlangCompilerTypes.hpp"
 #include "compile/RawLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
+#include "permute/PermutationSpace.hpp"
 #include "slang.h"
 #include <cstdint>
 #include <span>
 #include <string_view>
 #include <vector>
-
 
 namespace lodestone
 {
@@ -29,7 +29,8 @@ public:
     SlangReflector(const SlangReflector&) noexcept = delete;
     SlangReflector& operator=(const SlangReflector&) noexcept = delete;
 
-    CookResult<RawVariant> Reflect();
+    CookResult<RawVariant> Reflect(const struct LinkedVariant& linked_variant,
+                                   const VariantDescriptor& descriptor);
 
 private:
     [[nodiscard]] CookResult<RawEntryPoint> extractRawEntryPoint(slang::IComponentType* linked_program,
