@@ -955,6 +955,11 @@ CookResult<RawEntryPoint> SlangReflector::extractRawEntryPoint(const LinkedVaria
     return rawEntryPoint;
 }
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch-enum"
+#endif
+
 void SlangReflector::extractRasterState(slang::EntryPointReflection* entry_point_layout,
                                         ShaderStageKind stage,
                                         ReflectedRasterState& raster)
@@ -973,5 +978,9 @@ void SlangReflector::extractRasterState(slang::EntryPointReflection* entry_point
         break;
     }
 }
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 } // namespace lodestone

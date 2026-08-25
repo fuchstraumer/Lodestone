@@ -5,10 +5,8 @@
 #include "model/ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include <cstdint>
-#include <span>
 #include <string>
 #include <string_view>
-#include <variant>
 #include <vector>
 
 /** What stage 3 produces: everything the compiler said, and no opinion about any of it.

@@ -6,7 +6,7 @@
 #include "compile/SlangCompiler.hpp"
 #include "slang.h"
 #include "slang-com-ptr.h"
-#include <span>
+#include <cstddef>
 #include <string_view>
 #include <string>
 #include <vector>
@@ -22,6 +22,10 @@ class SlangModuleContext
 public:
     SlangModuleContext() = default;
     ~SlangModuleContext() = default;
+    SlangModuleContext(const SlangModuleContext&) = delete;
+    SlangModuleContext& operator=(const SlangModuleContext&) = delete;
+    SlangModuleContext(SlangModuleContext&&) noexcept;
+    SlangModuleContext& operator=(SlangModuleContext&&) noexcept;
 
     [[nodiscard]] CookError Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink);
     [[nodiscard]] CookError RunBootstrap();
@@ -29,9 +33,10 @@ public:
     [[nodiscard]] slang::ISession* Session() const noexcept;
     [[nodiscard]] std::vector<slang::IComponentType*> BaseComponents() const noexcept;
     [[nodiscard]] size_t EntryPointCount() const noexcept;
-    [[nodiscard]] std::vector<std::string_view> EntryPointNames() const noexcept;
+    [[nodiscard]] const std::vector<std::string>& EntryPointNames() const noexcept;
     [[nodiscard]] std::string_view ModuleName() const noexcept;
-    [[nodiscard]] std::vector<std::string_view> ModuleSourceStrings() const noexcept;
+    [[nodiscard]] const std::vector<std::string>& ModuleSourceStrings() const noexcept;
+    [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
 
 private:
 

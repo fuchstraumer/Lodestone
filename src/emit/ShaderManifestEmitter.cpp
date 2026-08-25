@@ -46,6 +46,7 @@ namespace
             {
                 return std::hash<std::string_view>{}(text);
             }
+            //NOLINTNEXTLINE(readability-identifier-naming)
             using is_transparent = void;
         };
     public:
@@ -484,11 +485,6 @@ namespace
         return CheckManifestRaster(module, view, variant, entry_point_index);
     }
 
-    std::string MakeManifestFileName(std::string_view module_name)
-    {
-        return std::format("{}.ldshaders", module_name);
-    }
-
     /** Each builder appends to the string table in call order, so the order of the calls in
      * EmitShaderManifest decides every string index in the file. Do not reorder them. */
     std::vector<ManifestEntryPoint> BuildEntryPointRecords(const CookedModule& module,
@@ -860,8 +856,8 @@ std::string EmitShaderManifest(const CookedModule& module)
 
 CookError VerifyManifestRoundTrip(const CookedModule& module, const std::string& manifest_bytes)
 {
-    const std::span<const std::byte> raw{ reinterpret_cast<const std::byte*>(manifest_bytes.data()),
-                                          manifest_bytes.size() };
+    const std::span<const char> rawChars{ manifest_bytes.data(), manifest_bytes.size() };
+    const std::span<const std::byte> raw = std::as_bytes(rawChars);
 
     const CookResult<ShaderManifestView> opened = OpenManifestForCheck(module, raw);
     if (!opened)

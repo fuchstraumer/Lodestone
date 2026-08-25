@@ -8,6 +8,7 @@
 namespace lodestone
 {
 
+//NOLINTNEXTLINE(performance-enum-size)
 enum class CookError : uint16_t
 {
     Invalid = 0,

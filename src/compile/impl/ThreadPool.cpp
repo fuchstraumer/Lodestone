@@ -45,7 +45,7 @@ CookError ThreadPool::Initialize(SlangCompilerCreateInfo create_info, size_t num
     workers.reserve(numThreads);
     for (size_t i = 0; i < numThreads; ++i)
     {
-        workers.emplace_back(&ThreadPool::workerFunction, this, globalSessions[i], sessions[i], i);
+        workers.emplace_back(&ThreadPool::workerFunction, this, i);
     }
 
     return CookError::Success;
@@ -97,8 +97,6 @@ SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDe
 }
 
 void ThreadPool::workerFunction(const std::stop_token& stop_token,
-                                const Slang::ComPtr<slang::IGlobalSession>& global_session,
-                                const Slang::ComPtr<slang::ISession>& session,
                                 const size_t thread_idx)
 {
     int32_t servedIndex = 0;

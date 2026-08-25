@@ -76,8 +76,6 @@ private:
 
     SlangCompilerCreateInfo createInfo;
     void workerFunction(const std::stop_token& stop_token,
-                        const Slang::ComPtr<slang::IGlobalSession>& global_session,
-                        const Slang::ComPtr<slang::ISession>& session,
                         size_t thread_idx);
     std::mutex mutex;
     std::condition_variable_any condition;

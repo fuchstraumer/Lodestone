@@ -4,7 +4,6 @@
 #include "CookerErrors.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
-#include "permute/PermutationPolicy.hpp"
 
 #include <cstddef>
 #include <cstdint>

@@ -4,6 +4,7 @@
 #include "model/CookedLibrary.hpp"
 #include "CookerErrors.hpp"
 #include <string>
+#include <string_view>
 
 /**
  * Writes one CookedModule as the binary manifest that `include/shader/ShaderManifest.hpp` reads.

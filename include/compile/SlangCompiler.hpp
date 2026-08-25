@@ -6,9 +6,12 @@
 #include "Diagnostics.hpp"
 #include "permute/PermutationSpace.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <string>
+#include <string_view>
 #include <vector>
 
 /** Owns every interaction with Slang. Nothing in this header names a Slang type, so the rest of the
@@ -43,6 +46,11 @@ public:
     CookResult<RawModule> PrepareRawModule(const PermutationSpace& space);
     using CompileResultList = std::vector<CookResult<RawVariant>>;
     [[nodiscard]] CompileResultList Compile(const std::vector<VariantDescriptor>& variants) const;
+    [[nodiscard]] std::string_view ModuleName() const noexcept;
+    [[nodiscard]] size_t EntryPointCount() const noexcept;
+    [[nodiscard]] const std::vector<std::string>& EntryPointNames() const noexcept;
+    [[nodiscard]] const std::vector<std::string>& ModuleSourceStrings() const noexcept;
+    [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
 
 private:
     std::unique_ptr<ThreadPool> compilePool{ nullptr };

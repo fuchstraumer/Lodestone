@@ -103,9 +103,9 @@ namespace
     std::vector<const ReflectedBinding*> SelectBindingsUsedByEntryPoint(const CompiledVariant& variant,
                                                                         size_t entry_point_index)
     {
-        auto extractBinding = [&variant](uint32_t bindingIndex) -> const ReflectedBinding*
+        auto extractBinding = [&variant](uint32_t binding_index) -> const ReflectedBinding*
         {
-            return &variant.Bindings[bindingIndex];
+            return &variant.Bindings[binding_index];
         };
         return variant.EntryPoints[entry_point_index].Reflection.UsedBindingIndices |
                std::views::transform(extractBinding) |
@@ -299,7 +299,7 @@ namespace
         return {};
     }
 
-    CookResult<void> EmitLibraryModules(std::string_view header_stem,
+    CookError EmitLibraryModules(std::string_view header_stem,
                                         std::string_view header_name,
                                         const std::vector<CookedModule>& modules,
                                         OutputSink& sink,
@@ -309,10 +309,10 @@ namespace
         {
             const std::string sourceName = MakeModuleSourceFileName(header_stem, module.Name);
             const std::string source = EmitShaderLibraryModuleSource(module, header_name);
-
-            if (CookResult<void> sourceResult = sink.WriteArtifact(sourceName, source); !sourceResult)
+            const CookError writeSourceResult = sink.WriteArtifact(sourceName, source);
+            if (writeSourceResult != CookError::Success)
             {
-                return sourceResult;
+                return writeSourceResult;
             }
 
             statistics.GeneratedSourceBytes += source.size();
@@ -328,21 +328,21 @@ namespace
                          source.size() / 1024u);
 
             const std::string manifest = EmitShaderManifest(module);
-
-            if (CookResult<void> manifestCheck = VerifyManifestRoundTrip(module, manifest); !manifestCheck)
+            
+            CookError manifestResult = VerifyManifestRoundTrip(module, manifest);
+            if (manifestResult != CookError::Success)
             {
-                return manifestCheck;
+                return manifestResult;
             }
 
-            if (CookResult<void> manifestResult =
-                    sink.WriteArtifact(MakeManifestFileName(module.Name), manifest);
-                !manifestResult)
+            manifestResult = sink.WriteArtifact(MakeManifestFileName(module.Name), manifest);
+            if (manifestResult != CookError::Success)
             {
                 return manifestResult;
             }
         }
 
-        return {};
+        return CookError::Success;
     }
 
     /** Writes the header and one source file for each module. The header name comes from the sink, so
@@ -350,7 +350,7 @@ namespace
      * todo: For writing files, we can accumulate output we want to write into a buffer, and only validate
      * things once. Validate directory when opening the stream, validate write success of coalesced writes
      * (cleans up control flow)*/
-    CookResult<void> EmitLibraryArtifacts(const CookedLibrary& library,
+    CookError EmitLibraryArtifacts(const CookedLibrary& library,
                                           OutputSink& sink,
                                           CookStatistics& statistics)
     {
@@ -359,40 +359,41 @@ namespace
         const std::string headerStem = headerPath.stem().string();
 
         const std::string header = EmitShaderLibraryHeader(library);
-        if (auto headerResult = sink.Write(header); !headerResult)
+        CookError result = sink.Write(header);
+        if (result != CookError::Success)
         {
-            return headerResult;
+            return result;
         }
 
-        if (auto emitLibraryResult =
-                EmitLibraryModules(headerStem, headerName, library.Modules, sink, statistics);
-            !emitLibraryResult)
+        result = EmitLibraryModules(headerStem, headerName, library.Modules, sink, statistics);
+        if (result != CookError::Success)
         {
-            return emitLibraryResult;
+            return result;
         }
 
         const std::string report = GenerateDedupeReport(library);
-        if (auto reportResult = sink.WriteArtifact("ShaderLibrary.dedupe.txt", report); !reportResult)
+        result = sink.WriteArtifact("ShaderLibrary.dedupe.txt", report);
+        if (result != CookError::Success)
         {
-            return reportResult;
+            return result;
         }
 
-        return {};
+        return CookError::Success;
     }
 
     /** Builds the dump only when the flag asked for it, because a dump of a large module costs real
      * work. The dump then goes out through the sink, so the determinism check compares it against
      * the second cook exactly as it compares every other artifact. */
     template<typename BuildDumpFn>
-    CookResult<void> WriteStageDumpIfRequested(const CookerOptions& options,
-                                               OutputSink& sink,
-                                               std::string_view module_name,
-                                               StageDumpKind kind,
-                                               BuildDumpFn build_dump)
+    CookError WriteStageDumpIfRequested(const CookerOptions& options,
+                                        OutputSink& sink,
+                                        std::string_view module_name,
+                                        StageDumpKind kind,
+                                        BuildDumpFn build_dump)
     {
         if (!IsStageDumpRequested(options, kind))
         {
-            return {};
+            return CookError::Success;
         }
 
         return sink.WriteArtifact(MakeStageDumpFileName(module_name, kind), build_dump());
@@ -418,16 +419,15 @@ namespace
             return std::unexpected(initializeResult);
         }
 
-        const std::string_view moduleName = compiler.GetModuleName();
+        const std::string_view moduleName = compiler.ModuleName();
         std::println(stderr,
                      "[shader_cooker] module {} declares {} entrypoints",
                      moduleName,
-                     compiler.GetEntryPointNames().size());
+                     compiler.EntryPointCount());
 
         out_space = FindPermutationSpaceForModule(moduleName);
 
-        const std::span<const std::string> sourceTexts = compiler.GetModuleSourceTexts();
-        const std::vector<std::string_view> sourceViews{ sourceTexts.begin(), sourceTexts.end() };
+        const std::vector<std::string_view> sourceViews{ compiler.ModuleSourceStringViews() };
 
         if (const CookError axisResult = out_space->VerifyAxisNamesAreDeclared(sourceViews, moduleName);
             axisResult != CookError::Success)
@@ -626,39 +626,39 @@ namespace
             return std::unexpected(variantSet.error());
         }
 
-        const std::string_view moduleName = compiler.GetModuleName();
+        const std::string_view moduleName = compiler.ModuleName();
         std::println(stderr,
                      "[shader_cooker] module {} expands to {} variants over an index space of {}",
                      moduleName,
                      variantSet.value().Variants.size(),
                      variantSet.value().SpaceSize);
 
-        if (CookResult<void> spaceDump = WriteStageDumpIfRequested(options,
+        auto dumpPermutationSpace = [&moduleName, &space]()
+        {
+            return DumpPermutationSpace(moduleName, *space);
+        };
+        const CookError spaceDumpResult = WriteStageDumpIfRequested(options,
                                                                    sink,
                                                                    moduleName,
                                                                    StageDumpKind::Space,
-                                                                   [&]
-                                                                   {
-                                                                       return DumpPermutationSpace(moduleName,
-                                                                                                   *space);
-                                                                   });
-            !spaceDump)
+                                                                   dumpPermutationSpace);
+        if (spaceDumpResult != CookError::Success)
         {
-            return spaceDump;
+            return std::unexpected(spaceDumpResult);
         }
 
-        if (CookResult<void> variantDump =
-                WriteStageDumpIfRequested(options,
-                                          sink,
-                                          moduleName,
-                                          StageDumpKind::Variants,
-                                          [&]
-                                          {
-                                              return DumpVariantSet(moduleName, variantSet.value());
-                                          });
-            !variantDump)
+        auto dumpVariantSet = [&moduleName, &variantSet]()
         {
-            return variantDump;
+            return DumpVariantSet(moduleName, variantSet.value());
+        };
+        const CookError variantDumpResult = WriteStageDumpIfRequested(options,
+                                                                     sink,
+                                                                     moduleName,
+                                                                     StageDumpKind::Variants,
+                                                                     dumpVariantSet);
+        if (variantDumpResult != CookError::Success)
+        {
+            return std::unexpected(variantDumpResult);
         }
 
         InternedModule internedModule;
@@ -668,7 +668,7 @@ namespace
         }
         internedModule.Name = moduleName;
         internedModule.Space = space;
-        internedModule.SpaceSize = variantSet.value().SpaceSize;
+        internedModule.SpaceSize = static_cast<uint32_t>(variantSet.value().SpaceSize);
 
         std::vector<CompiledVariant> moduleVariants;
         moduleVariants.reserve(variantSet.value().Variants.size());
@@ -680,61 +680,49 @@ namespace
         }
 
         RawModule rawModule = std::move(rawModuleResult.value());
-
-        if (CookResult<void> compiled = CompileModuleVariants(options,
-                                                              *target,
-                                                              compiler,
-                                                              variantSet.value(),
-                                                              internedModule,
-                                                              rawModule,
-                                                              moduleVariants,
-                                                              statistics);
-            !compiled)
+        const CookError compileVariantsResult = CompileModuleVariants(options,
+                                                                     *target,
+                                                                     compiler,
+                                                                     variantSet.value(),
+                                                                     internedModule,
+                                                                     rawModule,
+                                                                     moduleVariants,
+                                                                     statistics);
+        if (compileVariantsResult != CookError::Success)
         {
-            return compiled;
+            return std::unexpected(compileVariantsResult);
+        }
+        
+        auto dumpRawModule = [&]()
+        {
+            return DumpRawModule(rawModule);
+        };
+        const CookError rawDumpResult = WriteStageDumpIfRequested(options, sink, moduleName, StageDumpKind::Raw, dumpRawModule);
+        if (rawDumpResult != CookError::Success)
+        {
+            return std::unexpected(rawDumpResult);
         }
 
-        if (CookResult<void> rawDump = WriteStageDumpIfRequested(options,
-                                                                 sink,
-                                                                 moduleName,
-                                                                 StageDumpKind::Raw,
-                                                                 [&]
-                                                                 {
-                                                                     return DumpRawModule(rawModule);
-                                                                 });
-            !rawDump)
+        auto dumpResolvedModule = [&]()
         {
-            return rawDump;
-        }
-
-        if (CookResult<void> resolvedDump =
-                WriteStageDumpIfRequested(options,
-                                          sink,
-                                          moduleName,
-                                          StageDumpKind::Resolved,
-                                          [&]
-                                          {
-                                              return DumpResolvedModule(moduleName, moduleVariants);
-                                          });
-            !resolvedDump)
+            return DumpResolvedModule(moduleName, moduleVariants);
+        };
+        const CookError resolvedDumpResult = WriteStageDumpIfRequested(options, sink, moduleName, StageDumpKind::Resolved, dumpResolvedModule);
+        if (resolvedDumpResult != CookError::Success)
         {
-            return resolvedDump;
+            return std::unexpected(resolvedDumpResult);
         }
 
         // Written before the freeze, because this is the one dump whose subject stops existing. Every
         // other dump reads a value that outlives the call.
-        if (CookResult<void> internedDump =
-                WriteStageDumpIfRequested(options,
-                                          sink,
-                                          moduleName,
-                                          StageDumpKind::Interned,
-                                          [&]
-                                          {
-                                              return DumpInternedModule(internedModule);
-                                          });
-            !internedDump)
+        auto dumpInternedModule = [&]()
         {
-            return internedDump;
+            return DumpInternedModule(internedModule);
+        };
+        const CookError internedDumpResult = WriteStageDumpIfRequested(options, sink, moduleName, StageDumpKind::Interned, dumpInternedModule);
+        if (internedDumpResult != CookError::Success)
+        {
+            return std::unexpected(internedDumpResult);
         }
 
         CookResult<CookedModule> finalized = FinalizeModule(std::move(internedModule), moduleVariants);
@@ -745,17 +733,14 @@ namespace
 
         CookedModule cookedModule = std::move(finalized.value());
 
-        if (CookResult<void> cookedDump = WriteStageDumpIfRequested(options,
-                                                                    sink,
-                                                                    moduleName,
-                                                                    StageDumpKind::Cooked,
-                                                                    [&]
-                                                                    {
-                                                                        return DumpCookedModule(cookedModule);
-                                                                    });
-            !cookedDump)
+        auto dumpCookedModule = [&]()
         {
-            return cookedDump;
+            return DumpCookedModule(cookedModule);
+        };
+        const CookError cookedDumpResult = WriteStageDumpIfRequested(options, sink, moduleName, StageDumpKind::Cooked, dumpCookedModule);
+        if (cookedDumpResult != CookError::Success)
+        {
+            return std::unexpected(cookedDumpResult);
         }
 
         out_library.Modules.push_back(std::move(cookedModule));
@@ -798,10 +783,10 @@ CookResult<CookStatistics> RunCookOnce(const CookerOptions& options, OutputSink&
         return std::unexpected(CookError::ReflectionMismatch);
     }
 
-    const CookResult<void> emitResult = EmitLibraryArtifacts(library, sink, statistics);
-    if (!emitResult)
+    const CookError emitResult = EmitLibraryArtifacts(library, sink, statistics);
+    if (emitResult != CookError::Success)
     {
-        return std::unexpected(emitResult.error());
+        return std::unexpected(emitResult);
     }
 
     const std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
@@ -868,18 +853,19 @@ namespace
                      "[shader_cooker] determinism verified: {} artifacts identical across two cooks",
                      first.GetArtifacts().size() + 1u);
 
-        const CookResult<void> writeResult = sink.Write(first.GetContent());
-        if (!writeResult)
+
+        const CookError writeResult = sink.Write(first.GetContent());
+        if (writeResult != CookError::Success)
         {
-            return std::unexpected(writeResult.error());
+            return std::unexpected(writeResult);
         }
 
         for (const auto& [name, content] : first.GetArtifacts())
         {
-            const CookResult<void> artifactResult = sink.WriteArtifact(name, content);
-            if (!artifactResult)
+            const CookError artifactResult = sink.WriteArtifact(name, content);
+            if (artifactResult != CookError::Success)
             {
-                return std::unexpected(artifactResult.error());
+                return std::unexpected(artifactResult);
             }
         }
 
