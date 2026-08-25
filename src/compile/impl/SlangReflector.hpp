@@ -15,6 +15,7 @@
 
 namespace lodestone
 {
+struct LinkedVariant;
 
 class SlangReflector
 {
@@ -29,13 +30,12 @@ public:
     SlangReflector(const SlangReflector&) noexcept = delete;
     SlangReflector& operator=(const SlangReflector&) noexcept = delete;
 
-    CookResult<RawVariant> Reflect(const struct LinkedVariant& linked_variant,
+    CookResult<RawVariant> Reflect(LinkedVariant& linked_variant,
                                    const VariantDescriptor& descriptor);
 
 private:
-    [[nodiscard]] CookResult<RawEntryPoint> extractRawEntryPoint(slang::IComponentType* linked_program,
-                                                                 slang::ProgramLayout* program_layout,
-                                                                 SlangInt entry_point_index,
+    [[nodiscard]] CookResult<RawEntryPoint> extractRawEntryPoint(const LinkedVariant& linked_variant,
+                                                                 int64_t entry_point_index,
                                                                  std::span<const RawBinding> global_bindings,
                                                                  std::vector<RawBindingDraft>& out_drafts);
     [[nodiscard]] CookError extractRawBindings(slang::ProgramLayout* program_layout,
@@ -56,11 +56,6 @@ private:
                                     SlangInt range_index,
                                     slang::BindingType binding_type,
                                     RawBinding& binding);
-    // Not static: it reports through the sink, which is a member.
-    void collectUsedBindingIndices(slang::IComponentType* linked_program,
-                                   SlangInt entry_point_index,
-                                   std::span<const RawBinding> global_bindings,
-                                   std::vector<uint32_t>& out_used_indices) const;
     static void extractRasterState(slang::EntryPointReflection* entry_point_layout,
                                    ShaderStageKind stage,
                                    ReflectedRasterState& raster);

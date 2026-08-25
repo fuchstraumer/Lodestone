@@ -6,6 +6,7 @@
 #include "compile/Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
+#include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -185,10 +186,13 @@ std::string JoinFieldNames(std::span<slang::VariableLayoutReflection* const> pat
         return name ? std::string_view{ name } : std::string_view{};
     };
 
-    auto fieldNames = path |
-                      std::views::transform(&slang::VariableLayoutReflection::getName) |
+    auto fieldNames = path | std::views::transform(&slang::VariableLayoutReflection::getName) |
                       std::views::transform(toStrView);
-    if (std::ranges::any_of(fieldNames, [](std::string_view name) { return name.empty(); }))
+    if (std::ranges::any_of(fieldNames,
+                            [](std::string_view name)
+                            {
+                                return name.empty();
+                            }))
     {
         return std::string{};
     }
@@ -501,11 +505,48 @@ void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
     }
 
     out_bindings.insert_range(out_bindings.end(),
-                              drafts | std::views::as_rvalue |
-                                  std::views::transform(&RawBindingDraft::Binding));
+                              drafts | std::views::transform(&RawBindingDraft::Binding) |
+                                  std::views::as_rvalue);
     out_attributes.insert_range(out_attributes.end(),
                                 drafts | std::views::transform(&RawBindingDraft::Attributes) |
                                     std::views::join | std::views::as_rvalue);
+}
+
+/** Asks the metadata of one entry point which global bindings that entry point reads.
+ *
+ * `global_bindings` holds the global scope alone. Slang generates each entry point as its own
+ * artifact, so two entry points can place different resources at one group and binding. A placement
+ * query over the entry point rows would then let one entry point claim the parameter of another. */
+std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_variant,
+                               SlangInt entry_point_index,
+                               std::span<const RawBinding> global_bindings)
+{
+    const auto epIndex = static_cast<size_t>(entry_point_index);
+    const Slang::ComPtr<slang::IMetadata>& metadata = linked_variant.EntryPointMetadata[epIndex];
+
+    auto isUsedLambda = [&metadata](const RawPlacement& placement) -> bool
+    {
+        const BoundPlacement* boundPlacement = GetBoundPlacement(placement);
+        if (boundPlacement == nullptr)
+        {
+            return false;
+        }
+
+        bool isUsed = false;
+        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
+                                          boundPlacement->Group,
+                                          boundPlacement->Binding,
+                                          isUsed);
+        return isUsed;
+    };
+
+    // for each global binding, filter it out if it's not used by the entry point
+    // extract just the index from it, and then return the result as a new std::vector<uint32_t>
+    // note that we check entry point usage using the metadata here
+    return std::views::enumerate(global_bindings) |
+           std::views::filter([&](const auto& pair) { return isUsedLambda(std::get<1>(pair).Placement);}) |
+           std::views::transform([](const auto& pair) { return std::get<0>(pair); }) |
+           std::ranges::to<std::vector<uint32_t>>();
 }
 
 } // namespace
@@ -522,9 +563,49 @@ SlangReflector::SlangReflector(std::span<const std::string_view> entry_point_nam
 {
 }
 
-CookResult<RawVariant> SlangReflector::Reflect(const LinkedVariant& linked_variant,
+CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
                                                const VariantDescriptor& descriptor)
 {
+    RawVariant rawVariant;
+    rawVariant.VariantSuffix = MakeAssignmentSuffix(descriptor.Canonical);
+    rawVariant.VariantDescription = DescribeAssignment(descriptor.Canonical);
+    rawVariant.VariantIndex = static_cast<uint32_t>(descriptor.Index);
+
+    // this step extracts the global bindings, which are put into the raw variant first
+    // the global bindings are sorted by placement ordering before return from this fn
+    const CookError bindingExtrResult =
+        extractRawBindings(linked_variant.ProgramLayout, rawVariant.Bindings, rawVariant.SizeAttributes);
+    if (bindingExtrResult != CookError::Success) [[unlikely]]
+    {
+        return std::unexpected(bindingExtrResult);
+    }
+
+    for (int64_t i = 0; i < std::ssize(linked_variant.EntryPointStrings); ++i)
+    {
+        std::vector<RawBindingDraft> entryPointDrafts;
+        CookResult<RawEntryPoint> entryPointResult = extractRawEntryPoint(linked_variant, i, rawVariant.Bindings, entryPointDrafts);
+        if (!entryPointResult) [[unlikely]]
+        {
+            return std::unexpected(entryPointResult.error());
+        }
+
+        RawEntryPoint& rawEntryPoint = entryPointResult.value();
+
+        const auto ownedBaseSize = static_cast<uint32_t>(rawVariant.Bindings.size());
+        AppendBindingDrafts(entryPointDrafts, rawVariant.Bindings, rawVariant.SizeAttributes);
+
+        // now we need to append the indices of the used bindings for *this* entry point
+        auto newIndices = std::views::iota(ownedBaseSize, static_cast<uint32_t>(rawVariant.Bindings.size()));
+        rawEntryPoint.UsedBindingIndices.append_range(newIndices | std::views::as_rvalue);
+        // set suffix, and copy over the target text
+        rawEntryPoint.VariantSuffix = rawVariant.VariantSuffix;
+        rawEntryPoint.TargetText = std::move(linked_variant.EntryPointStrings[i]);
+        // weird quirk: dereferencing a std::expected with * directly returns an rvalue. otherwise 
+        // we would have to do std::move(entryPointResult).value() lol
+        rawVariant.EntryPoints.emplace_back(std::move(*entryPointResult));
+    }
+
+    return rawVariant;
 }
 
 /** Reads the size, shape, and type facts off one binding range's leaf type layout.
@@ -812,6 +893,8 @@ CookError SlangReflector::extractRawBindings(slang::ProgramLayout* program_layou
         return walkError;
     }
 
+    // todo-ship: do we actually need stable_sort? if placements are equal, that's an error: it means they have
+    // same group and binding, and that shouldn't be possible.
     std::ranges::stable_sort(drafts,
                              PlacementLess,
                              [](const RawBindingDraft& draft) -> const RawPlacement&
@@ -824,59 +907,8 @@ CookError SlangReflector::extractRawBindings(slang::ProgramLayout* program_layou
     return CookError::Success;
 }
 
-/** Asks the metadata of one entry point which global bindings that entry point reads.
- *
- * `global_bindings` holds the global scope alone. Slang generates each entry point as its own
- * artifact, so two entry points can place different resources at one group and binding. A placement
- * query over the entry point rows would then let one entry point claim the parameter of another. */
-void SlangReflector::collectUsedBindingIndices(slang::IComponentType* linked_program,
-                                               SlangInt entry_point_index,
-                                               std::span<const RawBinding> global_bindings,
-                                               std::vector<uint32_t>& out_used_indices) const
-{
-    Slang::ComPtr<slang::IMetadata> metadata;
-    Slang::ComPtr<slang::IBlob> diagnostics;
-    if (SLANG_FAILED(linked_program->getEntryPointMetadata(
-            entry_point_index, 0u, metadata.writeRef(), diagnostics.writeRef())) ||
-        metadata == nullptr)
-    {
-        ReportDiagnostics(*sink, "getEntryPointMetadata", diagnostics.get());
-        return;
-    }
-
-    auto isUsedLambda = [&metadata](const RawPlacement& placement) -> bool
-    {
-        const BoundPlacement* boundPlacement = GetBoundPlacement(placement);
-        if (boundPlacement == nullptr)
-        {
-            return false;
-        }
-
-        bool isUsed = false;
-        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
-                                          boundPlacement->Group,
-                                          boundPlacement->Binding,
-                                          isUsed);
-        return isUsed;
-    };
-
-    // this wouldn't be nearly as ugly if std::pair wasn't ruining everything
-    out_used_indices.append_range(std::views::enumerate(global_bindings) |
-                                  std::views::filter(
-                                      [&](const auto& pair)
-                                      {
-                                          return isUsedLambda(std::get<1>(pair).Placement);
-                                      }) |
-                                  std::views::transform(
-                                      [](const auto& pair)
-                                      {
-                                          return std::get<0>(pair);
-                                      }));
-}
-
-CookResult<RawEntryPoint> SlangReflector::extractRawEntryPoint(slang::IComponentType* linked_program,
-                                                               slang::ProgramLayout* program_layout,
-                                                               SlangInt entry_point_index,
+CookResult<RawEntryPoint> SlangReflector::extractRawEntryPoint(const LinkedVariant& linked_variant,
+                                                               int64_t entry_point_index,
                                                                std::span<const RawBinding> global_bindings,
                                                                std::vector<RawBindingDraft>& out_drafts)
 {
@@ -884,7 +916,7 @@ CookResult<RawEntryPoint> SlangReflector::extractRawEntryPoint(slang::IComponent
     rawEntryPoint.Name = entryPointNames[static_cast<size_t>(entry_point_index)];
 
     slang::EntryPointReflection* entryPointLayout =
-        program_layout->getEntryPointByIndex(static_cast<SlangUInt>(entry_point_index));
+        linked_variant.ProgramLayout->getEntryPointByIndex(static_cast<SlangUInt>(entry_point_index));
     if (entryPointLayout == nullptr)
     {
         return rawEntryPoint;
@@ -903,8 +935,7 @@ CookResult<RawEntryPoint> SlangReflector::extractRawEntryPoint(slang::IComponent
 
     extractRasterState(entryPointLayout, rawEntryPoint.Stage, rawEntryPoint.Raster);
 
-    collectUsedBindingIndices(
-        linked_program, entry_point_index, global_bindings, rawEntryPoint.UsedBindingIndices);
+    rawEntryPoint.UsedBindingIndices = CollectUsedBindingIndices(linked_variant, entry_point_index, global_bindings);
 
     // A `uniform` parameter on the entry point takes a placement in the space the global bindings
     // use, and the entry point var layout says where that scope starts.
