@@ -27,7 +27,8 @@ public:
     [[nodiscard]] CookError RunBootstrap();
 
     [[nodiscard]] slang::ISession* Session() const noexcept;
-    [[nodiscard]] std::span<slang::IComponentType*> BaseComponents() const noexcept;
+    [[nodiscard]] std::vector<slang::IComponentType*> BaseComponents() const noexcept;
+    [[nodiscard]] size_t EntryPointCount() const noexcept;
     [[nodiscard]] std::vector<std::string_view> EntryPointNames() const noexcept;
     [[nodiscard]] std::string_view ModuleName() const noexcept;
     [[nodiscard]] std::vector<std::string_view> ModuleSourceStrings() const noexcept;

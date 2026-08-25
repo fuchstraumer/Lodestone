@@ -1,17 +1,20 @@
 #pragma once
 #ifndef LODESTONE_SLANG_VARIANT_COMPILER_HPP
 #define LODESTONE_SLANG_VARIANT_COMPILER_HPP
-#include "compile/SlangCompiler.hpp"
-#include "SlangCompilerTypes.hpp"
+#include "CookerErrors.hpp"
+#include "compile/Diagnostics.hpp"
+#include "permute/PermutationSpace.hpp"
 #include <slang-com-helper.h>
 #include <slang-com-ptr.h>
 #include <slang.h>
+#include <string>
+#include <vector>
 
 namespace lodestone
 {
 
 /**@brief The result of the variant compiler: a fully linked variant, but with
- * none of the reflection completed. This purely exists to invoke slang and 
+ * none of the reflection completed. This purely exists to invoke slang and
  * retrieve bytecode.
  */
 struct LinkedVariant
@@ -22,17 +25,15 @@ struct LinkedVariant
     std::vector<Slang::ComPtr<slang::IMetadata>> EntryPointMetadata;
 };
 
+class SlangModuleContext;
+
 class SlangVariantCompiler
 {
 public:
-    SlangVariantCompiler(const VariantDescriptor& descriptor);
-
-private:
-
-    [[nodiscard]] CookResult<Slang::ComPtr<slang::IComponentType>> linkVariant(
-        const PermutationAssignment& assignment) const;
-    std::vector<std::string> generateEntryPointCode(slang::IComponentType* linked_program) const;
-    
+    SlangVariantCompiler() noexcept = default;
+    [[nodiscard]] CookResult<LinkedVariant> CompileVariant(SlangModuleContext& context,
+                                                           const VariantDescriptor& descriptor,
+                                                           DiagnosticSink& sink);
 };
 
 } // namespace lodestone

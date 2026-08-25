@@ -450,5 +450,414 @@ namespace
 
 namespace lodestone
 {
+/** Reads the size, shape, and type facts off one binding range's leaf type layout.
+ *
+ * Slang wraps a resource type around the type it carries, so the useful facts sit one level down.
+ * A structured buffer reports its element layout. A texture reports the type it returns. */
+void SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* containing_layout,
+                                              SlangInt range_index,
+                                              slang::BindingType binding_type,
+                                              RawBinding& binding)
+{
+    slang::TypeLayoutReflection* leafLayout = containing_layout->getBindingRangeLeafTypeLayout(range_index);
+    if (leafLayout == nullptr)
+    {
+        return;
+    }
+
+    if (binding.Kind == BindingKind::StorageTexture)
+    {
+        binding.StorageFormat =
+            FromSlangImageFormat(containing_layout->getBindingRangeImageFormat(range_index));
+        binding.StorageAccess = FromSlangBindingTypeAccess(binding_type);
+    }
+
+    if (binding.Kind == BindingKind::Sampler)
+    {
+        binding.Shape = ResourceShape::Invalid;
+        binding.SamplerType = SamplerBindingType::Filtering;
+        return;
+    }
+
+    slang::TypeReflection* leafType = leafLayout->getType();
+    if (leafType == nullptr)
+    {
+        return;
+    }
+
+    binding.Shape = FromSlangResourceShape(leafType->getResourceShape());
+
+    if (IsTextureBinding(binding.Kind))
+    {
+        slang::TypeReflection* resultType = leafType->getResourceResultType();
+        if (resultType != nullptr)
+        {
+            binding.SampleType = FromSlangScalarType(resultType->getScalarType());
+        }
+
+        return;
+    }
+
+    if (binding.Kind == BindingKind::UniformBuffer)
+    {
+        // A uniform block's size is fully determined. The graph must never take it from the caller.
+        binding.ByteSize = static_cast<uint64_t>(leafLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
+        slang::TypeLayoutReflection* elementLayout = leafLayout->getElementTypeLayout();
+        if (elementLayout != nullptr && binding.ByteSize == 0u)
+        {
+            binding.ByteSize =
+                static_cast<uint64_t>(elementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
+        }
+
+        CollectUniformMembers(elementLayout, binding.UniformMembers);
+        return;
+    }
+
+    slang::TypeLayoutReflection* elementLayout = leafLayout->getElementTypeLayout();
+    if (elementLayout != nullptr)
+    {
+        binding.ElementStride = static_cast<uint32_t>(elementLayout->getSize());
+    }
+}
+
+/** Reads one `[vx_*]` annotation into its argument strings. Stage 3 never evaluates one, so a
+ * malformed argument is caught here only when it is not a string at all. */
+CookError SlangReflector::CollectRawSizeAttributes(slang::VariableReflection* leaf_variable,
+                                                        std::string_view binding_name,
+                                                        std::vector<RawSizeAttribute>& out_attributes) const
+{
+    if (leaf_variable == nullptr)
+    {
+        // end of leaf/chain
+        return CookError::Success;
+    }
+
+    for (const RawSizeAttributeKind kind : k_SizeAttributeKinds)
+    {
+        const std::string attributeName{ ToString(kind) };
+        slang::Attribute* found =
+            leaf_variable->findAttributeByName(globalSession.get(), attributeName.c_str());
+        if (found == nullptr)
+        {
+            continue;
+        }
+
+        RawSizeAttribute attribute;
+        attribute.Kind = kind;
+        attribute.Arguments.reserve(ArgumentCountOf(kind));
+
+        for (uint32_t i = 0u; i < ArgumentCountOf(kind); ++i)
+        {
+            CookResult<std::string> argument = ReadStringArgument(found, i, binding_name);
+            if (!argument)
+            {
+                return argument.error();
+            }
+
+            attribute.Arguments.emplace_back(std::move(argument.value()));
+        }
+
+        out_attributes.emplace_back(std::move(attribute));
+    }
+
+    return CookError::Success;
+}
+
+/** Walks the binding ranges of one scope, and drafts a binding for each one. */
+CookError SlangReflector::CollectBindingRangeDrafts(slang::TypeLayoutReflection* containing_layout,
+                                                         const BindingScope& scope,
+                                                         std::vector<RawBindingDraft>& out_drafts) const
+{
+    if (containing_layout == nullptr)
+    {
+        // reached end of the binding range chain (hopefully)
+        return CookError::Success;
+    }
+
+    const SlangInt bindingRangeCount = containing_layout->getBindingRangeCount();
+    out_drafts.reserve(out_drafts.size() + static_cast<size_t>(bindingRangeCount));
+
+    std::vector<std::string> scopeNames(static_cast<size_t>(bindingRangeCount), scope.Name);
+    CollectScopeNames(containing_layout, scope.Name, 0, scopeNames);
+
+    for (SlangInt rangeIndex = 0; rangeIndex < bindingRangeCount; ++rangeIndex)
+    {
+        const slang::BindingType bindingType = containing_layout->getBindingRangeType(rangeIndex);
+        // Skip input/output attributes, which slang considers to be part of the global params
+        if (bindingType == slang::BindingType::Unknown || bindingType == slang::BindingType::VaryingInput ||
+            bindingType == slang::BindingType::VaryingOutput)
+        {
+            continue;
+        }
+
+        const SlangInt descriptorSetIndex = containing_layout->getBindingRangeDescriptorSetIndex(rangeIndex);
+        const SlangInt descriptorRangeIndex =
+            containing_layout->getBindingRangeFirstDescriptorRangeIndex(rangeIndex);
+        if (descriptorSetIndex < 0 || descriptorRangeIndex < 0)
+        {
+            continue;
+        }
+
+        const std::optional<uint32_t> spaceOffset = ResolvedNumber(
+            static_cast<size_t>(containing_layout->getDescriptorSetSpaceOffset(descriptorSetIndex)));
+        const std::optional<uint32_t> indexOffset =
+            ResolvedNumber(static_cast<size_t>(containing_layout->getDescriptorSetDescriptorRangeIndexOffset(
+                descriptorSetIndex, descriptorRangeIndex)));
+        if (!spaceOffset || !indexOffset)
+        {
+            ReportUnresolvedLocation("binding", rangeIndex);
+            continue;
+        }
+
+        slang::VariableReflection* leafVariable = containing_layout->getBindingRangeLeafVariable(rangeIndex);
+        const char* leafName = leafVariable != nullptr ? leafVariable->getName() : nullptr;
+
+        RawBindingDraft draft;
+        draft.Binding.Name = leafName != nullptr ? leafName : std::string{};
+        draft.Binding.ScopeName = std::move(scopeNames[static_cast<size_t>(rangeIndex)]);
+        draft.Binding.Placement = BoundPlacement{ .Group = scope.Base.Group + *spaceOffset,
+                                                  .Binding = scope.Base.Binding + *indexOffset };
+        draft.Binding.Kind = FromSlangBindingType(bindingType);
+        draft.Binding.ArrayCount =
+            static_cast<uint32_t>(containing_layout->getBindingRangeBindingCount(rangeIndex));
+
+        applyLeafTypeLayout(containing_layout, rangeIndex, bindingType, draft.Binding);
+        const CookError collectAttributesError =
+            collectRawSizeAttributes(leafVariable, draft.Binding.Name, draft.Attributes);
+        if (collectAttributesError != CookError::Success)
+        {
+            return collectAttributesError;
+        }
+
+        out_drafts.emplace_back(std::move(draft));
+    }
+
+    return collectSubObjectDrafts(containing_layout, scope, out_drafts);
+}
+
+/** Walks the parameter blocks of one scope, and drafts the container and the contents of each.
+ *
+ * Slang gives a parent scope only descriptor ranges for a block, so the binding range of the block
+ * carries a descriptor set index of -1 and the range walk drops it. The contents live in a sub-object
+ * range instead, and this is the only walk that reaches them. `ReadParameterBlock` reads one range,
+ * and `ReadBlockContainer` reads the slot Slang adds to hold the ordinary data. */
+CookError SlangReflector::CollectSubObjectDrafts(slang::TypeLayoutReflection* containing_layout,
+                                                      const BindingScope& scope,
+                                                      std::vector<RawBindingDraft>& out_drafts) const
+{
+    const SlangInt subObjectRangeCount = containing_layout->getSubObjectRangeCount();
+
+    for (SlangInt subObjectIndex = 0; subObjectIndex < subObjectRangeCount; ++subObjectIndex)
+    {
+        const std::optional<ParameterBlockInfo> block =
+            ReadParameterBlock(containing_layout, subObjectIndex, scope);
+        if (!block)
+        {
+            continue;
+        }
+
+        if (block->UniformSize != 0u)
+        {
+            CookResult<RawBindingDraft> container = ReadBlockContainer(*block, scope.Name);
+            if (!container)
+            {
+                return container.error();
+            }
+
+            out_drafts.emplace_back(std::move(container.value()));
+        }
+
+        const CookError contentsError =
+            collectBindingRangeDrafts(block->ElementLayout, block->Scope, out_drafts);
+        if (contentsError != CookError::Success)
+        {
+            return contentsError;
+        }
+    }
+
+    return CookError::Success;
+}
+
+/** The parameter scope of one entry point: where it starts, and the name Slang emits around it.
+ *
+ * Slang reports an unresolved offset as `SLANG_UNKNOWN_SIZE`. That answer cannot be a placement, and
+ * a cook that carried it would emit a binding at a location no shader holds.
+ *
+ * The scope name is the parameter's own name when the entry point declares one parameter of a struct
+ * type. Slang collects loose `uniform` parameters into a synthetic struct instead, and names that
+ * `entryPointParams`. Both answers come from the same call, so neither is a special case here. */
+CookResult<BindingScope> SlangReflector::entryPointScope(slang::EntryPointReflection* entry_point_layout,
+                                                              std::string_view entry_point_name) const
+{
+    slang::VariableLayoutReflection* varLayout = entry_point_layout->getVarLayout();
+    if (varLayout == nullptr)
+    {
+        return BindingScope{};
+    }
+
+    const std::optional<uint32_t> group =
+        ResolvedNumber(varLayout->getBindingSpace(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT));
+    const std::optional<uint32_t> binding =
+        ReadOffset(varLayout, SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+    const std::optional<uint32_t> spaceBase =
+        ReadOffset(varLayout, SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE);
+    if (!group || !binding || !spaceBase)
+    {
+        Diagnostic report;
+        report.Severity = DiagnosticSeverity::Error;
+        report.Context = "entryPointScope";
+        report.Message =
+            std::format("entry point {} has an unresolved parameter scope offset", entry_point_name);
+        sink->Report(report);
+        return std::unexpected(CookError::ReflectionUnavailable);
+    }
+
+    return BindingScope{ .Base = BoundPlacement{ .Group = *group, .Binding = *binding },
+                         .SpaceBase = *spaceBase,
+                         .Name = std::string{ k_EntryPointScopeName } };
+}
+
+CookError SlangReflector::ExtractRawBindings(slang::ProgramLayout* program_layout,
+                                                  std::vector<RawBinding>& out_bindings,
+                                                  std::vector<RawSizeAttribute>& out_attributes) const
+{
+    std::vector<RawBindingDraft> drafts;
+    const CookError walkError =
+        collectBindingRangeDrafts(program_layout->getGlobalParamsTypeLayout(), BindingScope{}, drafts);
+    if (walkError != CookError::Success)
+    {
+        return walkError;
+    }
+
+    std::ranges::stable_sort(drafts,
+                             PlacementLess,
+                             [](const RawBindingDraft& draft) -> const RawPlacement&
+                             {
+                                 return draft.Binding.Placement;
+                             });
+
+    AppendBindingDrafts(drafts, out_bindings, out_attributes);
+
+    return CookError::Success;
+}
+
+/** Asks the metadata of one entry point which global bindings that entry point reads.
+ *
+ * `global_bindings` holds the global scope alone. Slang generates each entry point as its own
+ * artifact, so two entry points can place different resources at one group and binding. A placement
+ * query over the entry point rows would then let one entry point claim the parameter of another. */
+void SlangReflector::CollectUsedBindingIndices(slang::IComponentType* linked_program,
+                                                    SlangInt entry_point_index,
+                                                    std::span<const RawBinding> global_bindings,
+                                                    std::vector<uint32_t>& out_used_indices) const
+{
+    Slang::ComPtr<slang::IMetadata> metadata;
+    Slang::ComPtr<slang::IBlob> diagnostics;
+    if (SLANG_FAILED(linked_program->getEntryPointMetadata(
+            entry_point_index, k_WgslTargetIndex, metadata.writeRef(), diagnostics.writeRef())) ||
+        metadata == nullptr)
+    {
+        ReportDiagnostics(*sink, "getEntryPointMetadata", diagnostics.get());
+        return;
+    }
+
+    auto isUsedLambda = [&metadata](const RawPlacement& placement) -> bool
+    {
+        const BoundPlacement* boundPlacement = GetBoundPlacement(placement);
+        if (boundPlacement == nullptr)
+        {
+            return false;
+        }
+
+        bool isUsed = false;
+        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
+                                          boundPlacement->Group,
+                                          boundPlacement->Binding,
+                                          isUsed);
+        return isUsed;
+    };
+
+    out_used_indices.append_range(std::views::enumerate(global_bindings) |
+                                  std::views::filter(
+                                      [&](const auto& pair)
+                                      {
+                                          return isUsedLambda(std::get<1>(pair).Placement);
+                                      }) |
+                                  std::views::transform(
+                                      [](const auto& pair)
+                                      {
+                                          return std::get<0>(pair);
+                                      }));
+}
+
+CookResult<RawEntryPoint> SlangReflector::ExtractRawEntryPoint(
+    slang::IComponentType* linked_program,
+    slang::ProgramLayout* program_layout,
+    SlangInt entry_point_index,
+    std::span<const RawBinding> global_bindings,
+    std::vector<RawBindingDraft>& out_drafts)
+{
+    RawEntryPoint rawEntryPoint;
+    rawEntryPoint.Name = entryPointNames[static_cast<size_t>(entry_point_index)];
+
+    slang::EntryPointReflection* entryPointLayout =
+        program_layout->getEntryPointByIndex(static_cast<SlangUInt>(entry_point_index));
+    if (entryPointLayout == nullptr)
+    {
+        return rawEntryPoint;
+    }
+
+    rawEntryPoint.Stage = FromSlangStage(entryPointLayout->getStage());
+
+    if (rawEntryPoint.Stage == ShaderStageKind::Compute)
+    {
+        std::array<SlangUInt, k_WorkgroupAxisCount> workgroupSizes{ 1u, 1u, 1u };
+        entryPointLayout->getComputeThreadGroupSize(k_WorkgroupAxisCount, workgroupSizes.data());
+        rawEntryPoint.Workgroup.X = static_cast<uint32_t>(workgroupSizes[0]);
+        rawEntryPoint.Workgroup.Y = static_cast<uint32_t>(workgroupSizes[1]);
+        rawEntryPoint.Workgroup.Z = static_cast<uint32_t>(workgroupSizes[2]);
+    }
+
+    extractRasterState(entryPointLayout, rawEntryPoint.Stage, rawEntryPoint.Raster);
+
+    collectUsedBindingIndices(
+        linked_program, entry_point_index, global_bindings, rawEntryPoint.UsedBindingIndices);
+
+    // A `uniform` parameter on the entry point takes a placement in the space the global bindings
+    // use, and the entry point var layout says where that scope starts.
+    CookResult<BindingScope> scope = entryPointScope(entryPointLayout, rawEntryPoint.Name);
+    if (!scope)
+    {
+        return std::unexpected(scope.error());
+    }
+
+    const CookError walkError =
+        collectBindingRangeDrafts(entryPointLayout->getTypeLayout(), scope.value(), out_drafts);
+    if (walkError != CookError::Success)
+    {
+        return std::unexpected(walkError);
+    }
+
+    return rawEntryPoint;
+}
+
+void SlangReflector::extractRasterState(slang::EntryPointReflection* entry_point_layout,
+                                             ShaderStageKind stage,
+                                             ReflectedRasterState& raster)
+{
+    if (stage == ShaderStageKind::Vertex)
+    {
+        CollectVertexInputs(entry_point_layout->getVarLayout(), raster);
+        return;
+    }
+
+    if (stage != ShaderStageKind::Fragment)
+    {
+        return;
+    }
+
+    CollectColorTargets(entry_point_layout->getResultVarLayout(), raster);
+    CollectDepthWrites(entry_point_layout->getVarLayout(), raster);
+}
 
 }
