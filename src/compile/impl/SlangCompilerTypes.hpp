@@ -17,6 +17,11 @@
 namespace lodestone
 {
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch-enum"
+#endif
+
 constexpr ShaderStageKind FromSlangStage(SlangStage stage) noexcept
 {
     switch (stage)
@@ -175,19 +180,6 @@ constexpr VertexScalarType FromSlangVertexScalarType(
     }
 }
 
-/** True for a name the hardware supplies, such as SV_Position. Those never become a vertex buffer
-    * attribute, so they must not reach the vertex input list. */
-constexpr bool IsSystemSemantic(std::string_view semantic_name) noexcept
-{
-    return semantic_name.starts_with("SV_") || semantic_name.starts_with("sv_");
-}
-
-constexpr bool IsDepthSemantic(std::string_view semantic_name) noexcept
-{
-    return semantic_name == "SV_Depth" || semantic_name == "SV_DEPTH" ||
-            semantic_name == "SV_DepthGreaterEqual" || semantic_name == "SV_DepthLessEqual";
-}
-
 /** Only the formats Velox curates. An unmapped format returns Invalid on purpose: the graph must
     * reject a shader that asks for a format the engine does not express. */
 constexpr TextureFormat FromSlangImageFormat(SlangImageFormat format) noexcept
@@ -239,6 +231,24 @@ constexpr StorageTextureAccess FromSlangBindingTypeAccess(slang::BindingType bin
         return StorageTextureAccess::Invalid;
     }
 }
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
+/** True for a name the hardware supplies, such as SV_Position. Those never become a vertex buffer
+    * attribute, so they must not reach the vertex input list. */
+constexpr bool IsSystemSemantic(std::string_view semantic_name) noexcept
+{
+    return semantic_name.starts_with("SV_") || semantic_name.starts_with("sv_");
+}
+
+constexpr bool IsDepthSemantic(std::string_view semantic_name) noexcept
+{
+    return semantic_name == "SV_Depth" || semantic_name == "SV_DEPTH" ||
+            semantic_name == "SV_DepthGreaterEqual" || semantic_name == "SV_DepthLessEqual";
+}
+
 /**
  * Where one parameter scope starts, and what Slang emits around the bindings inside it.
  *
@@ -285,10 +295,13 @@ struct ParameterBlockInfo
  * what the entry held before this became a table. */
 struct CompilerOptionRow
 {
-    slang::CompilerOptionName Name;
-    slang::CompilerOptionValueKind Kind;
-    int32_t IntValue{ 0 };
-    const char* StringValue{ nullptr };
+    slang::CompilerOptionName Name{ slang::CompilerOptionName::CountOf };
+    slang::CompilerOptionValueKind Kind{};
+    union
+    {
+        int32_t IntValue{ 0 };
+        const char* StringValue;
+    };
 };
 
 constexpr const char* k_AllWarningsAsErrors = "all";

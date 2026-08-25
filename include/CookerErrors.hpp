@@ -48,8 +48,11 @@ enum class CookError : uint16_t
     CookNotDeterministic = 91,
     ModulePolicyViolated = 92,
 
+    // output and diagnostic sink operation errors
     OutputPathInvalid = 100,
-    OutputWriteFailed = 101,
+    OutputFileOpenFailed = 101,
+    OutputWriteFailed = 102,
+    ArtifactAlreadyWritten = 103,
 
     // start system errors
     SystemError = 200,
