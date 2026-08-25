@@ -178,6 +178,7 @@ struct UniformMemberInfo
  * are used here instead of owning strings. It is critical to use the group and binding indices
  * declared here to avoid errors and crashes.
  */
+//NOLINTBEGIN(misc-non-private-member-variables-in-classes)
 struct BindingInfo
 {
     std::string_view Name;
@@ -216,6 +217,7 @@ struct BindingInfo
     /** @brief Validate the resource binding, ensuring it is correctly configured. */
     [[nodiscard]] bool Validate() const noexcept;
 };
+//NOLINTEND(misc-non-private-member-variables-in-classes)
 
 /** @brief Finds one uniform block member by name. A missing name returns nullptr, and that must be an
  * error: it means the CPU side names a field the shader does not have. */

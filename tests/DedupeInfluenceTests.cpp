@@ -3,10 +3,14 @@
 
 #include "model/CookedLibrary.hpp"
 #include "emit/DedupeReport.hpp"
+#include "permute/PermutationAssignment.hpp"
+#include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "permute/PermutationValue.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <string>
@@ -150,8 +154,8 @@ CookedModule BuildModule(const PermutationSpace& space, bool dedupe_enabled)
             const CanonicalAssignment canonical =
                 MakeAssignment(space, space.Axes()[0], space.Axes()[1], firstAxisValue, secondAxisValue);
 
-            const CookResult<void> appended = AppendVariantToModule(module, variant, canonical);
-            if (!appended)
+            const CookError appended = AppendVariantToModule(module, variant, canonical);
+            if (appended != CookError::Success)
             {
                 module.Variants.clear();
                 return FreezeModuleTables(std::move(module));
@@ -185,10 +189,10 @@ CookedModule BuildSingleEntryPointModule(const PermutationSpace& space, bool ded
         // Only the first axis is named. Canonicalization supplies the second.
         const CanonicalAssignment canonical =
             space.CanonicalizeAssignment(PermutationAssignment{ PermutationBinding{
-                .Axis = &space.Axes()[0], .Value = PermutationValue{ firstAxisValue } } });
+                .Axis = space.Axes().data(), .Value = PermutationValue{ firstAxisValue } } });
 
-        const CookResult<void> appended = AppendVariantToModule(module, variant, canonical);
-        if (!appended)
+        const CookError appended = AppendVariantToModule(module, variant, canonical);
+        if (appended != CookError::Success)
         {
             module.Variants.clear();
             return FreezeModuleTables(std::move(module));
@@ -218,8 +222,8 @@ CookedModule BuildConditionalModule(const PermutationSpace& space)
             const CanonicalAssignment canonical =
                 MakeAssignment(space, space.Axes()[0], space.Axes()[1], firstAxisValue, secondAxisValue);
 
-            const CookResult<void> appended = AppendVariantToModule(module, variant, canonical);
-            if (!appended)
+            const CookError appended = AppendVariantToModule(module, variant, canonical);
+            if (appended != CookError::Success)
             {
                 module.Variants.clear();
                 return FreezeModuleTables(std::move(module));

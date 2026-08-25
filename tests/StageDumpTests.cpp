@@ -4,11 +4,14 @@
 #include "model/ContentHash.hpp"
 #include "model/CookedLibrary.hpp"
 #include "driver/CookerOptions.hpp"
+#include "permute/PermutationAssignment.hpp"
+#include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "compile/RawLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "emit/StageDump.hpp"
+#include "permute/PermutationValue.hpp"
 
 #include <array>
 #include <cstdint>
@@ -81,11 +84,11 @@ InternedModule BuildTinyInternedModule()
 
     for (const CompiledVariant& variant : variants)
     {
-        const CookResult<void> appended =
+        const CookError appended =
             AppendVariantToModule(module,
                                   variant,
                                   k_EmptySpace.CanonicalizeAssignment(PermutationAssignment{}));
-        if (!appended)
+        if (appended != CookError::Success)
         {
             module.Variants.clear();
             return module;

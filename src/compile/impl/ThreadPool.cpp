@@ -45,7 +45,13 @@ CookError ThreadPool::Initialize(SlangCompilerCreateInfo create_info, size_t num
     workers.reserve(numThreads);
     for (size_t i = 0; i < numThreads; ++i)
     {
-        workers.emplace_back(&ThreadPool::workerFunction, this, i);
+        // need to inject stop_token since jthread invocable check doesn't work
+        // with member functions taking stop_token? i think
+        auto workerLambda = [this, i](std::stop_token token)
+        {
+            workerFunction(token, i);
+        };
+        workers.emplace_back(workerLambda);
     }
 
     return CookError::Success;
