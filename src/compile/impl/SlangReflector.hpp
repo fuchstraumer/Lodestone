@@ -20,7 +20,9 @@ class SlangReflector
 {
 public:
     // Since we need to propagate errors/results, ctor is just defaulted
-    SlangReflector() noexcept = default;
+    SlangReflector(std::span<const std::string_view> entry_point_names,
+                   DiagnosticSink* sink,
+                   slang::IGlobalSession* global_session) noexcept;
     ~SlangReflector() noexcept = default;
     // this thing works like a local one-shot invocation of reflection, so copying
     // shouldn't happen, but better safe than sorry
@@ -61,6 +63,10 @@ private:
     static void extractRasterState(slang::EntryPointReflection* entry_point_layout,
                                    ShaderStageKind stage,
                                    ReflectedRasterState& raster);
+
+    std::span<const std::string_view> entryPointNames;
+    DiagnosticSink* sink{ nullptr };
+    slang::IGlobalSession* globalSession;
 };
 
 } // namespace lodestone

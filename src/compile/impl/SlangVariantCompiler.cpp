@@ -1,5 +1,6 @@
 #include "SlangVariantCompiler.hpp"
 #include "CookerErrors.hpp"
+#include "SlangCompilerTypes.hpp"
 #include "SlangModuleContext.hpp"
 #include "compile/Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
@@ -28,76 +29,6 @@ namespace
 using namespace lodestone;
 
 constexpr SlangInt k_WgslTargetIndex = 0;
-/** What Slang names the scope it moves each entry point `uniform` parameter into.
- *
- * `slang-ir-entry-point-uniforms.cpp` writes this string as a name hint, and reflection reports it
- * nowhere. It is a Slang convention, so it lives behind the Slang wall and reaches no other
- * folder. Every emitted name of an entry point parameter starts with it. */
-constexpr std::string_view k_EntryPointScopeName = "entryPointParams";
-
-constexpr SlangUInt k_WorkgroupAxisCount = 3u;
-
-// The shader-side attribute names live on RawSizeAttributeKind, so one table states the contract
-// and this file asks it for the spelling. Slang drops the `Attribute` suffix from the struct name,
-// so those strings match the declarations in tests/assets/LodestoneAttributes.slang.
-constexpr std::array<RawSizeAttributeKind, 3u> k_SizeAttributeKinds{ RawSizeAttributeKind::ElementCount,
-                                                                     RawSizeAttributeKind::Extent2d,
-                                                                     RawSizeAttributeKind::Extent3d };
-
-std::string BlobToString(slang::IBlob* blob)
-{
-    // Slang leaves the blob null when a call has nothing to say, and a clean codegen is the common
-    // case. `GenerateOneEntryPoint` reads its diagnostic blob without asking, so the check is here
-    // and not only in `ReportDiagnostics`.
-    if (blob == nullptr)
-    {
-        return {};
-    }
-
-    return std::string{ static_cast<const char*>(blob->getBufferPointer()), blob->getBufferSize() };
-}
-
-void ReportDiagnostics(DiagnosticSink& sink, std::string_view context, slang::IBlob* blob)
-{
-    // this check is the point of this function: only report diagnostics if blob has content,
-    // but otherwise make it trivial to call inline in case we want to report diagnositcs from
-    // slang calls
-    if (blob == nullptr || blob->getBufferSize() == 0u)
-    {
-        return;
-    }
-
-    ParseSlangDiagnostics(BlobToString(blob), context, sink);
-}
-
-/** Attribute string arguments reflect as a pointer plus a length, and a null return means the
- * argument was not a string literal after all. That is a cook error rather than a skip: the
- * annotation was written, so the author expects it to do something. */
-CookResult<std::string> ReadStringArgument(slang::Attribute* attribute,
-                                           uint32_t argument_index,
-                                           std::string_view binding_name)
-{
-    size_t length = 0u;
-    const char* text = attribute->getArgumentValueString(argument_index, &length);
-    if (text == nullptr)
-    {
-        std::println(stderr,
-                     "[shader_cooker] argument {} of [{}] on '{}' is not a string literal",
-                     argument_index,
-                     attribute->getName(),
-                     binding_name);
-        return std::unexpected(CookError::SizeExpressionParseFailed);
-    }
-
-    // The reflected span includes the surrounding quotes on some paths; trim them if present.
-    std::string_view value{ text, length };
-    if (value.size() >= 2u && value.front() == '"' && value.back() == '"')
-    {
-        value = value.substr(1u, value.size() - 2u);
-    }
-
-    return std::string{ value };
-}
 
 /** What one entry point's codegen produced. The diagnostic text travels with the code so that a
  * worker thread never touches a sink. coalesced after threads join */
@@ -130,7 +61,7 @@ std::vector<std::string> GenerateEntryPointCode(SlangModuleContext& context,
         GeneratedEntryPoint result = GenerateOneEntryPoint(linked_program, i);
         if (!result.Diagnostics.empty())
         {
-            ParseSlangDiagnostics(result.Diagnostics, "getEntryPointCode", *sink);
+            ParseSlangDiagnostics(result.Diagnostics, "getEntryPointCode", sink);
         }
         generated[i] = std::move(result.Code);
     }
@@ -138,9 +69,9 @@ std::vector<std::string> GenerateEntryPointCode(SlangModuleContext& context,
     return generated;
 }
 
-
-CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(
-    SlangModuleContext& context, const VariantDescriptor& descriptor, DiagnosticSink& sink) const
+CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext& context,
+                                                             const VariantDescriptor& descriptor,
+                                                             DiagnosticSink& sink)
 {
     std::vector<slang::IComponentType*> components = context.BaseComponents();
     components.reserve(context.BaseComponents().size() + descriptor.Active.size());
@@ -200,6 +131,5 @@ CookResult<LinkedVariant> SlangVariantCompiler::CompileVariant(SlangModuleContex
                                                                DiagnosticSink& sink)
 {
 }
-
 
 } // namespace lodestone

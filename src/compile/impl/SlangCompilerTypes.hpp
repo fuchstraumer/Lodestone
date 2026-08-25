@@ -344,6 +344,10 @@ slang::CompilerOptionEntry ToOptionEntry(const CompilerOptionRow& row) noexcept;
  * row the table cannot hold. */
 std::vector<slang::CompilerOptionEntry> MakeCompilerOptions(uint32_t optimization_level);
 
+std::string BlobToString(slang::IBlob* blob);
+
+void ReportDiagnostics(class DiagnosticSink& sink, std::string_view context, slang::IBlob* blob);
+
 } // namespace lodestone
 
 #endif // LODESTONE_SHADER_COMPILER_SLANG_COMPILER_TYPES_HPP

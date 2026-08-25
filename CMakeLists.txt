@@ -84,6 +84,7 @@ set(LODESTONE_COMPILE_SOURCES
 
 set(LODESTONE_COMPILE_IMPL_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangCompilerTypes.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangCompilerTypes.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangModuleContext.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangModuleContext.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangReflector.hpp"
