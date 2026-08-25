@@ -3,6 +3,7 @@
 #include "SlangModuleContext.hpp"
 #include "compile/Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
+#include "compile/SlangDiagnosticParser.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "permute/PermutationValue.hpp"
