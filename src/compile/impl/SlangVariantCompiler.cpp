@@ -11,13 +11,12 @@
 #include "slang-com-ptr.h"
 #include "slang.h"
 
-#include <array>
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <expected>
-#include <format>
-#include <print>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -130,6 +129,48 @@ CookResult<LinkedVariant> SlangVariantCompiler::CompileVariant(SlangModuleContex
                                                                const VariantDescriptor& descriptor,
                                                                DiagnosticSink& sink)
 {
+    LinkedVariant result;
+
+    CookResult<Slang::ComPtr<slang::IComponentType>> linkResult = LinkVariant(context, descriptor, sink);
+    if (!linkResult)
+    {
+        return std::unexpected(linkResult.error());
+    }
+
+    Slang::ComPtr<slang::IComponentType> linkedProgram = linkResult.value();
+    result.LinkedProgram = linkedProgram;
+    // todo-ship: another location we'll need to update to support further output target formats
+    slang::ProgramLayout* programLayout = linkedProgram->getLayout(k_WgslTargetIndex);
+    if (programLayout == nullptr)
+    {
+        return std::unexpected(CookError::ReflectionUnavailable);
+    }
+
+    result.ProgramLayout = programLayout;
+
+    std::vector<std::string> entryPointCode = GenerateEntryPointCode(context, linkedProgram, sink);
+    if (std::ranges::any_of(entryPointCode, [](const std::string& code) { return code.empty(); }))
+    {
+        return std::unexpected(CookError::CodeGenerationFailed);
+    }
+
+    // extract metadata for each entrypoint
+    auto extractMetadataLambda = [&](const auto& ep_tuple)
+    {
+        const auto&[entryPointIndex, entryPointCode] = ep_tuple;
+        const auto castIndex = static_cast<int64_t>(entryPointIndex);
+        Slang::ComPtr<slang::IMetadata> metadata;
+        linkedProgram->getEntryPointMetadata(castIndex, k_WgslTargetIndex, metadata.writeRef());
+        return std::move(metadata);
+    };
+    result.EntryPointMetadata = entryPointCode |
+                                std::views::enumerate |
+                                std::views::transform(extractMetadataLambda) |
+                                std::ranges::to<std::vector<Slang::ComPtr<slang::IMetadata>>>();
+
+    result.EntryPointStrings = std::move(entryPointCode);
+
+    return result;
 }
 
 } // namespace lodestone

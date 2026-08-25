@@ -297,6 +297,10 @@ std::string_view ToString(WgslAddressSpace address_space) noexcept
     return "unrecognized";
 }
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch"
+#endif
 bool AddressSpaceAgreesWithKind(WgslAddressSpace address_space, BindingKind kind) noexcept
 {
     switch (kind)
@@ -319,6 +323,9 @@ bool AddressSpaceAgreesWithKind(WgslAddressSpace address_space, BindingKind kind
 
     return false;
 }
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 BindingComparison CompareBindings(std::span<const WgslDeclaredBinding> declared,
                                   std::span<const ReflectedBinding*> reflected)

@@ -1,25 +1,30 @@
 #include "compile/SlangCompiler.hpp"
-#include "impl/SlangModuleContext.hpp"
-#include "impl/ThreadPool.hpp"
 #include "CookerErrors.hpp"
 #include "compile/Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangDiagnosticParser.hpp"
+#include "impl/SlangModuleContext.hpp"
+#include "impl/ThreadPool.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
 
+
+#include <cstddef>
 #include <expected>
 #include <memory>
+#include <slang.h>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
-#include <slang.h>
+
 
 namespace lodestone
 {
 
-SlangCompiler::SlangCompiler() noexcept : compilePool{ nullptr }, bootstrapContext{ nullptr }
+SlangCompiler::SlangCompiler() noexcept
+    : compilePool{ nullptr },
+      bootstrapContext{ nullptr }
 {
 }
 
@@ -29,7 +34,7 @@ CookError SlangCompiler::Initialize(const SlangCompilerCreateInfo& create_info, 
 {
     compilePool = std::make_unique<ThreadPool>();
     bootstrapContext = std::make_unique<SlangModuleContext>();
-    
+
     CookError initResult = bootstrapContext->Initialize(create_info, sink);
     if (initResult != CookError::Success)
     {
@@ -64,6 +69,16 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
     module.EntryPointNames = bootstrapContext->EntryPointNames();
     module.ExternDefaults = std::move(defaults.value());
     return module;
+}
+
+SlangCompiler::CompileResultList SlangCompiler::Compile(const std::vector<VariantDescriptor>& variants, DiagnosticSink& sink) const
+{
+    return compilePool->Compile(variants, sink);
+}
+
+std::string_view SlangCompiler::ModuleName() const noexcept
+{
+    return bootstrapContext ? bootstrapContext->ModuleName() : std::string_view{};
 }
 
 size_t SlangCompiler::EntryPointCount() const noexcept

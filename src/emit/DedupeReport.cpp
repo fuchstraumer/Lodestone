@@ -3,6 +3,8 @@
 #include "model/ContentInterner.hpp"
 #include "model/CookedLibrary.hpp"
 #include "CookerErrors.hpp"
+#include "permute/PermutationAssignment.hpp"
+#include "permute/PermutationAxis.hpp"
 #include "permute/PermutationPolicy.hpp"
 #include "permute/PermutationRegistry.hpp"
 #include "permute/PermutationSpace.hpp"
@@ -164,7 +166,7 @@ namespace
         for (const EntryPointInfluence& entry : influence.EntryPoints)
         {
             table += std::format("  {:<{}}", entry.EntryPointName, nameWidth);
-            for (AxisInfluence value : entry.Axes)
+            for (const AxisInfluence value : entry.Axes)
             {
                 table += std::format("{:<24}", std::string(1u, InfluenceMarker(value)));
             }

@@ -45,7 +45,8 @@ public:
     CookError Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink);
     CookResult<RawModule> PrepareRawModule(const PermutationSpace& space);
     using CompileResultList = std::vector<CookResult<RawVariant>>;
-    [[nodiscard]] CompileResultList Compile(const std::vector<VariantDescriptor>& variants) const;
+    [[nodiscard]] CompileResultList Compile(const std::vector<VariantDescriptor>& variants,
+                                            DiagnosticSink& sink) const;
     [[nodiscard]] std::string_view ModuleName() const noexcept;
     [[nodiscard]] size_t EntryPointCount() const noexcept;
     [[nodiscard]] const std::vector<std::string>& EntryPointNames() const noexcept;

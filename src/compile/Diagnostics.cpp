@@ -101,6 +101,13 @@ void StderrDiagnosticSink::Report(const Diagnostic& diagnostic)
     }
 }
 
+// pointless lint warning: we're just trying to match interfaces. moving helps the recording sink
+//NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
+void StderrDiagnosticSink::Report(Diagnostic&& diagnostic)
+{
+    Report(diagnostic);
+}
+
 int32_t StderrDiagnosticSink::FailureCount() const noexcept
 {
     return failureCount;
