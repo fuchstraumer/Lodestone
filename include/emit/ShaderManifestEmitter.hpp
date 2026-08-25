@@ -2,6 +2,7 @@
 #ifndef LODESTONE_MANIFEST_EMITTER_HPP
 #define LODESTONE_MANIFEST_EMITTER_HPP
 #include "model/CookedLibrary.hpp"
+#include "CookerErrors.hpp"
 #include <string>
 
 /**
@@ -21,16 +22,16 @@ namespace lodestone
  * `ShaderManifestView::Open` rejects a span that does not, because it maps 64-bit fields in place. A
  * heap allocated `std::string` satisfies this today, but the type does not promise it. Copy the bytes
  * into an aligned buffer if you ever move them somewhere the alignment is not certain. */
-std::string EmitShaderManifest(const CookedModule& module);
+[[nodiscard]] std::string EmitShaderManifest(const CookedModule& module);
 
-std::string MakeManifestFileName(std::string_view module_name);
+[[nodiscard]] std::string MakeManifestFileName(std::string_view module_name);
 
 /** Reads the manifest back and compares every entry point of every variant against the module it came
  * from. It checks the source bytes, the workgroup size, and each binding field.
  *
  * This runs on every cook. A manifest that says something different from the generated C++ is the one
  * failure this format could hide, so the check is not optional. */
-CookResult<void> VerifyManifestRoundTrip(const CookedModule& module, const std::string& manifest_bytes);
+[[nodiscard]] CookError VerifyManifestRoundTrip(const CookedModule& module, const std::string& manifest_bytes);
 
 } // namespace lodestone
 

@@ -47,12 +47,23 @@ enum class CookError : uint16_t
     LibraryRoundTripFailed = 90,
     CookNotDeterministic = 91,
     ModulePolicyViolated = 92,
+    ManifestVariantWorkgroupSizeMismatch = 93,
+    ManifestVariantSourceCodeMismatch = 94,
+    ManifestMissingVariant = 95,
+    ManifestVariantMissingEntryPoint = 96,
+    ManifestVariantResourceVisibilityMismatch = 97,
+    ManifestVariantResourceResolveOutOfRange = 98,
+    ManifestVariantResourceBindingMismatch = 99,
+    ManifestVertexInputMismatch = 100,
+    ManifestColorTargetMismatch = 101,
+    ManifestRasterStateMismatch = 102,
+
 
     // output and diagnostic sink operation errors
-    OutputPathInvalid = 100,
-    OutputFileOpenFailed = 101,
-    OutputWriteFailed = 102,
-    ArtifactAlreadyWritten = 103,
+    OutputPathInvalid = 120,
+    OutputFileOpenFailed = 121,
+    OutputWriteFailed = 122,
+    ArtifactAlreadyWritten = 123,
 
     // start system errors
     SystemError = 200,

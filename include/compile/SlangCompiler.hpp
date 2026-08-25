@@ -6,11 +6,9 @@
 #include "Diagnostics.hpp"
 #include "permute/PermutationSpace.hpp"
 
+#include <cstdint>
 #include <filesystem>
 #include <memory>
-#include <span>
-#include <string>
-#include <string_view>
 #include <vector>
 
 /** Owns every interaction with Slang. Nothing in this header names a Slang type, so the rest of the
@@ -18,8 +16,8 @@
 namespace lodestone
 {
 
-struct SlangCompilerImpl;
 struct SlangReflector;
+class SlangModuleContext;
 
 struct SlangCompilerCreateInfo
 {
@@ -42,16 +40,13 @@ public:
     SlangCompiler& operator=(SlangCompiler&&) = delete;
 
     CookError Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink);
+    CookResult<RawModule> PrepareRawModule(const PermutationSpace& space);
     using CompileResultList = std::vector<CookResult<RawVariant>>;
     [[nodiscard]] CompileResultList Compile(const std::vector<VariantDescriptor>& variants) const;
 
-    [[nodiscard]] std::string_view GetModuleName() const noexcept;
-    [[nodiscard]] std::span<const std::string> GetEntryPointNames() const noexcept;
-    /** Every source file the module pulled in, transitively, in Slang's dependency order. */
-    [[nodiscard]] std::span<const std::string> GetModuleSourceTexts() const noexcept;
-
 private:
-    std::unique_ptr<ThreadPool> compilePool;
+    std::unique_ptr<ThreadPool> compilePool{ nullptr };
+    std::unique_ptr<SlangModuleContext> bootstrapContext{ nullptr };
 };
 
 } // namespace lodestone

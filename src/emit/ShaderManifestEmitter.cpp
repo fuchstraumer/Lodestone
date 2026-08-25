@@ -1,10 +1,12 @@
 #include "emit/ShaderManifestEmitter.hpp"
 #include "model/CookedLibrary.hpp"
 #include "CookerErrors.hpp"
+#include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifest.hpp"
+#include "permute/PermutationValue.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -13,13 +15,14 @@
 #include <cstring>
 #include <expected>
 #include <format>
-#include <numeric>
+#include <functional>
 #include <print>
 #include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 // todo-ship: in almost all places we are using std::string, we could just use std::vector<std::byte> and
@@ -217,7 +220,7 @@ namespace
         return opened.value();
     }
 
-    CookResult<void> CheckManifestSource(const CookedModule& module,
+    CookError CheckManifestSource(const CookedModule& module,
                                          const ManifestShaderSourceProvider& provider,
                                          const LibraryVariant& variant,
                                          size_t entry_point_index,
@@ -226,7 +229,7 @@ namespace
         const std::string_view expectedSource = ResolveSource(module, variant, entry_point_index);
         if (provider.Source(entry_point_id, variant.Index) == expectedSource)
         {
-            return {};
+            return CookError::Success;
         }
 
         std::println(stderr,
@@ -234,10 +237,10 @@ namespace
                      module.EntryPoints[entry_point_index].Name,
                      variant.Index,
                      variant.Description);
-        return std::unexpected(CookError::LibraryRoundTripFailed);
+        return CookError::ManifestVariantSourceCodeMismatch;
     }
 
-    CookResult<void> CheckManifestWorkgroup(const CookedModule& module,
+    CookError CheckManifestWorkgroup(const CookedModule& module,
                                             const ManifestShaderSourceProvider& provider,
                                             const LibraryVariant& variant,
                                             size_t entry_point_index,
@@ -248,14 +251,14 @@ namespace
 
         if (read.X == expected.X && read.Y == expected.Y && read.Z == expected.Z)
         {
-            return {};
+            return CookError::Success;
         }
 
         std::println(stderr,
                      "[shader_cooker] manifest returns a different workgroup size for {} variant {}",
                      module.EntryPoints[entry_point_index].Name,
                      variant.Index);
-        return std::unexpected(CookError::LibraryRoundTripFailed);
+        return CookError::ManifestVariantWorkgroupSizeMismatch;
     }
 
     bool ManifestUniformMembersMatch(const ShaderManifestView& view,
@@ -286,7 +289,7 @@ namespace
         return true;
     }
 
-    CookResult<void> CheckManifestLayout(const CookedModule& module,
+    CookError CheckManifestLayout(const CookedModule& module,
                                          const ShaderManifestView& view,
                                          const LibraryVariant& variant,
                                          size_t entry_point_index)
@@ -303,7 +306,7 @@ namespace
             readVariantIter->Index != variant.Index)
         {
             std::println(stderr, "[shader_cooker] manifest holds no variant {}", variant.Index);
-            return std::unexpected(CookError::LibraryRoundTripFailed);
+            return CookError::ManifestMissingVariant;
         }
 
         const ManifestVariant& readVariant = *readVariantIter;
@@ -320,7 +323,7 @@ namespace
                          "[shader_cooker] manifest variant {} holds no slot {}",
                          variant.Index,
                          entry_point_index);
-            return std::unexpected(CookError::LibraryRoundTripFailed);
+            return CookError::ManifestVariantMissingEntryPoint;
         }
 
         const std::span<const uint32_t> visible =
@@ -335,7 +338,7 @@ namespace
                          entry_point_index,
                          visible.size(),
                          expectedLayout.size());
-            return std::unexpected(CookError::LibraryRoundTripFailed);
+            return CookError::ManifestVariantResourceVisibilityMismatch;
         }
 
         for (size_t i = 0u; i < expectedLayout.size(); ++i)
@@ -350,7 +353,7 @@ namespace
                              "[shader_cooker] manifest variant {} resolves resource {} out of range",
                              variant.Index,
                              local);
-                return std::unexpected(CookError::LibraryRoundTripFailed);
+                return CookError::ManifestVariantResourceResolveOutOfRange;
             }
 
             const ManifestBinding& read = view.Bindings()[resources[local]];
@@ -365,14 +368,14 @@ namespace
                              "[shader_cooker] manifest binding '{}' of variant {} does not match the cook",
                              expected.Resource->Name,
                              variant.Index);
-                return std::unexpected(CookError::LibraryRoundTripFailed);
+                return CookError::ManifestVariantResourceBindingMismatch;
             }
         }
 
-        return {};
+        return CookError::Success;
     }
 
-    CookResult<void> CheckManifestVertexInputs(std::span<const ManifestVertexInput> read_inputs,
+    CookError CheckManifestVertexInputs(std::span<const ManifestVertexInput> read_inputs,
                                                const ReflectedRasterState& expected_raster,
                                                const ShaderManifestView& view)
     {
@@ -390,14 +393,14 @@ namespace
                 std::println(stderr,
                              "[shader_cooker] manifest vertex input '{}' does not match the cook",
                              expectedInput.SemanticName);
-                return std::unexpected(CookError::LibraryRoundTripFailed);
+                return CookError::ManifestVertexInputMismatch;
             }
         }
 
-        return {};
+        return CookError::Success;
     }
 
-    CookResult<void> CheckManifestColorTargets(std::span<const ManifestColorTarget> read_targets,
+    CookError CheckManifestColorTargets(std::span<const ManifestColorTarget> read_targets,
                                                const ReflectedRasterState& expected_raster)
     {
         for (size_t targetIndex = 0u; targetIndex < read_targets.size(); ++targetIndex)
@@ -412,14 +415,14 @@ namespace
                 std::println(stderr,
                              "[shader_cooker] manifest color target {} does not match the cook",
                              expectedTarget.Location);
-                return std::unexpected(CookError::LibraryRoundTripFailed);
+                return CookError::ManifestColorTargetMismatch;
             }
         }
 
-        return {};
+        return CookError::Success;
     }
 
-    CookResult<void> CheckManifestRaster(const CookedModule& module,
+    CookError CheckManifestRaster(const CookedModule& module,
                                          const ShaderManifestView& view,
                                          const LibraryVariant& variant,
                                          size_t entry_point_index)
@@ -438,19 +441,20 @@ namespace
                          "[shader_cooker] manifest raster state {} does not match the cook for {}",
                          rasterIndex,
                          module.EntryPoints[entry_point_index].Name);
-            return std::unexpected(CookError::LibraryRoundTripFailed);
+            return CookError::ManifestRasterStateMismatch;
         }
 
-        if (CookResult<void> inputs = CheckManifestVertexInputs(readInputs, expectedRaster, view); !inputs)
+        const CookError inputsError = CheckManifestVertexInputs(readInputs, expectedRaster, view);
+        if (inputsError != CookError::Success)
         {
-            return inputs;
+            return inputsError;
         }
 
         return CheckManifestColorTargets(readTargets, expectedRaster);
     }
 
     /** Every fact the manifest states about one entry point of one variant. */
-    CookResult<void> CheckManifestSlot(const CookedModule& module,
+    CookError CheckManifestSlot(const CookedModule& module,
                                        const ShaderManifestView& view,
                                        const ManifestShaderSourceProvider& provider,
                                        const LibraryVariant& variant,
@@ -459,41 +463,34 @@ namespace
         // The provider takes the EntryPointId value, which counts from one.
         const auto entryPointId = static_cast<uint16_t>(entry_point_index + 1u);
 
-        if (CookResult<void> source =
-                CheckManifestSource(module, provider, variant, entry_point_index, entryPointId);
-            !source)
+        const CookError sourceError = CheckManifestSource(module, provider, variant, entry_point_index, entryPointId);
+        if (sourceError != CookError::Success)
         {
-            return source;
+            return sourceError;
         }
 
-        if (CookResult<void> workgroup =
-                CheckManifestWorkgroup(module, provider, variant, entry_point_index, entryPointId);
-            !workgroup)
+        const CookError workgroupError = CheckManifestWorkgroup(module, provider, variant, entry_point_index, entryPointId);
+        if (workgroupError != CookError::Success)
         {
-            return workgroup;
+            return workgroupError;
         }
 
-        if (CookResult<void> layout = CheckManifestLayout(module, view, variant, entry_point_index); !layout)
+        const CookError layoutError = CheckManifestLayout(module, view, variant, entry_point_index);
+        if (layoutError != CookError::Success)
         {
-            return layout;
+            return layoutError;
         }
 
         return CheckManifestRaster(module, view, variant, entry_point_index);
     }
 
-} // namespace
-
-std::string MakeManifestFileName(std::string_view module_name)
-{
-    return std::format("{}.ldshaders", module_name);
-}
-
-namespace
-{
+    std::string MakeManifestFileName(std::string_view module_name)
+    {
+        return std::format("{}.ldshaders", module_name);
+    }
 
     /** Each builder appends to the string table in call order, so the order of the calls in
      * EmitShaderManifest decides every string index in the file. Do not reorder them. */
-
     std::vector<ManifestEntryPoint> BuildEntryPointRecords(const CookedModule& module,
                                                            StringTableBuilder& strings)
     {
@@ -861,7 +858,7 @@ std::string EmitShaderManifest(const CookedModule& module)
     return bytes;
 }
 
-CookResult<void> VerifyManifestRoundTrip(const CookedModule& module, const std::string& manifest_bytes)
+CookError VerifyManifestRoundTrip(const CookedModule& module, const std::string& manifest_bytes)
 {
     const std::span<const std::byte> raw{ reinterpret_cast<const std::byte*>(manifest_bytes.data()),
                                           manifest_bytes.size() };
@@ -869,7 +866,7 @@ CookResult<void> VerifyManifestRoundTrip(const CookedModule& module, const std::
     const CookResult<ShaderManifestView> opened = OpenManifestForCheck(module, raw);
     if (!opened)
     {
-        return std::unexpected(opened.error());
+        return opened.error();
     }
 
     const ShaderManifestView& view = opened.value();
@@ -880,9 +877,10 @@ CookResult<void> VerifyManifestRoundTrip(const CookedModule& module, const std::
     {
         for (size_t i = 0u; i < module.EntryPoints.size(); ++i)
         {
-            if (CookResult<void> slot = CheckManifestSlot(module, view, provider, variant, i); !slot)
+            const CookError slotError = CheckManifestSlot(module, view, provider, variant, i);
+            if (slotError != CookError::Success)
             {
-                return slot;
+                return slotError;
             }
 
             ++checked;
@@ -896,7 +894,7 @@ CookResult<void> VerifyManifestRoundTrip(const CookedModule& module, const std::
                  checked,
                  manifest_bytes.size() / 1024u);
 
-    return {};
+    return CookError::Success;
 }
 
 } // namespace lodestone
