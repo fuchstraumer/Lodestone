@@ -36,6 +36,7 @@ namespace lodestone
 
 CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink)
 {
+    diagnosticSink = &sink;
     if (SLANG_FAILED(slang::createGlobalSession(globalSession.writeRef())))
     {
         return CookError::GlobalSessionCreationFailed;
