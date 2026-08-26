@@ -414,7 +414,7 @@ namespace
         createInfo.ModulePath = module_path;
         createInfo.ModuleCacheDirectory = options.ModuleCacheDirectory;
         createInfo.OptimizationLevel = options.OptimizationLevel;
-        createInfo.MultithreadEntryPointCodegen = options.MultithreadEntryPointCodegen;
+        createInfo.MultithreadVariantBuild = options.MultithreadEntryPointCodegen;
 
         if (auto initializeResult = compiler.Initialize(createInfo, diagnostics);
             initializeResult != CookError::Success)

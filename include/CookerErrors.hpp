@@ -24,6 +24,7 @@ enum class CookError : uint16_t
     CompilerNotInitialized = 18,
     CompilerGlobalSessionCreationFailed = 19,
     FailedToLoadModuleDependencySource = 20,
+    VariantNotCompiled = 21,
 
     ReflectionUnavailable = 40,
     ReflectionMismatch = 41,

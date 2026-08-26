@@ -27,7 +27,7 @@ struct SlangCompilerCreateInfo
     std::filesystem::path ModulePath;
     std::filesystem::path ModuleCacheDirectory;
     uint32_t OptimizationLevel{ 0u };
-    bool MultithreadEntryPointCodegen{ true };
+    bool MultithreadVariantBuild{ true };
 };
 
 class ThreadPool;
@@ -42,7 +42,7 @@ public:
     SlangCompiler(SlangCompiler&&) = delete;
     SlangCompiler& operator=(SlangCompiler&&) = delete;
 
-    CookError Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink);
+    CookError Initialize(SlangCompilerCreateInfo create_info, DiagnosticSink& sink);
     CookResult<RawModule> PrepareRawModule(const PermutationSpace& space);
     using CompileResultList = std::vector<CookResult<RawVariant>>;
     [[nodiscard]] CompileResultList Compile(const std::vector<VariantDescriptor>& variants,

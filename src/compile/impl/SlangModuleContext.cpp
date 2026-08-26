@@ -47,7 +47,7 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
 
     // todo-asap: I am inserting the tests/assets/ rootdir here for the attributes file. This needs to be
     // optionalized and standardized
-    const std::filesystem::path attributesPath = std::filesystem::canonical("D:/ShaderTools/tests/assets/");
+    const std::filesystem::path attributesPath = std::filesystem::canonical("C:/SoftwareDev/Lodestone/tests/assets/");
     const std::string attributesPathStr = attributesPath.string();
     const std::filesystem::path canonicalModulePath = std::filesystem::canonical(create_info.ModulePath);
     const std::string sourceDirectory = canonicalModulePath.parent_path().string();
@@ -108,6 +108,11 @@ CookError SlangModuleContext::RunBootstrap()
     }
 
     return bootstrapResult;
+}
+
+slang::IGlobalSession* SlangModuleContext::GlobalSession() const noexcept
+{
+    return globalSession;
 }
 
 slang::ISession* SlangModuleContext::Session() const noexcept

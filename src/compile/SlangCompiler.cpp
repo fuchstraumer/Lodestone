@@ -3,6 +3,7 @@
 #include "compile/Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangDiagnosticParser.hpp"
+#include "impl/SlangCompilerTypes.hpp"
 #include "impl/SlangModuleContext.hpp"
 #include "impl/ThreadPool.hpp"
 #include "permute/PermutationAssignment.hpp"
@@ -30,7 +31,7 @@ SlangCompiler::SlangCompiler() noexcept
 
 SlangCompiler::~SlangCompiler() = default;
 
-CookError SlangCompiler::Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink)
+CookError SlangCompiler::Initialize(SlangCompilerCreateInfo create_info, DiagnosticSink& sink)
 {
     compilePool = std::make_unique<ThreadPool>();
     bootstrapContext = std::make_unique<SlangModuleContext>();
@@ -42,6 +43,14 @@ CookError SlangCompiler::Initialize(const SlangCompilerCreateInfo& create_info, 
     }
 
     initResult = bootstrapContext->RunBootstrap();
+    if (initResult != CookError::Success)
+    {
+        return initResult;
+    }
+
+    // bootstrap completed, retrieve serialized modules and initialize the thread pool with them
+    std::vector<SerializedModule> serializedModules = bootstrapContext->SerializeModules();
+    initResult = compilePool->Initialize(std::move(create_info), std::move(serializedModules), 0);
     if (initResult != CookError::Success)
     {
         return initResult;

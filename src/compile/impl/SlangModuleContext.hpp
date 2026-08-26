@@ -2,12 +2,12 @@
 #ifndef LODESTONE_SLANG_MODULE_CONTEXT_HPP
 #define LODESTONE_SLANG_MODULE_CONTEXT_HPP
 #include "CookerErrors.hpp"
+#include "SlangCompilerTypes.hpp"
 #include "compile/Diagnostics.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "slang.h"
 #include "slang-com-ptr.h"
 #include <cstddef>
-#include <filesystem>
 #include <span>
 #include <string_view>
 #include <string>
@@ -15,13 +15,6 @@
 
 namespace lodestone
 {
-
-struct SerializedModule
-{
-    std::string Name;
-    std::string Path;
-    Slang::ComPtr<slang::IBlob> Blob;
-};
 
 /**@brief Each worker thread creates one of these objects, encapsulating the context and Slang state
   *needed for efficient compiliation of variants. The global session and base session types both need
@@ -34,8 +27,6 @@ public:
     ~SlangModuleContext() = default;
     SlangModuleContext(const SlangModuleContext&) = delete;
     SlangModuleContext& operator=(const SlangModuleContext&) = delete;
-    SlangModuleContext(SlangModuleContext&&) noexcept;
-    SlangModuleContext& operator=(SlangModuleContext&&) noexcept;
 
     [[nodiscard]] CookError Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink);
     [[nodiscard]] CookError RunBootstrap();

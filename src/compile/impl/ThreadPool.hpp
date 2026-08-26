@@ -2,19 +2,17 @@
 #ifndef LODESTONE_SHADER_COMPILER_THREAD_POOL_HPP
 #define LODESTONE_SHADER_COMPILER_THREAD_POOL_HPP
 #include "CookerErrors.hpp"
+#include "SlangCompilerTypes.hpp"
 #include "compile/Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "permute/PermutationSpace.hpp"
 
-#include "slang-com-ptr.h"
-#include "slang.h"
 
 #include <atomic>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
 #include <functional>
 #include <latch>
 #include <mutex>
@@ -49,7 +47,8 @@ public:
     ThreadPool(ThreadPool&&) = delete;
     ThreadPool& operator=(ThreadPool&&) = delete;
     // Results of initialize can be reused for multiple batches, but likely won't be
-    [[nodiscard]] CookError Initialize(SlangCompilerCreateInfo create_info, size_t num_threads_override = 0u);
+    [[nodiscard]] CookError Initialize(SlangCompilerCreateInfo create_info,
+                                       std::vector<SerializedModule> serialized_modules);
     [[nodiscard]] SlangCompiler::CompileResultList Compile(const std::vector<VariantDescriptor>& variants,
                                                            DiagnosticSink& diagnostic_sink);
 
@@ -64,11 +63,6 @@ private:
         std::span<CookResult<RawVariant>> Results;
         std::atomic<int32_t> NextJobIndex{ 0u };
         std::latch* DoneLatch{ nullptr };
-        // We might want to rename these, as this isn't the *slang* root module
-        // but the one we build as the base case for this set of variants. We
-        // keep it in memory to save a disk roundtrip, and each worker loads this
-        std::filesystem::path RootModulePath;
-        Slang::ComPtr<slang::IBlob> RootBlob;
         std::span<RecordingDiagnosticSink> DiagnosticSinks;
         std::span<RecordingDiagnosticSink> ThreadSinks;
     };
@@ -82,6 +76,7 @@ private:
     std::condition_variable_any condition;
     std::condition_variable idleCondition;
     std::vector<std::jthread> workers;
+    std::vector<SerializedModule> serializedModules;
     size_t numThreads{ 1u };
     int32_t activeJobs{ 0 };
     int32_t activeBatchIndex{ 0 };

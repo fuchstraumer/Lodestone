@@ -11,6 +11,7 @@
 #include <string_view>
 #include <vector>
 #include <slang.h>
+#include <slang-com-ptr.h>
 
 /** @brief Holds types and definitions used only within this module,
  * but which are shared by multiple components within this module.*/
@@ -288,6 +289,15 @@ struct ParameterBlockInfo
     std::string_view Name;
     BindingScope Scope;
     uint32_t UniformSize{ 0u };
+};
+
+
+
+struct SerializedModule
+{
+    std::string Name;
+    std::string Path;
+    Slang::ComPtr<slang::IBlob> Blob;
 };
 
 /** One compiler option as a row. A row of `Int` kind reads `IntValue`, and a row of `String`

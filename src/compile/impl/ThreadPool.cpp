@@ -34,10 +34,12 @@ ThreadPool::~ThreadPool()
     // dump module binaries to disk
 }
 
-CookError ThreadPool::Initialize(SlangCompilerCreateInfo create_info, size_t num_threads_override)
+CookError ThreadPool::Initialize(SlangCompilerCreateInfo create_info, std::vector<SerializedModule> serialized_modules)
 {
     createInfo = std::move(create_info);
-    numThreads = (num_threads_override == 0u) ? std::thread::hardware_concurrency() : num_threads_override;
+    serializedModules = std::move(serialized_modules);
+
+    numThreads = createInfo.MultithreadVariantBuild ? std::thread::hardware_concurrency() : 1u;
     if (numThreads > 1u)
     {
         // take off one thread for the main thread, since it works as a helper after dispatching
@@ -67,17 +69,20 @@ SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDe
     // and we'll merge them into the main sink (no matter it's type) after the work completes.
     std::vector<RecordingDiagnosticSink> diagnosticSinks;
     diagnosticSinks.resize(variants.size());
-
-    SlangCompiler::CompileResultList results(variants.size());
+    std::vector<RecordingDiagnosticSink> threadSinks;
+    threadSinks.resize(workers.size());
+    
+    SlangCompiler::CompileResultList results(variants.size(), std::unexpected(CookError::VariantNotCompiled));
     std::latch done{ std::ssize(workers) };
-
+    
     CompileBatch currBatch
     {
         .Variants = variants,
         .Results = results,
         .NextJobIndex = 0,
         .DoneLatch = &done,
-        .DiagnosticSinks = diagnosticSinks
+        .DiagnosticSinks = diagnosticSinks,
+        .ThreadSinks = threadSinks
     };
 
     {
@@ -102,6 +107,14 @@ SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDe
         }
     }
 
+    for (auto& sink : threadSinks)
+    {
+        for (auto&& record : sink.Records())
+        {
+            diagnostic_sink.Report(std::move(record));
+        }
+    }
+
     return results;
 }
 
@@ -109,7 +122,6 @@ void ThreadPool::workerFunction(const std::stop_token& stop_token,
                                 const size_t thread_idx)
 {
     int32_t servedIndex = 0;
-
 
     while (!stop_token.stop_requested())
     {
@@ -133,7 +145,21 @@ void ThreadPool::workerFunction(const std::stop_token& stop_token,
         }
 
         SlangModuleContext moduleContext;
-        moduleContext.Initialize(batch->Module, batch->ThreadSinks[thread_idx]);
+        CookError contextError = moduleContext.Initialize(createInfo, batch->ThreadSinks[thread_idx]);
+        if (contextError != CookError::Success)
+        {
+            //batch->ThreadSinks[thread_idx].Report(CookError::ModuleContextInitializationFailed);
+            batch->DoneLatch->count_down();
+            return;
+        }
+
+        contextError = moduleContext.RunWorkerSetup(serializedModules);
+        if (contextError != CookError::Success)
+        {
+            //batch->ThreadSinks[thread_idx].Report(CookError::ModuleContextInitializationFailed);
+            batch->DoneLatch->count_down();
+            return;
+        }
 
         while (true)
         {
@@ -149,14 +175,18 @@ void ThreadPool::workerFunction(const std::stop_token& stop_token,
             // rolling eyes because i have to convert jobindex to unsigned to avoid goofy signed/unsigned comparison warnings
             const auto jobIndexU = static_cast<size_t>(jobIndex);
             SlangVariantCompiler variantCompiler;
+            // todo: standardize how these two take diagnostic sinks, instead of one being pointer and one being reference
             CookResult<LinkedVariant> variantBuildResult = variantCompiler.CompileVariant(moduleContext, batch->Variants[jobIndexU], batch->DiagnosticSinks[jobIndexU]);
             SlangReflector variantReflector(moduleContext.EntryPointNames(), &batch->DiagnosticSinks[jobIndexU], moduleContext.GlobalSession());
 
             batch->Results[jobIndexU] = variantBuildResult ? variantReflector.Reflect(*variantBuildResult, batch->Variants[jobIndexU]) : std::unexpected(CookError::VariantModuleCreationFailed);
-
-            
         }
 
+        const CookError writeCacheError = moduleContext.WriteModuleCache();
+        if (writeCacheError != CookError::Success)
+        {
+            //batch->ThreadSinks[thread_idx].Report(CookError::ModuleContextInitializationFailed);
+        }
         batch->DoneLatch->count_down();
     }
 }
