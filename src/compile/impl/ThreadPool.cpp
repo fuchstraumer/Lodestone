@@ -1,6 +1,9 @@
 #include "ThreadPool.hpp"
 #include "CookerErrors.hpp"
 #include "SlangCompilerTypes.hpp"
+#include "SlangModuleContext.hpp"
+#include "SlangReflector.hpp"
+#include "SlangVariantCompiler.hpp"
 #include "compile/Diagnostics.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "permute/PermutationSpace.hpp"
@@ -107,6 +110,7 @@ void ThreadPool::workerFunction(const std::stop_token& stop_token,
 {
     int32_t servedIndex = 0;
 
+
     while (!stop_token.stop_requested())
     {
         CompileBatch* batch = nullptr;
@@ -128,6 +132,9 @@ void ThreadPool::workerFunction(const std::stop_token& stop_token,
             batch = activeBatch;
         }
 
+        SlangModuleContext moduleContext;
+        moduleContext.Initialize(batch->Module, batch->ThreadSinks[thread_idx]);
+
         while (true)
         {
             // all we need is a unique index, not a strictly ordered one
@@ -141,6 +148,12 @@ void ThreadPool::workerFunction(const std::stop_token& stop_token,
 
             // rolling eyes because i have to convert jobindex to unsigned to avoid goofy signed/unsigned comparison warnings
             const auto jobIndexU = static_cast<size_t>(jobIndex);
+            SlangVariantCompiler variantCompiler;
+            CookResult<LinkedVariant> variantBuildResult = variantCompiler.CompileVariant(moduleContext, batch->Variants[jobIndexU], batch->DiagnosticSinks[jobIndexU]);
+            SlangReflector variantReflector(moduleContext.EntryPointNames(), &batch->DiagnosticSinks[jobIndexU], moduleContext.GlobalSession());
+
+            batch->Results[jobIndexU] = variantBuildResult ? variantReflector.Reflect(*variantBuildResult, batch->Variants[jobIndexU]) : std::unexpected(CookError::VariantModuleCreationFailed);
+
             
         }
 

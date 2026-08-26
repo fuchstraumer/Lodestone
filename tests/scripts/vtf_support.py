@@ -606,6 +606,104 @@ def reference_bvh_leaves(positions: np.ndarray, ranges: np.ndarray, order: np.nd
     return lower, upper
 
 
+def build_bvh_levels(positions: np.ndarray, ranges: np.ndarray, order: np.ndarray,
+                     leaf_size: int = 32, branching: int = 32):
+    """Builds every node level of the tree, from the level above the lights up to the root.
+
+    The lights are not a level. A node of the lowest level holds `leaf_size` lights, and a node of
+    each level above holds `branching` nodes of the level below it. The two counts are equal in the
+    shipped tree, and this function keeps them apart so that a narrow bottom can be measured.
+
+    Each level is a tuple of three arrays: the lower corners, the upper corners, and the count of
+    children each node holds. The last run of a level can be short, so the child count is an array
+    and not one number.
+
+    The returned list runs from the bottom to the root.
+    """
+    lower, upper = reference_bvh_leaves(positions, ranges, order, leaf_size)
+
+    light_count = len(order)
+    node_count = len(lower)
+    children = np.full(node_count, leaf_size, dtype=np.int64)
+    children[-1] = light_count - (node_count - 1) * leaf_size
+
+    levels = [(lower, upper, children)]
+
+    while len(lower) > 1:
+        child_count = len(lower)
+        parent_count = (child_count + branching - 1) // branching
+
+        parent_lower = np.empty((parent_count, 3), dtype=np.float64)
+        parent_upper = np.empty((parent_count, 3), dtype=np.float64)
+        for parent in range(parent_count):
+            start = parent * branching
+            stop = min(start + branching, child_count)
+            parent_lower[parent] = lower[start:stop].min(axis=0)
+            parent_upper[parent] = upper[start:stop].max(axis=0)
+
+        parent_children = np.full(parent_count, branching, dtype=np.int64)
+        parent_children[-1] = child_count - (parent_count - 1) * branching
+
+        lower, upper = parent_lower, parent_upper
+        levels.append((lower, upper, parent_children))
+
+    return levels
+
+
+def count_traversal_tests(levels, cluster_min: np.ndarray, cluster_max: np.ndarray) -> dict:
+    """Counts every test the traversal performs, at every level of the tree.
+
+    `VtfAssignLightsToClusters` walks the tree once for each cluster. It enters the root without a
+    test. It then tests each child of every node it enters, and it enters a child whose box touches
+    the cluster box. A child box is inside its parent box, so a node is entered exactly when its box
+    touches the cluster. Therefore the count of tests on one level is the count of (cluster, node)
+    pairs of the level above, multiplied by the children each of those nodes holds.
+
+    A test against a node of the lowest level is a sphere test, because a child of that level is a
+    light. Every other test is a box against a box.
+
+    `count_cluster_overlaps` gives the count of clusters that touch each node, so the sum over a
+    level is the count of (cluster, node) pairs of that level.
+
+    Earlier work counted the lowest level alone. That undercounts a narrow bottom, because a narrow
+    bottom needs more levels and each new level charges its own tests.
+    """
+    cluster_count = len(cluster_min)
+    top_down = list(reversed(levels))
+
+    per_level = []
+    sphere_tests = 0
+    box_tests = 0
+
+    for depth, (lower, upper, children) in enumerate(top_down):
+        if depth == 0:
+            # Every cluster enters the root, and no test decides that.
+            visits = np.full(len(lower), cluster_count, dtype=np.int64)
+        else:
+            visits = count_cluster_overlaps(lower, upper, cluster_min, cluster_max)
+
+        tests = int((visits * children).sum())
+        if depth == len(top_down) - 1:
+            sphere_tests += tests
+        else:
+            box_tests += tests
+
+        per_level.append({
+            "nodes": len(lower),
+            "visits": int(visits.sum()),
+            "tests": tests,
+        })
+
+    return {
+        "sphere_tests": sphere_tests,
+        "box_tests": box_tests,
+        "total_tests": sphere_tests + box_tests,
+        "node_count": sum(len(lower) for lower, _, _ in levels),
+        "level_count": len(levels),
+        "per_level": per_level,
+    }
+
+
 class ClusterGrid:
     """One cluster grid, and the camera it belongs to.
 

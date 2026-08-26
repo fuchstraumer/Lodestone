@@ -70,6 +70,7 @@ private:
         std::filesystem::path RootModulePath;
         Slang::ComPtr<slang::IBlob> RootBlob;
         std::span<RecordingDiagnosticSink> DiagnosticSinks;
+        std::span<RecordingDiagnosticSink> ThreadSinks;
     };
 
     CompileBatch* activeBatch{ nullptr };
