@@ -496,11 +496,11 @@ namespace
                                                   InternedModule& interned_module,
                                                   RawModule& raw_module,
                                                   std::vector<CompiledVariant>& out_module_variants,
-                                                  CookStatistics& statistics)
+                                                  CookStatistics& statistics,
+                                                  DiagnosticSink& sink)
     {
         const bool keepRawVariants = IsStageDumpRequested(options, StageDumpKind::Raw);
-        RecordingDiagnosticSink recordingSink;
-        auto compileResultsList = compiler.Compile(variant_set.Variants, recordingSink);
+        auto compileResultsList = compiler.Compile(variant_set.Variants, sink);
 
         for (auto&& [idx, result] : std::views::enumerate(compileResultsList))
         {
@@ -685,7 +685,8 @@ namespace
                                                                       internedModule,
                                                                       rawModule,
                                                                       moduleVariants,
-                                                                      statistics);
+                                                                      statistics,
+                                                                      diagnostics);
         if (compileVariantsResult != CookError::Success)
         {
             return std::unexpected(compileVariantsResult);

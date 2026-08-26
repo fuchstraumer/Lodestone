@@ -50,7 +50,7 @@ CookError SlangCompiler::Initialize(SlangCompilerCreateInfo create_info, Diagnos
 
     // bootstrap completed, retrieve serialized modules and initialize the thread pool with them
     std::vector<SerializedModule> serializedModules = bootstrapContext->SerializeModules();
-    initResult = compilePool->Initialize(std::move(create_info), std::move(serializedModules), 0);
+    initResult = compilePool->Initialize(std::move(create_info), std::move(serializedModules));
     if (initResult != CookError::Success)
     {
         return initResult;
