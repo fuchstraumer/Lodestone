@@ -70,6 +70,10 @@ enum class CookError : uint16_t
     // start system errors
     SystemError = 200,
     FilesystemError = 201, // will expand later
+
+    SlangErrors = 220,
+    SlangCoreModuleLoadFailed = 221,
+    SlangCoreModuleBuildFailed = 222
 };
 
 template<typename T>

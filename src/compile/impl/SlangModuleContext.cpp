@@ -34,12 +34,43 @@ std::string BuildCachedModulePath(std::string_view cache_directory, std::string_
 namespace lodestone
 {
 
+constexpr bool k_UseSlangWorkaround = true;
+
 CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink)
 {
     diagnosticSink = &sink;
-    if (SLANG_FAILED(slang::createGlobalSession(globalSession.writeRef())))
+    if (k_UseSlangWorkaround)
     {
-        return CookError::GlobalSessionCreationFailed;
+        const SlangResult created = slang_createGlobalSessionWithoutCoreModule(SLANG_API_VERSION, globalSession.writeRef());
+        if (SLANG_FAILED(created))
+        {
+            return CookError::GlobalSessionCreationFailed;
+        }
+
+        if (ISlangBlob* coreModuleBlob = slang_getEmbeddedCoreModule())
+        {
+            const SlangResult loaded = globalSession->loadCoreModule(coreModuleBlob->getBufferPointer(), coreModuleBlob->getBufferSize());
+            if (SLANG_FAILED(loaded))
+            {
+                return CookError::SlangCoreModuleLoadFailed;
+            }
+        }
+        else
+        {
+            // attempt to build core module
+            const SlangResult built = globalSession->compileCoreModule(0);
+            if (SLANG_FAILED(built))
+            {
+                return CookError::SlangCoreModuleBuildFailed;
+            }
+        }
+    }
+    else
+    {
+        if (SLANG_FAILED(slang::createGlobalSession(globalSession.writeRef())))
+        {   
+            return CookError::GlobalSessionCreationFailed;
+        }
     }
 
     const std::vector<slang::CompilerOptionEntry> compileOptions =
@@ -75,7 +106,7 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
     sessionDesc.searchPathCount = static_cast<SlangInt>(searchPaths.size());
     sessionDesc.compilerOptionEntries = compileOptions.data();
     sessionDesc.compilerOptionEntryCount = static_cast<uint32_t>(compileOptions.size());
-
+    
     // create session attached to each threads global session
     if (SLANG_FAILED(globalSession->createSession(sessionDesc, session.writeRef())))
     {
