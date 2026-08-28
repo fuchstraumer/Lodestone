@@ -50,10 +50,14 @@ public:
 
 private:
 
+    [[nodiscard]] CookError primeSessionFromCache(std::span<const SerializedModule> serialized_modules);
+    // fixed: now for worker threads this will just resolve to the module loaded in the prev func
     [[nodiscard]] CookError loadRootModule();
-    [[nodiscard]] CookError loadSerializedModules(std::span<const SerializedModule> serialized_modules);
     [[nodiscard]] CookError readDependencySourceStrings();
     [[nodiscard]] CookError enumerateEntryPoints();
+    // fixing prev bug: need to only add to base components in one location, or this breaks rapdily
+    // when multiple sources can invoke this code. this makes things more consistent and repeatable.
+    [[nodiscard]] CookError buildSlangComponents();
 
     std::string cacheDirectory;
     Slang::ComPtr<slang::IGlobalSession> globalSession;
