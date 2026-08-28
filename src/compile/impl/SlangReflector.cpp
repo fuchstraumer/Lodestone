@@ -975,6 +975,8 @@ void SlangReflector::extractRasterState(slang::EntryPointReflection* entry_point
         CollectColorTargets(entry_point_layout->getResultVarLayout(), raster);
         CollectDepthWrites(entry_point_layout->getVarLayout(), raster);
         break;
+    case ShaderStageKind::Compute:
+        break;
     default:
         std::println(stderr, "Unsupported shader stage in extractRasterState: {}", static_cast<int>(stage));
         break;
