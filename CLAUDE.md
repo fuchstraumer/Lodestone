@@ -21,15 +21,18 @@ cmake --preset ninja-msvc
 ```
 
 ```bash
-scriptsuild.bat
+scripts\build.bat
 ```
 
 `scripts/build.bat [Debug|RelWithDebInfo] [preset]` sets the compiler environment and then builds.
 **Use it rather than a bare `cmake --build`.** The build tree keeps the compiler that `CMakeCache.txt`
-holds, which is Visual Studio 18 Community. Another environment gives that compiler the headers of a
-different toolset, `ammintrin.h` raises C4392, and every SPIRV-Tools target fails because Slang builds
-them with `/WX`. The `lodestone` targets still build, so the fault stays hidden until a change
-invalidates the whole graph.
+holds, which is Visual Studio 18 Community, toolset 14.51.36231. Another environment gives that
+compiler the headers of a different toolset, `ammintrin.h` raises C4392, and every SPIRV-Tools target
+fails because Slang builds them with `/WX`. The `lodestone` targets still build, so the fault stays
+hidden until a change invalidates the whole graph.
+
+The install holds both 14.51.36231 and 14.52.36615. `vcvars64.bat` selects one, and the cache then
+keeps it. Do not change which one the cache holds without a reconfigure.
 
 `scripts/configure.bat [preset]` sets the same environment and configures. Run it after a change to a
 `CMakeLists.txt` that adds or removes a target. A bare `cmake --preset` writes a cache that names a
@@ -50,8 +53,7 @@ failed build then looks like a success.
 Run every test:
 
 ```bash
-scripts
-un-tests.bat
+scripts\run-tests.bat
 ```
 
 It runs each executable directly and prints one line for each. A failing target is run a second time
@@ -147,13 +149,26 @@ is therefore a visible word in a diff: the day a file in `emit/` writes
 | Folder | Holds | Why it is one thing |
 |---|---|---|
 | `permute/` | `PermutationValue`, `PermutationAxis`, `PermutationAssignment`, `PermutationSpace`, `PermutationPolicy`, `PermutationRegistry`, `SizeExpression`, `ExternConstantScanner` | The authoring parameter domain. Stages 1 and 2. Phase E fills this folder. |
-| `compile/` | `SlangCompiler`, `SlangDiagnosticParser`, `RawLibrary`, `Diagnostics` | **The Slang wall. No file outside this folder names a Slang type.** |
+| `compile/` | `SlangCompiler`, `SlangDiagnosticParser`, `RawLibrary`, `Diagnostics`, and `src/compile/impl/` | **The Slang wall. No file outside this folder names a Slang type.** |
 | `model/` | `ResolveStage`, `ShaderDataSchema`, `ContentHash`, `ContentInterner`, `CookedLibrary` | The data that flows, interns, and freezes. Stages 4, 6, and 7. |
 | `target/` | `TargetProfile`, `WgslBindingScanner` | A target, its access model, and its validator. Phase F fills this folder. |
 | `emit/` | `ShaderLibraryEmitter`, `ShaderManifestEmitter`, `OutputSink`, `StageDump`, `DedupeReport` | Everything that writes through a sink. Stage 8, plus the two reports. |
 | `driver/` | `CookerDriver`, `CookerOptions` | The loop and its command line. |
 
 `CookerErrors.hpp` sits at the top of `include/`, because every folder uses it.
+
+`src/compile/impl/` is the one place a header sits beside its source instead of in `include/`. Those
+five headers name Slang types, so `include/` must not hold them. `include/compile/SlangCompiler.hpp`
+is the wall, and it names no Slang type. **A file that needs `slang.h` belongs in `src/compile/impl/`
+and nowhere else.**
+
+| File | Owns | Lifetime |
+|---|---|---|
+| `SlangCompilerTypes` | The enum conversions, `BindingScope`, `RawBindingDraft`, the option table. | Free functions. |
+| `SlangModuleContext` | One global session, one session, the root module, the entry points, the source texts. | One for each thread. |
+| `SlangVariantCompiler` | Link, target codegen, entry point metadata. Returns `LinkedVariant`. | One for each job. |
+| `SlangReflector` | Every reflection walk. Takes `LinkedVariant`, returns `RawVariant`. | One for each job. |
+| `ThreadPool` | An atomic job index and a latch. Spreads variants across workers. | One for each compiler. |
 
 `client/include/` is not part of this split. It is the contract a renderer links against, and it holds
 four headers and nothing else.
@@ -286,14 +301,14 @@ number would state that every target must supply one. A target supplies a valida
    module and returns the module facts only Slang can supply: the name, the entry point names, and
    the declared default of every `extern static const` constant no axis drives. A size expression may
    name one of those defaults, so it must run before the first variant.
-   `SlangCompiler::CompileVariantRaw` then runs once for each variant. It links and generates. It builds one synthetic Slang
-   module for each active axis value, composites those with the base module, links, then asks Slang
-   for target text for each entry point. Entry point codegen runs on `std::async` unless
-   `MultithreadEntryPointCodegen` is false. Output is `RawVariant`. Every `[vx_*]` argument comes back
-   as the string the author wrote, because evaluating one is stage 4's job.
+   `SlangCompiler::Compile` then runs once for the whole variant set, and returns one
+   `CookResult<RawVariant>` for each variant. A `ThreadPool` spreads the variants across workers.
+   Each worker holds one `SlangModuleContext`, and each job runs a `SlangVariantCompiler` and then a
+   `SlangReflector`. Output is `RawVariant`. Every `[vx_*]` argument comes back as the string the
+   author wrote, because evaluating one is stage 4's job.
 4. **Resolve.** `ResolveVariant` in `model/ResolveStage.cpp` reads the `[vx_*]` attributes and evaluates each
    size expression against a `ResolveContext`. Output is `CompiledVariant`.
-   **`compile/SlangCompiler.cpp` names no size expression and no `[vx_*]` attribute, and
+   **No file under `src/compile/` names a size expression or evaluates a `[vx_*]` attribute, and
    `model/ResolveStage.cpp` names no Slang type.** Phase D step D5 made that true, and it is what lets a second target language
    exist. Do not undo it.
 5. **Normalize.** Empty on purpose. The dedup report says `normalization passes active: (none)`. A
@@ -461,26 +476,24 @@ complete. No `velox` name remains in `src/`, `include/`, `client/`, `tests/`, or
 
 The shader side keeps the old prefix on purpose. `tests/assets/LodestoneAttributes.slang` declares
 `module VeloxAttributes` and the `vx_element_count`, `vx_extent_2d`, and `vx_extent_3d` attributes.
-Those names are part of the shader-side contract, and `src/compile/SlangCompiler.cpp` reads them by string. A
-rename there touches every test shader, so treat it as its own task.
+Those names are part of the shader-side contract, and `src/compile/impl/SlangReflector.cpp` reads
+them by string. A rename there touches every test shader, so treat it as its own task.
 
 ## Documents
 
-**`docs/` is in `.gitignore`.** Only `shader-cooker-handoff.md` and `shader-cooker-change-summary.md`
-are tracked, because they were added before the rule. Every other document below exists on disk and
-in no commit. Force-add one with `git add -f` when it must survive.
+**`docs/` is in `.gitignore`.** A document survives only when somebody force-adds it with
+`git add -f`. Run `git ls-files docs/` to see which ones did. Every other document exists on disk and
+in no commit.
 
 ### Background — what the repository is
 
-- `docs/phase-d-tail-handoff.md` — **read this first.** State, the decisions the author settled, the
-  defects found, and the next task. It is newer than this file on anything that moves.
-- `docs/cooker-rendergraph-plan.md` — the design document. It comes from the engine repository, so it
-  frames the rendergraph as the consumer. The real goal is any rendering backend.
-- `docs/shader-cooker-handoff.md` — state, invariants, and the agreed next tasks. The stage 3 and
-  stage 4 split is the first one.
-- `docs/shader-cooker-change-summary.md` — the eight-stage pipeline, and a commit map.
+- `docs/agent-handoff.md` — **read this first.** State, the build faults that are open, the measured
+  Slang facts, and the next task. It is newer than this file on anything that moves.
 - `README.md` — the author's intent. It mixes shipped features with planned ones. Check the code
   before you trust a feature claim there.
+
+**Check that a document exists before you cite it.** This list has named files that were deleted or
+renamed. `ls docs/` is the only reliable answer.
 
 ### Planned work — where the repository is going
 
@@ -491,15 +504,13 @@ beside them.
   **Complete.** Read it for the reasoning behind the shape of the pipeline, and for §4b, which states
   why a binding record is four tables and not one.
 - `docs/phase-e-data-driven-permutations.md` — axis declarations in the shader, policy in a data file,
-  constraint expressions, and a ranking index in place of mixed radix. **This is the next work.**
-  §9 lists what phase D was asked to leave behind. One item is open: the space dump does not yet
-  carry the axis fields that E2 adds. §1c, §1d, and §1e hold steps E0a, E0b, and E0c, which are found
-  work rather than phase E ideas, and which come first.
+  constraint expressions, and a ranking index in place of mixed radix. **This is the current work.**
+  The compiler split it waited on is complete. Steps E0a and E0b are done. §1e holds step E0c, which
+  is a defect rather than a missing capability, and it comes first. `docs/agent-handoff.md` §8 gives
+  the order.
 - `docs/phase-f-vocabulary.md` — **read this before proposing anything about targets or bindings.**
   It defines axis kind, binding time, and access model, and it divides the work between Slang's
   capability system and this repository. It is a vocabulary, not a plan.
-- `docs/tooling-track.md` — the offline CLI, the diagnostic sink, the live cooker, and the decision
-  not to compress.
 
 Two terms from phase F are worth carrying into any discussion of variants:
 
@@ -515,7 +526,7 @@ supports.
 
 ### The stage numbering
 
-Phase D step D0 settled this, and the three files now agree: **eight numbered stages, each one a
-transformation, and each validator gets a name and no number.** See the data flow section above.
+Phase D step D0 settled this: **eight numbered stages, each one a transformation, and each validator
+gets a name and no number.** See the data flow section above.
 
-The design document calls the phases "tiers". They are the same thing.
+An older document calls the phases "tiers". They are the same thing.

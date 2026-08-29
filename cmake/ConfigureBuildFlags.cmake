@@ -37,16 +37,20 @@ endfunction()
 
 # Specifies generator expressions for flags that are shared between Clang and Emscripten
 # Makes list of different flags far more succinct
+# RelWithDebInfo has to use -O1, as -O2 over-optimizes and -Og causes codegen 
+# crashes with clang 22.1.8 when using the MSVC ABI/RT. this expands to 
+# -fextend-variable-liveness=all, and that's the flag causing the crash
+# todo-ship: scope -Og to just our code, rather than globally
 function(add_shared_clang_style_build_flags_all_targets)
     add_compile_options(
         "$<$<CONFIG:Debug>:-O0;-glldb;>"
-        "$<$<CONFIG:RelWithDebInfo>:-Og;-g;-flto>"
+        "$<$<CONFIG:RelWithDebInfo>:-O1;-g;-flto>"
         "$<$<CONFIG:Release>:-O3;-flto;-fno-exceptions;-fno-rtti;-fno-threadsafe-statics>"
         "$<$<CONFIG:MinSizeRel>:-Oz;-flto;-fno-exceptions;-fno-rtti;-fno-threadsafe-statics>")
     add_link_options(
         "-fuse-ld=lld"
         "$<$<CONFIG:Debug>:-O0;-glldb>"
-        "$<$<CONFIG:RelWithDebInfo>:-Og;-g;-flto>"
+        "$<$<CONFIG:RelWithDebInfo>:-O1;-g;-flto>"
         "$<$<CONFIG:Release>:-O3>"
         "$<$<CONFIG:MinSizeRel>:-Oz;-flto>")
 endfunction()
