@@ -205,12 +205,12 @@ std::string JoinFieldNames(std::span<slang::VariableLayoutReflection* const> pat
  * a dotted name to reflect the hierarchy. Offset is accumulated from the root of the
  * struct, as slang structures offsets from zero based on recursive walks of all fields.
  */
-void CollectUniformMembers(slang::TypeLayoutReflection* struct_layout,
-                           std::vector<ReflectedUniformMember>& members)
+CookError CollectUniformMembers(slang::TypeLayoutReflection* struct_layout,
+                                std::vector<ReflectedUniformMember>& members)
 {
     if (struct_layout == nullptr || struct_layout->getKind() != slang::TypeReflection::Kind::Struct)
     {
-        return;
+        return CookError::Success;
     }
 
     const auto visit = [&members](const LeafVisit& leaf)
@@ -234,6 +234,8 @@ void CollectUniformMembers(slang::TypeLayoutReflection* struct_layout,
     {
         VisitLeaves(struct_layout->getFieldByIndex(i), SLANG_PARAMETER_CATEGORY_UNIFORM, 0u, path, visit);
     }
+    
+    return CookError::Success;
 }
 
 std::string_view ReadSemanticName(slang::VariableLayoutReflection* var_layout) noexcept

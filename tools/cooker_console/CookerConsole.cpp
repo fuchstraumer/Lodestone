@@ -47,7 +47,7 @@ bool RunCookingPipelineWithArgs(const lodestone::CookerOptions& options)
                  statistics.value().ModulesCooked,
                  statistics.value().VariantsCompiled,
                  statistics.value().EntryPointsCompiled,
-                 statistics.value().TotalWgslBytes / 1024u,
+                 statistics.value().TotalSourceBytes / 1024u,
                  statistics.value().ElapsedMilliseconds,
                  sink.Describe());
     return true;

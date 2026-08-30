@@ -6,7 +6,6 @@
 #include "driver/CookerOptions.hpp"
 #include "emit/DedupeReport.hpp"
 #include "emit/OutputSink.hpp"
-#include "emit/ShaderLibraryEmitter.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 #include "emit/StageDump.hpp"
 #include "model/CookedLibrary.hpp"
@@ -299,34 +298,11 @@ namespace
         return CookError::Success;
     }
 
-    CookError EmitLibraryModules(std::string_view header_stem,
-                                 std::string_view header_name,
-                                 const std::vector<CookedModule>& modules,
-                                 OutputSink& sink,
-                                 CookStatistics& statistics)
+    CookError EmitLibraryModules(const std::vector<CookedModule>& modules,
+                                 OutputSink& sink)
     {
         for (const CookedModule& module : modules)
         {
-            const std::string sourceName = MakeModuleSourceFileName(header_stem, module.Name);
-            const std::string source = EmitShaderLibraryModuleSource(module, header_name);
-            const CookError writeSourceResult = sink.WriteArtifact(sourceName, source);
-            if (writeSourceResult != CookError::Success)
-            {
-                return writeSourceResult;
-            }
-
-            statistics.GeneratedSourceBytes += source.size();
-            std::println(stderr,
-                         "[shader_cooker] wrote {} ({} unique sources, {} resources, {} resource "
-                         "lists, {} footprint lists, {} visibility lists, {} KiB)",
-                         sourceName,
-                         module.Sources.size(),
-                         module.Resources.size(),
-                         module.ResourceLists.size(),
-                         module.FootprintLists.size(),
-                         module.VisibilityLists.size(),
-                         source.size() / 1024u);
-
             const std::string manifest = EmitShaderManifest(module);
 
             CookError manifestResult = VerifyManifestRoundTrip(module, manifest);
@@ -355,27 +331,10 @@ namespace
      * todo: For writing files, we can accumulate output we want to write into a buffer, and only validate
      * things once. Validate directory when opening the stream, validate write success of coalesced writes
      * (cleans up control flow)*/
-    CookError EmitLibraryArtifacts(const CookedLibrary& library, OutputSink& sink, CookStatistics& statistics)
+    CookError EmitLibraryArtifacts(const CookedLibrary& library, OutputSink& sink)
     {
-        const std::string headerName{ sink.PrimaryName() };
-        const std::filesystem::path headerPath{ headerName };
-        const std::string headerStem = headerPath.stem().string();
-
-        const std::string header = EmitShaderLibraryHeader(library);
-        CookError result = sink.Write(header);
-        if (result != CookError::Success)
-        {
-            return result;
-        }
-
-        result = EmitLibraryModules(headerStem, headerName, library.Modules, sink, statistics);
-        if (result != CookError::Success)
-        {
-            return result;
-        }
-
         const std::string report = GenerateDedupeReport(library);
-        result = sink.WriteArtifact("ShaderLibrary.dedupe.txt", report);
+        const CookError result = sink.WriteArtifact("ShaderLibrary.dedupe.txt", report);
         if (result != CookError::Success)
         {
             return result;
@@ -454,7 +413,7 @@ namespace
 
         for (const CompiledEntryPoint& entryPoint : variant.EntryPoints)
         {
-            statistics.TotalWgslBytes += entryPoint.Code.size();
+            statistics.TotalSourceBytes += entryPoint.Code.size();
         }
     }
 
@@ -786,7 +745,7 @@ CookResult<CookStatistics> RunCookOnce(const CookerOptions& options, OutputSink&
         return std::unexpected(CookError::ReflectionMismatch);
     }
 
-    const CookError emitResult = EmitLibraryArtifacts(library, sink, statistics);
+    const CookError emitResult = EmitLibraryArtifacts(library, sink);
     if (emitResult != CookError::Success)
     {
         return std::unexpected(emitResult);
