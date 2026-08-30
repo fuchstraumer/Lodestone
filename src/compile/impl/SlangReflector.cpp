@@ -15,8 +15,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <expected>
 #include <format>
+#include <functional>
 #include <optional>
 #include <print>
 #include <ranges>
@@ -30,6 +32,8 @@ namespace
 {
 
 using namespace lodestone;
+
+constexpr size_t k_MaxRecursiveDepth = 16u;
 
 /** What Slang names the scope it moves each entry point `uniform` parameter into.
  *
@@ -181,24 +185,24 @@ void WalkVaryingTree(slang::VariableLayoutReflection* var_layout,
  * caller that needs a full name can refuse a partial one. */
 std::string JoinFieldNames(std::span<slang::VariableLayoutReflection* const> path)
 {
-    auto toStrView = [](const char* name) -> std::string_view
-    {
-        return name ? std::string_view{ name } : std::string_view{};
-    };
-
-    auto fieldNames = path | std::views::transform(&slang::VariableLayoutReflection::getName) |
-                      std::views::transform(toStrView);
-    if (std::ranges::any_of(fieldNames,
-                            [](std::string_view name)
-                            {
-                                return name.empty();
-                            }))
+    if (path.empty())
     {
         return std::string{};
     }
+    
+    std::string result;
+  
+    for (auto* field : path)
+    {
+        if (!result.empty())
+        {
+            result.append(".");
+        }
 
-    auto joinedView = fieldNames | std::views::join_with(std::string_view("."));
-    return std::ranges::to<std::string>(joinedView);
+        result.append(field->getName());
+    }
+
+    return result;
 }
 
 /**Flattens one uniform block into rows of name, offset, and size. Nested fields take
@@ -212,6 +216,8 @@ CookError CollectUniformMembers(slang::TypeLayoutReflection* struct_layout,
     {
         return CookError::Success;
     }
+    
+    std::array<std::string_view, k_MaxRecursiveDepth> fieldNamesBuffer{};
 
     const auto visit = [&members](const LeafVisit& leaf)
     {
@@ -507,8 +513,10 @@ void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
     }
 
     out_bindings.insert_range(out_bindings.end(),
-                              drafts | std::views::transform(&RawBindingDraft::Binding) |
-                                  std::views::as_rvalue);
+                              drafts | std::views::transform(&RawBindingDraft::Binding));
+    // std::views::join will effectively expand to a push_back for each element in the joined ranges, so reserve upfront
+    const size_t attributesCount = std::ranges::fold_left(drafts | std::views::transform([](const RawBindingDraft& draft) { return draft.Attributes.size(); }), size_t{ 0u }, std::plus{});
+    out_attributes.reserve(out_attributes.size() + attributesCount);
     out_attributes.insert_range(out_attributes.end(),
                                 drafts | std::views::transform(&RawBindingDraft::Attributes) |
                                     std::views::join | std::views::as_rvalue);
@@ -533,7 +541,7 @@ std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_vari
         {
             return false;
         }
-
+        // calling across the dll boundary means no inlining this :( 
         bool isUsed = false;
         metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
                                           boundPlacement->Group,
@@ -600,10 +608,10 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
 
         // now we need to append the indices of the used bindings for *this* entry point
         auto newIndices = std::views::iota(ownedBaseSize, static_cast<uint32_t>(rawVariant.Bindings.size()));
-        rawEntryPoint.UsedBindingIndices.append_range(newIndices | std::views::as_rvalue);
+        rawEntryPoint.UsedBindingIndices.append_range(newIndices);
         // set suffix, and copy over the target text
         rawEntryPoint.VariantSuffix = rawVariant.VariantSuffix;
-        rawEntryPoint.TargetText = std::move(linked_variant.EntryPointStrings[i]);
+        rawEntryPoint.TargetText = std::move(linked_variant.EntryPointStrings[static_cast<size_t>(i)]);
         // weird quirk: dereferencing a std::expected with * directly returns an rvalue. otherwise 
         // we would have to do std::move(entryPointResult).value() lol
         rawVariant.EntryPoints.emplace_back(std::move(*entryPointResult));
