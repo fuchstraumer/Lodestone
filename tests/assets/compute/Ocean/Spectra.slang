@@ -61,7 +61,6 @@ internal float GetJonswapPeakOmega(in float dimensionlessFetch, in float windSpe
 }
 
 // peak sharpening is gamma raised to this value
-// todo: is this actually the right formulation of this value? it differs from references, but follows paper...
 internal float GetPeakSharpeningPower(in float omega, in float peakOmega)
 {
     float sigma = (omega <= peakOmega) ? 2.0f * (0.07f * 0.07f) : 2.0f * (0.09f * 0.09f);
@@ -77,7 +76,7 @@ internal float KitaiGorodskiiDepthCorrection(in float omega, in float depth)
     // (which isn't happening), but this is a good compromise and is nice and branchless and still clamped
     // bizarrely, horvath's own tanh approximation is actually a worse fit than all of the alternatives. i think he chose it for boundary
     // condition handling happening gracefully
-    const float omegaH = omega * sqrt(depth / OceanFft_G);
+    const float omegaH = omega * sqrt(depth * OceanFft_InvG);
     return smoothstep(0.0f, 2.0f, omegaH);
 }
 
@@ -183,25 +182,34 @@ internal float SwellDirectionalSpreading(in float theta, in float omega, in floa
 
 internal float SpreadPowerMitsuyasu(in float omega, in float peakOmega, in float windSpeed)
 {
-    const float x = (peakOmega * windSpeed) / OceanFft_G;
+    const float x = (peakOmega * windSpeed) * OceanFft_InvG;
     const float xPow = pow(x, -2.5f);
     return 11.5f * xPow;
 }
 
+internal float SpreadFactorMitsuyasu(in float spreadPower, in float omega, in float peakOmega)
+{
+    const float exponent = omega <= peakOmega ? 5.0f : -2.5f;
+    return spreadPower * pow(omega / peakOmega, exponent);
+}
+
 internal float SpreadPowerHasselman(in float omega, in float peakOmega, in float windSpeed)
 {
-    const float windOverModalCelerity = windSpeed / (OceanFft_G / peakOmega);
-    float shape = 0.0f;
-    if (omega > peakOmega)
+    if (omega <= peakOmega)
     {
-        // what the hell
-        shape = 9.77f * pow(omega / peakOmega, -2.33f - (1.45f * (windOverModalCelerity - 1.17f)));
+        return 4.06f;
     }
     else
     {
-        shape = 6.97f * pow(omega / peakOmega, 4.06f);
+        const float inputFactor = (windSpeed * peakOmega) * OceanFft_InvG;
+        return -2.33f - (1.45f * (inputFactor - 1.17f));
     }
-    return shape;
+}
+
+internal float SpreadFactorHasselman(in float spreadPower, in float omega, in float peakOmega)
+{
+    const float factor = omega <= peakOmega ? 6.97f : 9.77f;
+    return factor * pow(omega / peakOmega, spreadPower);
 }
 
 internal float PositiveCosineSquaredDirectionalSpreading(in float theta, in float spreadPower)
@@ -218,9 +226,12 @@ internal float MitsuyasuDirectionalSpread(
     in float swellAmount)
 {
     const float spreadPower = SpreadPowerMitsuyasu(omega, peakOmega, windSpeed);
-    const float norm = MitsuyasuNormalizationFactor(spreadPower);
-    const float swell = SwellDirectionalSpreading(theta, omega, peakOmega, swellAmount);
-    return PositiveCosineSquaredDirectionalSpreading(theta, spreadPower + swell) * norm;
+    // fix: we should use the spread factor for normalization, not the raw spread power
+    const float spreadFactor = SpreadFactorMitsuyasu(spreadPower, omega, peakOmega);
+    // fix: swell amount from SwellShaper (not other fn) is *added* to shapeFactor 
+    const float finalSpreadFactor = spreadFactor + SwellShaper(omega, peakOmega, swellAmount);
+    const float norm = MitsuyasuNormalizationFactor(finalSpreadFactor);
+    return PositiveCosineSquaredDirectionalSpreading(theta, finalSpreadFactor) * norm;
 }
 
 internal float HasselmanDirectionalSpreading(
@@ -231,9 +242,11 @@ internal float HasselmanDirectionalSpreading(
     in float swellAmount)
 {
     const float spreadPower = SpreadPowerHasselman(omega, peakOmega, windSpeed);
-    const float norm = HasselmanNormalizationFactor(spreadPower);
-    const float swell = SwellDirectionalSpreading(theta, omega, peakOmega, swellAmount);
-    return PositiveCosineSquaredDirectionalSpreading(theta, spreadPower + swell) * norm;
+    const float spreadFactor = SpreadFactorHasselman(spreadPower, omega, peakOmega);
+    // fix: same issue as mitsuyasu. we just add SwellShaper to the spread *factor*
+    const float finalSpreadFactor = spreadFactor + SwellShaper(omega, peakOmega, swellAmount);
+    const float norm = HasselmanNormalizationFactor(finalSpreadFactor);
+    return PositiveCosineSquaredDirectionalSpreading(theta, finalSpreadFactor) * norm;
 }
 
 // closed form of Donelan-Banner directional spreading. d/dTheta[tanh(beta * theta)] = beta * sech^2(beta * theta)
@@ -250,11 +263,12 @@ internal float DonelanBannerDirectionalSpreading(
     in SamplerState normSampler,
     in Texture2D normTexture)
 {
-    const float beta = DonelanBannerBeta(omega, peakOmega);                              // u axis
-    const float swell = SwellDirectionalSpreading(theta, omega, peakOmega, swellAmount); // v axis
-    // we pre-divide before storing to the lut, so we can just mul by this
-    const float norm = SampleHasselmanLUT(beta, swell, normTexture, normSampler);
+    const float beta = DonelanBannerBeta(omega, peakOmega);               // u axis
+    const float swellShape = SwellShaper(omega, peakOmega, swellAmount);  // v axis
+    // LUT is stored as the inverse, so we can just mul it
+    const float norm = SampleHasselmanLUT(beta, swellShape, normTexture, normSampler);
     const float db = 1.0f / cosh(theta * beta);
     const float db2 = db * db;
+    const float swell = SwellDirectionalSpreading(theta, omega, peakOmega, swellAmount);
     return (db2 * swell) * norm;
 }

@@ -7,6 +7,7 @@ internal const static half IFFT_RADIX4_SCALE_FACTOR = 0.25h;
 internal const static float OceanFft_PI = 3.1415926535897932384626433832795f;
 internal const static float OceanFft_2PI = 6.283185307179586476925286766559f;
 internal const static float OceanFft_G = 9.81f;
+internal const static float OceanFft_InvG = 1.0f / OceanFft_G;
 internal const static float OceanFft_SigmaOverRho = 0.074e-3f; // surface tension over density of water
 
 public struct SpectrumParameters

@@ -111,7 +111,7 @@ internal float DirectionalSpreading(
     }
     else if (DirectionalSpreadingMode == OCEAN_FFT_SPREAD_MODE_DONELAN_BANNER)
     {
-        spread = DonelanBannerDirectionalSpreading(theta, omega, peakOmega, windSpeed, normSampler, normTexture);
+        spread = DonelanBannerDirectionalSpreading(theta, omega, peakOmega, swellAmount, normSampler, normTexture);
     }
 
     // now get into range
@@ -125,8 +125,8 @@ internal float ShortWavesFade(in float kLength, in float fadeLength)
 
 [shader("compute")]
 [numthreads(8, 8, FFT_NUM_WAVE_CASCADES)]
-void SpectrumInitCS(uint3 dispatchThreadID: SV_DispatchThreadID,
-                    uint3 groupThreadID: SV_GroupThreadID)
+void SpectrumInitCS(uint3 dispatchThreadID : SV_DispatchThreadID,
+                    uint3 groupThreadID : SV_GroupThreadID)
 {
     // even though we partition this into workgroups, it's still important to consider coords as global
     int2 coordinates = int2(dispatchThreadID.x - FFT_SIZE / 2, dispatchThreadID.y - FFT_SIZE / 2);
@@ -134,7 +134,7 @@ void SpectrumInitCS(uint3 dispatchThreadID: SV_DispatchThreadID,
     float dK = OceanFft_2PI / cascadeParams.LengthScales[cascade];
     const float2 k = dK * float2(coordinates);
     const float kLength = max(length(k), 1e-6f);
-    const uint linearIndex = LinearizeThreadIndex(groupThreadID, cascadeParams.Dimensions);
+    const uint linearIndex = LinearizeThreadIndex(dispatchThreadID, cascadeParams.Dimensions);
 
     float contribution = CascadeContribution(kLength, cascade, cascadeParams);
     if (contribution > 0.0f)
@@ -165,7 +165,8 @@ void SpectrumInitCS(uint3 dispatchThreadID: SV_DispatchThreadID,
         const float finalSpectrum = freqComponent * directionalComponent * fade;
         const float dK2 = dK * dK;
         const float dOmegaUnit = abs(omegaAnddOmegadK.y) / kLength;
-        const float spectrumNorm = sqrt(2.0f * finalSpectrum * dOmegaUnit * dK2);
+        // fix: multiplied by 2.0f, which is the Tessendorf form instead of Horvath's improved form
+        const float spectrumNorm = sqrt(finalSpectrum * dOmegaUnit * dK2);
         const float2 scaledPermutedSpectrum = contribution.xx * randomFloats * spectrumNorm.xx;
         // for the sake of debugging right now, we put finalSpectrum in .y
         WaveData[linearIndex] = half4(half(k.x),
