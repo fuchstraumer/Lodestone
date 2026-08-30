@@ -54,7 +54,7 @@ bool AllVariantsShareOneLayout(const CookedModule& module);
 
 /** Compares the measured influence against what the module declared, and checks the variant budget.
  * A mismatch fails the cook and names the entry point and the axis. */
-CookResult<void> EnforceModulePolicy(const CookedModule& module, const ModuleInfluence& influence);
+CookError EnforceModulePolicy(const CookedModule& module, const ModuleInfluence& influence);
 
 std::string GenerateDedupeReport(const CookedLibrary& library);
 

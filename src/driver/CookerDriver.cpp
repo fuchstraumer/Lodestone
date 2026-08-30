@@ -214,7 +214,7 @@ namespace
      * The source table has a second opinion, and until this check the layout table had none.
      * `CheckManifestLayout` compares the manifest against the table it was written from, so it can
      * prove the serialization is faithful and cannot see a wrong collapse. */
-    CookResult<void> VerifyLayoutRoundTrip(const CookedModule& module,
+    CookError VerifyLayoutRoundTrip(const CookedModule& module,
                                            std::span<const CompiledVariant> compiled)
     {
         uint32_t mismatches = 0u;
@@ -245,13 +245,13 @@ namespace
 
         if (mismatches != 0u)
         {
-            return std::unexpected(CookError::LibraryRoundTripFailed);
+            return CookError::LibraryRoundTripFailed;
         }
 
-        return {};
+        return CookError::Success;
     }
 
-    CookResult<void> VerifyLibraryRoundTrip(const CookedModule& module,
+    CookError VerifyLibraryRoundTrip(const CookedModule& module,
                                             std::span<const CompiledVariant> compiled)
     {
         if (module.Variants.size() != compiled.size())
@@ -261,7 +261,7 @@ namespace
                          module.Name,
                          module.Variants.size(),
                          compiled.size());
-            return std::unexpected(CookError::LibraryRoundTripFailed);
+            return CookError::LibraryRoundTripFailed;
         }
 
         uint32_t mismatches = 0u;
@@ -293,10 +293,10 @@ namespace
 
         if (mismatches != 0u)
         {
-            return std::unexpected(CookError::LibraryRoundTripFailed);
+            return CookError::LibraryRoundTripFailed;
         }
 
-        return {};
+        return CookError::Success;
     }
 
     CookError EmitLibraryModules(std::string_view header_stem,
@@ -404,8 +404,9 @@ namespace
 
     /** Builds the compiler for one module, and checks everything that must hold before the first
      * variant compiles. */
-    CookResult<void> PrepareModuleCompiler(const CookerOptions& options,
+    CookError PrepareModuleCompiler(const CookerOptions& options,
                                            const std::filesystem::path& module_path,
+                                           const TargetProfile& target_profile,
                                            DiagnosticSink& diagnostics,
                                            SlangCompiler& compiler,
                                            const PermutationSpace*& out_space)
@@ -415,11 +416,12 @@ namespace
         createInfo.ModuleCacheDirectory = options.ModuleCacheDirectory;
         createInfo.OptimizationLevel = options.OptimizationLevel;
         createInfo.MultithreadVariantBuild = options.MultithreadEntryPointCodegen;
+        createInfo.AccessModel = PlacementKindFromAccessModel(target_profile.Access);
 
         if (auto initializeResult = compiler.Initialize(createInfo, diagnostics);
-            initializeResult != CookError::Success)
+            !initializeResult)
         {
-            return std::unexpected(initializeResult);
+            return initializeResult;
         }
 
         const std::string_view moduleName = compiler.ModuleName();
@@ -433,15 +435,15 @@ namespace
         const std::vector<std::string_view> sourceViews{ compiler.ModuleSourceStringViews() };
 
         if (const CookError axisResult = out_space->VerifyAxisNamesAreDeclared(sourceViews, moduleName);
-            axisResult != CookError::Success)
+            !axisResult)
         {
-            return std::unexpected(axisResult);
+            return axisResult;
         }
 
         // No error checking needed as ReportUndrivenExternConstants now returns void
         out_space->ReportUndrivenExternConstants(sourceViews, moduleName);
 
-        return {};
+        return CookError::Success;
     }
 
     /** Everything the cook measures for one compiled variant, before it reaches the tables. */
@@ -564,17 +566,16 @@ namespace
                                             std::span<const CompiledVariant> module_variants)
     {
         CookedModule cookedModule = FreezeModuleTables(std::move(interned_module));
-
-        if (CookResult<void> roundTripResult = VerifyLibraryRoundTrip(cookedModule, module_variants);
-            !roundTripResult)
+        const CookError roundTripResult = VerifyLibraryRoundTrip(cookedModule, module_variants);
+        if (!roundTripResult)
         {
-            return std::unexpected(roundTripResult.error());
+            return std::unexpected(roundTripResult);
         }
 
-        if (CookResult<void> layoutResult = VerifyLayoutRoundTrip(cookedModule, module_variants);
-            !layoutResult)
+        const CookError layoutResult = VerifyLayoutRoundTrip(cookedModule, module_variants);
+        if (!layoutResult)
         {
-            return std::unexpected(layoutResult.error());
+            return std::unexpected(layoutResult);
         }
 
         std::println(stderr,
@@ -584,15 +585,16 @@ namespace
                      cookedModule.Variants.size());
 
         const ModuleInfluence influence = ComputeAxisInfluence(cookedModule);
-        if (const CookResult<void> policy = EnforceModulePolicy(cookedModule, influence); !policy)
+        const CookError policyError = EnforceModulePolicy(cookedModule, influence);
+        if (!policyError)
         {
-            return std::unexpected(policy.error());
+            return std::unexpected(policyError);
         }
 
         return cookedModule;
     }
 
-    CookResult<void> CookModule(const CookerOptions& options,
+    CookError CookModule(const CookerOptions& options,
                                 const std::filesystem::path& module_path,
                                 OutputSink& sink,
                                 DiagnosticSink& diagnostics,
@@ -603,17 +605,15 @@ namespace
         const TargetProfile* target = FindTargetProfile(options.TargetName);
         if (target == nullptr)
         {
-            return std::unexpected(CookError::UnknownTargetProfile);
+            return CookError::UnknownTargetProfile;
         }
 
         SlangCompiler compiler;
         const PermutationSpace* space = nullptr;
-
-        if (CookResult<void> prepared =
-                PrepareModuleCompiler(options, module_path, diagnostics, compiler, space);
-            !prepared)
+        CookError prepareResult = PrepareModuleCompiler(options, module_path, *target, diagnostics, compiler, space);
+        if (!prepareResult)
         {
-            return prepared;
+            return prepareResult;
         }
 
         // Said once for each module, because a cook that checked nothing must not look like a cook
@@ -627,7 +627,7 @@ namespace
         const CookResult<VariantSet> variantSet = space->EnumerateVariants();
         if (!variantSet)
         {
-            return std::unexpected(variantSet.error());
+            return variantSet.error();
         }
 
         const std::string_view moduleName = compiler.ModuleName();
@@ -645,7 +645,7 @@ namespace
             WriteStageDumpIfRequested(options, sink, moduleName, StageDumpKind::Space, dumpPermutationSpace);
         if (spaceDumpResult != CookError::Success)
         {
-            return std::unexpected(spaceDumpResult);
+            return spaceDumpResult;
         }
 
         auto dumpVariantSet = [&moduleName, &variantSet]()
@@ -656,7 +656,7 @@ namespace
             WriteStageDumpIfRequested(options, sink, moduleName, StageDumpKind::Variants, dumpVariantSet);
         if (variantDumpResult != CookError::Success)
         {
-            return std::unexpected(variantDumpResult);
+            return variantDumpResult;
         }
 
         InternedModule internedModule;
@@ -674,7 +674,7 @@ namespace
         CookResult<RawModule> rawModuleResult = compiler.PrepareRawModule(*space);
         if (!rawModuleResult)
         {
-            return std::unexpected(rawModuleResult.error());
+            return rawModuleResult.error();
         }
 
         RawModule rawModule = std::move(rawModuleResult.value());
@@ -689,7 +689,7 @@ namespace
                                                                       diagnostics);
         if (compileVariantsResult != CookError::Success)
         {
-            return std::unexpected(compileVariantsResult);
+            return compileVariantsResult;
         }
 
         auto dumpRawModule = [&]()
@@ -700,7 +700,7 @@ namespace
             WriteStageDumpIfRequested(options, sink, moduleName, StageDumpKind::Raw, dumpRawModule);
         if (rawDumpResult != CookError::Success)
         {
-            return std::unexpected(rawDumpResult);
+            return rawDumpResult;
         }
 
         auto dumpResolvedModule = [&]()
@@ -711,7 +711,7 @@ namespace
             WriteStageDumpIfRequested(options, sink, moduleName, StageDumpKind::Resolved, dumpResolvedModule);
         if (resolvedDumpResult != CookError::Success)
         {
-            return std::unexpected(resolvedDumpResult);
+            return resolvedDumpResult;
         }
 
         // Written before the freeze, because this is the one dump whose subject stops existing. Every
@@ -724,13 +724,13 @@ namespace
             WriteStageDumpIfRequested(options, sink, moduleName, StageDumpKind::Interned, dumpInternedModule);
         if (internedDumpResult != CookError::Success)
         {
-            return std::unexpected(internedDumpResult);
+            return internedDumpResult;
         }
 
         CookResult<CookedModule> finalized = FinalizeModule(std::move(internedModule), moduleVariants);
         if (!finalized)
         {
-            return std::unexpected(finalized.error());
+            return finalized.error();
         }
 
         CookedModule cookedModule = std::move(finalized.value());
@@ -743,12 +743,12 @@ namespace
             WriteStageDumpIfRequested(options, sink, moduleName, StageDumpKind::Cooked, dumpCookedModule);
         if (cookedDumpResult != CookError::Success)
         {
-            return std::unexpected(cookedDumpResult);
+            return cookedDumpResult;
         }
 
         out_library.Modules.push_back(std::move(cookedModule));
         ++statistics.ModulesCooked;
-        return {};
+        return CookError::Success;
     }
 
 } // namespace
@@ -773,11 +773,11 @@ CookResult<CookStatistics> RunCookOnce(const CookerOptions& options, OutputSink&
     for (const std::filesystem::path& modulePath : options.ModulePaths)
     {
         std::println(stderr, "[shader_cooker] cooking {}", modulePath.string());
-        const CookResult<void> moduleResult =
+        const CookError moduleResult =
             CookModule(options, modulePath, sink, diagnostics, library, statistics);
         if (!moduleResult)
         {
-            return std::unexpected(moduleResult.error());
+            return std::unexpected(moduleResult);
         }
     }
 

@@ -14,7 +14,7 @@ set(SLANG_ENABLE_REPLAYER OFF CACHE BOOL "Enable slang-replay tool")
 set(SLANG_ENABLE_SLANG_RHI OFF CACHE BOOL "Use slang-rhi as dependency")
 set(SLANG_EXCLUDE_DAWN ON CACHE BOOL "Optionally exclude webgpu_dawn from the build")
 set(SLANG_EXCLUDE_TINT ON CACHE BOOL "Optionally exclude slang-tint from the build")
-set(SLANG_ENABLE_RELEASE_LTO ON CACHE BOOL "Enable LTO for release builds")
+set(SLANG_ENABLE_RELEASE_LTO OFF CACHE BOOL "Enable LTO for release builds")
 set(SLANG_USE_SYSTEM_VULKAN_HEADERS ON)
 set(SLANG_ENABLE_MIMALLOC OFF)
 set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC OFF)
@@ -223,20 +223,13 @@ function(copy_slang_dlls_to_target TARGET_NAME)
         return()
     endif()
 
-    # Define the list of DLLs that need to be copied
-    # These are built by Slang and required at runtime
-    set(SLANG_DLL_NAMES
-        "slang-compiler.dll"
-        "slang-compiler.pdb")
-
-    # For each DLL, add a post-build command to copy it to the target's output directory
-    foreach(DLL_NAME ${SLANG_DLL_NAMES})
-        add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/${DLL_NAME}"
-                "$<TARGET_FILE_DIR:${TARGET_NAME}>/${DLL_NAME}"
-            COMMENT "Copying ${DLL_NAME} to ${TARGET_NAME} output directory"
-            VERBATIM
-        )
-    endforeach()
+    # Ask CMake where the Slang library is. Do not write the path.
+    # Slang decides its own output directory, and it moved that directory in v2026.16
+    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:slang>"
+            "$<TARGET_FILE_DIR:${TARGET_NAME}>"
+        COMMENT "Copying the Slang library to the ${TARGET_NAME} output directory"
+        VERBATIM
+    )
 endfunction()

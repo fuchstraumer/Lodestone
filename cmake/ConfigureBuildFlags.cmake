@@ -37,6 +37,9 @@ endfunction()
 
 # Specifies generator expressions for flags that are shared between Clang and Emscripten
 # Makes list of different flags far more succinct
+# LTO is off for every configuration. lld 22.1.8 crashes on the link of the Slang
+# shared library, and the crash stops any build of a clean tree. Slang sets LTO off
+# by default for the same class of reason.
 # RelWithDebInfo has to use -O1, as -O2 over-optimizes and -Og causes codegen 
 # crashes with clang 22.1.8 when using the MSVC ABI/RT. this expands to 
 # -fextend-variable-liveness=all, and that's the flag causing the crash
@@ -44,15 +47,15 @@ endfunction()
 function(add_shared_clang_style_build_flags_all_targets)
     add_compile_options(
         "$<$<CONFIG:Debug>:-O0;-glldb;>"
-        "$<$<CONFIG:RelWithDebInfo>:-O1;-g;-flto>"
-        "$<$<CONFIG:Release>:-O3;-flto;-fno-exceptions;-fno-rtti;-fno-threadsafe-statics>"
-        "$<$<CONFIG:MinSizeRel>:-Oz;-flto;-fno-exceptions;-fno-rtti;-fno-threadsafe-statics>")
+        "$<$<CONFIG:RelWithDebInfo>:-O1;-g>"
+        "$<$<CONFIG:Release>:-O3;-fno-exceptions;-fno-rtti;-fno-threadsafe-statics>"
+        "$<$<CONFIG:MinSizeRel>:-Oz;-fno-exceptions;-fno-rtti;-fno-threadsafe-statics>")
     add_link_options(
         "-fuse-ld=lld"
         "$<$<CONFIG:Debug>:-O0;-glldb>"
-        "$<$<CONFIG:RelWithDebInfo>:-O1;-g;-flto>"
+        "$<$<CONFIG:RelWithDebInfo>:-O1;-g>"
         "$<$<CONFIG:Release>:-O3>"
-        "$<$<CONFIG:MinSizeRel>:-Oz;-flto>")
+        "$<$<CONFIG:MinSizeRel>:-Oz>")
 endfunction()
 
 function(add_clang_style_build_flags_all_targets)

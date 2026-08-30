@@ -462,12 +462,12 @@ namespace
 
 } // namespace
 
-CookResult<void> EnforceModulePolicy(const CookedModule& module, const ModuleInfluence& influence)
+CookError EnforceModulePolicy(const CookedModule& module, const ModuleInfluence& influence)
 {
     const ModulePolicy* policy = FindPolicyForModule(module.Name);
     if (policy == nullptr)
     {
-        return {};
+        return CookError::Success;
     }
 
     uint32_t violations = CheckVariantBudget(module, *policy);
@@ -479,10 +479,10 @@ CookResult<void> EnforceModulePolicy(const CookedModule& module, const ModuleInf
 
     if (violations != 0u)
     {
-        return std::unexpected(CookError::ModulePolicyViolated);
+        return CookError::ModulePolicyViolated;
     }
 
-    return {};
+    return CookError::Success;
 }
 
 std::string GenerateDedupeReport(const CookedLibrary& library)

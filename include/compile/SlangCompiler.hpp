@@ -5,6 +5,7 @@
 #include "RawLibrary.hpp"
 #include "Diagnostics.hpp"
 #include "permute/PermutationSpace.hpp"
+#include "ShaderLibraryTypes.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -28,6 +29,10 @@ struct SlangCompilerCreateInfo
     std::filesystem::path ModuleCacheDirectory;
     uint32_t OptimizationLevel{ 0u };
     bool MultithreadVariantBuild{ true };
+    /**@brief If multithreading enabled, it's important to specify expected batch size.
+     * As session creation is expensive, using all threads for low variant counts oversubscribes and slows the build. */
+    size_t ExpectedBatchSize{ 0u };
+    PlacementKind AccessModel;
 };
 
 class ThreadPool;

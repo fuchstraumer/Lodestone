@@ -33,6 +33,7 @@ enum class CookError : uint16_t
     SizeExpressionUnknownSymbol = 44,
     SizeExpressionDivideByZero = 45,
     SizeExpressionOutOfRange = 46,
+    PointerTypeNotSupported = 47, // tried to use pointer placements w unsupported target
 
     NoModulesSpecified = 60,
     NoOutputSpecified = 61,
@@ -75,6 +76,16 @@ enum class CookError : uint16_t
     SlangCoreModuleLoadFailed = 221,
     SlangCoreModuleBuildFailed = 222
 };
+
+constexpr bool operator!(CookError error) noexcept
+{
+    return error != CookError::Success;
+}
+
+constexpr bool IsSuccess(CookError error) noexcept
+{
+    return error == CookError::Success;
+}
 
 template<typename T>
 using CookResult = std::expected<T, CookError>;

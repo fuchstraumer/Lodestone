@@ -1,6 +1,7 @@
 #include "target/TargetProfile.hpp"
-#include "model/ShaderDataSchema.hpp"
 #include "target/WgslBindingScanner.hpp"
+#include "model/ShaderDataSchema.hpp"
+#include "ShaderLibraryTypes.hpp"
 
 #include <array>
 #include <span>
@@ -42,14 +43,14 @@ namespace
             // this is a WGSL binding validator: we can collapse these to BoundPlacement* pointers
             // Copy "used" to sort, and sort `declared`: We will scan by location otherwise, wasting time
             std::ranges::sort(declared,
-                              [](const WgslDeclaredBinding& a, const WgslDeclaredBinding& b)
+                              [](const WgslDeclaredBinding& lhs, const WgslDeclaredBinding& rhs)
                               {
                                 // for descriptor layouts, sort first by group then by binding
-                                if (a.Group != b.Group)
+                                if (lhs.Group != rhs.Group)
                                 {
-                                    return a.Group < b.Group;
+                                    return lhs.Group < rhs.Group;
                                 }
-                                return a.Binding < b.Binding;
+                                return lhs.Binding < rhs.Binding;
                               });
             // used comes to us unsorted, as the caller of this code is not supposed to know the 
             // target (and thus, binding model) it is calling for validation.
@@ -102,6 +103,23 @@ const TargetProfile* FindTargetProfile(std::string_view name) noexcept
 std::span<const std::string_view> GetTargetProfileNames() noexcept
 {
     return k_TargetProfileNames;
+}
+
+PlacementKind PlacementKindFromAccessModel(AccessModel model) noexcept
+{
+    switch (model)
+    {
+    case AccessModel::Bound:
+        return PlacementKind::Bound;
+    case AccessModel::Indexed:
+        return PlacementKind::Indexed;
+    case AccessModel::Pointer:
+        return PlacementKind::Pointer;
+    case AccessModel::Invalid:
+        [[fallthrough]];
+    default:
+        return PlacementKind::None;
+    }
 }
 
 } // namespace lodestone

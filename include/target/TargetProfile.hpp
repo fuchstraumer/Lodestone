@@ -1,4 +1,5 @@
 #pragma once
+#include "ShaderLibraryTypes.hpp"
 #ifndef LODESTONE_TARGET_PROFILE_HPP
 #define LODESTONE_TARGET_PROFILE_HPP
 #include "model/ShaderDataSchema.hpp"
@@ -15,6 +16,7 @@
 namespace lodestone
 {
 
+// todo-ship: unify this with "PlacementKind" in ShaderLibraryTypes.hpp eventually
 /**@brief: How a shader reaches a resource. */
 enum class AccessModel : uint8_t
 {
@@ -76,6 +78,8 @@ const TargetProfile* FindTargetProfile(std::string_view name) noexcept;
 
 /** Every target name this build accepts, for the usage text and for an error message. */
 std::span<const std::string_view> GetTargetProfileNames() noexcept;
+
+PlacementKind PlacementKindFromAccessModel(AccessModel model) noexcept;
 
 } // namespace lodestone
 

@@ -164,7 +164,14 @@ target_include_directories(lodestone PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/slang/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/magic_enum/include")
 target_link_libraries(lodestone PRIVATE slang lodestone::client_internal xxHash::xxhash lodestone::json)
-target_compile_options(lodestone PUBLIC "$<$<CONFIG:RelWithDebInfo>:/Ob2;/arch:AVX2>")
+# /Ob2 and /arch:AVX2 are MSVC spellings, and the full Clang driver rejects both. The pure Clang
+# build therefore gets the GNU spelling of the same two requests. Every other flag decision in this
+# file goes through the compiler test at the top, and this one must also.
+if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    target_compile_options(lodestone PUBLIC "$<$<CONFIG:RelWithDebInfo>:/Ob2;/arch:AVX2>")
+else()
+    target_compile_options(lodestone PUBLIC "$<$<CONFIG:RelWithDebInfo>:-finline-functions;-mavx2>")
+endif()
 if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     target_compile_definitions(lodestone PRIVATE "_HAS_CXX23=1")
     # No sanitizer here. AddressSanitizer on Windows does not support the debug CRT: it intercepts
