@@ -88,7 +88,7 @@ namespace
         {
             return DiagnosticSeverity::Error;
         }
-        else if (name == "fatal error" || name == "internal error") [[unlikely]]
+        else if (name == "fatal error" || name == "internal error")
         {
             return DiagnosticSeverity::Fatal;
         }
