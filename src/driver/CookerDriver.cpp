@@ -113,30 +113,25 @@ namespace
 
     void ReportUnreferencedBindings(const CompiledVariant& variant)
     {
-        // i think we could flatten this even more with a vector of bools or bytes, but that's kinda ugly
-        auto extractUsedBindingIndices = [](const CompiledEntryPoint& entry_point)
+        std::vector<uint8_t> used(variant.Bindings.size(), uint8_t{0});
+        for (const CompiledEntryPoint& entryPoint : variant.EntryPoints)
         {
-            return entry_point.Reflection.UsedBindingIndices;
-        };
-        auto allUsedBindingIndices = variant.EntryPoints | std::views::transform(extractUsedBindingIndices) |
-                                     std::views::join | std::ranges::to<std::vector<uint32_t>>();
+            for (const auto& bindingIndex : entryPoint.Reflection.UsedBindingIndices)
+            {
+                used[bindingIndex] = static_cast<uint8_t>(true);
+            }
+        }
 
-        std::ranges::sort(allUsedBindingIndices);
-        // clear out duplicates
-        auto [beginDuplicates, endDuplicates] = std::ranges::unique(allUsedBindingIndices);
-        allUsedBindingIndices.erase(beginDuplicates, endDuplicates);
-        std::vector<uint32_t> unusedBindingIndices;
-        std::ranges::set_difference(std::views::iota(0u, static_cast<uint32_t>(variant.Bindings.size())),
-                                    allUsedBindingIndices,
-                                    std::back_inserter(unusedBindingIndices));
-
-        for (const auto& unusedIndex : unusedBindingIndices)
+        for (const auto [index, isUsed] : std::views::enumerate(used))
         {
-            std::println(
-                stderr,
-                "[shader_cooker] unreferenced binding in [{}]: {} is declared but no entrypoint reads it",
-                variant.VariantDescription,
-                DescribeBinding(variant.Bindings[unusedIndex]));
+            if (!static_cast<bool>(isUsed))
+            {
+                std::println(
+                    stderr,
+                    "[shader_cooker] unreferenced binding in [{}]: {} is declared but no entrypoint reads it",
+                    variant.VariantDescription,
+                    DescribeBinding(variant.Bindings[static_cast<size_t>(index)]));
+            }
         }
     }
 
