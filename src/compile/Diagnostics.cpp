@@ -1,9 +1,11 @@
 #include "compile/Diagnostics.hpp"
+#include "CookerErrors.hpp"
 
 #include <cstdint>
 #include <cstdio>
 #include <format>
 #include <print>
+#include <source_location>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -147,6 +149,38 @@ std::vector<Diagnostic>&& RecordingDiagnosticSink::Records() noexcept
 void RecordingDiagnosticSink::Reset() noexcept
 {
     records.clear();
+}
+
+void ReportToSink(DiagnosticSink& sink,
+                  DiagnosticSeverity severity,
+                  std::string message,
+                  std::source_location location = std::source_location::current())
+{
+    Diagnostic diag;
+    diag.Severity = severity;
+    diag.Message = std::move(message);
+    diag.Context = std::format(
+        "{} {}:L{}", location.file_name(), location.function_name(), location.line());
+    sink.Report(std::move(diag));
+}
+
+CookError ReportError(DiagnosticSink& sink,
+                      CookError error,
+                      std::string message,
+                      std::source_location location)
+{
+    ReportToSink(sink, DiagnosticSeverity::Error, std::move(message), location);
+    return error;
+}
+
+void ReportWarning(DiagnosticSink& sink, std::string message, std::source_location location)
+{
+    ReportToSink(sink, DiagnosticSeverity::Warning, std::move(message), location);
+}
+
+void ReportInfo(DiagnosticSink& sink, std::string message, std::source_location location)
+{
+    ReportToSink(sink, DiagnosticSeverity::Note, std::move(message), location);
 }
 
 } // namespace lodestone

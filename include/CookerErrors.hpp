@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <expected>
 #include <string_view>
+#include <source_location>
 
 namespace lodestone
 {
@@ -34,6 +35,8 @@ enum class CookError : uint16_t
     SizeExpressionDivideByZero = 45,
     SizeExpressionOutOfRange = 46,
     PointerTypeNotSupported = 47, // tried to use pointer placements w unsupported target
+    ReflectionCouldNotFindBufferElementSize = 48,
+    ReflectionUnsupportedBindingKind = 49,
 
     NoModulesSpecified = 60,
     NoOutputSpecified = 61,
