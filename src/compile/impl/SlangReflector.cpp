@@ -5,6 +5,7 @@
 #include "SlangVariantCompiler.hpp"
 #include "compile/Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
+#include "magic_enum/magic_enum.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
@@ -32,8 +33,6 @@ namespace
 {
 
 using namespace lodestone;
-
-constexpr size_t k_MaxRecursiveDepth = 16u;
 
 /** What Slang names the scope it moves each entry point `uniform` parameter into.
  *
@@ -189,9 +188,9 @@ std::string JoinFieldNames(std::span<slang::VariableLayoutReflection* const> pat
     {
         return std::string{};
     }
-    
+
     std::string result;
-  
+
     for (auto* field : path)
     {
         if (!result.empty())
@@ -203,45 +202,6 @@ std::string JoinFieldNames(std::span<slang::VariableLayoutReflection* const> pat
     }
 
     return result;
-}
-
-/**Flattens one uniform block into rows of name, offset, and size. Nested fields take
- * a dotted name to reflect the hierarchy. Offset is accumulated from the root of the
- * struct, as slang structures offsets from zero based on recursive walks of all fields.
- */
-CookError CollectUniformMembers(slang::TypeLayoutReflection* struct_layout,
-                                std::vector<ReflectedUniformMember>& members)
-{
-    if (struct_layout == nullptr || struct_layout->getKind() != slang::TypeReflection::Kind::Struct)
-    {
-        return CookError::Success;
-    }
-    
-    std::array<std::string_view, k_MaxRecursiveDepth> fieldNamesBuffer{};
-
-    const auto visit = [&members](const LeafVisit& leaf)
-    {
-        std::string name = JoinFieldNames(leaf.Path);
-        if (name.empty())
-        {
-            return;
-        }
-        const auto memberSize = static_cast<uint32_t>(leaf.Type->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
-        const auto arrayCount = leaf.Type->getKind() == slang::TypeReflection::Kind::Array
-                                    ? static_cast<uint32_t>(leaf.Type->getElementCount())
-                                    : 1u;
-
-        members.emplace_back(std::move(name), leaf.Offset, memberSize, arrayCount);
-    };
-
-    std::vector<slang::VariableLayoutReflection*> path;
-    const unsigned int fieldCount = struct_layout->getFieldCount();
-    for (unsigned int i = 0u; i < fieldCount; ++i)
-    {
-        VisitLeaves(struct_layout->getFieldByIndex(i), SLANG_PARAMETER_CATEGORY_UNIFORM, 0u, path, visit);
-    }
-    
-    return CookError::Success;
 }
 
 std::string_view ReadSemanticName(slang::VariableLayoutReflection* var_layout) noexcept
@@ -468,34 +428,6 @@ std::optional<ParameterBlockInfo> ReadParameterBlock(slang::TypeLayoutReflection
     return block;
 }
 
-/** The constant buffer Slang adds to hold the ordinary data of a block. Neither range list holds
- * it, and a client must create it, so it becomes a binding that carries the name of the block.
- *
- * A block of resources alone holds no such data and gets no such slot, so the caller asks only
- * when `UniformSize` is not zero. Drafting one anyway reports a binding the shader has not got. */
-CookResult<RawBindingDraft> ReadBlockContainer(const ParameterBlockInfo& block, std::string_view scope_name)
-{
-    const std::optional<uint32_t> containerBinding =
-        ReadOffset(block.Container, SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
-    if (!containerBinding)
-    {
-        std::println(stderr,
-                     "[shader_cooker] parameter block '{}' holds {} bytes of data and reports no "
-                     "container binding",
-                     block.Name,
-                     block.UniformSize);
-        return std::unexpected(CookError::ReflectionUnavailable);
-    }
-
-    RawBindingDraft draft;
-    draft.Binding.Name = std::string{ block.Name };
-    draft.Binding.ScopeName = std::string{ scope_name };
-    draft.Binding.Placement = BoundPlacement{ .Group = block.Scope.Base.Group, .Binding = *containerBinding };
-    draft.Binding.Kind = BindingKind::UniformBuffer;
-    draft.Binding.ByteSize = static_cast<uint64_t>(block.UniformSize);
-    CollectUniformMembers(block.ElementLayout, draft.Binding.UniformMembers);
-    return draft;
-}
 
 /** Moves each draft into the binding list, and keys each annotation against the position its
  * binding takes. The caller settles the order first, because `BindingIndex` is that position. */
@@ -512,10 +444,16 @@ void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
         }
     }
 
-    out_bindings.insert_range(out_bindings.end(),
-                              drafts | std::views::transform(&RawBindingDraft::Binding));
-    // std::views::join will effectively expand to a push_back for each element in the joined ranges, so reserve upfront
-    const size_t attributesCount = std::ranges::fold_left(drafts | std::views::transform([](const RawBindingDraft& draft) { return draft.Attributes.size(); }), size_t{ 0u }, std::plus{});
+    out_bindings.insert_range(out_bindings.end(), drafts | std::views::transform(&RawBindingDraft::Binding));
+    // std::views::join will effectively expand to a push_back for each element in the joined ranges, so
+    // reserve upfront
+    const size_t attributesCount = std::ranges::fold_left(drafts | std::views::transform(
+                                                                       [](const RawBindingDraft& draft)
+                                                                       {
+                                                                           return draft.Attributes.size();
+                                                                       }),
+                                                          size_t{ 0u },
+                                                          std::plus<size_t>{});
     out_attributes.reserve(out_attributes.size() + attributesCount);
     out_attributes.insert_range(out_attributes.end(),
                                 drafts | std::views::transform(&RawBindingDraft::Attributes) |
@@ -528,8 +466,8 @@ void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
  * artifact, so two entry points can place different resources at one group and binding. A placement
  * query over the entry point rows would then let one entry point claim the parameter of another. */
 std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_variant,
-                               SlangInt entry_point_index,
-                               std::span<const RawBinding> global_bindings)
+                                                SlangInt entry_point_index,
+                                                std::span<const RawBinding> global_bindings)
 {
     const auto epIndex = static_cast<size_t>(entry_point_index);
     const Slang::ComPtr<slang::IMetadata>& metadata = linked_variant.EntryPointMetadata[epIndex];
@@ -541,7 +479,7 @@ std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_vari
         {
             return false;
         }
-        // calling across the dll boundary means no inlining this :( 
+        // calling across the dll boundary means no inlining this :(
         bool isUsed = false;
         metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
                                           boundPlacement->Group,
@@ -554,8 +492,16 @@ std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_vari
     // extract just the index from it, and then return the result as a new std::vector<uint32_t>
     // note that we check entry point usage using the metadata here
     return std::views::enumerate(global_bindings) |
-           std::views::filter([&](const auto& pair) { return isUsedLambda(std::get<1>(pair).Placement);}) |
-           std::views::transform([](const auto& pair) { return std::get<0>(pair); }) |
+           std::views::filter(
+               [&](const auto& pair)
+               {
+                   return isUsedLambda(std::get<1>(pair).Placement);
+               }) |
+           std::views::transform(
+               [](const auto& pair)
+               {
+                   return std::get<0>(pair);
+               }) |
            std::ranges::to<std::vector<uint32_t>>();
 }
 
@@ -566,10 +512,12 @@ namespace lodestone
 
 SlangReflector::SlangReflector(std::span<const std::string> entry_point_names,
                                DiagnosticSink* _sink,
-                               slang::IGlobalSession* global_session) noexcept
+                               slang::IGlobalSession* global_session,
+                               PlacementKind active_placement_kind) noexcept
     : entryPointNames(entry_point_names),
       sink(_sink),
-      globalSession(global_session)
+      globalSession(global_session),
+      activePlacementKind(active_placement_kind)
 {
 }
 
@@ -594,8 +542,10 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
     for (int64_t i = 0; i < std::ssize(linked_variant.EntryPointStrings); ++i)
     {
         std::vector<RawBindingDraft> entryPointDrafts;
-        const std::span<const RawBinding> globalBindings = std::span{ rawVariant.Bindings }.first(globalBindingCount);
-        CookResult<RawEntryPoint> entryPointResult = extractRawEntryPoint(linked_variant, i, globalBindings, entryPointDrafts);
+        const std::span<const RawBinding> globalBindings =
+            std::span{ rawVariant.Bindings }.first(globalBindingCount);
+        CookResult<RawEntryPoint> entryPointResult =
+            extractRawEntryPoint(linked_variant, i, globalBindings, entryPointDrafts);
         if (!entryPointResult) [[unlikely]]
         {
             return std::unexpected(entryPointResult.error());
@@ -612,7 +562,7 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
         // set suffix, and copy over the target text
         rawEntryPoint.VariantSuffix = rawVariant.VariantSuffix;
         rawEntryPoint.TargetText = std::move(linked_variant.EntryPointStrings[static_cast<size_t>(i)]);
-        // weird quirk: dereferencing a std::expected with * directly returns an rvalue. otherwise 
+        // weird quirk: dereferencing a std::expected with * directly returns an rvalue. otherwise
         // we would have to do std::move(entryPointResult).value() lol
         rawVariant.EntryPoints.emplace_back(std::move(*entryPointResult));
     }
@@ -620,67 +570,123 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
     return rawVariant;
 }
 
+CookError SlangReflector::applyLeafTypeUniformBufferLayout(slang::TypeLayoutReflection* buffer_leaf_layout,
+                                                           RawBinding& binding) const
+{
+    // A uniform block's size is fully determined. The graph must never take it from the caller.
+    binding.ByteSize = static_cast<uint64_t>(buffer_leaf_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
+    slang::TypeLayoutReflection* elementLayout = buffer_leaf_layout->getElementTypeLayout();
+
+    if (elementLayout != nullptr && binding.ByteSize == 0u)
+    {
+        binding.ByteSize = static_cast<uint64_t>(elementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
+    }
+
+    // if bytesize is still 0, we have a problem and should error out
+    if (binding.ByteSize == 0u)
+    {
+        // log a diagnostic so it's clear where this probably came from
+        const char* bufferName = buffer_leaf_layout->getName();
+        std::string message = std::format("Failed to determine byte size of buffer element {}",
+                                          bufferName != nullptr ? bufferName : "<unknown>");
+        return ReportError(*sink, CookError::ReflectionCouldNotFindBufferElementSize, std::move(message));
+    }
+
+    const CookError uniformWalkResult = collectUniformMembers(elementLayout, binding.UniformMembers);
+
+    if (!uniformWalkResult)
+    {
+        return uniformWalkResult;
+    }
+
+    return CookError::Success;
+}
+
 /** Reads the size, shape, and type facts off one binding range's leaf type layout.
  *
  * Slang wraps a resource type around the type it carries, so the useful facts sit one level down.
  * A structured buffer reports its element layout. A texture reports the type it returns. */
-void SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* containing_layout,
-                                         SlangInt range_index,
-                                         slang::BindingType binding_type,
-                                         RawBinding& binding)
+CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* containing_layout,
+                                              SlangInt range_index,
+                                              slang::BindingType binding_type,
+                                              RawBinding& binding) const
 {
     slang::TypeLayoutReflection* leafLayout = containing_layout->getBindingRangeLeafTypeLayout(range_index);
     if (leafLayout == nullptr)
     {
-        return;
-    }
-
-    if (binding.Kind == BindingKind::StorageTexture)
-    {
-        binding.StorageFormat =
-            FromSlangImageFormat(containing_layout->getBindingRangeImageFormat(range_index));
-        binding.StorageAccess = FromSlangBindingTypeAccess(binding_type);
-    }
-
-    if (binding.Kind == BindingKind::Sampler)
-    {
-        binding.Shape = ResourceShape::Invalid;
-        binding.SamplerType = SamplerBindingType::Filtering;
-        return;
+        // just reached end of leaf
+        return CookError::Success;
     }
 
     slang::TypeReflection* leafType = leafLayout->getType();
     if (leafType == nullptr)
     {
-        return;
+        return CookError::Success;
     }
 
+    // this will just set shape back to invalid for things like samplers, but otherwise most of the
+    // other binding kinds will have their shape determined correctly.
     binding.Shape = FromSlangResourceShape(leafType->getResourceShape());
 
-    if (IsTextureBinding(binding.Kind))
+    switch (binding.Kind)
     {
-        slang::TypeReflection* resultType = leafType->getResourceResultType();
-        if (resultType != nullptr)
+    case BindingKind::Sampler:
+        binding.Shape = ResourceShape::Invalid;
+        binding.SamplerType = SamplerBindingType::Filtering;
+        return CookError::Success;
+    case BindingKind::StorageTexture:
+        binding.StorageFormat =
+            FromSlangImageFormat(containing_layout->getBindingRangeImageFormat(range_index));
+        binding.StorageAccess = FromSlangBindingTypeAccess(binding_type);
+        [[fallthrough]];
+    case BindingKind::CombinedTextureSampler:
+        [[fallthrough]];
+    case BindingKind::Texture:
+        if (slang::TypeReflection* resultType =
+                leafLayout->getBindingRangeLeafTypeLayout(range_index)->getType();
+            resultType != nullptr)
         {
             binding.SampleType = FromSlangScalarType(resultType->getScalarType());
         }
-
-        return;
+        return CookError::Success;
+    case BindingKind::UniformBuffer:
+        return applyLeafTypeUniformBufferLayout(leafLayout, binding);
+    case BindingKind::ReadOnlyStructuredBuffer:
+        [[fallthrough]];
+    case BindingKind::ReadOnlyStorageBuffer:
+        [[fallthrough]];
+    case BindingKind::StructuredBuffer:
+        [[fallthrough]];
+    case BindingKind::StorageBuffer:
+        if (slang::TypeLayoutReflection* elementLayout = leafLayout->getElementTypeLayout();
+            elementLayout != nullptr) [[likely]]
+        {
+            binding.ElementStride = static_cast<uint32_t>(elementLayout->getSize());
+            return CookError::Success;
+        }
+        else
+        {
+            std::string message = std::format("Could not find element stride for binding: {}", binding.Name);
+            return ReportError(*sink, CookError::ReflectionCouldNotFindBufferElementSize, std::move(message));
+        }
+    case BindingKind::Invalid:
+        [[fallthrough]];
+    case BindingKind::InlineUniform:
+        [[fallthrough]];
+    case BindingKind::RayTracingAccelerationStructure:
+        [[fallthrough]];
+    case BindingKind::InputRenderTarget:
+        [[fallthrough]];
+    case BindingKind::ParameterBlock:
+        {
+            std::string message =
+                std::format("Unsupported binding kind: {}", magic_enum::enum_name(binding.Kind));
+            return ReportError(*sink, CookError::ReflectionUnsupportedBindingKind, std::move(message));
+        }
     }
 
     if (binding.Kind == BindingKind::UniformBuffer)
     {
-        // A uniform block's size is fully determined. The graph must never take it from the caller.
-        binding.ByteSize = static_cast<uint64_t>(leafLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
-        slang::TypeLayoutReflection* elementLayout = leafLayout->getElementTypeLayout();
-        if (elementLayout != nullptr && binding.ByteSize == 0u)
-        {
-            binding.ByteSize =
-                static_cast<uint64_t>(elementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
-        }
-
-        CollectUniformMembers(elementLayout, binding.UniformMembers);
-        return;
     }
 
     slang::TypeLayoutReflection* elementLayout = leafLayout->getElementTypeLayout();
@@ -730,6 +736,53 @@ CookError SlangReflector::collectRawSizeAttributes(slang::VariableReflection* le
     }
 
     return CookError::Success;
+}
+
+/**Flattens one uniform block into rows of name, offset, and size. Nested fields take
+ * a dotted name to reflect the hierarchy. Offset is accumulated from the root of the
+ * struct, as slang structures offsets from zero based on recursive walks of all fields.
+ */
+CookError SlangReflector::collectUniformMembers(slang::TypeLayoutReflection* struct_layout,
+                                                std::vector<ReflectedUniformMember>& members) const
+{
+    if (struct_layout == nullptr || struct_layout->getKind() != slang::TypeReflection::Kind::Struct)
+    {
+        return CookError::Success;
+    }
+
+    CookError result = CookError::Success;
+
+    const auto visit = [&members, this, &result](const LeafVisit& leaf)
+    {
+        std::string name = JoinFieldNames(leaf.Path);
+        if (name.empty())
+        {
+            return;
+        }
+        const auto memberSize = static_cast<uint32_t>(leaf.Type->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
+        const auto arrayCount = leaf.Type->getKind() == slang::TypeReflection::Kind::Array
+                                    ? static_cast<uint32_t>(leaf.Type->getElementCount())
+                                    : 1u;
+        const auto isPointerType = leaf.Type->getKind() == slang::TypeReflection::Kind::Pointer;
+        if (isPointerType && (activePlacementKind == PlacementKind::Bound))
+        {
+            result = ReportError(
+                *sink,
+                CookError::PointerTypeNotSupported,
+                std::format("Bound placement of resource with name {} cannot be a pointer.", name));
+        }
+
+        members.emplace_back(std::move(name), leaf.Offset, memberSize, arrayCount);
+    };
+
+    std::vector<slang::VariableLayoutReflection*> path;
+    const unsigned int fieldCount = struct_layout->getFieldCount();
+    for (unsigned int i = 0u; i < fieldCount; ++i)
+    {
+        VisitLeaves(struct_layout->getFieldByIndex(i), SLANG_PARAMETER_CATEGORY_UNIFORM, 0u, path, visit);
+    }
+
+    return result;
 }
 
 // clang-tidy whines about no recursion, and normally while I am indeed an anti-recursion zealot, in this
@@ -795,10 +848,15 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
         draft.Binding.ArrayCount =
             static_cast<uint32_t>(containing_layout->getBindingRangeBindingCount(rangeIndex));
 
-        applyLeafTypeLayout(containing_layout, rangeIndex, bindingType, draft.Binding);
+        const CookError applyLayoutError = applyLeafTypeLayout(containing_layout, rangeIndex, bindingType, draft.Binding);
+        if (!applyLayoutError)
+        {
+            return applyLayoutError;
+        }
+
         const CookError collectAttributesError =
             collectRawSizeAttributes(leafVariable, draft.Binding.Name, draft.Attributes);
-        if (collectAttributesError != CookError::Success)
+        if (!collectAttributesError)
         {
             return collectAttributesError;
         }
@@ -807,6 +865,39 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
     }
 
     return collectSubObjectDrafts(containing_layout, scope, out_drafts);
+}
+
+/** The constant buffer Slang adds to hold the ordinary data of a block. Neither range list holds
+ * it, and a client must create it, so it becomes a binding that carries the name of the block.
+ *
+ * A block of resources alone holds no such data and gets no such slot, so the caller asks only
+ * when `UniformSize` is not zero. Drafting one anyway reports a binding the shader has not got. */
+CookResult<RawBindingDraft> SlangReflector::readBlockContainer(const ParameterBlockInfo& block, std::string_view scope_name) const
+{
+    const std::optional<uint32_t> containerBinding =
+        ReadOffset(block.Container, SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+    if (!containerBinding)
+    {
+        std::println(stderr,
+                     "[shader_cooker] parameter block '{}' holds {} bytes of data and reports no "
+                     "container binding",
+                     block.Name,
+                     block.UniformSize);
+        return std::unexpected(CookError::ReflectionUnavailable);
+    }
+
+    RawBindingDraft draft;
+    draft.Binding.Name = std::string{ block.Name };
+    draft.Binding.ScopeName = std::string{ scope_name };
+    draft.Binding.Placement = BoundPlacement{ .Group = block.Scope.Base.Group, .Binding = *containerBinding };
+    draft.Binding.Kind = BindingKind::UniformBuffer;
+    draft.Binding.ByteSize = static_cast<uint64_t>(block.UniformSize);
+    const CookError uniformMembersError = collectUniformMembers(block.ElementLayout, draft.Binding.UniformMembers);
+    if (!uniformMembersError)
+    {
+        return std::unexpected(uniformMembersError);
+    }
+    return draft;
 }
 
 /**@brief Walks the parameter blocks of one scope, and drafts the container and the contents of each.
@@ -832,7 +923,7 @@ CookError SlangReflector::collectSubObjectDrafts(slang::TypeLayoutReflection* co
 
         if (block->UniformSize != 0u)
         {
-            CookResult<RawBindingDraft> container = ReadBlockContainer(*block, scope.Name);
+            CookResult<RawBindingDraft> container = readBlockContainer(*block, scope.Name);
             if (!container)
             {
                 return container.error();
@@ -900,13 +991,13 @@ CookError SlangReflector::extractRawBindings(slang::ProgramLayout* program_layou
     std::vector<RawBindingDraft> drafts;
     const CookError walkError =
         collectBindingRangeDrafts(program_layout->getGlobalParamsTypeLayout(), BindingScope{}, drafts);
-    if (walkError != CookError::Success)
+    if (!walkError)
     {
         return walkError;
     }
 
-    // todo-ship: do we actually need stable_sort? if placements are equal, that's an error: it means they have
-    // same group and binding, and that shouldn't be possible.
+    // todo-ship: do we actually need stable_sort? if placements are equal, that's an error: it means they
+    // have same group and binding, and that shouldn't be possible.
     std::ranges::stable_sort(drafts,
                              PlacementLess,
                              [](const RawBindingDraft& draft) -> const RawPlacement&
@@ -947,7 +1038,8 @@ CookResult<RawEntryPoint> SlangReflector::extractRawEntryPoint(const LinkedVaria
 
     extractRasterState(entryPointLayout, rawEntryPoint.Stage, rawEntryPoint.Raster);
 
-    rawEntryPoint.UsedBindingIndices = CollectUsedBindingIndices(linked_variant, entry_point_index, global_bindings);
+    rawEntryPoint.UsedBindingIndices =
+        CollectUsedBindingIndices(linked_variant, entry_point_index, global_bindings);
 
     // A `uniform` parameter on the entry point takes a placement in the space the global bindings
     // use, and the entry point var layout says where that scope starts.
@@ -959,7 +1051,7 @@ CookResult<RawEntryPoint> SlangReflector::extractRawEntryPoint(const LinkedVaria
 
     const CookError walkError =
         collectBindingRangeDrafts(entryPointLayout->getTypeLayout(), scope.value(), out_drafts);
-    if (walkError != CookError::Success)
+    if (!walkError)
     {
         return std::unexpected(walkError);
     }

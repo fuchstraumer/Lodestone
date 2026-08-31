@@ -24,15 +24,15 @@ public:
     // Since we need to propagate errors/results, ctor is just defaulted
     SlangReflector(std::span<const std::string> entry_point_names,
                    DiagnosticSink* sink,
-                   slang::IGlobalSession* global_session) noexcept;
+                   slang::IGlobalSession* global_session,
+                   PlacementKind active_placement_kind) noexcept;
     ~SlangReflector() noexcept = default;
     // this thing works like a local one-shot invocation of reflection, so copying
     // shouldn't happen, but better safe than sorry
     SlangReflector(const SlangReflector&) noexcept = delete;
     SlangReflector& operator=(const SlangReflector&) noexcept = delete;
 
-    CookResult<RawVariant> Reflect(LinkedVariant& linked_variant,
-                                   const VariantDescriptor& descriptor);
+    CookResult<RawVariant> Reflect(LinkedVariant& linked_variant, const VariantDescriptor& descriptor);
 
 private:
     [[nodiscard]] CookResult<RawEntryPoint> extractRawEntryPoint(const LinkedVariant& linked_variant,
@@ -45,6 +45,8 @@ private:
     [[nodiscard]] CookError collectBindingRangeDrafts(slang::TypeLayoutReflection* containing_layout,
                                                       const BindingScope& scope,
                                                       std::vector<RawBindingDraft>& out_drafts) const;
+    [[nodiscard]] CookResult<RawBindingDraft> readBlockContainer(const ParameterBlockInfo& block,
+                                                                 std::string_view scope_name) const;
     [[nodiscard]] CookError collectSubObjectDrafts(slang::TypeLayoutReflection* containing_layout,
                                                    const BindingScope& scope,
                                                    std::vector<RawBindingDraft>& out_drafts) const;
@@ -53,10 +55,15 @@ private:
     [[nodiscard]] CookError collectRawSizeAttributes(slang::VariableReflection* leaf_variable,
                                                      std::string_view binding_name,
                                                      std::vector<RawSizeAttribute>& out_attributes) const;
-    static void applyLeafTypeLayout(slang::TypeLayoutReflection* containing_layout,
-                                    SlangInt range_index,
-                                    slang::BindingType binding_type,
-                                    RawBinding& binding);
+    [[nodiscard]] CookError collectUniformMembers(slang::TypeLayoutReflection* struct_layout,
+                                                  std::vector<ReflectedUniformMember>& members) const;
+    [[nodiscard]] CookError applyLeafTypeUniformBufferLayout(slang::TypeLayoutReflection* buffer_leaf_layout,
+                                                             RawBinding& binding) const;
+    [[nodiscard]] CookError applyLeafTypeLayout(slang::TypeLayoutReflection* containing_layout,
+                                                SlangInt range_index,
+                                                slang::BindingType binding_type,
+                                                RawBinding& binding) const;
+
     static void extractRasterState(slang::EntryPointReflection* entry_point_layout,
                                    ShaderStageKind stage,
                                    ReflectedRasterState& raster);
@@ -64,6 +71,8 @@ private:
     std::span<const std::string> entryPointNames;
     DiagnosticSink* sink{ nullptr };
     slang::IGlobalSession* globalSession;
+    // governs checks for how bindings and layouts are interpreted or lowered
+    PlacementKind activePlacementKind;
 };
 
 } // namespace lodestone
