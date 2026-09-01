@@ -26,7 +26,9 @@
 *.ps1      text eol=crlf
 
 # Serialization
-*.json     text
+# The cooker writes LF, and the stage dumps under tests/known_good are compared against cooker
+# output byte for byte. A CRLF working tree would fail that comparison on line endings alone.
+*.json     text eol=lf
 *.toml     text
 *.xml      text
 *.yaml     text
