@@ -39,6 +39,7 @@ constexpr bool k_UseSlangWorkaround = true;
 CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink)
 {
     diagnosticSink = &sink;
+    placementKind = create_info.AccessModel;
     if (k_UseSlangWorkaround)
     {
         const SlangResult created = slang_createGlobalSessionWithoutCoreModule(SLANG_API_VERSION, globalSession.writeRef());
@@ -192,6 +193,11 @@ std::vector<std::string_view> SlangModuleContext::ModuleSourceStringViews() cons
                    return std::string_view(str);
                }) |
            std::ranges::to<std::vector<std::string_view>>();
+}
+
+PlacementKind SlangModuleContext::PlacementKindForTarget() const noexcept
+{
+    return placementKind;
 }
 
 std::vector<SerializedModule> SlangModuleContext::SerializeModules() const

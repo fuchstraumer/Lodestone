@@ -5,6 +5,7 @@
 #include "SlangCompilerTypes.hpp"
 #include "compile/Diagnostics.hpp"
 #include "compile/SlangCompiler.hpp"
+#include "ShaderLibraryTypes.hpp"
 #include "slang.h"
 #include "slang-com-ptr.h"
 #include <cstddef>
@@ -38,6 +39,7 @@ public:
     [[nodiscard]] std::string_view ModuleName() const noexcept;
     [[nodiscard]] const std::vector<std::string>& ModuleSourceStrings() const noexcept;
     [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
+    [[nodiscard]] PlacementKind PlacementKindForTarget() const noexcept;
 
     /**@brief Serialized every module this session loaded, in depdency order, into the returned list
       *of serialized modules. Order must be preserved in order for this to work as a shortcut */
@@ -68,6 +70,7 @@ private:
     std::vector<std::string> entryPointNames;
     std::string moduleName;
     std::vector<std::string> moduleSourceStrings;
+    PlacementKind placementKind{ PlacementKind::None };
     DiagnosticSink* diagnosticSink{ nullptr };
 };
 }
