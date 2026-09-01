@@ -32,18 +32,27 @@ namespace
                              PermutationValue{ 4096u },
                              PermutationValue{ 8192u } },
                            PermutationAxis::k_NoParent,
-                           PermutationValue{} },
+                           PermutationValue{},
+                           AxisKind::Tuning,
+                           EarliestBindingTime::Cook,
+                           AxisValueDomain::Integral },
           PermutationAxis{ "IFFT_USE_WAVE_OPS",
                            { PermutationValue{ false }, PermutationValue{ true } },
                            PermutationAxis::k_NoParent,
-                           PermutationValue{} },
+                           PermutationValue{},
+                           AxisKind::Capability,
+                           EarliestBindingTime::Cook,
+                           AxisValueDomain::Boolean },
           PermutationAxis{ "IFFT_WAVE_SIZE",
                            { PermutationValue{ 16u },
                              PermutationValue{ 32u },
                              PermutationValue{ 64u },
                              PermutationValue{ 128u } },
                            1,
-                           PermutationValue{ true } } } };
+                           PermutationValue{ true },
+                           AxisKind::Tuning,
+                           EarliestBindingTime::Cook,
+                           AxisValueDomain::Integral } } };
 
     const PermutationSpace k_EmptySpace{ "", {} };
 
