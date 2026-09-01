@@ -34,7 +34,7 @@ namespace
                          ToString(attribute.Kind),
                          binding_name,
                          argument_index);
-            return std::unexpected(CookError::SizeExpressionParseFailed);
+            return std::unexpected(CookError::AttributeExpressionParseFailed);
         }
 
         const CookResult<int64_t> value =
@@ -52,7 +52,7 @@ namespace
                          argument_index,
                          binding_name,
                          value.value());
-            return std::unexpected(CookError::SizeExpressionOutOfRange);
+            return std::unexpected(CookError::AttributeExpressionOutOfRange);
         }
 
         return static_cast<uint32_t>(value.value());
@@ -92,7 +92,7 @@ namespace
                          "[shader_cooker] [{}] on '{}' has no argument",
                          ToString(attribute.Kind),
                          binding_name);
-            return std::unexpected(CookError::SizeExpressionParseFailed);
+            return std::unexpected(CookError::AttributeExpressionParseFailed);
         }
 
         const CookResult<int64_t> value =
@@ -113,7 +113,7 @@ namespace
                          ToString(attribute.Kind),
                          binding_name,
                          value.value());
-            return std::unexpected(CookError::SizeExpressionOutOfRange);
+            return std::unexpected(CookError::AttributeExpressionOutOfRange);
         }
 
         return BufferFootprint{ .ElementCount = static_cast<uint64_t>(value.value()),

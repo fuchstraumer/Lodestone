@@ -122,21 +122,21 @@ int main()
     CheckValue(runner, "!(IFFT_USE_WAVE_OPS != 0)", 0, "not of the active-when guard");
 
     runner.BeginSection("rejections");
-    CheckError(runner, "", CookError::SizeExpressionParseFailed, "empty expression");
-    CheckError(runner, "IFFT_SIZ", CookError::SizeExpressionUnknownSymbol, "typo in a symbol name");
-    CheckError(runner, "FFT_SIZE", CookError::SizeExpressionUnknownSymbol, "the historical typo");
-    CheckError(runner, "4 / 0", CookError::SizeExpressionDivideByZero, "divide by zero");
-    CheckError(runner, "4 % 0", CookError::SizeExpressionDivideByZero, "modulo by zero");
-    CheckError(runner, "1 << 99", CookError::SizeExpressionOutOfRange, "shift past the word");
-    CheckError(runner, "(2 + 3", CookError::SizeExpressionParseFailed, "unclosed parenthesis");
-    CheckError(runner, "2 +", CookError::SizeExpressionParseFailed, "dangling operator");
-    CheckError(runner, "2 3", CookError::SizeExpressionParseFailed, "trailing text");
-    CheckError(runner, "$", CookError::SizeExpressionParseFailed, "unexpected character");
-    CheckError(runner, "1 <", CookError::SizeExpressionParseFailed, "dangling comparison");
-    CheckError(runner, "1 &&", CookError::SizeExpressionParseFailed, "dangling logical operator");
-    CheckError(runner, "&& 1", CookError::SizeExpressionParseFailed, "leading logical operator");
-    CheckError(runner, "1 = 2", CookError::SizeExpressionParseFailed, "a single equals is not an operator");
-    CheckError(runner, "!", CookError::SizeExpressionParseFailed, "not with no operand");
+    CheckError(runner, "", CookError::AttributeExpressionParseFailed, "empty expression");
+    CheckError(runner, "IFFT_SIZ", CookError::AttributeExpressionUnknownSymbol, "typo in a symbol name");
+    CheckError(runner, "FFT_SIZE", CookError::AttributeExpressionUnknownSymbol, "the historical typo");
+    CheckError(runner, "4 / 0", CookError::AttributeExpressionDivideByZero, "divide by zero");
+    CheckError(runner, "4 % 0", CookError::AttributeExpressionDivideByZero, "modulo by zero");
+    CheckError(runner, "1 << 99", CookError::AttributeExpressionOutOfRange, "shift past the word");
+    CheckError(runner, "(2 + 3", CookError::AttributeExpressionParseFailed, "unclosed parenthesis");
+    CheckError(runner, "2 +", CookError::AttributeExpressionParseFailed, "dangling operator");
+    CheckError(runner, "2 3", CookError::AttributeExpressionParseFailed, "trailing text");
+    CheckError(runner, "$", CookError::AttributeExpressionParseFailed, "unexpected character");
+    CheckError(runner, "1 <", CookError::AttributeExpressionParseFailed, "dangling comparison");
+    CheckError(runner, "1 &&", CookError::AttributeExpressionParseFailed, "dangling logical operator");
+    CheckError(runner, "&& 1", CookError::AttributeExpressionParseFailed, "leading logical operator");
+    CheckError(runner, "1 = 2", CookError::AttributeExpressionParseFailed, "a single equals is not an operator");
+    CheckError(runner, "!", CookError::AttributeExpressionParseFailed, "not with no operand");
 
     return runner.Report();
 }

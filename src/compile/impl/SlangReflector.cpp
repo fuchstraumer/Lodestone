@@ -66,7 +66,7 @@ CookResult<std::string> ReadStringArgument(slang::Attribute* attribute,
                      argument_index,
                      attribute->getName(),
                      binding_name);
-        return std::unexpected(CookError::SizeExpressionParseFailed);
+        return std::unexpected(CookError::AttributeExpressionParseFailed);
     }
 
     // The reflected span includes the surrounding quotes on some paths; trim them if present.

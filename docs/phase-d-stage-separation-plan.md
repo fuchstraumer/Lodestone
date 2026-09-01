@@ -223,7 +223,7 @@ contents do not change, so stages 5 to 8 do not change.
 ### `ResolveContext`, the input of stage 4
 
 Holds the symbol table for one variant: the axis values from `descriptor.Canonical`, plus the extern
-defaults from `RawModule`. `EvaluateSizeExpression` already takes this shape, so this is a small type.
+defaults from `RawModule`. `EvaluateExpression` already takes this shape, so this is a small type.
 
 ---
 
@@ -243,8 +243,8 @@ gives the wrong answer.
 
 | Check | Detects today | Reports today |
 |---|---|---|
-| A size expression names an unknown symbol | `SizeExpressionUnknownSymbol` | the binding name |
-| An attribute has the wrong number of arguments | `SizeExpressionParseFailed` | the binding name |
+| A size expression names an unknown symbol | `AttributeExpressionUnknownSymbol` | the binding name |
+| An attribute has the wrong number of arguments | `AttributeExpressionParseFailed` | the binding name |
 | An axis name matches no `extern const static` | `VerifyAxisNamesAreDeclared` | the axis name |
 
 Each one prints a name, because a name is all the code holds. A reader must then find the line.
@@ -418,7 +418,7 @@ it here.
 ### D6 — Test stage 4 with no Slang
 
 Add `tests/ResolveStageTests.cpp`. Build a `RawVariant` by hand. Resolve it. Check that the derived
-element count is correct, that an unknown symbol fails with `SizeExpressionUnknownSymbol`, and that a
+element count is correct, that an unknown symbol fails with `AttributeExpressionUnknownSymbol`, and that a
 binding with no attribute keeps `HasElementCount` false.
 
 This test is the proof that the split worked. Before D5 it cannot be written at all.
@@ -851,7 +851,7 @@ each. It must stay 0 for OceanFft.
 not try to split it and move it in one commit. Move first with the shape unchanged, then split.
 
 **The extern defaults are easy to forget.** Section 4 states why stage 4 needs them. A cook that
-forgets them fails with `SizeExpressionUnknownSymbol` and names `IFFT_NUM_WAVE_CASCADES`. That is a
+forgets them fails with `AttributeExpressionUnknownSymbol` and names `IFFT_NUM_WAVE_CASCADES`. That is a
 loud failure, so the risk is small, but it will cost an hour if it is a surprise.
 
 **The dumps must stay ordered.** A dump that reads an `unordered_map` gives a different order on a

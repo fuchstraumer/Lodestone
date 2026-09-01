@@ -225,27 +225,27 @@ void TestRejections(TestRunner& runner)
 
     CheckRejection(runner,
                    MakeAttribute(RawSizeAttributeKind::ElementCount, { "IFFT_SIZ" }),
-                   CookError::SizeExpressionUnknownSymbol,
+                   CookError::AttributeExpressionUnknownSymbol,
                    "a typo in a symbol name");
     CheckRejection(runner,
                    MakeAttribute(RawSizeAttributeKind::ElementCount, { "IFFT_WAVE_SIZE * 4" }),
-                   CookError::SizeExpressionUnknownSymbol,
+                   CookError::AttributeExpressionUnknownSymbol,
                    "a constant that no axis drives and no default declares");
     CheckRejection(runner,
                    MakeAttribute(RawSizeAttributeKind::ElementCount, {}),
-                   CookError::SizeExpressionParseFailed,
+                   CookError::AttributeExpressionParseFailed,
                    "an element count with no argument");
     CheckRejection(runner,
                    MakeAttribute(RawSizeAttributeKind::ElementCount, { "0" }),
-                   CookError::SizeExpressionOutOfRange,
+                   CookError::AttributeExpressionOutOfRange,
                    "an element count of zero cannot size a buffer");
     CheckRejection(runner,
                    MakeAttribute(RawSizeAttributeKind::Extent2d, { "IFFT_SIZE" }),
-                   CookError::SizeExpressionParseFailed,
+                   CookError::AttributeExpressionParseFailed,
                    "a 2d extent with one argument");
     CheckRejection(runner,
                    MakeAttribute(RawSizeAttributeKind::Extent2d, { "IFFT_SIZE", "0" }),
-                   CookError::SizeExpressionOutOfRange,
+                   CookError::AttributeExpressionOutOfRange,
                    "an extent axis of zero is not a texture dimension");
 
     RawVariant bothExtents = MakeVariantWithOneBuffer();

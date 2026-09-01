@@ -232,19 +232,28 @@ module instead of reading the file. Fact 10 in §4 states which modules belong i
 
 ---
 
-## 8. The next task: phase E step E1
+## 8. The next task: phase E step E2
 
-`docs/phase-e-data-driven-permutations.md` holds the plan. **Steps E0a, E0b, E0c, and E0 are
+`docs/phase-e-data-driven-permutations.md` holds the plan. **Steps E0a, E0b, E0c, E0, and E1 are
 complete, and item D2 of §10 is settled.** Nothing in that document is open for a decision.
 
-**E1 is next.** §6 of that document. It adds a comparison level and a logical level to
-`SizeExpression`, about 80 lines, and the existing tests stay green. Everything in the constraint
-path depends on it.
+**E1 is done, on 2026-09-01.** The attribute expression evaluator gained a comparison level, a
+logical level, and unary `!`. The file `SizeExpression.{hpp,cpp}` became `AttributeExpression.{hpp,cpp}`,
+`EvaluateSizeExpression` became `EvaluateExpression`, the four `SizeExpression*` cook errors became
+`AttributeExpression*`, and `SizeExpressionTest` became `AttributeExpressionTest`. `&&` and `||` do
+not short circuit, because the parser evaluates as it descends; the class comment in
+`AttributeExpression.cpp` records the one effect this has. All six stage dumps stayed byte identical,
+because no shader uses a comparison yet.
+
+**E2 is next.** §6 and the §11 table of that document. It adds `AxisValueDomain`, `AxisKind`,
+`EarliestBindingTime`, `ActiveWhen`, and `Require` to the axis model, with `k_ModuleSpaces` still the
+source. The space dump is the check, and §10 D2 settled the shape it compares against.
 
 One requirement in §6 is easy to miss. An `ActiveWhen` expression can name other axes, and those
 axes can carry expressions of their own. The axes therefore form a directed graph, and
 canonicalization must evaluate them in topological order. A cycle must fail when the registry loads,
-and never during a cook. Add the cycle check in the same step.
+and never during a cook. The cycle check rides with E2, because the axis-to-axis reference that a
+cycle needs does not exist until `ActiveWhen` does.
 
 **`docs/phase-e-interface-spike.md` holds the E0 answers.** Read it before E7. Three results matter
 early: a link-time `extern` type works and uses the mechanism the constant axis already uses, an

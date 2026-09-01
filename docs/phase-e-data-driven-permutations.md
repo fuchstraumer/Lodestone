@@ -163,7 +163,7 @@ model must hold both.
 | Arithmetic can read it | No | Yes. `IFFT_SIZE * 4` is a size expression |
 | Example | Which BRDF | How large the FFT is |
 
-An interface axis has no integer value, so `EvaluateSizeExpression` cannot read it. **Give every axis
+An interface axis has no integer value, so `EvaluateExpression` cannot read it. **Give every axis
 value an ordinal.** The evaluator then reads the ordinal, and the linker reads the type or the
 constant.
 
@@ -278,8 +278,8 @@ removes an axis that matters.
 
 ## 6. The constraint language
 
-Extend `SizeExpression` with a comparison level and a logical level. The grammar gains two rows below
-`shift`:
+Extend `AttributeExpression` with a comparison level and a logical level. The grammar gains two rows
+below `shift`:
 
 ```
 logical    := comparison (( '&&' | '||' ) comparison)*
@@ -291,7 +291,13 @@ shift      := sum (( '<<' | '>>' ) sum)*
 Slang. It adds no type, and it keeps one evaluator. A size expression and a constraint expression are
 then one function called in two places.
 
-About 80 new lines. The existing tests stay green.
+`&&` and `||` do **not** short circuit. The parser evaluates as it descends, so it has no unevaluated
+right operand to skip. The only effect is that a divide by zero or an out-of-range shift on the right
+of a false `&&` still fails, where C would not reach it. That guard is rare in a constraint, and a
+loud failure is the safer default. Revisit this only if a constraint needs it.
+
+About 80 new lines. The existing tests stay green. **The evaluator landed in E1 on 2026-09-01.** The
+constraint kinds below, `ActiveWhen` and `Require`, are E2.
 
 ### Two constraint kinds, and no more
 
@@ -621,7 +627,7 @@ Walk the declaration tree once, here.
 
 ### D6. Test the evaluator through its interface. **Done**
 
-Section 6 adds two grammar levels. Write the stage 4 tests against `EvaluateSizeExpression` and the
+Section 6 adds two grammar levels. Write the stage 4 tests against `EvaluateExpression` and the
 resolve entry point, and never against a parse tree. The new levels then do not churn the tests.
 
 ### Small, and only while the code is open
@@ -643,7 +649,7 @@ change **what**. Each one adds capability that no golden file covers.
 | E0b | The `ParameterBlock` sub-object walk, from §3b. **Done 2026-08-21** | A probe module cooks and the cross-check agrees | low |
 | E0c | Reject a pointer type under a bound access model, from §3c. **Done 2026-09-01** | `AccessModelRejectTest`, on `PointerMember.slang` | low |
 | E0 | Slang interface spike, with citations. **Done 2026-09-01** | `docs/phase-e-interface-spike.md` | none |
-| E1 | Comparison and logical levels in `SizeExpression` | The existing tests, plus new ones | low |
+| E1 | Comparison and logical levels in `AttributeExpression`. **Done 2026-09-01** | `AttributeExpressionTest`, plus the six dumps unchanged | low |
 | E2 | `AxisValueDomain`, `AxisKind`, `EarliestBindingTime`, `ActiveWhen`, `Require`, axis DAG, cycle check. `k_ModuleSpaces` stays the source | The space dump, **once §10 D2 is settled** | medium |
 | E3 | Depth-first enumeration with constraint propagation | **The variants dump is byte identical** | medium |
 | E4 | Sorted key table and binary search, in place of the storage index. Add the per-variant capability requirement to the manifest | Round trips, and the emitted tables shrink | **high** |
@@ -652,7 +658,8 @@ change **what**. Each one adds capability that no golden file covers.
 | E7 | Interface axes. E0 removed the enum fallback | A new test shader | medium |
 | E8 | Documents, and the measured numbers again | — | none |
 
-**E0c and E0 are complete.** E1 is the next step, and everything in the constraint path depends on it.
+**E0c, E0, and E1 are complete.** E2 is the next step. Everything else in the constraint path depends
+on E2.
 
 **E4 needs care.** It changes the emitted C++, the manifest variant table, and the arithmetic of the
 cooker at one time. The round trips find an error, and the stage dumps say where.

@@ -59,7 +59,7 @@ scripts\run-tests.bat
 It runs each executable directly and prints one line for each. A failing target is run a second time
 with its output shown.
 
-`ctest --test-dir build/ninja-msvc -C Debug -R SizeExpressionTest --output-on-failure` runs one test.
+`ctest --test-dir build/ninja-msvc -C Debug -R AttributeExpressionTest --output-on-failure` runs one test.
 
 **Do not pipe a long run into a pager or into PowerShell `Select-Object`.** The whole stream is held
 until the command ends. The run then prints nothing for minutes, and it looks like a deadlock. A test
@@ -77,7 +77,7 @@ None of them needs Slang, a compiler, or an asset, and all ten together run in u
 
 | Target | Proves |
 |---|---|
-| `SizeExpressionTest` | The size expression grammar, and every rejection it must make. |
+| `AttributeExpressionTest` | The attribute expression grammar — arithmetic, comparison, and logic — and every rejection it must make. |
 | `ContentInternerTest` | A hash never decides equality. It supplies a hash that returns one constant, so only the byte comparison can separate the payloads. |
 | `PermutationIndexTest` | A variant index is unique, dense, and stable, and a partial assignment resolves to one variant. |
 | `ShaderManifestRejectTest` | The manifest reader rejects a short, misaligned, or damaged file, and opens a real one. |
@@ -148,7 +148,7 @@ is therefore a visible word in a diff: the day a file in `emit/` writes
 
 | Folder | Holds | Why it is one thing |
 |---|---|---|
-| `permute/` | `PermutationValue`, `PermutationAxis`, `PermutationAssignment`, `PermutationSpace`, `PermutationPolicy`, `PermutationRegistry`, `SizeExpression`, `ExternConstantScanner` | The authoring parameter domain. Stages 1 and 2. Phase E fills this folder. |
+| `permute/` | `PermutationValue`, `PermutationAxis`, `PermutationAssignment`, `PermutationSpace`, `PermutationPolicy`, `PermutationRegistry`, `AttributeExpression`, `ExternConstantScanner` | The authoring parameter domain. Stages 1 and 2. Phase E fills this folder. |
 | `compile/` | `SlangCompiler`, `SlangDiagnosticParser`, `RawLibrary`, `Diagnostics`, and `src/compile/impl/` | **The Slang wall. No file outside this folder names a Slang type.** |
 | `model/` | `ResolveStage`, `ShaderDataSchema`, `ContentHash`, `ContentInterner`, `CookedLibrary` | The data that flows, interns, and freezes. Stages 4, 6, and 7. |
 | `target/` | `TargetProfile`, `WgslBindingScanner` | A target, its access model, and its validator. Phase F fills this folder. |
@@ -427,12 +427,15 @@ compile. The type holds the same vector and costs nothing at run time.
 `SpaceSize` counts the dense index range with the holes included. A disabled dependent axis leaves
 gaps, and the design accepts them.
 
-### Size expressions
+### Attribute expressions
 
 A size travels as a string, and this is not a style choice. Slang folds an attribute integer argument
 at compile time, but the permutation constants are `extern static const` and fold at link time.
 `[vx_element_count(IFFT_SIZE * 4)]` therefore fails to compile. A string argument reaches reflection
-untouched, and `EvaluateSizeExpression` does the arithmetic once for each variant.
+untouched, and `EvaluateExpression` does the arithmetic once for each variant. The same evaluator now
+reads an axis constraint expression as well, which is why it lives in `permute/AttributeExpression.hpp`
+and not the old `SizeExpression.hpp`. Phase E step E1 gave it comparison and logical operators for the
+constraint language.
 
 The attribute declarations are in `tests/assets/LodestoneAttributes.slang`: `vx_element_count`,
 `vx_extent_2d`, `vx_extent_3d`. Slang has no optional attribute parameters, so each arity needs its

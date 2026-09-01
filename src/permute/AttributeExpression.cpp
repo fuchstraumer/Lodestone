@@ -71,7 +71,7 @@ namespace
                              "[shader_cooker] attribute expression '{}' has trailing text at offset {}",
                              text,
                              cursor);
-                return std::unexpected(CookError::SizeExpressionParseFailed);
+                return std::unexpected(CookError::AttributeExpressionParseFailed);
             }
 
             return value;
@@ -216,7 +216,7 @@ namespace
                                  "of range",
                                  text,
                                  right.value());
-                    return std::unexpected(CookError::SizeExpressionOutOfRange);
+                    return std::unexpected(CookError::AttributeExpressionOutOfRange);
                 }
 
                 left = shiftLeft ? (left.value() << right.value()) : (left.value() >> right.value());
@@ -283,7 +283,7 @@ namespace
                 if ((isDivide || isModulo) && right.value() == 0)
                 {
                     std::println(stderr, "[shader_cooker] attribute expression '{}' divides by zero", text);
-                    return std::unexpected(CookError::SizeExpressionDivideByZero);
+                    return std::unexpected(CookError::AttributeExpressionDivideByZero);
                 }
 
                 if (isMultiply)
@@ -339,7 +339,7 @@ namespace
             if (cursor >= text.size())
             {
                 std::println(stderr, "[shader_cooker] attribute expression '{}' ends early", text);
-                return std::unexpected(CookError::SizeExpressionParseFailed);
+                return std::unexpected(CookError::AttributeExpressionParseFailed);
             }
 
             if (consumeOperator("("))
@@ -356,7 +356,7 @@ namespace
                                  "[shader_cooker] attribute expression '{}' is missing a closing "
                                  "parenthesis",
                                  text);
-                    return std::unexpected(CookError::SizeExpressionParseFailed);
+                    return std::unexpected(CookError::AttributeExpressionParseFailed);
                 }
 
                 return inner;
@@ -378,7 +378,7 @@ namespace
                          text,
                          text[cursor],
                          cursor);
-            return std::unexpected(CookError::SizeExpressionParseFailed);
+            return std::unexpected(CookError::AttributeExpressionParseFailed);
         }
 
         CookResult<int64_t> parseInteger()
@@ -419,7 +419,7 @@ namespace
                              "offset {}",
                              text,
                              cursor);
-                return std::unexpected(CookError::SizeExpressionParseFailed);
+                return std::unexpected(CookError::AttributeExpressionParseFailed);
             }
 
             cursor = digitsEnd;
@@ -448,7 +448,7 @@ namespace
                          "permutation constant of this module",
                          text,
                          name);
-            return std::unexpected(CookError::SizeExpressionUnknownSymbol);
+            return std::unexpected(CookError::AttributeExpressionUnknownSymbol);
         }
 
         /** `<` and `>` alone are comparisons now, so a shift needs both characters to tell it from a
@@ -507,7 +507,7 @@ CookResult<int64_t> EvaluateExpression(std::string_view expression,
     if (expression.empty())
     {
         std::println(stderr, "[shader_cooker] attribute expression is empty");
-        return std::unexpected(CookError::SizeExpressionParseFailed);
+        return std::unexpected(CookError::AttributeExpressionParseFailed);
     }
 
     ExpressionParser parser{ expression, symbols };
