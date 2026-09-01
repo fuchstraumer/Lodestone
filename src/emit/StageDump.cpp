@@ -62,6 +62,11 @@ namespace
     {
         writer.BeginObject();
         writer.KeyString("name", axis.Name);
+        // adding these keys now before we complete later tasks, to preserve parity of byte comparisons
+        // todo: remove these as soon as we are actually able to write values for this
+        writer.KeyNull("kind");
+        writer.KeyNull("earliestBindingTime");
+        writer.KeyNull("valueDomain");
 
         writer.Key("values");
         writer.BeginArray();

@@ -256,6 +256,9 @@ void CheckSpaceDump(lodestone::tests::TestRunner& runner)
     "axes": [
         {
             "name": "USE_FOO",
+            "kind": null,
+            "earliestBindingTime": null,
+            "valueDomain": null,
             "values": [
                 "false",
                 "true"

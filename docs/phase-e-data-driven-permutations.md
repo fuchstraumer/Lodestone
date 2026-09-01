@@ -5,10 +5,12 @@ source. Policy moves into a data file.
 
 Phase D is complete, and so is the compiler split. Phase E is the current work.
 
-Text in this file follows ASD-STE100. Condensed on 2026-08-28.
+Text in this file follows ASD-STE100. Condensed on 2026-08-28. Updated on 2026-09-01, after steps
+E0a, E0b, E0c, and E0 completed and the C++ emitter was removed.
 
-Read `docs/agent-handoff.md` first. It holds the state and the measured Slang facts. Section 10 of
-this document lists what phase D left for phase E, and one item is still open.
+Read `docs/agent-handoff.md` first. It holds the state and the measured Slang facts.
+`docs/phase-e-interface-spike.md` holds the E0 answers, and section 8 records what they changed.
+Section 10 lists what phase D left for phase E. Every item there is now settled or done.
 
 ---
 
@@ -61,9 +63,8 @@ only between targets is a defect in the declaration.
 
 ## 3. Found work
 
-Three items came from probe modules, and none is a phase E idea. **Do all three before the numbered
-steps.** Each one is small. Each one is independent. All three touch the stage 3 code that E6 also
-changes.
+Three items came from probe modules, and none is a phase E idea. **All three are complete.** Each
+one was small and independent, and all three touched the stage 3 code that E6 also changes.
 
 ### 3a. The entry point scope walk. Complete on 2026-08-21
 
@@ -97,7 +98,7 @@ today. With the code open, decide whether to remove the line or to make it corre
 **Two probes nobody wrote.** A block that holds only ordinary data. Two entry points with a block on
 each one.
 
-### 3c. A pointer type reaches WGSL, and no check sees it. **Open. Do this first.**
+### 3c. A pointer type reaches WGSL, and no check sees it. **Done 2026-09-01**
 
 Found on 2026-08-20, during the phase F spike on buffer device addresses. This is a defect, and not a
 missing capability. A cook can exit 0 and write invalid output.
@@ -135,7 +136,17 @@ the rule: validate at the ingestion surface, then trust the data inside.
 command line. Slang states the type kind, and the shader source decided it. Neither side derived the
 other.
 
-*Small. No risk. `OceanFft` declares no pointer, so no artifact moves.*
+*`OceanFft` declares no pointer, and no artifact moved.*
+
+`tests/assets/PointerMember.slang` is the probe, and `AccessModelRejectTest` runs it. The test holds
+a table of one row for each claim, plus a control row that must cook. A later rejection, such as a
+bound resource on a target that has pointers alone, is one module and one line.
+
+**One thing the probe measured.** The check reads a uniform member, so the resource must be a
+`ConstantBuffer`. Slang reports a push constant as `BindingType::PushConstant`, `FromSlangBindingType`
+has no row for it, and the walk stops at an invalid binding kind before it reads any member. A push
+constant therefore cannot be cooked at all today. WGSL has no push constants, so nothing is lost yet.
+`docs/phase-f-vocabulary.md` is where that becomes a question.
 
 ---
 
@@ -192,8 +203,12 @@ variant of every shader that uses the axis.
 
 Use both defenses:
 
-1. **Sort conformances by fully qualified type name.** Never by discovery order. Discovery order
-   comes from a file system walk, and it is not stable across machines.
+1. **Sort conformances by a key of the module name and the type name.** Never by discovery order.
+   Discovery order comes from a file system walk, and it is not stable across machines. Step E0
+   measured the type name: `TypeReflection::getFullName` qualifies a namespace, and it does not
+   qualify a module. So it gives `FooSampler` and not `common.FooSampler`, and two modules that
+   each declare `FooSampler` produce one key. The cooker knows which module it walked, so the
+   module name costs nothing to add.
 2. **Let policy name the cooked set.** A new conformance then enters the space only when a person
    adds it to the policy file.
 
@@ -364,18 +379,23 @@ more elegant answer. It is not worth the cost yet. Consider it if a module ever 
 
 What exists today. It fails as described above.
 
-### Three places implement the index
+### One place implements the index. It was three
 
-This finding decides how phase E divides. One of the three is kept in step by hand.
+The removal of `ShaderLibraryEmitter` on 2026-09-01 deleted two of the three sites. Only the
+cooker's own arithmetic is left.
 
-| Site | What it is |
-|---|---|
-| `ComputeVariantIndex`, `src/permute/PermutationSpace.cpp:221` | The cooker's own arithmetic |
-| `EmitVariantIndex`, `src/emit/ShaderLibraryEmitter.cpp:388` | Emits a `constexpr` C++ function |
-| `EmitCanonicalize`, `src/emit/ShaderLibraryEmitter.cpp:360` | Emits the `constexpr` canonical form |
+| Site | What it is | State |
+|---|---|---|
+| `ComputeVariantIndex`, `src/permute/PermutationSpace.cpp:221` | The cooker's own arithmetic | The one site |
+| `EmitVariantIndex`, in the C++ emitter | Emitted a `constexpr` C++ function | Deleted |
+| `EmitCanonicalize`, in the C++ emitter | Emitted the `constexpr` canonical form | Deleted |
 
-The comment above `EmitVariantIndex` at line 386 reads "This must match ComputeVariantIndex in". That
-is a hand-maintained copy of the one rule the whole index rests on.
+The emitter held a comment reading "This must match ComputeVariantIndex in". That was a copy of the
+one rule the whole index rests on, kept in step by hand. It is gone.
+
+**This makes E4 much smaller.** E4 used to change the cooker arithmetic, the emitted C++, and the
+manifest variant table at one time, and the step is marked high risk for that reason. It now changes
+the arithmetic and the manifest.
 
 **Form 1 removes the copy.** The emitted side becomes a sorted array and a search, and the search
 encodes no radix rule. The cooker computes the keys, and the header only reads them. The rule then
@@ -401,28 +421,40 @@ reference a variant by its assignment, and never by its index.** The index is a 
 
 ---
 
-## 8. Interface axes: spike before you commit
+## 8. Interface axes. The spike is complete
 
-**Spike E0** answers three questions against `third_party/slang`. Report with a citation for each
-answer, as the design document does.
+**Step E0 ran on 2026-09-01. `docs/phase-e-interface-spike.md` holds the answers and the
+citations.** Read it before you start E7. This section records what it decided.
 
-1. Can link-time specialization fill an `extern` value or type of interface type? `extern const
-   static` works this way for a constant.
-2. Can reflection enumerate the types that conform to an interface, and does it give a stable fully
-   qualified name for each?
-3. Can an interface carry its own bindings, so that a choice of conformance changes the binding set?
-   If it can, the layout depends on the axis, and the layout interner already handles that.
+| Question | Answer |
+|---|---|
+| Can link-time specialization fill an `extern` of interface type? | **Yes** |
+| Can reflection enumerate the conforming types, with a stable name? | **Yes**, but no one API does it |
+| Can an interface carry its own bindings? | **No** |
 
-**The fallback always works, so the spike decides ergonomics and not capability.** An interface axis
-lowers to an `Enum` axis and a dispatch function:
+**Take the interface axis. The enum fallback is not needed.** This section used to keep the fallback
+because the spike might have found no capability. It found the capability.
 
-```slang
-[vx_axis_values("Lambert, GgxSmith, CharlieSheen")]
-extern const static uint BRDF_KIND;
-```
+`extern struct Sampler : ISampler;` in one module, and `export struct Sampler : ISampler = FooSampler;`
+in another, link and generate code. **That is the mechanism the constant axis already uses.** The
+cooker writes one synthetic module for each active axis value today. A constant axis emits
+`export static const uint X = 5;`, and a type axis emits `export struct X : IFoo = Concrete;`.
 
-with a factory that switches on it. Slang specializes at link time either way, so the compile cost is
-the same. The loss is the type-level statement, and nothing else.
+Three findings change the work. Each one costs time if it is found late.
+
+1. **An interface axis can never carry a resource.** A conformance that declares a resource member
+   fails code generation, and the layout never changes. So resource presence, which
+   `docs/phase-f-vocabulary.md` §2 lists as an axis kind, must stay a constant axis with a null test
+   or an index test. An interface axis carries behaviour alone.
+2. **Enumeration takes a declaration walk and a conformance test.** Slang has no API that lists the
+   types conforming to an interface. An interface also reflects as an unsupported declaration kind,
+   so `findTypeByName` must find the interface itself.
+3. **`getFullName` is not module qualified.** Section 4 states the sort key, and the spike shows it
+   is not unique. Build the key from the module name and `getFullName` together.
+
+E7 also owes one check. A conformance that declares a resource member must fail the cook with a
+message that names the conformance. Slang reports it as a code generation error against the module
+that used the type, which names the wrong file. Step E0c built the shape this check takes.
 
 ---
 
@@ -504,23 +536,43 @@ nothing outside this repository reads it. `k_IsManifestRecord` replaced the `siz
 ## 10. What phase D left for phase E
 
 **Phase D is complete. Read this as a checklist.** D4, D5b, and D6 are done. D-wide holds. D1 is half
-done. **D2 is open. It saves the most later work, so settle it before E2 starts.**
+done. D2 is settled, and section 10 D2 records what it still owes E2.
 
-### D2. Dump the space stage with full fidelity. **Open**
+### D2. Dump the space stage with full fidelity. **Settled 2026-09-01**
 
-The riskiest change in phase E replaces `k_ModuleSpaces` with data. If the stage 1 dump has a stable JSON shape, that job becomes "produce the same JSON from a
-different source". The golden dump of `OceanFft` is then a byte-exact acceptance test for it.
+The riskiest change in phase E replaces `k_ModuleSpaces` with data. A stable JSON shape for the
+stage 1 dump turns that job into "produce the same JSON from a different source".
 
-`WriteAxis` in `src/emit/StageDump.cpp:61` writes the name, the values, the parent, and the required
-parent value. E2 adds `AxisValueDomain`, `AxisKind`, and `EarliestBindingTime`. The dump therefore
-gains fields, and it cannot stay byte identical to the phase D golden.
+**The author chose the first answer. The three fields are written now, as nulls.** `WriteAxis` in
+`src/emit/StageDump.cpp` emits `kind`, `earliestBindingTime`, and `valueDomain` between the name and
+the values. E2 fills them. E2 therefore changes a value and never the shape of the object, and the
+known good dump stays a byte comparison for the step that most needs one.
 
-**The author must choose one answer before E2 starts:**
+`tests/known_good/OceanFft.stage-space.json` holds the new shape. The change added nine lines, which
+is three fields for each of three axes, and nothing else moved.
 
-- Add the fields to the dump now as nulls. Accept one artifact change. Keep the byte comparison as
-  the evidence for E2. **This costs one edit, and it keeps the rule the whole phase rests on.**
-- Or let E2 move the dump on purpose, and give E2 a field by field comparison instead, as phase D
-  step D8b did. **This costs E2 its acceptance test.**
+**The byte comparison already exists, and it is not a file.** `CheckSpaceDump` in
+`tests/StageDumpTests.cpp` holds one golden literal in the source. Its comment states the job: it
+pins the JSON shape, the key names, the key order, and the four space indent, so a change to any of
+those fails there rather than in a large diff. It failed on the three new fields at once, and the
+literal now carries them.
+
+**An inline literal is the better home for this check.** It needs no file, so it cannot disagree with
+a checkout about line endings, and it names the failing claim rather than printing a diff.
+
+**The files in `tests/known_good/` are a separate thing, and nothing reads them.** No test, no
+script, and no CMake rule names that directory. They serve a person with a diff tool. Two facts
+apply if E2 ever makes one of them a test:
+
+1. The stored files are CRLF, and the cooker writes LF. A byte comparison fails on that alone. The
+   directory would need a `.gitattributes` rule marking it `-text`.
+2. `space` is current. `variants` is unchanged. The other four are stale, and the next paragraph
+   says why.
+
+**Four of the six known good dumps are stale.** The `raw` and `resolved` dumps differ by 350 lines,
+`cooked` by 42, and `interned` by 12. They date from 2026-08-26, and the Ocean shaders and the Slang
+submodule both moved after that. `variants` is unchanged, and `space` is current. Regenerating the
+four would record shader edits that are still in progress, so it waits for the author.
 
 ### D4. Separate the module-level stage 3 call from the per-variant one. **Done**
 
@@ -539,9 +591,9 @@ the alias, at the start of E5.
 
 ### D-wide. Do not add a fourth index site. **Holds**
 
-Section 7 lists three. Nothing new computes a mixed-radix index. The comment at
-`src/emit/ShaderLibraryEmitter.cpp:386` is still in place. It is an accurate warning, and phase E
-deletes it.
+Section 7 listed three sites. The removal of the C++ emitter deleted two, so one is left. Nothing
+new computes a mixed-radix index. The hand-maintained copy that the warning comment named went with
+the emitter, so phase E no longer has to delete it.
 
 ### D5b. The diagnostic sink. **Done, and phase E makes it pay**
 
@@ -585,18 +637,18 @@ change **what**. Each one adds capability that no golden file covers.
 |---|---|---|---|
 | E0a | The entry point scope walk, from §3a. **Done 2026-08-21** | A probe module cooks and the cross-check agrees | low |
 | E0b | The `ParameterBlock` sub-object walk, from §3b. **Done 2026-08-21** | A probe module cooks and the cross-check agrees | low |
-| E0c | Reject a pointer type under a bound access model, from §3c | **A probe module fails the cook** | low |
-| E0 | Slang interface spike, with citations | A written report | none |
+| E0c | Reject a pointer type under a bound access model, from §3c. **Done 2026-09-01** | `AccessModelRejectTest`, on `PointerMember.slang` | low |
+| E0 | Slang interface spike, with citations. **Done 2026-09-01** | `docs/phase-e-interface-spike.md` | none |
 | E1 | Comparison and logical levels in `SizeExpression` | The existing tests, plus new ones | low |
 | E2 | `AxisValueDomain`, `AxisKind`, `EarliestBindingTime`, `ActiveWhen`, `Require`, axis DAG, cycle check. `k_ModuleSpaces` stays the source | The space dump, **once §10 D2 is settled** | medium |
 | E3 | Depth-first enumeration with constraint propagation | **The variants dump is byte identical** | medium |
 | E4 | Sorted key table and binary search, in place of the storage index. Add the per-variant capability requirement to the manifest | Round trips, and the emitted tables shrink | **high** |
 | E5 | Rename the JSON target, then the reader, the policy file, per-target sections, `CookValues`, `CookWhen` | Round trip against `JsonWriter` | medium |
 | E6 | Axis attributes and the bootstrap compile. Delete `VerifyAxisNamesAreDeclared` | A cook of `OceanFft` with no registry entry | **high** |
-| E7 | Interface axes, or the enum fallback from E0 | A new test shader | medium |
+| E7 | Interface axes. E0 removed the enum fallback | A new test shader | medium |
 | E8 | Documents, and the measured numbers again | — | none |
 
-**E0c comes first.** It is the only open item that lets a cook exit 0 with invalid output.
+**E0c and E0 are complete.** E1 is the next step, and everything in the constraint path depends on it.
 
 **E4 needs care.** It changes the emitted C++, the manifest variant table, and the arithmetic of the
 cooker at one time. The round trips find an error, and the stage dumps say where.
