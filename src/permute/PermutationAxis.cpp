@@ -16,26 +16,38 @@
 namespace lodestone
 {
 
-PermutationAxis::PermutationAxis(std::string _name,
+PermutationAxis::PermutationAxis(std::string name,
                                  std::span<const PermutationValue> _values,
-                                 int32_t _parentIndex,
-                                 PermutationValue _requiredParentValue) noexcept
-    : Name(std::move(_name)),
-      ParentIndex(_parentIndex),
-      RequiredParentValue(_requiredParentValue)
+                                 int32_t parent_index,
+                                 PermutationValue required_parent_value,
+                                 AxisKind kind,
+                                 EarliestBindingTime binding_time,
+                                 AxisValueDomain value_domain) noexcept
+    : Name(std::move(name)),
+      ParentIndex(parent_index),
+      RequiredParentValue(required_parent_value),
+      Kind(kind),
+      BindingTime(binding_time),
+      ValueDomain(value_domain)
 {
-    numValues = static_cast<int64_t>(std::min(_values.size(), values.size()));
+    numValues = static_cast<int64_t>(std::min(_values.size(), static_cast<size_t>(k_MaxValues)));
     std::copy_n(_values.begin(), numValues, values.begin());
 }
 
-PermutationAxis::PermutationAxis(std::string _name,
+PermutationAxis::PermutationAxis(std::string name,
                                  std::initializer_list<PermutationValue> _values,
-                                 int32_t _parentIndex,
-                                 PermutationValue _requiredParentValue) noexcept
-    : PermutationAxis(std::move(_name),
+                                 int32_t parent_index,
+                                 PermutationValue required_parent_value,
+                                 AxisKind kind,
+                                 EarliestBindingTime binding_time,
+                                 AxisValueDomain value_domain) noexcept
+    : PermutationAxis(std::move(name),
                       std::span<const PermutationValue>{ _values.begin(), _values.size() },
-                      _parentIndex,
-                      _requiredParentValue)
+                      parent_index,
+                      required_parent_value,
+                      kind,
+                      binding_time,
+                      value_domain)
 {
 }
 

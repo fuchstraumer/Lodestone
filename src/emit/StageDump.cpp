@@ -64,9 +64,9 @@ namespace
         writer.KeyString("name", axis.Name);
         // adding these keys now before we complete later tasks, to preserve parity of byte comparisons
         // todo: remove these as soon as we are actually able to write values for this
-        writer.KeyNull("kind");
-        writer.KeyNull("earliestBindingTime");
-        writer.KeyNull("valueDomain");
+        writer.KeyString("kind", magic_enum::enum_name(axis.Kind));
+        writer.KeyString("earliestBindingTime", magic_enum::enum_name(axis.BindingTime));
+        writer.KeyString("valueDomain", magic_enum::enum_name(axis.ValueDomain));
 
         writer.Key("values");
         writer.BeginArray();
