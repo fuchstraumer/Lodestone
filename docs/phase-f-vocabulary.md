@@ -69,12 +69,17 @@ The binding time of an axis is the latest point at which its value must be known
 | Binding time | Mechanism | Cost of one more value |
 |---|---|---|
 | **Cook** | Link-time constant. `extern const static` | One more compiled variant |
-| **Pipeline** | Specialization constant, or a WGSL `override` | One more pipeline object |
-| **Draw** | Push constant, then a uniform branch | One branch, uniform across the dispatch |
-| **Thread** | A divergent branch | Divergence |
+| **Bind** | Specialization constant, or a WGSL `override` | One more pipeline object |
+| **Invocation** | Push constant, then a uniform branch | One branch, uniform across the dispatch |
+| **Execution** | A divergent branch | Divergence |
+
+Each name is the **action** that fixes the value, not a stage noun: the cook, the pipeline bind, one
+draw or dispatch invocation, and the thread's own execution. This reads as a point on the pipeline
+rather than a mix of nouns and verbs. The `EarliestBindingTime` enum uses these four names. They were
+formerly cook, pipeline, draw, and thread.
 
 Examples from this repository: `[SpecializationConstant] const uint MaxLights = 2048` in
-`VtfAssignLightsToClustersBVH.slang` is pipeline time. The `!= -1` test in `Clustered.frag` is draw
+`VtfAssignLightsToClustersBVH.slang` is bind time. The `!= -1` test in `Clustered.frag` is invocation
 time. `IFFT_SIZE` is cook time.
 
 ### Earliest sound binding time
@@ -85,7 +90,7 @@ then move it later when the target permits.**
 This is the primitive, and the reason is portability past one API.
 
 The author knows which binding times are correct. An axis that sizes a `groupshared` array is
-cook-time and can never be later. An axis that only selects a pointer is sound at draw time and at
+cook-time and can never be later. An axis that only selects a pointer is sound at invocation time and at
 every earlier time as well. That statement is a property of the shader, and it does not change when
 the target changes.
 
@@ -320,7 +325,7 @@ Answer these before phase F becomes a plan. Each is a spike with a written resul
    that type covers textures on both targets, the indexed access model is portable and the access
    model question shrinks to buffers alone.
 3. **What can a WGSL `override` legally size?** Workgroup size, workgroup array extents? This decides
-   whether pipeline time is a real third binding time on WebGPU, and several current cook-time axes
+   whether bind time is a real third binding time on WebGPU, and several current cook-time axes
    may move.
 4. **Confirm the exact Vulkan extension names and driver coverage** for the address-command and
    descriptor-heap features. That set moves quickly, and no phase should rest on a half-remembered
@@ -397,8 +402,8 @@ target, and not a property of the structure.** Section 5 states this too.
 
 **Axis kind** — resource presence, capability, tuning, or technique. Section 2.
 
-**Binding time** — cook, pipeline, draw, or thread. The latest point at which an axis value must be
-known. Section 3.
+**Binding time** — cook, bind, invocation, or execution. The latest point at which an axis value must
+be known. Section 3.
 
 **Earliest sound binding time** — the earliest binding time at which an axis is correct, declared by
 the author. The cooker and the client may move the value later. Section 3.
