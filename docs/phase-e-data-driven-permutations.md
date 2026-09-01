@@ -560,19 +560,23 @@ literal now carries them.
 **An inline literal is the better home for this check.** It needs no file, so it cannot disagree with
 a checkout about line endings, and it names the failing claim rather than printing a diff.
 
-**The files in `tests/known_good/` are a separate thing, and nothing reads them.** No test, no
-script, and no CMake rule names that directory. They serve a person with a diff tool. Two facts
-apply if E2 ever makes one of them a test:
+**`tests/known_good/` now has a reader.** `scripts/check-known-good.py` cooks a module, compares all
+six stage dumps, and prints a unified diff for each one that differs. `--accept` copies the new dumps
+over the accepted ones, and it exists so that a schema change is accepted on purpose and never in
+passing. All six files are current as of 2026-09-01, and `.gitattributes` keeps JSON at LF so the
+comparison never fails on a line ending.
 
-1. The stored files are CRLF, and the cooker writes LF. A byte comparison fails on that alone. The
-   directory would need a `.gitattributes` rule marking it `-text`.
-2. `space` is current. `variants` is unchanged. The other four are stale, and the next paragraph
-   says why.
+**The two checks answer different questions, and both are needed.** The inline literal pins the shape
+of one small space, and it fails fast with no build artifact. The dump files pin the whole content of
+a real module, across every stage. The literal cannot see a reflection regression in `OceanFft`, and
+the script cannot fail before a cook runs.
 
-**Four of the six known good dumps are stale.** The `raw` and `resolved` dumps differ by 350 lines,
-`cooked` by 42, and `interned` by 12. They date from 2026-08-26, and the Ocean shaders and the Slang
-submodule both moved after that. `variants` is unchanged, and `space` is current. Regenerating the
-four would record shader edits that are still in progress, so it waits for the author.
+**The stale dumps were refreshed on 2026-09-01, and one of the differences was a defect.** Four
+changes were schema moves: the `ScopeName` field that E0a and E0b added, `globalBindings` renamed to
+`bindings`, the binding kind `SampledTexture` renamed to `Texture`, and the hash name `xxHash3`
+renamed to `xxHash3_64`. The fifth was a reflection regression that made every texture report an
+invalid sample type. `docs/agent-handoff.md` §13 records it. **Read a difference before accepting
+it.**
 
 ### D4. Separate the module-level stage 3 call from the per-variant one. **Done**
 

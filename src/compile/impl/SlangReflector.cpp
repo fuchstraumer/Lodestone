@@ -642,9 +642,10 @@ CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* conta
     case BindingKind::CombinedTextureSampler:
         [[fallthrough]];
     case BindingKind::Texture:
-        if (slang::TypeReflection* resultType =
-                leafLayout->getBindingRangeLeafTypeLayout(range_index)->getType();
-            resultType != nullptr)
+        // fixed: we used `getType()` here, but that just gives the texture: the scalar type of a slang
+        // texture is invalid, so to get the actual sample type we need to use `getResourceResultType()`
+        // makes sense, but an easy mistake to make
+        if (slang::TypeReflection* resultType = leafType->getResourceResultType(); resultType != nullptr)
         {
             binding.SampleType = FromSlangScalarType(resultType->getScalarType());
         }

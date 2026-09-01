@@ -413,9 +413,10 @@
     "resources": [
         {
             "index": 0,
-            "contentHash": 2418597765598125630,
+            "contentHash": 15617206707651349768,
             "resource": {
                 "name": "IfftInput",
+                "scope": "",
                 "placementKind": "bound",
                 "group": 0,
                 "binding": 0,
@@ -433,9 +434,10 @@
         },
         {
             "index": 1,
-            "contentHash": 2993570526458366551,
+            "contentHash": 1907367111400362289,
             "resource": {
                 "name": "IfftParams",
+                "scope": "",
                 "placementKind": "bound",
                 "group": 0,
                 "binding": 1,
@@ -478,13 +480,14 @@
         },
         {
             "index": 2,
-            "contentHash": 16221759262437020080,
+            "contentHash": 15719195848912102434,
             "resource": {
                 "name": "IfftSinCosLUT",
+                "scope": "",
                 "placementKind": "bound",
                 "group": 0,
                 "binding": 2,
-                "kind": "SampledTexture",
+                "kind": "Texture",
                 "elementStride": 0,
                 "byteSize": 0,
                 "arrayCount": 1,
@@ -498,9 +501,10 @@
         },
         {
             "index": 3,
-            "contentHash": 12876530392605100326,
+            "contentHash": 11338881021428589764,
             "resource": {
                 "name": "IfftLUTSampler",
+                "scope": "",
                 "placementKind": "bound",
                 "group": 0,
                 "binding": 3,
@@ -532,7 +536,7 @@
     "footprintLists": [
         {
             "index": 0,
-            "contentHash": 12095074592409691087,
+            "contentHash": 4595279363123946348,
             "footprints": [
                 {
                     "footprint": {
@@ -560,7 +564,7 @@
         },
         {
             "index": 1,
-            "contentHash": 7887302270755646103,
+            "contentHash": 17651058771480055639,
             "footprints": [
                 {
                     "footprint": {
@@ -588,7 +592,7 @@
         },
         {
             "index": 2,
-            "contentHash": 7588095551120836190,
+            "contentHash": 12184693801765116623,
             "footprints": [
                 {
                     "footprint": {
@@ -616,7 +620,7 @@
         },
         {
             "index": 3,
-            "contentHash": 6581256236267084642,
+            "contentHash": 16463664819726766914,
             "footprints": [
                 {
                     "footprint": {
@@ -644,7 +648,7 @@
         },
         {
             "index": 4,
-            "contentHash": 12835513619624584530,
+            "contentHash": 12747455927005457537,
             "footprints": [
                 {
                     "footprint": {
@@ -672,7 +676,7 @@
         },
         {
             "index": 5,
-            "contentHash": 8749247564418839545,
+            "contentHash": 12987530564357425225,
             "footprints": [
                 {
                     "footprint": {
@@ -700,7 +704,7 @@
         },
         {
             "index": 6,
-            "contentHash": 2976673494172573153,
+            "contentHash": 11734503064291270614,
             "footprints": [
                 {
                     "footprint": {
@@ -2612,7 +2616,7 @@
     ],
     "interners": {
         "sources": {
-            "hashName": "xxHash3",
+            "hashName": "xxHash3_64",
             "dedupeEnabled": true,
             "artifactsSeen": 105,
             "uniqueEntries": 77,
@@ -2620,7 +2624,7 @@
             "byteComparisons": 28
         },
         "resources": {
-            "hashName": "xxHash3",
+            "hashName": "xxHash3_64",
             "dedupeEnabled": true,
             "artifactsSeen": 140,
             "uniqueEntries": 4,
@@ -2628,7 +2632,7 @@
             "byteComparisons": 136
         },
         "resourceLists": {
-            "hashName": "xxHash3",
+            "hashName": "xxHash3_64",
             "dedupeEnabled": true,
             "artifactsSeen": 35,
             "uniqueEntries": 1,
@@ -2636,7 +2640,7 @@
             "byteComparisons": 34
         },
         "footprintLists": {
-            "hashName": "xxHash3",
+            "hashName": "xxHash3_64",
             "dedupeEnabled": true,
             "artifactsSeen": 35,
             "uniqueEntries": 7,
@@ -2644,7 +2648,7 @@
             "byteComparisons": 28
         },
         "visibility": {
-            "hashName": "xxHash3",
+            "hashName": "xxHash3_64",
             "dedupeEnabled": true,
             "artifactsSeen": 105,
             "uniqueEntries": 2,
@@ -2652,7 +2656,7 @@
             "byteComparisons": 103
         },
         "rasterStates": {
-            "hashName": "xxHash3",
+            "hashName": "xxHash3_64",
             "dedupeEnabled": true,
             "artifactsSeen": 105,
             "uniqueEntries": 1,

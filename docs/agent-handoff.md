@@ -1,30 +1,39 @@
 # Agent handoff
 
-Written on 2026-08-22. Rewritten on 2026-08-28, after the compiler split finished and the tests came
-back green. This document records the state, the measured facts, and the next task. Read it first.
+Written on 2026-08-22. Rewritten on 2026-08-28, after the compiler split finished. Updated on
+2026-09-01, after six build faults were fixed, the C++ emitter was removed, and phase E steps E0c and
+E0 completed. This document records the state, the measured facts, and the next task. Read it first.
 
 Text in this file follows ASD-STE100.
 
 ---
 
-## 1. State on 2026-08-28
+## 1. State on 2026-09-01
 
-**The compiler split is complete and the pipeline works.** Both build configurations are green, and
-all thirteen test targets pass in each one.
+**The compiler split is complete and the pipeline works.** Fourteen test targets pass. The count
+rose by one, because phase E step E0c added `AccessModelRejectTest`.
 
 | Configuration | Build | Tests |
 |---|---|---|
-| Debug | green | 13 of 13 |
-| RelWithDebInfo | green | 13 of 13 |
+| RelWithDebInfo, `ninja-clang-cl` | green | 14 of 14 |
 
-Ten targets are unit tests. Three are cooks. `scripts\run-tests.bat` reports `all targets passed`.
+Eleven targets are unit tests. Three are cooks. `scripts\run-tests.bat` reports `all targets
+passed`.
+
+**Only the clang tree was rebuilt on 2026-09-01.** `build/ninja-msvc` went with the rest of `build/`
+and has not been configured since. Build it before you trust a claim about MSVC.
 
 ### The numbers to compare against
 
 A green cook of `OceanFft` reports 35 variants over an index space of 56, 105 entry point variants,
 77 unique sources, 4 resources, 1 resource list, 7 footprint lists, and 2 visibility lists, and it
 emits 663 KiB of WGSL. Those numbers are the regression check, and they were confirmed again on
-2026-08-28.
+2026-09-01. The whole cook then took 1080 ms in RelWithDebInfo.
+
+**`python scripts/check-known-good.py` is the finer check.** It cooks a module and compares each of
+the six stage dumps against `tests/known_good/`. Those files are current as of 2026-09-01. Run it
+after a change to reflection, to a stage, or to a dump. It found a reflection regression on the day
+it was written, and section 13 records that.
 
 | Cook | Module | Proves |
 |---|---|---|
@@ -165,7 +174,7 @@ Each fact now belongs to `src/compile/impl/SlangReflector.cpp`.
 
 ---
 
-## 5. Phase E steps E0a and E0b are complete
+## 5. Phase E steps E0a, E0b, E0c, and E0 are complete
 
 **E0a reads the entry point scope.** `collectBindingRangeDrafts` walks any scope, and
 `extractRawEntryPoint` calls it a second time with `entryPointLayout->getTypeLayout()`. An entry point
@@ -223,20 +232,25 @@ module instead of reading the file. Fact 10 in §4 states which modules belong i
 
 ---
 
-## 8. The next task: phase E
+## 8. The next task: phase E step E1
 
-The compiler work is done. `docs/phase-e-data-driven-permutations.md` holds the plan, and steps E0a
-and E0b are already complete.
+`docs/phase-e-data-driven-permutations.md` holds the plan. **Steps E0a, E0b, E0c, and E0 are
+complete, and item D2 of §10 is settled.** Nothing in that document is open for a decision.
 
-**Read §9 of that document first.** It lists what phase D was asked to leave behind for phase E, and
-one item is still open: the space dump does not carry the axis fields that E2 adds. §9 states the two
-possible answers, and the author must settle it **before** E2 starts.
+**E1 is next.** §6 of that document. It adds a comparison level and a logical level to
+`SizeExpression`, about 80 lines, and the existing tests stay green. Everything in the constraint
+path depends on it.
 
-**Step E0c comes first.** §1e of the same document. A pointer type reaches WGSL and no check sees it.
-It is a defect and not a missing capability, so a cook can exit 0 and write invalid output. It is
-also small, and it fits the "correctness is proved by comparison" rule: the fix is a validator.
+One requirement in §6 is easy to miss. An `ActiveWhen` expression can name other axes, and those
+axes can carry expressions of their own. The axes therefore form a directed graph, and
+canonicalization must evaluate them in topological order. A cycle must fail when the registry loads,
+and never during a cook. Add the cycle check in the same step.
 
-After E0c, the phase E order is the one §10 of that document gives. The parts worth knowing before
+**`docs/phase-e-interface-spike.md` holds the E0 answers.** Read it before E7. Three results matter
+early: a link-time `extern` type works and uses the mechanism the constant axis already uses, an
+interface axis can never carry a resource, and `getFullName` is not module qualified.
+
+The rest of the phase E order is the one §11 of that document gives. The parts worth knowing before
 you read it:
 
 - The axis declaration moves onto the `extern static const` in the shader, as an attribute. That is
@@ -350,32 +364,36 @@ oversubscribes the machine.
 Ordered by what can write wrong output, then by what wastes time.
 
 - **A compiled-in absolute path.** §2. It stops a cook on any other machine.
-- **Step E0c.** A pointer type reaches WGSL and no check sees it. A cook can exit 0 and write invalid
-  output. §8 says it comes first.
-- **Two unguarded reads.** `VisitLeaves` reads `getOffset(category)`, and `CollectUniformMembers`
+- **Two unguarded reads.** `VisitLeaves` reads `getOffset(category)`, and `collectUniformMembers`
   reads a leaf `getSize`. Neither tests `SLANG_UNKNOWN_SIZE`. Neither is a placement, so neither can
   misplace a binding.
+- **Two silent gaps in `applyLeafTypeLayout`.** A texture with no result type leaves `SampleType`
+  invalid, and a uniform block may end with a byte size of zero while a comment above the line states
+  that the size is fully determined. The second one is a comment that no code enforces. Section 13
+  records what the first one already cost.
 - **`hardware_concurrency` is the wrong thread count. Started.**
   `SlangCompilerCreateInfo::ExpectedBatchSize` exists for this, and `ThreadPool::Initialize` does not
-  read it yet, so the count is still `hardware_concurrency`. §10b measured 3 to 4 workers as the
-  optimum with the lock, against `hardware_concurrency` at 2.4 times worse. The count should follow
-  the variant count.
+  read it yet. §10b measured 3 to 4 workers as the optimum **with LTO on and the record lock in
+  place**. Both of those changed on 2026-09-01, so measure again before you tune.
 - **A global session for each batch.** Each worker creates one inside the outer loop. One for each
   thread is correct, because a global session is not thread safe. One for each batch is more than
   necessary.
 - **One pool for each module.** The driver builds one `SlangCompiler` for each module, so a cook of
-  several modules pays the convoy of §10b once for each. `CompileBatch` would have to carry the
-  module state for one pool to serve several.
-- **MSVC raises warnings that Clang does not.** Three C4244 trace to the ranges pipeline at
-  `src/compile/impl/SlangReflector.cpp:547`, where `std::views::enumerate` yields an `int64_t` index
-  and `std::ranges::to<std::vector<uint32_t>>` narrows it. Two C4715 sit at
-  `src/permute/PermutationValue.cpp:99` and line 114. Build both arms before you call a file clean.
-- **The space dump does not carry the axis fields that E2 adds.** §9 of the phase E document states
-  the two answers. Settle it before E2 starts.
+  several modules pays the startup cost once for each. `CompileBatch` would have to carry the module
+  state for one pool to serve several.
+- **A push constant cannot be cooked.** `FromSlangBindingType` has no row for
+  `slang::BindingType::PushConstant`, and `BindingKind` has no value to map it to. The walk stops at
+  an invalid binding kind. WGSL has no push constants, so nothing is lost yet.
+  `docs/phase-f-vocabulary.md` is where this becomes a question.
+- **`/arch:AVX2` is vestigial.** `CMakeLists.txt` asks for it, and the comment justifies it by a
+  `Math.hpp` that this repository does not have. No AVX2 intrinsic appears anywhere in `include/`,
+  `src/`, or `client/`. Removing it changes code generation, so it is the author's call.
+- **The Slang PDB is no longer copied.** `copy_slang_dlls_to_target` copied it through a path that
+  went stale, and the repair dropped it. `$<TARGET_PDB_FILE:slang>` is the spelling that brings it
+  back.
+- **Four of the ten unit tests never ran under MSVC on this machine.** See §1.
 - **`docs/` is in `.gitignore`.** This file is force-added, so it survives. Use
   `git add -f docs/agent-handoff.md`. Run `git ls-files docs/` to see which others did.
-
----
 
 ## 12. How this author works
 
@@ -390,3 +408,46 @@ negligible.
 **Measure, and do not estimate.** A probe module and a temporary `std::println` answer a question
 about Slang in one build. Every fact in section 4 came that way, and three of them contradicted a
 plan document.
+
+---
+
+## 13. What a clean tree found on 2026-09-01
+
+`build/` was deleted and reconfigured. Six faults appeared at once. **Not one was new code.** Each
+was an old flag or path whose artifact had been cached for weeks, so no build had run the broken step.
+
+| Fault | Where | What it did |
+|---|---|---|
+| `-flto` on every configuration | `cmake/ConfigureBuildFlags.cmake` | Forced monolithic LTO on Slang. `lld` 22.1.8 crashed. |
+| `SLANG_ENABLE_RELEASE_LTO ON` | `cmake/ConfigureSlang.cmake` | Overrode the Slang default, which is off. |
+| `/Ob2 /arch:AVX2` with no compiler test | `CMakeLists.txt` | The full Clang driver reads them as file names. |
+| A written path to the Slang library | `cmake/ConfigureSlang.cmake` | Slang moved its output directory in v2026.16. |
+| `,gitattributes` | repository root | A comma in place of a dot, so git never read the file. |
+| `*.json text` | `.gitattributes` | With `core.autocrlf` on, that gives a CRLF working tree. The cooker writes LF. |
+
+**LTO is now off everywhere.** Slang sets it off by default for the same class of reason. Nobody
+measured what it bought here, and the cook is about 1080 ms without it.
+
+**Two lessons hold beyond these six.**
+
+`ninja-clang-cl` uses `clang++`, the GNU driver, and not the clang-cl frontend. **Any flag spelled
+the MSVC way is a latent break that waits for the next clean configure.** Every flag decision must
+go through the compiler test at the top of `CMakeLists.txt`.
+
+**Ask CMake where a file is. Do not write the path.** `$<TARGET_FILE:slang>` cannot go stale. A
+written path fails at the end of a long build, on the day a submodule moves.
+
+### The regression the known good dumps found
+
+`applyLeafTypeLayout` became a switch on the binding kind. The texture arm lost
+`getResourceResultType` and read `getType` on the wrong object. `getScalarType` of a texture is none,
+so **all 35 textures of `OceanFft` reported an invalid sample type, and the cook still exited 0.**
+
+No validator could see it. The WGSL cross-check compares group and binding alone, and both were
+right. The three round trips replay the cooker against itself, and the cooker agreed with itself.
+
+`scripts/check-known-good.py` found it in one run, as 35 changed lines. **This is why that script
+exists, and why a schema change must be accepted deliberately rather than in passing.** Accepting the
+new dumps without reading them would have made the defect the baseline.
+
+---

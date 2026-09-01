@@ -18,10 +18,11 @@
             "index": 0,
             "suffix": "_128_false_16",
             "description": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -41,6 +42,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -85,12 +87,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -104,6 +107,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -190,10 +194,11 @@
             "index": 4,
             "suffix": "_128_true_16",
             "description": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -213,6 +218,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -257,12 +263,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -276,6 +283,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -362,10 +370,11 @@
             "index": 5,
             "suffix": "_128_true_32",
             "description": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -385,6 +394,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -429,12 +439,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -448,6 +459,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -534,10 +546,11 @@
             "index": 6,
             "suffix": "_128_true_64",
             "description": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -557,6 +570,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -601,12 +615,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -620,6 +635,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -706,10 +722,11 @@
             "index": 7,
             "suffix": "_128_true_128",
             "description": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -729,6 +746,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -773,12 +791,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -792,6 +811,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -878,10 +898,11 @@
             "index": 8,
             "suffix": "_256_false_16",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -901,6 +922,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -945,12 +967,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -964,6 +987,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1050,10 +1074,11 @@
             "index": 12,
             "suffix": "_256_true_16",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1073,6 +1098,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1117,12 +1143,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -1136,6 +1163,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1222,10 +1250,11 @@
             "index": 13,
             "suffix": "_256_true_32",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1245,6 +1274,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1289,12 +1319,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -1308,6 +1339,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1394,10 +1426,11 @@
             "index": 14,
             "suffix": "_256_true_64",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1417,6 +1450,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1461,12 +1495,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -1480,6 +1515,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1566,10 +1602,11 @@
             "index": 15,
             "suffix": "_256_true_128",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1589,6 +1626,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1633,12 +1671,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -1652,6 +1691,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1738,10 +1778,11 @@
             "index": 16,
             "suffix": "_512_false_16",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1761,6 +1802,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1805,12 +1847,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -1824,6 +1867,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1910,10 +1954,11 @@
             "index": 20,
             "suffix": "_512_true_16",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1933,6 +1978,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -1977,12 +2023,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -1996,6 +2043,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2082,10 +2130,11 @@
             "index": 21,
             "suffix": "_512_true_32",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2105,6 +2154,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2149,12 +2199,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -2168,6 +2219,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2254,10 +2306,11 @@
             "index": 22,
             "suffix": "_512_true_64",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2277,6 +2330,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2321,12 +2375,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -2340,6 +2395,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2426,10 +2482,11 @@
             "index": 23,
             "suffix": "_512_true_128",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2449,6 +2506,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2493,12 +2551,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -2512,6 +2571,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2598,10 +2658,11 @@
             "index": 24,
             "suffix": "_1024_false_16",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2621,6 +2682,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2665,12 +2727,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -2684,6 +2747,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2770,10 +2834,11 @@
             "index": 28,
             "suffix": "_1024_true_16",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2793,6 +2858,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2837,12 +2903,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -2856,6 +2923,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2942,10 +3010,11 @@
             "index": 29,
             "suffix": "_1024_true_32",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -2965,6 +3034,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3009,12 +3079,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -3028,6 +3099,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3114,10 +3186,11 @@
             "index": 30,
             "suffix": "_1024_true_64",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3137,6 +3210,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3181,12 +3255,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -3200,6 +3275,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3286,10 +3362,11 @@
             "index": 31,
             "suffix": "_1024_true_128",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3309,6 +3386,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3353,12 +3431,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -3372,6 +3451,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3458,10 +3538,11 @@
             "index": 32,
             "suffix": "_2048_false_16",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3481,6 +3562,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3525,12 +3607,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -3544,6 +3627,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3630,10 +3714,11 @@
             "index": 36,
             "suffix": "_2048_true_16",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3653,6 +3738,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3697,12 +3783,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -3716,6 +3803,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3802,10 +3890,11 @@
             "index": 37,
             "suffix": "_2048_true_32",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3825,6 +3914,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3869,12 +3959,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -3888,6 +3979,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3974,10 +4066,11 @@
             "index": 38,
             "suffix": "_2048_true_64",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -3997,6 +4090,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4041,12 +4135,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -4060,6 +4155,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4146,10 +4242,11 @@
             "index": 39,
             "suffix": "_2048_true_128",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4169,6 +4266,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4213,12 +4311,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -4232,6 +4331,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4318,10 +4418,11 @@
             "index": 40,
             "suffix": "_4096_false_16",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4341,6 +4442,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4385,12 +4487,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -4404,6 +4507,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4490,10 +4594,11 @@
             "index": 44,
             "suffix": "_4096_true_16",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4513,6 +4618,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4557,12 +4663,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -4576,6 +4683,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4662,10 +4770,11 @@
             "index": 45,
             "suffix": "_4096_true_32",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4685,6 +4794,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4729,12 +4839,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -4748,6 +4859,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4834,10 +4946,11 @@
             "index": 46,
             "suffix": "_4096_true_64",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4857,6 +4970,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -4901,12 +5015,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -4920,6 +5035,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5006,10 +5122,11 @@
             "index": 47,
             "suffix": "_4096_true_128",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5029,6 +5146,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5073,12 +5191,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -5092,6 +5211,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5178,10 +5298,11 @@
             "index": 48,
             "suffix": "_8192_false_16",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5201,6 +5322,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5245,12 +5367,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -5264,6 +5387,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5350,10 +5474,11 @@
             "index": 52,
             "suffix": "_8192_true_16",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5373,6 +5498,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5417,12 +5543,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -5436,6 +5563,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5522,10 +5650,11 @@
             "index": 53,
             "suffix": "_8192_true_32",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5545,6 +5674,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5589,12 +5719,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -5608,6 +5739,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5694,10 +5826,11 @@
             "index": 54,
             "suffix": "_8192_true_64",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5717,6 +5850,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5761,12 +5895,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -5780,6 +5915,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5866,10 +6002,11 @@
             "index": 55,
             "suffix": "_8192_true_128",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-            "globalBindings": [
+            "bindings": [
                 {
                     "index": 0,
                     "name": "IfftInput",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5889,6 +6026,7 @@
                 {
                     "index": 1,
                     "name": "IfftParams",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
@@ -5933,12 +6071,13 @@
                 {
                     "index": 2,
                     "name": "IfftSinCosLUT",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,
                         "binding": 2
                     },
-                    "kind": "SampledTexture",
+                    "kind": "Texture",
                     "elementStride": 0,
                     "byteSize": 0,
                     "arrayCount": 1,
@@ -5952,6 +6091,7 @@
                 {
                     "index": 3,
                     "name": "IfftLUTSampler",
+                    "scope": "",
                     "placement": {
                         "model": "Bound",
                         "group": 0,

@@ -1876,7 +1876,7 @@
     ],
     "interners": {
         "sources": {
-            "hashName": "xxHash3",
+            "hashName": "xxHash3_64",
             "dedupeEnabled": true,
             "artifactsSeen": 105,
             "uniqueEntries": 77,
@@ -1884,7 +1884,7 @@
             "byteComparisons": 28
         },
         "resources": {
-            "hashName": "xxHash3",
+            "hashName": "xxHash3_64",
             "dedupeEnabled": true,
             "artifactsSeen": 140,
             "uniqueEntries": 4,
@@ -1892,7 +1892,7 @@
             "byteComparisons": 136
         },
         "resourceLists": {
-            "hashName": "xxHash3",
+            "hashName": "xxHash3_64",
             "dedupeEnabled": true,
             "artifactsSeen": 35,
             "uniqueEntries": 1,
@@ -1900,7 +1900,7 @@
             "byteComparisons": 34
         },
         "footprintLists": {
-            "hashName": "xxHash3",
+            "hashName": "xxHash3_64",
             "dedupeEnabled": true,
             "artifactsSeen": 35,
             "uniqueEntries": 7,
@@ -1908,7 +1908,7 @@
             "byteComparisons": 28
         },
         "visibility": {
-            "hashName": "xxHash3",
+            "hashName": "xxHash3_64",
             "dedupeEnabled": true,
             "artifactsSeen": 105,
             "uniqueEntries": 2,
@@ -1916,7 +1916,7 @@
             "byteComparisons": 103
         },
         "rasterStates": {
-            "hashName": "xxHash3",
+            "hashName": "xxHash3_64",
             "dedupeEnabled": true,
             "artifactsSeen": 105,
             "uniqueEntries": 1,
