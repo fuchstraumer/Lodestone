@@ -70,9 +70,9 @@ set(LODESTONE_CLIENT_SOURCES
 
 set(LODESTONE_COMMON_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/CookerErrors.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/Diagnostics.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Diagnostics.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/CookerErrors.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/Diagnostics.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Diagnostics.cpp")
 
 set(LODESTONE_COMPILE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/RawLibrary.hpp"
