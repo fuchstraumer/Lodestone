@@ -58,7 +58,7 @@ add_lodestone_unit_test(AccessModelRejectTest AccessModelRejectTests.cpp)
 target_compile_definitions(AccessModelRejectTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${CMAKE_SOURCE_DIR}/tests/assets")
 add_lodestone_unit_test(ExternConstantScannerTest ExternConstantScannerTests.cpp)
-add_lodestone_unit_test(SizeExpressionTest SizeExpressionTests.cpp)
+add_lodestone_unit_test(AttributeExpressionTest AttributeExpressionTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)
 add_lodestone_unit_test(PermutationIndexTest PermutationIndexTests.cpp)
 add_lodestone_unit_test(ShaderManifestRejectTest ShaderManifestRejectTests.cpp)

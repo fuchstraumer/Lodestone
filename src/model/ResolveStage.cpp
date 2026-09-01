@@ -3,7 +3,7 @@
 #include "permute/PermutationSpace.hpp"
 #include "compile/RawLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
-#include "permute/SizeExpression.hpp"
+#include "permute/AttributeExpression.hpp"
 
 #include <array>
 #include <cstddef>
@@ -38,7 +38,7 @@ namespace
         }
 
         const CookResult<int64_t> value =
-            EvaluateSizeExpression(attribute.Arguments[argument_index], context.Symbols);
+            EvaluateExpression(attribute.Arguments[argument_index], context.Symbols);
         if (!value)
         {
             return std::unexpected(value.error());
@@ -96,7 +96,7 @@ namespace
         }
 
         const CookResult<int64_t> value =
-            EvaluateSizeExpression(attribute.Arguments.front(), context.Symbols);
+            EvaluateExpression(attribute.Arguments.front(), context.Symbols);
         if (!value)
         {
             std::println(stderr,

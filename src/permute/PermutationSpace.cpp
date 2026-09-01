@@ -4,7 +4,7 @@
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationValue.hpp"
-#include "permute/SizeExpression.hpp"
+#include "permute/AttributeExpression.hpp"
 
 #include <algorithm>
 #include <array>
@@ -374,7 +374,7 @@ CookResult<std::vector<ExternConstantDefault>> PermutationSpace::CollectUndriven
         }
 
         const std::vector<SizeSymbol> known = AsSizeSymbols(defaults);
-        const CookResult<int64_t> value = EvaluateSizeExpression(trimmed, known);
+        const CookResult<int64_t> value = EvaluateExpression(trimmed, known);
         if (!value)
         {
             std::println(stderr,

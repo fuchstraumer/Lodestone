@@ -5,7 +5,7 @@
 #include "permute/PermutationSpace.hpp"
 #include "compile/RawLibrary.hpp"
 #include "ShaderDataSchema.hpp"
-#include "permute/SizeExpression.hpp"
+#include "permute/AttributeExpression.hpp"
 #include <span>
 #include <vector>
 
