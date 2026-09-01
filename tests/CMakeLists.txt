@@ -45,6 +45,18 @@ add_lodestone_unit_test(ParameterBlocksCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/parameter_blocks_output/ShaderLibrary.hpp"
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/ParameterBlocks.slang")
+# The one test in this suite that asserts a cook FAILS. Phase E step E0c needed it.
+#
+# Every other cook test states that a good module cooks. A check that never fires and a check that
+# always fires both leave those tests green, so only a module that must fail can separate them.
+# The table in the source holds a control row for that reason.
+#
+# CMake writes the asset directory in, so the test needs no command line and the run-tests script
+# can run it directly. The table names a file inside that directory, so a later rejection costs one
+# module and one line, and no new target.
+add_lodestone_unit_test(AccessModelRejectTest AccessModelRejectTests.cpp)
+target_compile_definitions(AccessModelRejectTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${CMAKE_SOURCE_DIR}/tests/assets")
 add_lodestone_unit_test(ExternConstantScannerTest ExternConstantScannerTests.cpp)
 add_lodestone_unit_test(SizeExpressionTest SizeExpressionTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)
