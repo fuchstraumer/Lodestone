@@ -40,7 +40,10 @@ PermutationAxis MakeBoolAxis(std::string name)
     return PermutationAxis{ std::move(name),
                             { PermutationValue{ false }, PermutationValue{ true } },
                             PermutationAxis::k_NoParent,
-                            PermutationValue{} };
+                            PermutationValue{},
+                            AxisKind::Capability,
+                            EarliestBindingTime::Cook,
+                            AxisValueDomain::Boolean };
 }
 
 ReflectedBinding MakeSharedBinding()

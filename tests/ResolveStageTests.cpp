@@ -57,11 +57,17 @@ const PermutationSpace k_Space{ "IfftTest",
                                 { PermutationAxis{ "IFFT_SIZE",
                                                    { PermutationValue{ 256u }, PermutationValue{ 512u } },
                                                    PermutationAxis::k_NoParent,
-                                                   PermutationValue{} },
+                                                   PermutationValue{},
+                                                   lodestone::AxisKind::Tuning,
+                                                   lodestone::EarliestBindingTime::Cook,
+                                                   lodestone::AxisValueDomain::Integral },
                                   PermutationAxis{ "IFFT_USE_WAVE_OPS",
                                                    { PermutationValue{ false }, PermutationValue{ true } },
                                                    PermutationAxis::k_NoParent,
-                                                   PermutationValue{} } } };
+                                                   PermutationValue{},
+                                                   lodestone::AxisKind::Capability,
+                                                   lodestone::EarliestBindingTime::Cook,
+                                                   lodestone::AxisValueDomain::Boolean } } };
 const PermutationAxis& k_SizeAxis = k_Space.Axes()[0];
 const PermutationAxis& k_WaveOpsAxis = k_Space.Axes()[1];
 

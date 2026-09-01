@@ -1,6 +1,9 @@
 #include "CookerErrors.hpp"
+#include "permute/PermutationAssignment.hpp"
+#include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "TestHarness.hpp"
+#include "permute/PermutationValue.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -28,6 +31,9 @@ using lodestone::PermutationSpace;
 using lodestone::PermutationValue;
 using lodestone::VariantDescriptor;
 using lodestone::VariantSet;
+using lodestone::AxisKind;
+using lodestone::EarliestBindingTime;
+using lodestone::AxisValueDomain;
 
 namespace
 {
@@ -42,17 +48,25 @@ const PermutationSpace k_TestSpace{
                          PermutationValue{ 512u },
                          PermutationValue{ 1024u } },
                        PermutationAxis::k_NoParent,
-                       PermutationValue{} },
+                       PermutationValue{},
+                       AxisKind::Tuning,
+                       EarliestBindingTime::Cook,
+                       AxisValueDomain::Integral },
       PermutationAxis{ "TEST_USE_WAVE_OPS",
                        { PermutationValue{ false }, PermutationValue{ true } },
                        PermutationAxis::k_NoParent,
-                       PermutationValue{} },
+                       PermutationValue{},
+                       AxisKind::Capability,
+                       EarliestBindingTime::Cook,
+                       AxisValueDomain::Boolean },
       /** Only contributes values when TEST_USE_WAVE_OPS took the value true. */
       PermutationAxis{ "TEST_WAVE_SIZE",
                        { PermutationValue{ 16u }, PermutationValue{ 32u }, PermutationValue{ 64u } },
                        1,
-                       PermutationValue{ true } } } };
-
+                       PermutationValue{ true },
+                       AxisKind::Tuning,
+                       EarliestBindingTime::Cook,
+                       AxisValueDomain::Integral } } };
 const PermutationAxis& k_SizeAxis = k_TestSpace.Axes()[0];
 const PermutationAxis& k_UseWaveOpsAxis = k_TestSpace.Axes()[1];
 const PermutationAxis& k_WaveSizeAxis = k_TestSpace.Axes()[2];

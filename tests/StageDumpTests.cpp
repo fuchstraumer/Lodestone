@@ -35,7 +35,10 @@ PermutationAxis MakeBoolAxis(std::string name)
     return PermutationAxis{ std::move(name),
                             { PermutationValue{ false }, PermutationValue{ true } },
                             PermutationAxis::k_NoParent,
-                            PermutationValue{} };
+                            PermutationValue{},
+                            AxisKind::Capability,
+                            EarliestBindingTime::Cook,
+                            AxisValueDomain::Boolean };
 }
 
 CompiledVariant MakeVariant(uint32_t index, const std::string& suffix, std::string code)
@@ -256,9 +259,9 @@ void CheckSpaceDump(lodestone::tests::TestRunner& runner)
     "axes": [
         {
             "name": "USE_FOO",
-            "kind": null,
-            "earliestBindingTime": null,
-            "valueDomain": null,
+            "kind": "Capability",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Boolean",
             "values": [
                 "false",
                 "true"
