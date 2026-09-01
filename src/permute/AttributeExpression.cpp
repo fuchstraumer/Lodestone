@@ -1,4 +1,4 @@
-#include "permute/SizeExpression.hpp"
+#include "permute/AttributeExpression.hpp"
 #include "CookerErrors.hpp"
 #include <cctype>
 #include <charconv>
@@ -15,6 +15,9 @@
 // The warning about RVO failures are for std::unexpected value returns, which are fine
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wnrvo"
+#pragma clang diagnostic ignored "-Wunsafe-buffer-usage" // offsets from string pointers
+// without this we get warnings about recursion... in a recursive descent parser. silenced.
+//NOLINTBEGIN(misc-no-recursion)
 #endif
 
 namespace lodestone
@@ -36,7 +39,7 @@ namespace
     /** Recursive descent over a fixed grammar. Every failure returns an error rather than a default,
      * because a size that silently evaluates to zero allocates a zero-byte buffer and fails much
      * later, somewhere unrelated. */
-    class ExpressionParser final
+    class ExpressionParser
     {
     public:
         ExpressionParser(std::string_view expression, std::span<const SizeSymbol> symbols) noexcept :
@@ -352,8 +355,8 @@ namespace
 
 } // namespace
 
-CookResult<int64_t> EvaluateSizeExpression(std::string_view expression,
-                                           std::span<const SizeSymbol> symbols)
+CookResult<int64_t> EvaluateExpression(std::string_view expression,
+                                       std::span<const SizeSymbol> symbols)
 {
     if (expression.empty())
     {
@@ -368,6 +371,7 @@ CookResult<int64_t> EvaluateSizeExpression(std::string_view expression,
 
 #ifdef __clang__
 #pragma clang diagnostic pop
+//NOLINTEND(misc-no-recursion)
 #endif
 
 } // namespace lodestone
