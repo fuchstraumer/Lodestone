@@ -6,6 +6,9 @@
     "axes": [
         {
             "name": "IFFT_SIZE",
+            "kind": null,
+            "earliestBindingTime": null,
+            "valueDomain": null,
             "values": [
                 "128",
                 "256",
@@ -20,6 +23,9 @@
         },
         {
             "name": "IFFT_USE_WAVE_OPS",
+            "kind": null,
+            "earliestBindingTime": null,
+            "valueDomain": null,
             "values": [
                 "false",
                 "true"
@@ -29,6 +35,9 @@
         },
         {
             "name": "IFFT_WAVE_SIZE",
+            "kind": null,
+            "earliestBindingTime": null,
+            "valueDomain": null,
             "values": [
                 "16",
                 "32",

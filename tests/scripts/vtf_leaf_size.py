@@ -35,9 +35,14 @@ LEAF_SIZES = (2, 4, 8, 16, 32, 64)
 # The traversal group holds this many threads today, and each thread visits one child.
 GROUP_THREADS = 32
 
-# vtf_timing.py measured this, in nanoseconds. The cost of one predicted test held at this value
-# across every sorted arm, so it is a measurement and not a guess.
-TEST_PRICE = 0.053
+# The price of one test, in nanoseconds. vtf_timing.py measured it on 2026-08-29, on a desktop
+# RTX 4080. The value is the cost of one sphere test alone. It does not include the appends, because
+# every row of each table below performs the same count of appends.
+#
+# An earlier value of 0.053 came from a different machine, and it also charged the appends to the
+# tests. Measure this again on each new machine. The direction of a row survives a change of machine.
+# The magnitude does not.
+TEST_PRICE = 0.0265
 
 # The cost of one turn of the traversal loop is not measured. These are the prices the table tries.
 TURN_PRICES = (0.0, 1.0, 5.0, 20.0)
@@ -141,9 +146,12 @@ def main() -> None:
               f"{lane_use(arity):>5.0f}%")
 
     # The turn count and the test count move in opposite directions, so neither one alone ranks the
-    # arms. This table gives the total time under a range of costs for one turn, with the cost of
-    # one test held at the measured 0.053 ns. A turn costs two group barriers and one serial pop, so
-    # the true value is tens of nanoseconds and not one.
+    # arms. This table gives the total time under a range of prices for one turn. It holds the price
+    # of one test at TEST_PRICE, which a device measured. A turn costs two group barriers and one pop
+    # that thread 0 performs alone, so the true price is tens of nanoseconds and not one.
+    #
+    # Read the 0 ns column as the best case a narrow tree can reach. Read every other column as the
+    # case that the hardware really gives.
     print("\nWhat a narrow tree costs, against a range of prices for one turn of the loop")
     print(f"\n  {'arity':>15}" + "".join(f"{price:>11.0f} ns" for price in TURN_PRICES))
 

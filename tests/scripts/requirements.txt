@@ -1,0 +1,13 @@
+# The packages that every script in this folder needs.
+#
+# Install them with:  py -m pip install -r tests/scripts/requirements.txt
+#
+# `py` must be the interpreter that holds these packages. A second interpreter on the machine holds
+# none of them, and each script then stops at the first import.
+#
+# The versions below are the versions that gave 58 checks passed on 2026-08-29. A later version is
+# probably correct, but nobody tested one. slangpy carries the Slang compiler and the device layer,
+# so it is the package that decides which shaders build.
+numpy==2.5.2
+matplotlib==3.11.1
+slangpy==0.43.1

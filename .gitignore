@@ -15,6 +15,7 @@ build/
 scratch/
 .vscode/c_cpp_properties.json
 third_party/magic_enum
+third_party/EncinoWaves
 out/
 *.pyc
 *.png
