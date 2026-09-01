@@ -3,7 +3,7 @@
 #define LODESTONE_SLANG_MODULE_CONTEXT_HPP
 #include "CookerErrors.hpp"
 #include "SlangCompilerTypes.hpp"
-#include "compile/Diagnostics.hpp"
+#include "Diagnostics.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "slang.h"

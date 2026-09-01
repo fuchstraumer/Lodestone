@@ -2,7 +2,7 @@
 #include "CookerErrors.hpp"
 #include "SlangCompilerTypes.hpp"
 #include "SlangModuleContext.hpp"
-#include "compile/Diagnostics.hpp"
+#include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangDiagnosticParser.hpp"
 #include "permute/PermutationAssignment.hpp"

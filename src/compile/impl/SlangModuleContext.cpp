@@ -1,7 +1,7 @@
 #include "SlangModuleContext.hpp"
 #include "CookerErrors.hpp"
 #include "SlangCompilerTypes.hpp"
-#include "compile/Diagnostics.hpp"
+#include "Diagnostics.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "slang-com-ptr.h"
 #include "slang.h"

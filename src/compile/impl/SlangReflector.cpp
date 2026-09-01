@@ -3,7 +3,7 @@
 #include "ShaderLibraryTypes.hpp"
 #include "SlangCompilerTypes.hpp"
 #include "SlangVariantCompiler.hpp"
-#include "compile/Diagnostics.hpp"
+#include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "magic_enum/magic_enum.hpp"
 #include "model/ShaderDataSchema.hpp"

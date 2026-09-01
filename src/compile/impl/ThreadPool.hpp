@@ -3,7 +3,7 @@
 #define LODESTONE_SHADER_COMPILER_THREAD_POOL_HPP
 #include "CookerErrors.hpp"
 #include "SlangCompilerTypes.hpp"
-#include "compile/Diagnostics.hpp"
+#include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "permute/PermutationSpace.hpp"

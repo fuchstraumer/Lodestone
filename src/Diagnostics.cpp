@@ -1,4 +1,4 @@
-#include "compile/Diagnostics.hpp"
+#include "Diagnostics.hpp"
 #include "CookerErrors.hpp"
 
 #include <cstdint>

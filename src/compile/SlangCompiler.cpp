@@ -1,6 +1,6 @@
 #include "compile/SlangCompiler.hpp"
 #include "CookerErrors.hpp"
-#include "compile/Diagnostics.hpp"
+#include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangDiagnosticParser.hpp"
 #include "impl/SlangCompilerTypes.hpp"

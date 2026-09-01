@@ -1,6 +1,6 @@
 #include "driver/CookerDriver.hpp"
 #include "CookerErrors.hpp"
-#include "compile/Diagnostics.hpp"
+#include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "driver/CookerOptions.hpp"

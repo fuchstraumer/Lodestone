@@ -2,7 +2,7 @@
 #ifndef LODESTONE_SLANG_VARIANT_COMPILER_HPP
 #define LODESTONE_SLANG_VARIANT_COMPILER_HPP
 #include "CookerErrors.hpp"
-#include "compile/Diagnostics.hpp"
+#include "Diagnostics.hpp"
 #include "permute/PermutationSpace.hpp"
 #include <slang-com-helper.h>
 #include <slang-com-ptr.h>

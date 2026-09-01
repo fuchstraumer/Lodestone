@@ -4,7 +4,7 @@
 #include "SlangModuleContext.hpp"
 #include "SlangReflector.hpp"
 #include "SlangVariantCompiler.hpp"
-#include "compile/Diagnostics.hpp"
+#include "Diagnostics.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "slang-com-ptr.h"

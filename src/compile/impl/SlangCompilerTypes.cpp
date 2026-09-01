@@ -1,5 +1,5 @@
 #include "SlangCompilerTypes.hpp"
-#include "compile/Diagnostics.hpp"
+#include "Diagnostics.hpp"
 #include "compile/SlangDiagnosticParser.hpp"
 #include "slang.h"
 #include <cstdint>

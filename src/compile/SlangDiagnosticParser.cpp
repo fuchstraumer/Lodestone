@@ -1,5 +1,5 @@
 #include "compile/SlangDiagnosticParser.hpp"
-#include "compile/Diagnostics.hpp"
+#include "Diagnostics.hpp"
 
 #include <array>
 #include <charconv>
