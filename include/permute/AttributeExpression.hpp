@@ -33,7 +33,7 @@ struct SizeSymbol
  *     sum        := product (( '+' | '-' ) product)*
  *     product    := unary (( '*' | '/' | '%' ) unary)*
  *     unary      := ('!' | '-') unary | primary
- *     primary    := integer | identifier | '(' shift ')'
+ *     primary    := integer | identifier | '(' logical ')'
  *
  * Integers are decimal or `0x` hexadecimal, with an optional `u` or `U` suffix so an expression can
  * be copied out of Slang source unchanged. */

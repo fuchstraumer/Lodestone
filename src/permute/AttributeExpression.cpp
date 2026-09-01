@@ -38,7 +38,15 @@ namespace
 
     /** Recursive descent over a fixed grammar. Every failure returns an error rather than a default,
      * because a size that silently evaluates to zero allocates a zero-byte buffer and fails much
-     * later, somewhere unrelated. */
+     * later, somewhere unrelated. A constraint that silently evaluates to zero is a false that the
+     * author did not write, which prunes a variant that should have cooked.
+     *
+     * A comparison and a logical operator yield 0 or 1, and every other level treats a nonzero
+     * value as true. This matches C and Slang, so `(IFFT_SIZE > 256) * 4` reads the way the author
+     * expects. `&&` and `||` do NOT short circuit: this parser evaluates as it descends, so it has no
+     * unevaluated right operand to skip. The only effect is that a divide by zero or an out-of-range
+     * shift on the right of a false `&&` still fails, where C would not reach it. A constraint that
+     * relies on that guard is rare, and the failure is loud rather than silent. */
     class ExpressionParser
     {
     public:
@@ -50,7 +58,7 @@ namespace
 
         CookResult<int64_t> ParseComplete()
         {
-            const CookResult<int64_t> value = parseShift();
+            const CookResult<int64_t> value = parseLogical();
             if (!value)
             {
                 return value;
@@ -60,7 +68,7 @@ namespace
             if (cursor != text.size())
             {
                 std::println(stderr,
-                             "[shader_cooker] size expression '{}' has trailing text at offset {}",
+                             "[shader_cooker] attribute expression '{}' has trailing text at offset {}",
                              text,
                              cursor);
                 return std::unexpected(CookError::SizeExpressionParseFailed);
@@ -91,12 +99,92 @@ namespace
             return true;
         }
 
-        /** `<` and `>` only ever appear as part of a shift here, so a single character is enough to
-         * tell the two shifts apart from anything else. */
-        bool peekIsShift() noexcept
+        CookResult<int64_t> parseLogical()
         {
-            skipWhitespace();
-            return text.compare(cursor, 2u, "<<") == 0 || text.compare(cursor, 2u, ">>") == 0;
+            CookResult<int64_t> left = parseComparison();
+            if (!left)
+            {
+                return left;
+            }
+
+            while (true)
+            {
+                skipWhitespace();
+                const bool isAnd = consumeOperator("&&");
+                const bool isOr = !isAnd && consumeOperator("||");
+                if (!isAnd && !isOr)
+                {
+                    break;
+                }
+
+                const CookResult<int64_t> right = parseComparison();
+                if (!right)
+                {
+                    return right;
+                }
+
+                const bool leftTrue = left.value() != 0;
+                const bool rightTrue = right.value() != 0;
+                left = static_cast<int64_t>(isAnd ? (leftTrue && rightTrue) : (leftTrue || rightTrue));
+            }
+
+            return left;
+        }
+
+        CookResult<int64_t> parseComparison()
+        {
+            CookResult<int64_t> left = parseShift();
+            if (!left)
+            {
+                return left;
+            }
+
+            while (true)
+            {
+                // A two-character operator must be tested before its one-character prefix, or `<=`
+                // reads as `<` and leaves a stray `=`. A `<<` or `>>` cannot reach this point,
+                // because `parseShift` consumes every shift before it returns, so a `<` or `>` here
+                // is always a comparison.
+                Comparison comparison = Comparison::None;
+                if (consumeOperator("=="))
+                {
+                    comparison = Comparison::Equal;
+                }
+                else if (consumeOperator("!="))
+                {
+                    comparison = Comparison::NotEqual;
+                }
+                else if (consumeOperator("<="))
+                {
+                    comparison = Comparison::LessOrEqual;
+                }
+                else if (consumeOperator(">="))
+                {
+                    comparison = Comparison::GreaterOrEqual;
+                }
+                else if (consumeOperator("<"))
+                {
+                    comparison = Comparison::Less;
+                }
+                else if (consumeOperator(">"))
+                {
+                    comparison = Comparison::Greater;
+                }
+                else
+                {
+                    break;
+                }
+
+                const CookResult<int64_t> right = parseShift();
+                if (!right)
+                {
+                    return right;
+                }
+
+                left = static_cast<int64_t>(Compare(comparison, left.value(), right.value()));
+            }
+
+            return left;
         }
 
         CookResult<int64_t> parseShift()
@@ -124,8 +212,8 @@ namespace
                 if (right.value() < 0 || right.value() >= 64)
                 {
                     std::println(stderr,
-                                 "[shader_cooker] size expression '{}' shifts by {}, which is out of "
-                                 "range",
+                                 "[shader_cooker] attribute expression '{}' shifts by {}, which is out "
+                                 "of range",
                                  text,
                                  right.value());
                     return std::unexpected(CookError::SizeExpressionOutOfRange);
@@ -194,7 +282,7 @@ namespace
 
                 if ((isDivide || isModulo) && right.value() == 0)
                 {
-                    std::println(stderr, "[shader_cooker] size expression '{}' divides by zero", text);
+                    std::println(stderr, "[shader_cooker] attribute expression '{}' divides by zero", text);
                     return std::unexpected(CookError::SizeExpressionDivideByZero);
                 }
 
@@ -218,6 +306,19 @@ namespace
         CookResult<int64_t> parseUnary()
         {
             skipWhitespace();
+            // `!` is tested before the operand. It never reads the `!` of a `!=`, because `!=` is a
+            // comparison operator and `parseComparison` consumes it before an operand begins.
+            if (consumeOperator("!"))
+            {
+                const CookResult<int64_t> operand = parseUnary();
+                if (!operand)
+                {
+                    return operand;
+                }
+
+                return static_cast<int64_t>(operand.value() == 0);
+            }
+
             if (consumeOperator("-"))
             {
                 const CookResult<int64_t> operand = parseUnary();
@@ -237,13 +338,13 @@ namespace
             skipWhitespace();
             if (cursor >= text.size())
             {
-                std::println(stderr, "[shader_cooker] size expression '{}' ends early", text);
+                std::println(stderr, "[shader_cooker] attribute expression '{}' ends early", text);
                 return std::unexpected(CookError::SizeExpressionParseFailed);
             }
 
             if (consumeOperator("("))
             {
-                const CookResult<int64_t> inner = parseShift();
+                const CookResult<int64_t> inner = parseLogical();
                 if (!inner)
                 {
                     return inner;
@@ -252,7 +353,8 @@ namespace
                 if (!consumeOperator(")"))
                 {
                     std::println(stderr,
-                                 "[shader_cooker] size expression '{}' is missing a closing parenthesis",
+                                 "[shader_cooker] attribute expression '{}' is missing a closing "
+                                 "parenthesis",
                                  text);
                     return std::unexpected(CookError::SizeExpressionParseFailed);
                 }
@@ -271,7 +373,7 @@ namespace
             }
 
             std::println(stderr,
-                         "[shader_cooker] size expression '{}' has an unexpected character '{}' at "
+                         "[shader_cooker] attribute expression '{}' has an unexpected character '{}' at "
                          "offset {}",
                          text,
                          text[cursor],
@@ -313,7 +415,8 @@ namespace
             if (result.ec != std::errc{} || result.ptr != last || valueEnd == digitsBegin)
             {
                 std::println(stderr,
-                             "[shader_cooker] size expression '{}' has a malformed integer at offset {}",
+                             "[shader_cooker] attribute expression '{}' has a malformed integer at "
+                             "offset {}",
                              text,
                              cursor);
                 return std::unexpected(CookError::SizeExpressionParseFailed);
@@ -341,11 +444,54 @@ namespace
             }
 
             std::println(stderr,
-                         "[shader_cooker] size expression '{}' names '{}', which is not a permutation "
-                         "constant of this module",
+                         "[shader_cooker] attribute expression '{}' names '{}', which is not a "
+                         "permutation constant of this module",
                          text,
                          name);
             return std::unexpected(CookError::SizeExpressionUnknownSymbol);
+        }
+
+        /** `<` and `>` alone are comparisons now, so a shift needs both characters to tell it from a
+         * comparison. This two-character peek is what lets the comparison level trust that no shift
+         * is left when it reads a single `<` or `>`. */
+        bool peekIsShift() noexcept
+        {
+            skipWhitespace();
+            return text.compare(cursor, 2u, "<<") == 0 || text.compare(cursor, 2u, ">>") == 0;
+        }
+
+        enum class Comparison : uint8_t
+        {
+            None,
+            Equal,
+            NotEqual,
+            Less,
+            LessOrEqual,
+            Greater,
+            GreaterOrEqual
+        };
+
+        static bool Compare(Comparison comparison, int64_t left, int64_t right) noexcept
+        {
+            switch (comparison)
+            {
+            case Comparison::Equal:
+                return left == right;
+            case Comparison::NotEqual:
+                return left != right;
+            case Comparison::Less:
+                return left < right;
+            case Comparison::LessOrEqual:
+                return left <= right;
+            case Comparison::Greater:
+                return left > right;
+            case Comparison::GreaterOrEqual:
+                return left >= right;
+            case Comparison::None:
+                break;
+            }
+
+            return false;
         }
 
         std::string_view text;
@@ -360,7 +506,7 @@ CookResult<int64_t> EvaluateExpression(std::string_view expression,
 {
     if (expression.empty())
     {
-        std::println(stderr, "[shader_cooker] size expression is empty");
+        std::println(stderr, "[shader_cooker] attribute expression is empty");
         return std::unexpected(CookError::SizeExpressionParseFailed);
     }
 
