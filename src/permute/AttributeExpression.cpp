@@ -63,7 +63,7 @@ namespace
     {
     public:
         ExpressionParser(std::string_view expression,
-                         std::span<const SizeSymbol> symbols,
+                         std::span<const AttrExprSymbol> symbols,
                          DiagnosticSink& _sink,
                          ParserMode mode) noexcept
             : text{ expression },
@@ -471,7 +471,7 @@ namespace
             }
             else if (parserMode == ParserMode::Default)
             {
-                for (const SizeSymbol& symbol : symbolTable)
+                for (const AttrExprSymbol& symbol : symbolTable)
                 {
                     if (symbol.Name == name)
                     {
@@ -532,7 +532,7 @@ namespace
         }
 
         std::string_view text;
-        std::span<const SizeSymbol> symbolTable;
+        std::span<const AttrExprSymbol> symbolTable;
         DiagnosticSink& sink; // clang will complain we're using a ref member, but whatever dude. its fine.
         ParserMode parserMode;
         size_t cursor{};
@@ -542,7 +542,7 @@ namespace
 } // namespace
 
 CookResult<int64_t> EvaluateExpression(std::string_view expression,
-                                       std::span<const SizeSymbol> symbols,
+                                       std::span<const AttrExprSymbol> symbols,
                                        DiagnosticSink& sink)
 {
     if (expression.empty())

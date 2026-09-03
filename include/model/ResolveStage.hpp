@@ -31,7 +31,7 @@ class DiagnosticSink;
  * @note `Symbols` holds `std::string_view` values, so the strings it points at must outlive the context.*/
 struct ResolveContext
 {
-    std::vector<SizeSymbol> Symbols;
+    std::vector<AttrExprSymbol> Symbols;
 };
 
 /**@brief Builds the symbol table for one variant.

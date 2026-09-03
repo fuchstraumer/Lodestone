@@ -23,16 +23,16 @@ using lodestone::CookError;
 using lodestone::DiagnosticSink;
 using lodestone::EvaluateExpression;
 using lodestone::CollectExpressionIdentifiers;
-using lodestone::SizeSymbol;
+using lodestone::AttrExprSymbol;
 using lodestone::StderrDiagnosticSink;
 
 namespace
 {
 
-constexpr std::array<SizeSymbol, 4> k_Symbols{ SizeSymbol{ .Name="IFFT_SIZE", .Value=512 },
-                                               SizeSymbol{ .Name="IFFT_NUM_WAVE_CASCADES", .Value=4 },
-                                               SizeSymbol{ .Name="IFFT_WAVE_SIZE", .Value=32 },
-                                               SizeSymbol{ .Name="IFFT_USE_WAVE_OPS", .Value=1 } };
+constexpr std::array<AttrExprSymbol, 4> k_Symbols{ AttrExprSymbol{ .Name="IFFT_SIZE", .Value=512 },
+                                               AttrExprSymbol{ .Name="IFFT_NUM_WAVE_CASCADES", .Value=4 },
+                                               AttrExprSymbol{ .Name="IFFT_WAVE_SIZE", .Value=32 },
+                                               AttrExprSymbol{ .Name="IFFT_USE_WAVE_OPS", .Value=1 } };
 
 void CheckValue(lodestone::tests::TestRunner& runner,
                 std::string_view expression,

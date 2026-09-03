@@ -1,10 +1,11 @@
 #include "permute/PermutationSpace.hpp"
 #include "CookerErrors.hpp"
+#include "permute/AttributeExpression.hpp"
 #include "permute/ExternConstantScanner.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationValue.hpp"
-#include "permute/AttributeExpression.hpp"
+
 
 #include <algorithm>
 #include <array>
@@ -48,9 +49,9 @@ namespace
     }
 
     /** Lets a later extern's default read an earlier one, which is how shaders usually derive them. */
-    std::vector<SizeSymbol> AsSizeSymbols(const std::vector<ExternConstantDefault>& defaults)
+    std::vector<AttrExprSymbol> AsAttrExprSymbols(const std::vector<ExternConstantDefault>& defaults)
     {
-        std::vector<SizeSymbol> symbols;
+        std::vector<AttrExprSymbol> symbols;
         symbols.reserve(defaults.size());
 
         for (const ExternConstantDefault& entry : defaults)
@@ -212,7 +213,7 @@ CanonicalAssignment PermutationSpace::CanonicalizeAssignment(const PermutationAs
     {
         auto foundIter = std::ranges::find(assignment, &axis, &PermutationBinding::Axis);
         const PermutationValue value = foundIter != assignment.end() ? foundIter->Value : axis.GetDefault();
-        return PermutationBinding{ .Axis=&axis, .Value=value };
+        return PermutationBinding{ .Axis = &axis, .Value = value };
     };
     auto canonical = axes | std::views::transform(findBinding) | std::ranges::to<PermutationAssignment>();
     return CanonicalAssignment{ std::move(canonical) };
@@ -237,9 +238,14 @@ int32_t PermutationSpace::ComputeVariantIndex(const CanonicalAssignment& canonic
 
 int32_t PermutationSpace::ComputeVariantSpaceSize() const noexcept
 {
-    return std::ranges::fold_left(
-        axes | std::views::transform(&PermutationAxis::NumValues),
-        int32_t{ 1 }, std::multiplies<int32_t>{});
+    int64_t size = 1;
+
+    for (const auto& axis : axes)
+    {
+        size *= axis.NumValues();
+    }
+
+    return static_cast<int32_t>(size);
 }
 
 CookResult<VariantSet> PermutationSpace::EnumerateVariants() const
@@ -373,7 +379,7 @@ CookResult<std::vector<ExternConstantDefault>> PermutationSpace::CollectUndriven
             continue;
         }
 
-        const std::vector<SizeSymbol> known = AsSizeSymbols(defaults);
+        const std::vector<AttrExprSymbol> known = AsAttrExprSymbols(defaults);
         const CookResult<int64_t> value = EvaluateExpression(trimmed, known, sink);
         if (!value)
         {

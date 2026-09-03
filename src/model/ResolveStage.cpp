@@ -244,13 +244,13 @@ ResolveContext MakeResolveContext(const PermutationAssignment& canonical,
 
     for (const ExternConstantDefault& entry : extern_defaults)
     {
-        context.Symbols.push_back(SizeSymbol{ .Name = entry.Name, .Value = entry.Value });
+        context.Symbols.push_back(AttrExprSymbol{ .Name = entry.Name, .Value = entry.Value });
     }
 
     for (const PermutationBinding& binding : canonical)
     {
         context.Symbols.push_back(
-            SizeSymbol{ .Name = binding.Axis->Name, .Value = PermutationValueToInt64(binding.Value) });
+            AttrExprSymbol{ .Name = binding.Axis->Name, .Value = PermutationValueToInt64(binding.Value) });
     }
 
     return context;

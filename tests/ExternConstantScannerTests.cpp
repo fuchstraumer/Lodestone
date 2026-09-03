@@ -6,7 +6,7 @@
 #include <vector>
 
 // A link-time constant never reaches a program layout, so Slang cannot report one. This scanner reads
-// the declaration out of the source text, and the value it reads becomes a `SizeSymbol`. A size
+// the declaration out of the source text, and the value it reads becomes a `AttrExprSymbol`. A size
 // expression that names one then decides how large a buffer the engine allocates.
 //
 // A misread declaration therefore gives a wrong allocation and no other symptom: the cook exits 0, and

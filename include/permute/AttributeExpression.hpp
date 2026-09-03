@@ -24,7 +24,7 @@ namespace lodestone
 
 class DiagnosticSink;
 
-struct SizeSymbol
+struct AttrExprSymbol
 {
     std::string_view Name;
     int64_t Value{ 0 };
@@ -41,7 +41,7 @@ struct SizeSymbol
  *
  * Integers are decimal or `0x` hexadecimal, with an optional `u` or `U` suffix so an expression can
  * be copied out of Slang source unchanged. */
-CookResult<int64_t> EvaluateExpression(std::string_view expression, std::span<const SizeSymbol> symbols, DiagnosticSink& sink);
+CookResult<int64_t> EvaluateExpression(std::string_view expression, std::span<const AttrExprSymbol> symbols, DiagnosticSink& sink);
 
 /** @brief Collects all named identifiers from the given expression, used to determine which axes an expression names before full evaluation. */
 CookResult<std::vector<std::string>> CollectExpressionIdentifiers(std::string_view expression, DiagnosticSink& sink);
