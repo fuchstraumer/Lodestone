@@ -7,7 +7,6 @@
 #include <cstdint>
 #include <cstdio>
 #include <expected>
-#include <print>
 #include <span>
 #include <string>
 #include <string_view>
@@ -20,7 +19,7 @@
 #pragma clang diagnostic ignored "-Wnrvo"
 #pragma clang diagnostic ignored "-Wunsafe-buffer-usage" // offsets from string pointers
 // without this we get warnings about recursion... in a recursive descent parser. silenced.
-//NOLINTBEGIN(misc-no-recursion)
+// NOLINTBEGIN(misc-no-recursion)
 #endif
 
 namespace lodestone
@@ -40,7 +39,7 @@ namespace
     }
 
     /** @brief We use parser mode primarily to enable the "CollectOnly" mode, which traverses the input
-      * without actually evaluating it - to gather identifiers ahead of time before evaluation. */
+     * without actually evaluating it - to gather identifiers ahead of time before evaluation. */
     enum class ParserMode : uint8_t
     {
         None,
@@ -65,12 +64,12 @@ namespace
         ExpressionParser(std::string_view expression,
                          std::span<const SizeSymbol> symbols,
                          DiagnosticSink& _sink,
-                         ParserMode mode) noexcept :
-            text{ expression },
-            symbolTable{ symbols },
-            sink{ _sink },
-            parserMode{ mode },
-            cursor{ 0u }
+                         ParserMode mode) noexcept
+            : text{ expression },
+              symbolTable{ symbols },
+              sink{ _sink },
+              parserMode{ mode },
+              cursor{ 0u }
         {
         }
 
@@ -85,7 +84,8 @@ namespace
             skipWhitespace();
             if (cursor != text.size())
             {
-                const CookError error = ReportError(sink, CookError::AttributeExpressionParseFailed, "Trailing text in attribute expression");
+                const CookError error = ReportError(
+                    sink, CookError::AttributeExpressionParseFailed, "Trailing text in attribute expression");
                 return std::unexpected(error);
             }
 
@@ -93,7 +93,6 @@ namespace
         }
 
     private:
-
         void skipWhitespace() noexcept
         {
             while (cursor < text.size() && std::isspace(static_cast<unsigned char>(text[cursor])) != 0)
@@ -226,7 +225,10 @@ namespace
 
                 if (right.value() < 0 || right.value() >= 64)
                 {
-                    const CookError error = ReportError(sink, CookError::AttributeExpressionOutOfRange, "Attribute expression shifts by an out-of-range value");
+                    const CookError error =
+                        ReportError(sink,
+                                    CookError::AttributeExpressionOutOfRange,
+                                    "Attribute expression shifts by an out-of-range value");
                     return std::unexpected(error);
                 }
 
@@ -293,7 +295,9 @@ namespace
 
                 if ((isDivide || isModulo) && right.value() == 0)
                 {
-                    const CookError error = ReportError(sink, CookError::AttributeExpressionDivideByZero, "Attribute expression divides by zero");
+                    const CookError error = ReportError(sink,
+                                                        CookError::AttributeExpressionDivideByZero,
+                                                        "Attribute expression divides by zero");
                     return std::unexpected(error);
                 }
 
@@ -349,7 +353,8 @@ namespace
             skipWhitespace();
             if (cursor >= text.size())
             {
-                const CookError error = ReportError(sink, CookError::AttributeExpressionParseFailed, "Attribute expression ends early");
+                const CookError error = ReportError(
+                    sink, CookError::AttributeExpressionParseFailed, "Attribute expression ends early");
                 return std::unexpected(error);
             }
 
@@ -363,7 +368,10 @@ namespace
 
                 if (!consumeOperator(")"))
                 {
-                    const CookError error = ReportError(sink, CookError::AttributeExpressionParseFailed, "Attribute expression is missing a closing parenthesis");
+                    const CookError error =
+                        ReportError(sink,
+                                    CookError::AttributeExpressionParseFailed,
+                                    "Attribute expression is missing a closing parenthesis");
                     return std::unexpected(error);
                 }
 
@@ -380,7 +388,9 @@ namespace
                 return parseIdentifier();
             }
 
-            const CookError error = ReportError(sink, CookError::AttributeExpressionParseFailed, "Attribute expression has an unexpected character");
+            const CookError error = ReportError(sink,
+                                                CookError::AttributeExpressionParseFailed,
+                                                "Attribute expression has an unexpected character");
             return std::unexpected(error);
         }
 
@@ -396,8 +406,7 @@ namespace
             }
 
             size_t digitsEnd = digitsBegin;
-            while (digitsEnd < text.size() &&
-                   std::isalnum(static_cast<unsigned char>(text[digitsEnd])) != 0)
+            while (digitsEnd < text.size() && std::isalnum(static_cast<unsigned char>(text[digitsEnd])) != 0)
             {
                 ++digitsEnd;
             }
@@ -417,7 +426,9 @@ namespace
 
             if (result.ec != std::errc{} || result.ptr != last || valueEnd == digitsBegin)
             {
-                const CookError error = ReportError(sink, CookError::AttributeExpressionParseFailed, "Attribute expression has a malformed integer");
+                const CookError error = ReportError(sink,
+                                                    CookError::AttributeExpressionParseFailed,
+                                                    "Attribute expression has a malformed integer");
                 return std::unexpected(error);
             }
 
@@ -442,7 +453,9 @@ namespace
                 }
             }
 
-            const CookError error = ReportError(sink, CookError::AttributeExpressionUnknownSymbol, "Attribute expression names an unknown symbol");
+            const CookError error = ReportError(sink,
+                                                CookError::AttributeExpressionUnknownSymbol,
+                                                "Attribute expression names an unknown symbol");
             return std::unexpected(error);
         }
 
@@ -504,7 +517,8 @@ CookResult<int64_t> EvaluateExpression(std::string_view expression,
 {
     if (expression.empty())
     {
-        const CookError error = ReportError(sink, CookError::AttributeExpressionParseFailed, "Attribute expression is empty");
+        const CookError error =
+            ReportError(sink, CookError::AttributeExpressionParseFailed, "Attribute expression is empty");
         return std::unexpected(error);
     }
 
@@ -512,14 +526,15 @@ CookResult<int64_t> EvaluateExpression(std::string_view expression,
     return parser.ParseComplete();
 }
 
-CookResult<std::vector<std::string>> CollectExpressionIdentifiers(std::string_view expression, DiagnosticSink& sink)
+CookResult<std::vector<std::string>> CollectExpressionIdentifiers(std::string_view expression,
+                                                                  DiagnosticSink& sink)
 {
-   return std::unexpected(CookError::AttributeExpressionParseFailed);
+    return std::unexpected(CookError::AttributeExpressionParseFailed);
 }
 
 #ifdef __clang__
 #pragma clang diagnostic pop
-//NOLINTEND(misc-no-recursion)
+// NOLINTEND(misc-no-recursion)
 #endif
 
 } // namespace lodestone
