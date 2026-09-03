@@ -47,30 +47,24 @@ struct PermutationAxis
 
     PermutationAxis(std::string name,
                     std::span<const PermutationValue> values,
-                    int32_t parent_index,
-                    PermutationValue required_parent_value,
                     AxisKind kind,
                     EarliestBindingTime binding_time,
-                    AxisValueDomain value_domain) noexcept;
+                    AxisValueDomain value_domain,
+                    std::string active_when) noexcept;
     // initializer_list will be removed once we get to the data-driven permutation system
     // this just keeps things compiling and running, for now
     PermutationAxis(std::string name,
                     std::initializer_list<PermutationValue> values,
-                    int32_t parent_index,
-                    PermutationValue required_parent_value,
                     AxisKind kind,
                     EarliestBindingTime binding_time,
-                    AxisValueDomain value_domain) noexcept;
+                    AxisValueDomain value_domain,
+                    std::string active_when) noexcept;
 
     std::string Name;
-    /** Where the parent axis sits in the space that owns this axis. An index and not a pointer: the
-     * space holds its axes by value, so a copy of the space would leave a pointer that still aims at
-     * the axis of the original. */
-    int32_t ParentIndex{ k_NoParent };
-    PermutationValue RequiredParentValue;
     AxisKind Kind{ AxisKind::None };
     EarliestBindingTime BindingTime{ EarliestBindingTime::None };
     AxisValueDomain ValueDomain{ AxisValueDomain::None };
+    std::string ActiveWhen{};
 
     [[nodiscard]] bool HasParent() const noexcept;
     [[nodiscard]] int64_t NumValues() const noexcept;

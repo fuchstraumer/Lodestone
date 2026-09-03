@@ -6,7 +6,6 @@
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationValue.hpp"
 
-
 #include <algorithm>
 #include <array>
 #include <cstddef>

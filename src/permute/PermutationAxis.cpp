@@ -18,17 +18,15 @@ namespace lodestone
 
 PermutationAxis::PermutationAxis(std::string name,
                                  std::span<const PermutationValue> _values,
-                                 int32_t parent_index,
-                                 PermutationValue required_parent_value,
                                  AxisKind kind,
                                  EarliestBindingTime binding_time,
-                                 AxisValueDomain value_domain) noexcept
+                                 AxisValueDomain value_domain,
+                                 std::string active_when) noexcept
     : Name(std::move(name)),
-      ParentIndex(parent_index),
-      RequiredParentValue(required_parent_value),
       Kind(kind),
       BindingTime(binding_time),
-      ValueDomain(value_domain)
+      ValueDomain(value_domain),
+      ActiveWhen(std::move(active_when))
 {
     numValues = static_cast<int64_t>(std::min(_values.size(), static_cast<size_t>(k_MaxValues)));
     std::copy_n(_values.begin(), numValues, values.begin());
@@ -36,18 +34,16 @@ PermutationAxis::PermutationAxis(std::string name,
 
 PermutationAxis::PermutationAxis(std::string name,
                                  std::initializer_list<PermutationValue> _values,
-                                 int32_t parent_index,
-                                 PermutationValue required_parent_value,
                                  AxisKind kind,
                                  EarliestBindingTime binding_time,
-                                 AxisValueDomain value_domain) noexcept
+                                 AxisValueDomain value_domain,
+                                 std::string active_when) noexcept
     : PermutationAxis(std::move(name),
                       std::span<const PermutationValue>{ _values.begin(), _values.size() },
-                      parent_index,
-                      required_parent_value,
                       kind,
                       binding_time,
-                      value_domain)
+                      value_domain,
+                      std::move(active_when))
 {
 }
 
@@ -68,7 +64,7 @@ const PermutationValue& PermutationAxis::GetDefault() const noexcept
 
 bool PermutationAxis::HasParent() const noexcept
 {
-    return ParentIndex != k_NoParent;
+    return !ActiveWhen.empty();
 }
 
 } // namespace lodestone
