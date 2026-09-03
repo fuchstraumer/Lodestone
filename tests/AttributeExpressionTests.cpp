@@ -3,9 +3,14 @@
 #include "Diagnostics.hpp"
 #include "TestHarness.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
+#include <initializer_list>
+#include <span>
+#include <string>
 #include <string_view>
+#include <vector>
 
 // The cooker evaluates a lodestone attribute expression itself, because Slang folds an attribute's
 // integer argument at compile time and the permutation constants only fold at link time. A size
@@ -17,7 +22,7 @@
 using lodestone::CookError;
 using lodestone::DiagnosticSink;
 using lodestone::EvaluateExpression;
-using lodestone::RecordingDiagnosticSink;
+using lodestone::CollectExpressionIdentifiers;
 using lodestone::SizeSymbol;
 using lodestone::StderrDiagnosticSink;
 
@@ -50,6 +55,15 @@ void CheckError(lodestone::tests::TestRunner& runner,
     runner.Check(!result.has_value() && result.error() == expected, description);
     runner.Check(sink.FailureCount() > diagCount, "expected diagnostic emitted");
     ++diagCount;
+}
+
+void CheckIdentifierCollection(lodestone::tests::TestRunner& runner, std::string_view expression, std::initializer_list<std::string_view> expected_identifiers, StderrDiagnosticSink& sink)
+{
+    const auto result = CollectExpressionIdentifiers(expression, sink);
+    runner.Check(result.has_value(), "collection succeeded");
+    // transform result values to std::string_view vector for comparison
+    const std::vector<std::string>& collectedIdentifiers = result.value();
+    runner.Check(std::ranges::equal(collectedIdentifiers, expected_identifiers), "collected identifiers match expected");
 }
 
 } // namespace
@@ -147,6 +161,14 @@ int main()
     CheckError(runner, "&& 1", CookError::AttributeExpressionParseFailed, "leading logical operator", rejectionSink);
     CheckError(runner, "1 = 2", CookError::AttributeExpressionParseFailed, "a single equals is not an operator", rejectionSink);
     CheckError(runner, "!", CookError::AttributeExpressionParseFailed, "not with no operand", rejectionSink);
+
+    runner.BeginSection("CollectOnly mode checks");
+    CheckIdentifierCollection(runner, "A + B * 2", {"A", "B"}, sink);
+    CheckIdentifierCollection(runner, "C * (D + E)", {"C", "D", "E"}, sink);
+    CheckIdentifierCollection(runner, "!(X == 1) && Y", {"X", "Y"}, sink);
+    CheckIdentifierCollection(runner, "P || Q && R", {"P", "Q", "R"}, sink);
+    // empty case
+    CheckIdentifierCollection(runner, "1 << 2", {}, sink);
 
     return runner.Report();
 }
