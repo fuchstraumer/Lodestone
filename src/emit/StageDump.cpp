@@ -4,6 +4,7 @@
 #include "model/CookedLibrary.hpp"
 #include "driver/CookerOptions.hpp"
 #include "JsonWriter.hpp"
+#include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "model/ShaderDataSchema.hpp"
@@ -58,7 +59,7 @@ namespace
         writer.EndArray();
     }
 
-    void WriteAxis(JsonWriter& writer, const PermutationSpace& space, const PermutationAxis& axis)
+    void WriteAxis(JsonWriter& writer, const PermutationAxis& axis)
     {
         writer.BeginObject();
         writer.KeyString("name", axis.Name);
@@ -533,7 +534,7 @@ std::string DumpPermutationSpace(std::string_view module_name, const Permutation
     writer.BeginArray();
     for (const PermutationAxis& axis : space.Axes())
     {
-        WriteAxis(writer, space, axis);
+        WriteAxis(writer, axis);
     }
     writer.EndArray();
 

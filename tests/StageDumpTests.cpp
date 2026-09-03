@@ -2,17 +2,18 @@
 #include "Diagnostics.hpp"
 #include "TestHarness.hpp"
 
+#include "ShaderLibraryTypes.hpp"
+#include "compile/RawLibrary.hpp"
+#include "driver/CookerOptions.hpp"
+#include "emit/StageDump.hpp"
 #include "model/ContentHash.hpp"
 #include "model/CookedLibrary.hpp"
-#include "driver/CookerOptions.hpp"
+#include "model/ShaderDataSchema.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
-#include "compile/RawLibrary.hpp"
-#include "model/ShaderDataSchema.hpp"
-#include "ShaderLibraryTypes.hpp"
-#include "emit/StageDump.hpp"
 #include "permute/PermutationValue.hpp"
+
 
 #include <array>
 #include <cstdint>
@@ -86,10 +87,8 @@ InternedModule BuildTinyInternedModule()
 
     for (const CompiledVariant& variant : variants)
     {
-        const CookError appended =
-            AppendVariantToModule(module,
-                                  variant,
-                                  k_EmptySpace.CanonicalizeAssignment(PermutationAssignment{}));
+        const CookError appended = AppendVariantToModule(
+            module, variant, k_EmptySpace.CanonicalizeAssignment(PermutationAssignment{}));
         if (appended != CookError::Success)
         {
             module.Variants.clear();
@@ -265,8 +264,7 @@ void CheckSpaceDump(lodestone::tests::TestRunner& runner)
                 "false",
                 "true"
             ],
-            "parent": null,
-            "requiredParentValue": null
+            "activeWhen": null
         }
     ]
 })";
@@ -289,9 +287,7 @@ void CheckDependentAxisDump(lodestone::tests::TestRunner& runner)
     const PermutationSpace space{ "TinyModule", { MakeBoolAxis("USE_FOO"), std::move(child) } };
     const std::string dump = DumpPermutationSpace("TinyModule", space);
 
-    runner.Check(Contains(dump, R"("parent": "USE_FOO")"), "a dependent axis names its parent");
-    runner.Check(Contains(dump, R"("requiredParentValue": "true")"),
-                 "a dependent axis states the value that enables it");
+    runner.Check(Contains(dump, R"("activeWhen": "USE_FOO == 1")"), "a dependent axis uses activeWhen");
     runner.Check(Contains(dump, R"("spaceSize": 4)"),
                  "the space size counts the dense range with the holes included");
 }
