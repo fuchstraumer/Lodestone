@@ -471,7 +471,7 @@ namespace
             }
 
             const ResolveContext context = MakeResolveContext(currVariant.Canonical, raw_module.ExternDefaults);
-            CookResult<CompiledVariant> variantResult = ResolveVariant(result.value(), context);
+            CookResult<CompiledVariant> variantResult = ResolveVariant(result.value(), context, sink);
             if (!variantResult)
             {
                 std::println(stderr,

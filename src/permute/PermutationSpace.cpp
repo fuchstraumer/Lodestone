@@ -344,7 +344,7 @@ void PermutationSpace::ReportUndrivenExternConstants(std::span<const std::string
 }
 
 CookResult<std::vector<ExternConstantDefault>> PermutationSpace::CollectUndrivenExternDefaults(
-    std::span<const std::string_view> source_texts) const
+    std::span<const std::string_view> source_texts, DiagnosticSink& sink) const
 {
     std::vector<ExternConstantDefault> defaults;
 
@@ -374,7 +374,7 @@ CookResult<std::vector<ExternConstantDefault>> PermutationSpace::CollectUndriven
         }
 
         const std::vector<SizeSymbol> known = AsSizeSymbols(defaults);
-        const CookResult<int64_t> value = EvaluateExpression(trimmed, known);
+        const CookResult<int64_t> value = EvaluateExpression(trimmed, known, sink);
         if (!value)
         {
             std::println(stderr,

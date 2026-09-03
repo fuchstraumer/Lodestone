@@ -1,9 +1,11 @@
 #include "model/ResolveStage.hpp"
 #include "CookerErrors.hpp"
+#include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "compile/RawLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "permute/AttributeExpression.hpp"
+#include "permute/PermutationValue.hpp"
 
 #include <array>
 #include <cstddef>
@@ -25,7 +27,8 @@ namespace
     CookResult<uint32_t> EvaluateExtentArgument(const RawSizeAttribute& attribute,
                                                 uint32_t argument_index,
                                                 std::string_view binding_name,
-                                                const ResolveContext& context)
+                                                const ResolveContext& context,
+                                                DiagnosticSink& sink)
     {
         if (argument_index >= attribute.Arguments.size())
         {
@@ -38,7 +41,7 @@ namespace
         }
 
         const CookResult<int64_t> value =
-            EvaluateExpression(attribute.Arguments[argument_index], context.Symbols);
+            EvaluateExpression(attribute.Arguments[argument_index], context.Symbols, sink);
         if (!value)
         {
             return std::unexpected(value.error());
@@ -60,14 +63,15 @@ namespace
 
     CookResult<TextureFootprint> ResolveExtent(const RawSizeAttribute& attribute,
                                                std::string_view binding_name,
-                                               const ResolveContext& context)
+                                               const ResolveContext& context,
+                                               DiagnosticSink& sink)
     {
         const uint32_t argumentCount = ArgumentCountOf(attribute.Kind);
         std::array<uint32_t, 3u> axes{ 1u, 1u, 1u };
 
         for (uint32_t i = 0u; i < argumentCount && i < axes.size(); ++i)
         {
-            const CookResult<uint32_t> value = EvaluateExtentArgument(attribute, i, binding_name, context);
+            const CookResult<uint32_t> value = EvaluateExtentArgument(attribute, i, binding_name, context, sink);
             if (!value)
             {
                 return std::unexpected(value.error());
@@ -84,7 +88,8 @@ namespace
 
     CookResult<BufferFootprint> ResolveElementCount(const RawSizeAttribute& attribute,
                                                     std::string_view binding_name,
-                                                    const ResolveContext& context)
+                                                    const ResolveContext& context,
+                                                    DiagnosticSink& sink)
     {
         if (attribute.Arguments.empty())
         {
@@ -96,7 +101,7 @@ namespace
         }
 
         const CookResult<int64_t> value =
-            EvaluateExpression(attribute.Arguments.front(), context.Symbols);
+            EvaluateExpression(attribute.Arguments.front(), context.Symbols, sink);
         if (!value)
         {
             std::println(stderr,
@@ -126,7 +131,8 @@ namespace
      * describing a buffer or texture, which is the current extent of our taxonomy here */
     CookResult<ResourceFootprint> ResolveFootprint(std::span<const RawSizeAttribute> attributes,
                                                    std::string_view binding_name,
-                                                   const ResolveContext& context)
+                                                   const ResolveContext& context,
+                                                   DiagnosticSink& sink)
     {
         const RawSizeAttribute* count = nullptr;
         const RawSizeAttribute* extent = nullptr;
@@ -159,7 +165,7 @@ namespace
 
         if (count != nullptr)
         {
-            CookResult<BufferFootprint> buffer = ResolveElementCount(*count, binding_name, context);
+            CookResult<BufferFootprint> buffer = ResolveElementCount(*count, binding_name, context, sink);
             if (!buffer)
             {
                 return std::unexpected(buffer.error());
@@ -169,7 +175,7 @@ namespace
 
         if (extent != nullptr)
         {
-            CookResult<TextureFootprint> texture = ResolveExtent(*extent, binding_name, context);
+            CookResult<TextureFootprint> texture = ResolveExtent(*extent, binding_name, context, sink);
             if (!texture)
             {
                 return std::unexpected(texture.error());
@@ -250,7 +256,7 @@ ResolveContext MakeResolveContext(const PermutationAssignment& canonical,
     return context;
 }
 
-CookResult<CompiledVariant> ResolveVariant(const RawVariant& raw, const ResolveContext& context)
+CookResult<CompiledVariant> ResolveVariant(const RawVariant& raw, const ResolveContext& context, DiagnosticSink& sink)
 {
     CompiledVariant variant;
     variant.VariantSuffix = raw.VariantSuffix;
@@ -265,7 +271,7 @@ CookResult<CompiledVariant> ResolveVariant(const RawVariant& raw, const ResolveC
         const RawBinding& rawBinding = raw.Bindings[i];
 
         CookResult<ResourceFootprint> footprint =
-            ResolveFootprint(AttributesOfBinding(raw, i), rawBinding.Name, context);
+            ResolveFootprint(AttributesOfBinding(raw, i), rawBinding.Name, context, sink);
         if (!footprint)
         {
             return std::unexpected(footprint.error());

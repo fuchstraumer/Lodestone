@@ -33,6 +33,7 @@ SlangCompiler::~SlangCompiler() = default;
 
 CookError SlangCompiler::Initialize(SlangCompilerCreateInfo create_info, DiagnosticSink& sink)
 {
+    diagnosticSink = &sink;
     compilePool = std::make_unique<ThreadPool>();
     bootstrapContext = std::make_unique<SlangModuleContext>();
 
@@ -67,7 +68,7 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
     }
     const std::vector<std::string_view> sourceViews = bootstrapContext->ModuleSourceStringViews();
     CookResult<std::vector<ExternConstantDefault>> defaults =
-        space.CollectUndrivenExternDefaults(sourceViews);
+        space.CollectUndrivenExternDefaults(sourceViews, *diagnosticSink);
     if (!defaults)
     {
         return std::unexpected(defaults.error());

@@ -11,6 +11,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #ifdef __clang__
@@ -68,8 +69,7 @@ namespace
             : text{ expression },
               symbolTable{ symbols },
               sink{ _sink },
-              parserMode{ mode },
-              cursor{ 0u }
+              parserMode{ mode }
         {
         }
 
@@ -90,6 +90,11 @@ namespace
             }
 
             return value;
+        }
+
+        std::vector<std::string>&& ConsumeIdentifiers() noexcept
+        {
+            return std::move(identifiers);
         }
 
     private:
@@ -195,7 +200,7 @@ namespace
                     return right;
                 }
 
-                left = static_cast<int64_t>(Compare(comparison, left.value(), right.value()));
+                left = static_cast<int64_t>(evaluateComparison(comparison, left.value(), right.value()));
             }
 
             return left;
@@ -221,6 +226,12 @@ namespace
                 if (!right)
                 {
                     return right;
+                }
+
+                if (parserMode == ParserMode::CollectOnly)
+                {
+                    // walk finished, exit
+                    continue;
                 }
 
                 if (right.value() < 0 || right.value() >= 64)
@@ -291,6 +302,12 @@ namespace
                 if (!right)
                 {
                     return right;
+                }
+
+                if (parserMode == ParserMode::CollectOnly)
+                {
+                    // structure walked, leave loop
+                    continue;
                 }
 
                 if ((isDivide || isModulo) && right.value() == 0)
@@ -445,18 +462,30 @@ namespace
             }
 
             const std::string_view name = text.substr(nameBegin, cursor - nameBegin);
-            for (const SizeSymbol& symbol : symbolTable)
+            CookResult<int64_t> result = std::unexpected(CookError::AttributeExpressionParseFailed);
+            
+            if (parserMode == ParserMode::CollectOnly)
             {
-                if (symbol.Name == name)
+                identifiers.emplace_back(name);
+                result = int64_t{ 1  }; // not going to actaully evaluate, just return 1!
+            }
+            else if (parserMode == ParserMode::Default)
+            {
+                for (const SizeSymbol& symbol : symbolTable)
                 {
-                    return symbol.Value;
+                    if (symbol.Name == name)
+                    {
+                        return symbol.Value;
+                    }
                 }
+
+                const CookError error = ReportError(sink,
+                                                    CookError::AttributeExpressionUnknownSymbol,
+                                                    "Attribute expression names an unknown symbol");
+                result = std::unexpected(error);
             }
 
-            const CookError error = ReportError(sink,
-                                                CookError::AttributeExpressionUnknownSymbol,
-                                                "Attribute expression names an unknown symbol");
-            return std::unexpected(error);
+            return result;
         }
 
         /** `<` and `>` alone are comparisons now, so a shift needs both characters to tell it from a
@@ -479,7 +508,7 @@ namespace
             GreaterOrEqual
         };
 
-        static bool Compare(Comparison comparison, int64_t left, int64_t right) noexcept
+        static bool evaluateComparison(Comparison comparison, int64_t left, int64_t right) noexcept
         {
             switch (comparison)
             {
@@ -504,9 +533,10 @@ namespace
 
         std::string_view text;
         std::span<const SizeSymbol> symbolTable;
-        DiagnosticSink& sink;
+        DiagnosticSink& sink; // clang will complain we're using a ref member, but whatever dude. its fine.
         ParserMode parserMode;
-        size_t cursor;
+        size_t cursor{};
+        std::vector<std::string> identifiers;
     };
 
 } // namespace
@@ -529,7 +559,21 @@ CookResult<int64_t> EvaluateExpression(std::string_view expression,
 CookResult<std::vector<std::string>> CollectExpressionIdentifiers(std::string_view expression,
                                                                   DiagnosticSink& sink)
 {
-    return std::unexpected(CookError::AttributeExpressionParseFailed);
+    if (expression.empty())
+    {
+        const CookError error =
+            ReportError(sink, CookError::AttributeExpressionParseFailed, "Attribute expression is empty");
+        return std::unexpected(error);
+    }
+
+    ExpressionParser parser{ expression, {}, sink, ParserMode::CollectOnly };
+    auto parseResult = parser.ParseComplete();
+    if (!parseResult)
+    {
+        return std::unexpected(parseResult.error());
+    }
+
+    return parser.ConsumeIdentifiers();
 }
 
 #ifdef __clang__

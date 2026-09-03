@@ -6,6 +6,7 @@
 #include "compile/RawLibrary.hpp"
 #include "ShaderDataSchema.hpp"
 #include "permute/AttributeExpression.hpp"
+#include "permute/PermutationAssignment.hpp"
 #include <span>
 #include <vector>
 
@@ -22,6 +23,8 @@
  * `RawModule::ExternDefaults`. */
 namespace lodestone
 {
+
+class DiagnosticSink;
 
 /**@brief The symbols one variant's size expressions may name.
  *
@@ -42,7 +45,7 @@ ResolveContext MakeResolveContext(const PermutationAssignment& canonical,
 
 /** Takes the RawVariant - "raw" here meaning just carrying our meta-annotations - and evaluates
  *  them to populate the `CompiledVariant` with resolved resource footprints and other derived information. */
-CookResult<CompiledVariant> ResolveVariant(const RawVariant& raw, const ResolveContext& context);
+CookResult<CompiledVariant> ResolveVariant(const RawVariant& raw, const ResolveContext& context, DiagnosticSink& sink);
 
 } // namespace lodestone
 

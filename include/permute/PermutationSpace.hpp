@@ -17,6 +17,7 @@ namespace lodestone
 {
 
 class PermutationSpace;
+class DiagnosticSink;
 
 struct ExternConstantDefault
 {
@@ -103,7 +104,7 @@ public:
     void ReportUndrivenExternConstants(std::span<const std::string_view> source_texts,
                                        std::string_view module_name) const;
     [[nodiscard]] CookResult<std::vector<ExternConstantDefault>> CollectUndrivenExternDefaults(
-        std::span<const std::string_view> source_texts) const;
+        std::span<const std::string_view> source_texts, DiagnosticSink& sink) const;
 private:
     std::string name;
     std::vector<PermutationAxis> axes;

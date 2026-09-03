@@ -3,7 +3,6 @@
 #define LODESTONE_SLANG_COMPILER_HPP
 #include "CookerErrors.hpp"
 #include "RawLibrary.hpp"
-#include "Diagnostics.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "ShaderLibraryTypes.hpp"
 
@@ -20,6 +19,7 @@
 namespace lodestone
 {
 
+class DiagnosticSink;
 struct SlangReflector;
 class SlangModuleContext;
 
@@ -59,6 +59,7 @@ public:
     [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
 
 private:
+    DiagnosticSink* diagnosticSink{ nullptr };
     std::unique_ptr<ThreadPool> compilePool{ nullptr };
     std::unique_ptr<SlangModuleContext> bootstrapContext{ nullptr };
 };
