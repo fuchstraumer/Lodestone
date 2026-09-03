@@ -1,5 +1,6 @@
 #include "permute/AttributeExpression.hpp"
 #include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
 #include <cctype>
 #include <charconv>
 #include <cstddef>
@@ -8,8 +9,10 @@
 #include <expected>
 #include <print>
 #include <span>
+#include <string>
 #include <string_view>
 #include <system_error>
+#include <vector>
 
 #ifdef __clang__
 // The warning about RVO failures are for std::unexpected value returns, which are fine
@@ -36,6 +39,15 @@ namespace
         return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_';
     }
 
+    /** @brief We use parser mode primarily to enable the "CollectOnly" mode, which traverses the input
+      * without actually evaluating it - to gather identifiers ahead of time before evaluation. */
+    enum class ParserMode : uint8_t
+    {
+        None,
+        Default,
+        CollectOnly
+    };
+
     /** Recursive descent over a fixed grammar. Every failure returns an error rather than a default,
      * because a size that silently evaluates to zero allocates a zero-byte buffer and fails much
      * later, somewhere unrelated. A constraint that silently evaluates to zero is a false that the
@@ -50,9 +62,15 @@ namespace
     class ExpressionParser
     {
     public:
-        ExpressionParser(std::string_view expression, std::span<const SizeSymbol> symbols) noexcept :
+        ExpressionParser(std::string_view expression,
+                         std::span<const SizeSymbol> symbols,
+                         DiagnosticSink& _sink,
+                         ParserMode mode) noexcept :
             text{ expression },
-            symbolTable{ symbols }
+            symbolTable{ symbols },
+            sink{ _sink },
+            parserMode{ mode },
+            cursor{ 0u }
         {
         }
 
@@ -67,11 +85,8 @@ namespace
             skipWhitespace();
             if (cursor != text.size())
             {
-                std::println(stderr,
-                             "[shader_cooker] attribute expression '{}' has trailing text at offset {}",
-                             text,
-                             cursor);
-                return std::unexpected(CookError::AttributeExpressionParseFailed);
+                const CookError error = ReportError(sink, CookError::AttributeExpressionParseFailed, "Trailing text in attribute expression");
+                return std::unexpected(error);
             }
 
             return value;
@@ -211,12 +226,8 @@ namespace
 
                 if (right.value() < 0 || right.value() >= 64)
                 {
-                    std::println(stderr,
-                                 "[shader_cooker] attribute expression '{}' shifts by {}, which is out "
-                                 "of range",
-                                 text,
-                                 right.value());
-                    return std::unexpected(CookError::AttributeExpressionOutOfRange);
+                    const CookError error = ReportError(sink, CookError::AttributeExpressionOutOfRange, "Attribute expression shifts by an out-of-range value");
+                    return std::unexpected(error);
                 }
 
                 left = shiftLeft ? (left.value() << right.value()) : (left.value() >> right.value());
@@ -282,8 +293,8 @@ namespace
 
                 if ((isDivide || isModulo) && right.value() == 0)
                 {
-                    std::println(stderr, "[shader_cooker] attribute expression '{}' divides by zero", text);
-                    return std::unexpected(CookError::AttributeExpressionDivideByZero);
+                    const CookError error = ReportError(sink, CookError::AttributeExpressionDivideByZero, "Attribute expression divides by zero");
+                    return std::unexpected(error);
                 }
 
                 if (isMultiply)
@@ -338,8 +349,8 @@ namespace
             skipWhitespace();
             if (cursor >= text.size())
             {
-                std::println(stderr, "[shader_cooker] attribute expression '{}' ends early", text);
-                return std::unexpected(CookError::AttributeExpressionParseFailed);
+                const CookError error = ReportError(sink, CookError::AttributeExpressionParseFailed, "Attribute expression ends early");
+                return std::unexpected(error);
             }
 
             if (consumeOperator("("))
@@ -352,11 +363,8 @@ namespace
 
                 if (!consumeOperator(")"))
                 {
-                    std::println(stderr,
-                                 "[shader_cooker] attribute expression '{}' is missing a closing "
-                                 "parenthesis",
-                                 text);
-                    return std::unexpected(CookError::AttributeExpressionParseFailed);
+                    const CookError error = ReportError(sink, CookError::AttributeExpressionParseFailed, "Attribute expression is missing a closing parenthesis");
+                    return std::unexpected(error);
                 }
 
                 return inner;
@@ -372,13 +380,8 @@ namespace
                 return parseIdentifier();
             }
 
-            std::println(stderr,
-                         "[shader_cooker] attribute expression '{}' has an unexpected character '{}' at "
-                         "offset {}",
-                         text,
-                         text[cursor],
-                         cursor);
-            return std::unexpected(CookError::AttributeExpressionParseFailed);
+            const CookError error = ReportError(sink, CookError::AttributeExpressionParseFailed, "Attribute expression has an unexpected character");
+            return std::unexpected(error);
         }
 
         CookResult<int64_t> parseInteger()
@@ -414,12 +417,8 @@ namespace
 
             if (result.ec != std::errc{} || result.ptr != last || valueEnd == digitsBegin)
             {
-                std::println(stderr,
-                             "[shader_cooker] attribute expression '{}' has a malformed integer at "
-                             "offset {}",
-                             text,
-                             cursor);
-                return std::unexpected(CookError::AttributeExpressionParseFailed);
+                const CookError error = ReportError(sink, CookError::AttributeExpressionParseFailed, "Attribute expression has a malformed integer");
+                return std::unexpected(error);
             }
 
             cursor = digitsEnd;
@@ -443,12 +442,8 @@ namespace
                 }
             }
 
-            std::println(stderr,
-                         "[shader_cooker] attribute expression '{}' names '{}', which is not a "
-                         "permutation constant of this module",
-                         text,
-                         name);
-            return std::unexpected(CookError::AttributeExpressionUnknownSymbol);
+            const CookError error = ReportError(sink, CookError::AttributeExpressionUnknownSymbol, "Attribute expression names an unknown symbol");
+            return std::unexpected(error);
         }
 
         /** `<` and `>` alone are comparisons now, so a shift needs both characters to tell it from a
@@ -496,24 +491,31 @@ namespace
 
         std::string_view text;
         std::span<const SizeSymbol> symbolTable;
-        size_t cursor{};
+        DiagnosticSink& sink;
+        ParserMode parserMode;
+        size_t cursor;
     };
 
 } // namespace
 
 CookResult<int64_t> EvaluateExpression(std::string_view expression,
-                                       std::span<const SizeSymbol> symbols)
+                                       std::span<const SizeSymbol> symbols,
+                                       DiagnosticSink& sink)
 {
     if (expression.empty())
     {
-        std::println(stderr, "[shader_cooker] attribute expression is empty");
-        return std::unexpected(CookError::AttributeExpressionParseFailed);
+        const CookError error = ReportError(sink, CookError::AttributeExpressionParseFailed, "Attribute expression is empty");
+        return std::unexpected(error);
     }
 
-    ExpressionParser parser{ expression, symbols };
+    ExpressionParser parser{ expression, symbols, sink, ParserMode::Default };
     return parser.ParseComplete();
 }
 
+CookResult<std::vector<std::string>> CollectExpressionIdentifiers(std::string_view expression, DiagnosticSink& sink)
+{
+   return std::unexpected(CookError::AttributeExpressionParseFailed);
+}
 
 #ifdef __clang__
 #pragma clang diagnostic pop

@@ -4,7 +4,9 @@
 #include "CookerErrors.hpp"
 #include <cstdint>
 #include <span>
+#include <string>
 #include <string_view>
+#include <vector>
 
 /**Evaluates the expression carried by a lodestone attribute declared in Slang source code.
  * The expression travels as a string because integral attribute expressions fold at compile time,
@@ -19,6 +21,8 @@
  * table, and it is therefore testable on its own. */
 namespace lodestone
 {
+
+class DiagnosticSink;
 
 struct SizeSymbol
 {
@@ -37,7 +41,12 @@ struct SizeSymbol
  *
  * Integers are decimal or `0x` hexadecimal, with an optional `u` or `U` suffix so an expression can
  * be copied out of Slang source unchanged. */
-CookResult<int64_t> EvaluateExpression(std::string_view expression, std::span<const SizeSymbol> symbols);
+CookResult<int64_t> EvaluateExpression(std::string_view expression, std::span<const SizeSymbol> symbols, DiagnosticSink& sink);
+
+/** @brief Collects all named identifiers from the given expression, used to determine which axes an expression names before full evaluation. */
+CookResult<std::vector<std::string>> CollectExpressionIdentifiers(std::string_view expression, DiagnosticSink& sink);
+
+
 
 } // namespace lodestone
 
