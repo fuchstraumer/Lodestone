@@ -500,7 +500,7 @@ std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_vari
            std::views::transform(
                [](const auto& pair)
                {
-                   return std::get<0>(pair);
+                   return static_cast<uint32_t>(std::get<0>(pair));
                }) |
            std::ranges::to<std::vector<uint32_t>>();
 }
@@ -686,15 +686,7 @@ CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* conta
         }
     }
 
-    if (binding.Kind == BindingKind::UniformBuffer)
-    {
-    }
-
-    slang::TypeLayoutReflection* elementLayout = leafLayout->getElementTypeLayout();
-    if (elementLayout != nullptr)
-    {
-        binding.ElementStride = static_cast<uint32_t>(elementLayout->getSize());
-    }
+    return CookError::ReflectionUnsupportedBindingKind;
 }
 
 /** Reads one `[vx_*]` annotation into its argument strings. Stage 3 never evaluates one, so a

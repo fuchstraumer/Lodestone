@@ -42,15 +42,13 @@ struct PermutationAxis
 {
     /**This helps control permutation explosions, mostly. todo-ship: make it a cmake configure opt */
     static constexpr std::size_t k_MaxValues = 8u;
-    /** `ParentIndex` of an axis with no parent. Such an axis is always active. */
-    static constexpr int32_t k_NoParent = -1;
 
     PermutationAxis(std::string name,
                     std::span<const PermutationValue> values,
                     AxisKind kind,
                     EarliestBindingTime binding_time,
                     AxisValueDomain value_domain,
-                    std::string active_when) noexcept;
+                    std::string active_when = {}) noexcept;
     // initializer_list will be removed once we get to the data-driven permutation system
     // this just keeps things compiling and running, for now
     PermutationAxis(std::string name,
@@ -58,7 +56,7 @@ struct PermutationAxis
                     AxisKind kind,
                     EarliestBindingTime binding_time,
                     AxisValueDomain value_domain,
-                    std::string active_when) noexcept;
+                    std::string active_when = {}) noexcept;
 
     std::string Name;
     AxisKind Kind{ AxisKind::None };
@@ -66,7 +64,6 @@ struct PermutationAxis
     AxisValueDomain ValueDomain{ AxisValueDomain::None };
     std::string ActiveWhen{};
 
-    [[nodiscard]] bool HasParent() const noexcept;
     [[nodiscard]] int64_t NumValues() const noexcept;
     [[nodiscard]] std::span<const PermutationValue> GetValues() const noexcept;
     [[nodiscard]] const PermutationValue& GetDefault() const noexcept;

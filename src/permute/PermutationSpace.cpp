@@ -123,12 +123,7 @@ bool PermutationSpace::IsEmpty() const noexcept
 
 const PermutationAxis* PermutationSpace::ParentOf(const PermutationAxis& axis) const noexcept
 {
-    if (!axis.HasParent())
-    {
-        return nullptr;
-    }
-
-    return &axes[static_cast<size_t>(axis.ParentIndex)];
+    return nullptr;
 }
 
 // perform CCSP with classic backtracking, but skip any axis whose parent is not active
@@ -170,11 +165,12 @@ CookResult<std::vector<PermutationAssignment>> PermutationSpace::EnumerateActive
                 }
                 // If the parent is active, but not set to the required value, close partial off
                 // for this current partial (where parent axis was evaluated to the wrong value)
-                if (parentBinding->Value != axis.RequiredParentValue)
-                {
-                    expanded.push_back(partial);
-                    continue;
-                }
+                
+                //if (parentBinding->Value != axis.RequiredParentValue)
+                //{
+                //    expanded.push_back(partial);
+                //    continue;
+                //}
             }
 
             // Expand the current axis, evaluating/instantiating it for each of it's values

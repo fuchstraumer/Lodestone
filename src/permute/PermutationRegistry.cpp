@@ -19,40 +19,35 @@ namespace lodestone
 namespace
 {
 
-    // Axis order is the declaration order, and `ParentIndex` is a position in this list.
-    // IFFT_WAVE_SIZE names index 1, which is IFFT_USE_WAVE_OPS.
-    const PermutationSpace k_OceanFftSpace{
-        "OceanFft",
-        { PermutationAxis{ "IFFT_SIZE",
-                           { PermutationValue{ 128u },
-                             PermutationValue{ 256u },
-                             PermutationValue{ 512u },
-                             PermutationValue{ 1024u },
-                             PermutationValue{ 2048u },
-                             PermutationValue{ 4096u },
-                             PermutationValue{ 8192u } },
-                           PermutationAxis::k_NoParent,
-                           PermutationValue{},
-                           AxisKind::Tuning,
-                           EarliestBindingTime::Cook,
-                           AxisValueDomain::Integral },
-          PermutationAxis{ "IFFT_USE_WAVE_OPS",
-                           { PermutationValue{ false }, PermutationValue{ true } },
-                           PermutationAxis::k_NoParent,
-                           PermutationValue{},
-                           AxisKind::Capability,
-                           EarliestBindingTime::Cook,
-                           AxisValueDomain::Boolean },
-          PermutationAxis{ "IFFT_WAVE_SIZE",
-                           { PermutationValue{ 16u },
-                             PermutationValue{ 32u },
-                             PermutationValue{ 64u },
-                             PermutationValue{ 128u } },
-                           1,
-                           PermutationValue{ true },
-                           AxisKind::Tuning,
-                           EarliestBindingTime::Cook,
-                           AxisValueDomain::Integral } } };
+    // Axis order is the declaration order, and last parameter is now `RequireWhen` string instead
+    // of an index and a value separately
+    const PermutationSpace k_OceanFftSpace{ "OceanFft",
+                                            { PermutationAxis{ "IFFT_SIZE",
+                                                               { PermutationValue{ 128u },
+                                                                 PermutationValue{ 256u },
+                                                                 PermutationValue{ 512u },
+                                                                 PermutationValue{ 1024u },
+                                                                 PermutationValue{ 2048u },
+                                                                 PermutationValue{ 4096u },
+                                                                 PermutationValue{ 8192u } },
+                                                               AxisKind::Tuning,
+                                                               EarliestBindingTime::Cook,
+                                                               AxisValueDomain::Integral },
+                                              PermutationAxis{
+                                                  "IFFT_USE_WAVE_OPS",
+                                                  { PermutationValue{ false }, PermutationValue{ true } },
+                                                  AxisKind::Capability,
+                                                  EarliestBindingTime::Cook,
+                                                  AxisValueDomain::Boolean },
+                                              PermutationAxis{ "IFFT_WAVE_SIZE",
+                                                               { PermutationValue{ 16u },
+                                                                 PermutationValue{ 32u },
+                                                                 PermutationValue{ 64u },
+                                                                 PermutationValue{ 128u } },
+                                                               AxisKind::Tuning,
+                                                               EarliestBindingTime::Cook,
+                                                               AxisValueDomain::Integral,
+                                                               "IFFT_USE_WAVE_OPS == 1" } } };
 
     const PermutationSpace k_EmptySpace{ "", {} };
 

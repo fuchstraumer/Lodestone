@@ -81,7 +81,8 @@ namespace
         {
             writer.KeyString("parent", parent->Name);
             writer.Key("requiredParentValue");
-            WriteAxisValue(writer, axis.RequiredParentValue);
+            // todo: fix
+            WriteAxisValue(writer, PermutationValue{ true });
         }
         else
         {

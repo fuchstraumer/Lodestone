@@ -62,9 +62,4 @@ const PermutationValue& PermutationAxis::GetDefault() const noexcept
     return values.front();
 }
 
-bool PermutationAxis::HasParent() const noexcept
-{
-    return !ActiveWhen.empty();
-}
-
 } // namespace lodestone

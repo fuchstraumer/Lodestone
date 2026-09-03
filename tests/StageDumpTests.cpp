@@ -34,8 +34,6 @@ PermutationAxis MakeBoolAxis(std::string name)
 {
     return PermutationAxis{ std::move(name),
                             { PermutationValue{ false }, PermutationValue{ true } },
-                            PermutationAxis::k_NoParent,
-                            PermutationValue{},
                             AxisKind::Capability,
                             EarliestBindingTime::Cook,
                             AxisValueDomain::Boolean };
@@ -285,8 +283,7 @@ void CheckDependentAxisDump(lodestone::tests::TestRunner& runner)
     runner.BeginSection("dependent axis");
 
     PermutationAxis child = MakeBoolAxis("FOO_DETAIL");
-    child.ParentIndex = 0;
-    child.RequiredParentValue = PermutationValue{ true };
+    child.ActiveWhen = std::string{ "USE_FOO == 1" };
 
     const PermutationSpace space{ "TinyModule", { MakeBoolAxis("USE_FOO"), std::move(child) } };
     const std::string dump = DumpPermutationSpace("TinyModule", space);
