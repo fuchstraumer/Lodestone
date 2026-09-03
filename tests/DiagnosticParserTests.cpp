@@ -1,4 +1,4 @@
-#include "compile/Diagnostics.hpp"
+#include "Diagnostics.hpp"
 #include "compile/SlangDiagnosticParser.hpp"
 #include "TestHarness.hpp"
 #include <string>

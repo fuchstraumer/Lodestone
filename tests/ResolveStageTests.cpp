@@ -1,10 +1,14 @@
 #include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "TestHarness.hpp"
 #include "compile/RawLibrary.hpp"
 #include "model/ResolveStage.hpp"
-#include "TestHarness.hpp"
 #include "model/ShaderDataSchema.hpp"
+#include "permute/PermutationAssignment.hpp"
+#include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
+#include "permute/PermutationValue.hpp"
 #include <array>
 #include <cstdint>
 #include <expected>
@@ -13,6 +17,7 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
 
 // Stage 4 is a pure function of a `RawVariant` and a symbol table. This test is the proof of that
 // claim: it links against no Slang type, it reads no asset, and it runs in milliseconds. Before phase
@@ -29,6 +34,7 @@ using lodestone::BufferFootprint;
 using lodestone::CompiledVariant;
 using lodestone::CookError;
 using lodestone::CookResult;
+using lodestone::DiagnosticSink;
 using lodestone::ExternConstantDefault;
 using lodestone::MakeResolveContext;
 using lodestone::PermutationAssignment;
@@ -45,6 +51,7 @@ using lodestone::ResolveContext;
 using lodestone::ResolveVariant;
 using lodestone::ResourcePlacement;
 using lodestone::ShaderStageKind;
+using lodestone::StderrDiagnosticSink;
 using lodestone::TextureFootprint;
 using lodestone::tests::TestRunner;
 
@@ -109,12 +116,12 @@ RawSizeAttribute MakeAttribute(RawSizeAttributeKind kind, std::vector<std::strin
 }
 
 /** Resolves a variant that carries one annotation, and gives back the derived size of binding 0. */
-CookResult<lodestone::ResourceFootprint> ResolveOneAttribute(RawSizeAttribute attribute)
+CookResult<lodestone::ResourceFootprint> ResolveOneAttribute(RawSizeAttribute attribute, DiagnosticSink& sink)
 {
     RawVariant variant = MakeVariantWithOneBuffer();
     variant.SizeAttributes.push_back(std::move(attribute));
 
-    CookResult<CompiledVariant> resolved = ResolveVariant(variant, MakeContext());
+    CookResult<CompiledVariant> resolved = ResolveVariant(variant, MakeContext(), sink);
     if (!resolved)
     {
         return std::unexpected(resolved.error());
@@ -126,10 +133,11 @@ CookResult<lodestone::ResourceFootprint> ResolveOneAttribute(RawSizeAttribute at
 void CheckElementCount(TestRunner& runner,
                        std::string_view expression,
                        uint64_t expected,
-                       std::string_view description)
+                       std::string_view description,
+                       DiagnosticSink& sink)
 {
-    const auto derived =
-        ResolveOneAttribute(MakeAttribute(RawSizeAttributeKind::ElementCount, { std::string{ expression } }));
+    const auto derived = ResolveOneAttribute(
+        MakeAttribute(RawSizeAttributeKind::ElementCount, { std::string{ expression } }), sink);
     const BufferFootprint* buffer =
         derived.has_value() ? std::get_if<BufferFootprint>(&derived.value()) : nullptr;
     runner.Check(buffer != nullptr && buffer->ElementCount == expected, description);
@@ -138,13 +146,14 @@ void CheckElementCount(TestRunner& runner,
 void CheckRejection(TestRunner& runner,
                     RawSizeAttribute attribute,
                     CookError expected,
-                    std::string_view description)
+                    std::string_view description,
+                    DiagnosticSink& sink)
 {
-    const auto derived = ResolveOneAttribute(std::move(attribute));
+    const auto derived = ResolveOneAttribute(std::move(attribute), sink);
     runner.Check(!derived.has_value() && derived.error() == expected, description);
 }
 
-void TestSymbolTable(TestRunner& runner)
+void TestSymbolTable(TestRunner& runner, DiagnosticSink& sink)
 {
     runner.BeginSection("symbol table");
 
@@ -157,24 +166,25 @@ void TestSymbolTable(TestRunner& runner)
                      context.Symbols.front().Value == 4,
                  "the undriven extern default comes first, with its declared value");
 
-    CheckElementCount(runner, "IFFT_SIZE", 512u, "an axis value reaches the evaluator");
-    CheckElementCount(runner, "IFFT_NUM_WAVE_CASCADES", 4u, "an extern default reaches the evaluator");
-    CheckElementCount(runner, "IFFT_USE_WAVE_OPS", 1u, "a bool axis widens to one");
+    CheckElementCount(runner, "IFFT_SIZE", 512u, "an axis value reaches the evaluator", sink);
+    CheckElementCount(runner, "IFFT_NUM_WAVE_CASCADES", 4u, "an extern default reaches the evaluator", sink);
+    CheckElementCount(runner, "IFFT_USE_WAVE_OPS", 1u, "a bool axis widens to one", sink);
 }
 
-void TestElementCount(TestRunner& runner)
+void TestElementCount(TestRunner& runner, DiagnosticSink& sink)
 {
     runner.BeginSection("element count");
 
-    CheckElementCount(runner, "1024", 1024u, "a literal needs no symbol");
-    CheckElementCount(runner, "IFFT_SIZE * IFFT_SIZE", 262144u, "the square case the ocean demo needs");
+    CheckElementCount(runner, "1024", 1024u, "a literal needs no symbol", sink);
+    CheckElementCount(runner, "IFFT_SIZE * IFFT_SIZE", 262144u, "the square case the ocean demo needs", sink);
     CheckElementCount(runner,
                       "IFFT_SIZE * IFFT_SIZE * IFFT_NUM_WAVE_CASCADES",
                       1048576u,
-                      "an axis and an extern default in one expression");
+                      "an axis and an extern default in one expression",
+                      sink);
 
     const auto derived =
-        ResolveOneAttribute(MakeAttribute(RawSizeAttributeKind::ElementCount, { "IFFT_SIZE * 4" }));
+        ResolveOneAttribute(MakeAttribute(RawSizeAttributeKind::ElementCount, { "IFFT_SIZE * 4" }), sink);
     const BufferFootprint* buffer =
         derived.has_value() ? std::get_if<BufferFootprint>(&derived.value()) : nullptr;
     runner.Check(buffer != nullptr && buffer->Expression == "IFFT_SIZE * 4",
@@ -183,12 +193,12 @@ void TestElementCount(TestRunner& runner)
                  "an element count is a buffer footprint, never a texture one");
 }
 
-void TestExtent(TestRunner& runner)
+void TestExtent(TestRunner& runner, DiagnosticSink& sink)
 {
     runner.BeginSection("extent");
 
-    const auto extent2d =
-        ResolveOneAttribute(MakeAttribute(RawSizeAttributeKind::Extent2d, { "IFFT_SIZE", "IFFT_SIZE / 2" }));
+    const auto extent2d = ResolveOneAttribute(
+        MakeAttribute(RawSizeAttributeKind::Extent2d, { "IFFT_SIZE", "IFFT_SIZE / 2" }), sink);
     const TextureFootprint* first =
         extent2d.has_value() ? std::get_if<TextureFootprint>(&extent2d.value()) : nullptr;
     runner.Check(first != nullptr && first->ExtentX == 512u && first->ExtentY == 256u,
@@ -197,8 +207,9 @@ void TestExtent(TestRunner& runner)
     runner.Check(extent2d.has_value() && !std::holds_alternative<BufferFootprint>(extent2d.value()),
                  "an extent is a texture footprint, never a buffer one");
 
-    const auto extent3d = ResolveOneAttribute(MakeAttribute(
-        RawSizeAttributeKind::Extent3d, { "IFFT_SIZE", "IFFT_SIZE", "IFFT_NUM_WAVE_CASCADES" }));
+    const auto extent3d = ResolveOneAttribute(
+        MakeAttribute(RawSizeAttributeKind::Extent3d, { "IFFT_SIZE", "IFFT_SIZE", "IFFT_NUM_WAVE_CASCADES" }),
+        sink);
     const TextureFootprint* second =
         extent3d.has_value() ? std::get_if<TextureFootprint>(&extent3d.value()) : nullptr;
     runner.Check(second != nullptr && second->ExtentX == 512u && second->ExtentY == 512u &&
@@ -206,13 +217,14 @@ void TestExtent(TestRunner& runner)
                  "a 3d extent fills all three axes");
 }
 
-void TestNoAnnotation(TestRunner& runner)
+void TestNoAnnotation(TestRunner& runner, DiagnosticSink& sink)
 {
     runner.BeginSection("no annotation");
 
     // Most resources are sized by the caller. An unannotated binding must stay unannotated, because a
     // size that defaults to zero and a size nobody declared are different facts.
-    const CookResult<CompiledVariant> resolved = ResolveVariant(MakeVariantWithOneBuffer(), MakeContext());
+    const CookResult<CompiledVariant> resolved =
+        ResolveVariant(MakeVariantWithOneBuffer(), MakeContext(), sink);
     runner.Check(resolved.has_value(), "a binding with no annotation is not an error");
 
     if (!resolved)
@@ -225,46 +237,52 @@ void TestNoAnnotation(TestRunner& runner)
                  "no annotation gives no footprint, which is a state of its own");
 }
 
-void TestRejections(TestRunner& runner)
+void TestRejections(TestRunner& runner, DiagnosticSink& sink)
 {
     runner.BeginSection("rejections");
 
     CheckRejection(runner,
                    MakeAttribute(RawSizeAttributeKind::ElementCount, { "IFFT_SIZ" }),
                    CookError::AttributeExpressionUnknownSymbol,
-                   "a typo in a symbol name");
+                   "a typo in a symbol name",
+                   sink);
     CheckRejection(runner,
                    MakeAttribute(RawSizeAttributeKind::ElementCount, { "IFFT_WAVE_SIZE * 4" }),
                    CookError::AttributeExpressionUnknownSymbol,
-                   "a constant that no axis drives and no default declares");
+                   "a constant that no axis drives and no default declares",
+                   sink);
     CheckRejection(runner,
                    MakeAttribute(RawSizeAttributeKind::ElementCount, {}),
                    CookError::AttributeExpressionParseFailed,
-                   "an element count with no argument");
+                   "an element count with no argument",
+                   sink);
     CheckRejection(runner,
                    MakeAttribute(RawSizeAttributeKind::ElementCount, { "0" }),
                    CookError::AttributeExpressionOutOfRange,
-                   "an element count of zero cannot size a buffer");
+                   "an element count of zero cannot size a buffer",
+                   sink);
     CheckRejection(runner,
                    MakeAttribute(RawSizeAttributeKind::Extent2d, { "IFFT_SIZE" }),
                    CookError::AttributeExpressionParseFailed,
-                   "a 2d extent with one argument");
+                   "a 2d extent with one argument",
+                   sink);
     CheckRejection(runner,
                    MakeAttribute(RawSizeAttributeKind::Extent2d, { "IFFT_SIZE", "0" }),
                    CookError::AttributeExpressionOutOfRange,
-                   "an extent axis of zero is not a texture dimension");
+                   "an extent axis of zero is not a texture dimension",
+                   sink);
 
     RawVariant bothExtents = MakeVariantWithOneBuffer();
     bothExtents.SizeAttributes.push_back(
         MakeAttribute(RawSizeAttributeKind::Extent2d, { "IFFT_SIZE", "IFFT_SIZE" }));
     bothExtents.SizeAttributes.push_back(
         MakeAttribute(RawSizeAttributeKind::Extent3d, { "IFFT_SIZE", "IFFT_SIZE", "2" }));
-    const CookResult<CompiledVariant> conflict = ResolveVariant(bothExtents, MakeContext());
+    const CookResult<CompiledVariant> conflict = ResolveVariant(bothExtents, MakeContext(), sink);
     runner.Check(!conflict.has_value() && conflict.error() == CookError::ReflectionSizeUnresolved,
                  "one resource cannot carry both a 2d and a 3d extent");
 }
 
-void TestAttributeTargeting(TestRunner& runner)
+void TestAttributeTargeting(TestRunner& runner, DiagnosticSink& sink)
 {
     runner.BeginSection("attribute targeting");
 
@@ -281,7 +299,7 @@ void TestAttributeTargeting(TestRunner& runner)
     attribute.BindingIndex = 1u;
     variant.SizeAttributes.push_back(std::move(attribute));
 
-    const CookResult<CompiledVariant> resolved = ResolveVariant(variant, MakeContext());
+    const CookResult<CompiledVariant> resolved = ResolveVariant(variant, MakeContext(), sink);
     runner.Check(resolved.has_value(), "a two binding variant resolves");
 
     if (!resolved)
@@ -296,7 +314,7 @@ void TestAttributeTargeting(TestRunner& runner)
                  "the annotation reaches the binding it names");
 }
 
-void TestPlacementAndPassthrough(TestRunner& runner)
+void TestPlacementAndPassthrough(TestRunner& runner, DiagnosticSink& sink)
 {
     runner.BeginSection("placement and passthrough");
 
@@ -309,7 +327,7 @@ void TestPlacementAndPassthrough(TestRunner& runner)
     unplaced.ByteSize = 64u;
     variant.Bindings.push_back(std::move(unplaced));
 
-    const CookResult<CompiledVariant> resolved = ResolveVariant(variant, MakeContext());
+    const CookResult<CompiledVariant> resolved = ResolveVariant(variant, MakeContext(), sink);
     runner.Check(resolved.has_value(), "a variant with an unplaced resource resolves");
 
     if (!resolved)
@@ -328,7 +346,7 @@ void TestPlacementAndPassthrough(TestRunner& runner)
                  "the variant identity passes through");
 }
 
-void TestEntryPoints(TestRunner& runner)
+void TestEntryPoints(TestRunner& runner, DiagnosticSink& sink)
 {
     runner.BeginSection("entry points");
 
@@ -343,7 +361,7 @@ void TestEntryPoints(TestRunner& runner)
     RawVariant variant = MakeVariantWithOneBuffer();
     variant.EntryPoints.push_back(std::move(raw));
 
-    const CookResult<CompiledVariant> resolved = ResolveVariant(variant, MakeContext());
+    const CookResult<CompiledVariant> resolved = ResolveVariant(variant, MakeContext(), sink);
     runner.Check(resolved.has_value() && resolved.value().EntryPoints.size() == 1u,
                  "one raw entry point gives one compiled entry point");
 
@@ -372,14 +390,15 @@ int main()
 {
     TestRunner runner{ "ResolveStageTests" };
 
-    TestSymbolTable(runner);
-    TestElementCount(runner);
-    TestExtent(runner);
-    TestNoAnnotation(runner);
-    TestRejections(runner);
-    TestAttributeTargeting(runner);
-    TestPlacementAndPassthrough(runner);
-    TestEntryPoints(runner);
+    lodestone::StderrDiagnosticSink sink;
+    TestSymbolTable(runner, sink);
+    TestElementCount(runner, sink);
+    TestExtent(runner, sink);
+    TestNoAnnotation(runner, sink);
+    TestRejections(runner, sink);
+    TestAttributeTargeting(runner, sink);
+    TestPlacementAndPassthrough(runner, sink);
+    TestEntryPoints(runner, sink);
 
     return runner.Report();
 }
