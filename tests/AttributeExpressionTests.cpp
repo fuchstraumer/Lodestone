@@ -61,9 +61,7 @@ void CheckIdentifierCollection(lodestone::tests::TestRunner& runner, std::string
 {
     const auto result = CollectExpressionIdentifiers(expression, sink);
     runner.Check(result.has_value(), "collection succeeded");
-    // transform result values to std::string_view vector for comparison
-    const std::vector<std::string>& collectedIdentifiers = result.value();
-    runner.Check(std::ranges::equal(collectedIdentifiers, expected_identifiers), "collected identifiers match expected");
+    runner.Check(result.has_value() && std::ranges::equal(*result, expected_identifiers), "collected identifiers match expected");
 }
 
 } // namespace
