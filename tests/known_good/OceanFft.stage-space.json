@@ -18,8 +18,7 @@
                 "4096",
                 "8192"
             ],
-            "parent": null,
-            "requiredParentValue": null
+            "activeWhen": null
         },
         {
             "name": "IFFT_USE_WAVE_OPS",
@@ -30,8 +29,7 @@
                 "false",
                 "true"
             ],
-            "parent": null,
-            "requiredParentValue": null
+            "activeWhen": null
         },
         {
             "name": "IFFT_WAVE_SIZE",
@@ -44,8 +42,7 @@
                 "64",
                 "128"
             ],
-            "parent": "IFFT_USE_WAVE_OPS",
-            "requiredParentValue": "true"
+            "activeWhen": "IFFT_USE_WAVE_OPS == 1"
         }
     ]
 }
