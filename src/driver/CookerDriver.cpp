@@ -578,7 +578,7 @@ namespace
                      ToString(target->Access),
                      DescribeCrossCheckState(*target, options));
 
-        const CookResult<VariantSet> variantSet = space->EnumerateVariants();
+        const CookResult<VariantSet> variantSet = space->EnumerateVariants(diagnostics);
         if (!variantSet)
         {
             return variantSet.error();

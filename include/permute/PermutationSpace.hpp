@@ -84,12 +84,9 @@ public:
     [[nodiscard]] std::span<const PermutationAxis> Axes() const noexcept;
     [[nodiscard]] std::size_t AxisCount() const noexcept;
     [[nodiscard]] bool IsEmpty() const noexcept;
-    /** The parent of `axis`, or null when it has none. Resolves `PermutationAxis::ParentIndex`
-     * against this space, which is the only space the index means anything in. */
-    [[nodiscard]] const PermutationAxis* ParentOf(const PermutationAxis& axis) const noexcept;
 
-    [[nodiscard]] CookResult<std::vector<PermutationAssignment>> EnumerateActiveCombinations() const;
-    [[nodiscard]] CookResult<VariantSet> EnumerateVariants() const;
+    [[nodiscard]] CookResult<std::vector<PermutationAssignment>> EnumerateActiveCombinations(DiagnosticSink& sink) const;
+    [[nodiscard]] CookResult<VariantSet> EnumerateVariants(DiagnosticSink& sink) const;
     [[nodiscard]] CanonicalAssignment CanonicalizeAssignment(const PermutationAssignment& assignment) const;
     [[nodiscard]] int32_t ComputeVariantIndex(const CanonicalAssignment& canonical) const;
     [[nodiscard]] int32_t ComputeVariantSpaceSize() const noexcept;

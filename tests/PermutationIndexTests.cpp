@@ -1,4 +1,5 @@
 #include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
@@ -22,18 +23,19 @@
 // The space below has the shape of the OceanFft space: two independent axes, and one axis that only
 // contributes values when its parent takes the enabling value.
 
+using lodestone::AxisKind;
+using lodestone::AxisValueDomain;
 using lodestone::CanonicalAssignment;
 using lodestone::CookResult;
+using lodestone::EarliestBindingTime;
 using lodestone::PermutationAssignment;
 using lodestone::PermutationAxis;
 using lodestone::PermutationBinding;
 using lodestone::PermutationSpace;
 using lodestone::PermutationValue;
+using lodestone::StderrDiagnosticSink;
 using lodestone::VariantDescriptor;
 using lodestone::VariantSet;
-using lodestone::AxisKind;
-using lodestone::EarliestBindingTime;
-using lodestone::AxisValueDomain;
 
 namespace
 {
@@ -90,8 +92,9 @@ const lodestone::PermutationBinding* FindBinding(const PermutationAssignment& as
 int main()
 {
     lodestone::tests::TestRunner runner{ "PermutationIndexTests" };
+    lodestone::StderrDiagnosticSink sink;
 
-    const CookResult<VariantSet> enumerated = k_TestSpace.EnumerateVariants();
+    const CookResult<VariantSet> enumerated = k_TestSpace.EnumerateVariants(sink);
     if (!enumerated)
     {
         runner.Check(false, "the test space enumerates");
@@ -195,7 +198,7 @@ int main()
 
     runner.BeginSection("a module with no registered space still cooks");
     const PermutationSpace emptySpace{ "", {} };
-    const CookResult<VariantSet> emptyVariants = emptySpace.EnumerateVariants();
+    const CookResult<VariantSet> emptyVariants = emptySpace.EnumerateVariants(sink);
 
     runner.Check(emptyVariants.has_value(), "an empty space enumerates rather than fails");
     if (emptyVariants)

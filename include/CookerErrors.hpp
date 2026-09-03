@@ -45,10 +45,9 @@ enum class CookError : uint16_t
     UnknownTargetProfile = 64,
 
     PermutationSpaceNotFound = 80,
-    PermutationParentAxisMissing = 81,
-    PermutationValueNotInAxis = 82,
-    PermutationAxisNotDeclared = 83,
-    PermutationVariantIndexCollision = 84,
+    PermutationValueNotInAxis = 81,
+    PermutationAxisNotDeclared = 82,
+    PermutationVariantIndexCollision = 83,
 
     LibraryRoundTripFailed = 90,
     CookNotDeterministic = 91,

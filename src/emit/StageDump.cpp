@@ -76,18 +76,13 @@ namespace
         }
         writer.EndArray();
 
-        const PermutationAxis* parent = space.ParentOf(axis);
-        if (parent != nullptr)
+        if (!axis.ActiveWhen.empty())
         {
-            writer.KeyString("parent", parent->Name);
-            writer.Key("requiredParentValue");
-            // todo: fix
-            WriteAxisValue(writer, PermutationValue{ true });
+            writer.KeyString("activeWhen", axis.ActiveWhen);
         }
         else
         {
-            writer.KeyNull("parent");
-            writer.KeyNull("requiredParentValue");
+            writer.KeyNull("activeWhen");
         }
 
         writer.EndObject();

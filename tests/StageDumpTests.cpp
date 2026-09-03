@@ -1,4 +1,5 @@
 #include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
 #include "TestHarness.hpp"
 
 #include "model/ContentHash.hpp"
@@ -295,13 +296,13 @@ void CheckDependentAxisDump(lodestone::tests::TestRunner& runner)
                  "the space size counts the dense range with the holes included");
 }
 
-void CheckVariantDump(lodestone::tests::TestRunner& runner)
+void CheckVariantDump(lodestone::tests::TestRunner& runner, DiagnosticSink& sink)
 {
     runner.BeginSection("variants dump");
 
     const PermutationSpace space{ "TinyModule", { MakeBoolAxis("USE_FOO") } };
 
-    const CookResult<VariantSet> variantSet = space.EnumerateVariants();
+    const CookResult<VariantSet> variantSet = space.EnumerateVariants(sink);
     runner.Check(variantSet.has_value(), "the space enumerates");
     if (!variantSet)
     {
@@ -479,13 +480,14 @@ void CheckCookedDumpDetectsChange(lodestone::tests::TestRunner& runner)
 int main()
 {
     lodestone::tests::TestRunner runner{ "StageDump" };
+    lodestone::StderrDiagnosticSink sink;
 
     CheckStageNames(runner);
     CheckStageBits(runner);
     CheckCommandLine(runner);
     CheckSpaceDump(runner);
     CheckDependentAxisDump(runner);
-    CheckVariantDump(runner);
+    CheckVariantDump(runner, sink);
     CheckInternedDump(runner);
     CheckRawPrimitives(runner);
     CheckRawDump(runner);

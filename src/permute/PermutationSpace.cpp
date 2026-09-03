@@ -32,21 +32,6 @@ namespace lodestone
 namespace
 {
 
-    const PermutationBinding* FindBindingForAxis(const PermutationAssignment& assignment,
-                                                 const PermutationAxis* axis) noexcept
-    {
-        auto bindingIter = std::ranges::find_if(assignment,
-                                                [axis](const PermutationBinding& binding)
-                                                {
-                                                    return binding.Axis == axis;
-                                                });
-        if (bindingIter != assignment.end())
-        {
-            return std::to_address(bindingIter);
-        }
-        return nullptr;
-    }
-
     /** Lets a later extern's default read an earlier one, which is how shaders usually derive them. */
     std::vector<AttrExprSymbol> AsAttrExprSymbols(const std::vector<ExternConstantDefault>& defaults)
     {
@@ -87,6 +72,20 @@ namespace
         }
     }
 
+    [[nodiscard]] std::vector<AttrExprSymbol> SymbolsFromCanonicalAssignment(const CanonicalAssignment& assignment)
+    {
+        std::vector<AttrExprSymbol> symbols;
+        symbols.reserve(assignment.size());
+
+        for (size_t i = 0; i < assignment.size(); ++i)
+        {
+            const PermutationBinding& binding = assignment[i];
+            symbols.emplace_back(binding.Axis->Name, PermutationValueToInt64(binding.Value));
+        }
+
+        return symbols;
+    }
+
 } // namespace
 
 PermutationSpace::PermutationSpace(std::string _name, std::span<const PermutationAxis> _axes) noexcept
@@ -121,16 +120,11 @@ bool PermutationSpace::IsEmpty() const noexcept
     return axes.empty();
 }
 
-const PermutationAxis* PermutationSpace::ParentOf(const PermutationAxis& axis) const noexcept
-{
-    return nullptr;
-}
-
 // perform CCSP with classic backtracking, but skip any axis whose parent is not active
 // this is a somewhat embarassing amount of commenting for me, but I have not done constraint satisfaction
 // formally *ever* before, and I want to make sure I understand it. these are notes for me. i am not a learned
 // woman
-CookResult<std::vector<PermutationAssignment>> PermutationSpace::EnumerateActiveCombinations() const
+CookResult<std::vector<PermutationAssignment>> PermutationSpace::EnumerateActiveCombinations(DiagnosticSink& sink) const
 {
     // A module with no registered space enumerates to the one empty assignment, so there is no first
     // axis to size against. `partials` is replaced by `expanded` on every pass anyway.
@@ -147,30 +141,34 @@ CookResult<std::vector<PermutationAssignment>> PermutationSpace::EnumerateActive
         // for every axis in the space.
         for (const PermutationAssignment& partial : partials)
         {
-            // If an axis has a parent, we must check that parent to know whether to expand this current axis
-            // If there is no parent, we proceed to just expand the axis as normal
-            const PermutationAxis* parentAxis = ParentOf(axis);
-            if (parentAxis != nullptr)
+            bool active = true;
+            // Evaluate the ActiveWhen expression on the axis, if it exists, to determine if the axis should be active.
+            if (!axis.ActiveWhen.empty())
             {
-                // Read the current list of active axes to see if the parent is active, and retrieve
-                // it if it is. If the parent is not active (present), there is an axis declaration
-                // order error.
-                const PermutationBinding* parentBinding = FindBindingForAxis(partial, parentAxis);
-                if (parentBinding == nullptr)
+                // canonicalize the current partial assignment to evaluate the ActiveWhen expression correctly, which
+                // works like default-substitution for missing values (i.e, if this value depends on an axis that's
+                // previously deactivated, the canonicalization will provide a default value for it)
+                const CanonicalAssignment canonical = CanonicalizeAssignment(partial);
+                const std::vector<AttrExprSymbol> symbols = SymbolsFromCanonicalAssignment(canonical);
+                // now evaluate the actual expression
+                const CookResult<int64_t> isActive = EvaluateExpression(axis.ActiveWhen, symbols, sink);
+                if (!isActive) [[unlikely]]
                 {
-                    // todo-ship: This is a user error, and should be evaluated during initial load when we're
-                    // already traversing permutations to check for undriven values, etc. Flatten this
-                    // calltree to use less Results
-                    return std::unexpected(CookError::PermutationParentAxisMissing);
+                    return std::unexpected(isActive.error());
                 }
-                // If the parent is active, but not set to the required value, close partial off
-                // for this current partial (where parent axis was evaluated to the wrong value)
-                
-                //if (parentBinding->Value != axis.RequiredParentValue)
-                //{
-                //    expanded.push_back(partial);
-                //    continue;
-                //}
+                else [[likely]]
+                {
+                    // if active, the result should be != 0
+                    active = static_cast<bool>(isActive.value());
+                }
+            }
+
+            if (!active)
+            {
+                // axis is inactive, so we just carry forward the current partial without expanding this axis
+                // canonicalization will fill it with the default later, as needed
+                expanded.emplace_back(partial);
+                continue;
             }
 
             // Expand the current axis, evaluating/instantiating it for each of it's values
@@ -196,6 +194,40 @@ CookResult<std::vector<PermutationAssignment>> PermutationSpace::EnumerateActive
     }
 
     return partials;
+}
+
+CookResult<VariantSet> PermutationSpace::EnumerateVariants(DiagnosticSink& sink) const
+{
+    CookResult<std::vector<PermutationAssignment>> enumerateActiveResult = EnumerateActiveCombinations(sink);
+    if (!enumerateActiveResult)
+    {
+        return std::unexpected(enumerateActiveResult.error());
+    }
+
+    std::vector<PermutationAssignment> active{ std::move(enumerateActiveResult.value()) };
+
+    VariantSet variantSet;
+    variantSet.Space = this;
+    variantSet.SpaceSize = ComputeVariantSpaceSize();
+    variantSet.Variants.reserve(active.size());
+
+    for (PermutationAssignment& assignment : active)
+    {
+        CanonicalAssignment canonical = CanonicalizeAssignment(assignment);
+        const int32_t index = ComputeVariantIndex(canonical);
+        variantSet.Variants.emplace_back(std::move(assignment), std::move(canonical), index);
+    }
+
+    // sort first, because then uniqueness check can assume the indices are in order
+    std::ranges::sort(variantSet.Variants, std::ranges::less{}, &VariantDescriptor::Index);
+
+    const CookError verifyUnique = VerifyVariantIndicesAreUnique(variantSet.Variants);
+    if (verifyUnique != CookError::Success)
+    {
+        return std::unexpected(verifyUnique);
+    }
+
+    return variantSet;
 }
 
 // Canonicalization is another expansion: for every axis in the space, we need to find the concrete
@@ -241,40 +273,6 @@ int32_t PermutationSpace::ComputeVariantSpaceSize() const noexcept
     }
 
     return static_cast<int32_t>(size);
-}
-
-CookResult<VariantSet> PermutationSpace::EnumerateVariants() const
-{
-    CookResult<std::vector<PermutationAssignment>> enumerateActiveResult = EnumerateActiveCombinations();
-    if (!enumerateActiveResult)
-    {
-        return std::unexpected(enumerateActiveResult.error());
-    }
-
-    std::vector<PermutationAssignment> active{ std::move(enumerateActiveResult.value()) };
-
-    VariantSet variantSet;
-    variantSet.Space = this;
-    variantSet.SpaceSize = ComputeVariantSpaceSize();
-    variantSet.Variants.reserve(active.size());
-
-    for (PermutationAssignment& assignment : active)
-    {
-        CanonicalAssignment canonical = CanonicalizeAssignment(assignment);
-        const int32_t index = ComputeVariantIndex(canonical);
-        variantSet.Variants.emplace_back(std::move(assignment), std::move(canonical), index);
-    }
-
-    // sort first, because then uniqueness check can assume the indices are in order
-    std::ranges::sort(variantSet.Variants, std::ranges::less{}, &VariantDescriptor::Index);
-
-    const CookError verifyUnique = VerifyVariantIndicesAreUnique(variantSet.Variants);
-    if (verifyUnique != CookError::Success)
-    {
-        return std::unexpected(verifyUnique);
-    }
-
-    return variantSet;
 }
 
 CookError PermutationSpace::VerifyAxisNamesAreDeclared(std::span<const std::string_view> source_texts,
