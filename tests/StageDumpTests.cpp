@@ -266,7 +266,8 @@ void CheckSpaceDump(lodestone::tests::TestRunner& runner)
             ],
             "activeWhen": null
         }
-    ]
+    ],
+    "require": []
 })";
 
     const std::string dump = DumpPermutationSpace("TinyModule", space);
