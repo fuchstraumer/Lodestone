@@ -447,6 +447,8 @@ void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
     out_bindings.insert_range(out_bindings.end(), drafts | std::views::transform(&RawBindingDraft::Binding));
     // std::views::join will effectively expand to a push_back for each element in the joined ranges, so
     // reserve upfront
+    // todo-ship: either find a way to get cache_latest in here or just stop doing this
+    // its sad but ranges just don't produce the best assembly used like this
     const size_t attributesCount = std::ranges::fold_left(drafts | std::views::transform(
                                                                        [](const RawBindingDraft& draft)
                                                                        {
@@ -455,9 +457,8 @@ void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
                                                           size_t{ 0u },
                                                           std::plus<size_t>{});
     out_attributes.reserve(out_attributes.size() + attributesCount);
-    out_attributes.insert_range(out_attributes.end(),
-                                drafts | std::views::transform(&RawBindingDraft::Attributes) |
-                                    std::views::join | std::views::as_rvalue);
+    out_attributes.append_range(drafts | std::views::transform(&RawBindingDraft::Attributes) |
+                                std::views::join | std::views::as_rvalue);
 }
 
 /** Asks the metadata of one entry point which global bindings that entry point reads.

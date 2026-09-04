@@ -154,19 +154,13 @@ CookResult<LinkedVariant> SlangVariantCompiler::CompileVariant(SlangModuleContex
         return std::unexpected(CookError::CodeGenerationFailed);
     }
 
-    // extract metadata for each entrypoint
-    auto extractMetadataLambda = [&](const auto& ep_tuple)
+    for (size_t i = 0; i < entryPointCode.size(); ++i)
     {
-        const auto&[entryPointIndex, entryPointCode] = ep_tuple;
-        const auto castIndex = static_cast<int64_t>(entryPointIndex);
+        const auto castIndex = static_cast<int64_t>(i);
         Slang::ComPtr<slang::IMetadata> metadata;
         linkedProgram->getEntryPointMetadata(castIndex, k_WgslTargetIndex, metadata.writeRef());
-        return std::move(metadata);
-    };
-    result.EntryPointMetadata = entryPointCode |
-                                std::views::enumerate |
-                                std::views::transform(extractMetadataLambda) |
-                                std::ranges::to<std::vector<Slang::ComPtr<slang::IMetadata>>>();
+        result.EntryPointMetadata.push_back(metadata);
+    }
 
     result.EntryPointStrings = std::move(entryPointCode);
 
