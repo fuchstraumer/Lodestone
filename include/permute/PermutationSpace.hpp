@@ -65,11 +65,13 @@ class PermutationSpace
 {
 public:
     PermutationSpace(std::string _name,
-                     std::span<const PermutationAxis> _axes) noexcept;
+                     std::span<const PermutationAxis> _axes,
+                     std::vector<std::string> require_expressions = {}) noexcept;
     // same as permutation axis: this is just to keep our nasty gross internal constructors
     // alive until we complete the next round of work to get data-driven permutations
     PermutationSpace(std::string _name,
-                     std::initializer_list<PermutationAxis> _axes) noexcept;
+                     std::initializer_list<PermutationAxis> _axes,
+                     std::vector<std::string> require_expressions = {}) noexcept;
     ~PermutationSpace() noexcept = default;
 
     /** The space owns its axes, and `PermutationBinding` points into them. A copy would leave every
@@ -84,6 +86,7 @@ public:
     [[nodiscard]] std::span<const PermutationAxis> Axes() const noexcept;
     [[nodiscard]] std::size_t AxisCount() const noexcept;
     [[nodiscard]] bool IsEmpty() const noexcept;
+    [[nodiscard]] std::span<const std::string> RequireExpressions() const noexcept;
 
     [[nodiscard]] CookResult<std::vector<PermutationAssignment>> EnumerateActiveCombinations(DiagnosticSink& sink) const;
     [[nodiscard]] CookResult<VariantSet> EnumerateVariants(DiagnosticSink& sink) const;
@@ -108,6 +111,7 @@ public:
 private:
     std::string name;
     std::vector<PermutationAxis> axes;
+    std::vector<std::string> requireExpressions;
 };
 
 } // namespace lodestone

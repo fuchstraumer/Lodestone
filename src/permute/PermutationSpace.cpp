@@ -90,15 +90,21 @@ namespace
 
 } // namespace
 
-PermutationSpace::PermutationSpace(std::string _name, std::span<const PermutationAxis> _axes) noexcept
+PermutationSpace::PermutationSpace(std::string _name,
+                                   std::span<const PermutationAxis> _axes,
+                                   std::vector<std::string> require_expressions) noexcept
     : name{ std::move(_name) },
-      axes{ _axes.begin(), _axes.end() }
+      axes{ _axes.begin(), _axes.end() },
+      requireExpressions{ std::move(require_expressions) }
 {
 }
 
-PermutationSpace::PermutationSpace(std::string _name, std::initializer_list<PermutationAxis> _axes) noexcept
+PermutationSpace::PermutationSpace(std::string _name,
+                                   std::initializer_list<PermutationAxis> _axes,
+                                   std::vector<std::string> require_expressions) noexcept
     : name{ std::move(_name) },
-      axes{ _axes }
+      axes{ _axes },
+      requireExpressions{ std::move(require_expressions) }
 {
 }
 
@@ -120,6 +126,11 @@ std::size_t PermutationSpace::AxisCount() const noexcept
 bool PermutationSpace::IsEmpty() const noexcept
 {
     return axes.empty();
+}
+
+std::span<const std::string> PermutationSpace::RequireExpressions() const noexcept
+{
+    return requireExpressions;
 }
 
 // perform CCSP with classic backtracking, but skip any axis whose parent is not active
@@ -219,6 +230,37 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(DiagnosticSink& sink)
     for (PermutationAssignment& assignment : active)
     {
         CanonicalAssignment canonical = CanonicalizeAssignment(assignment);
+
+        if (!requireExpressions.empty())
+        {
+            const std::vector<AttrExprSymbol> symbols = SymbolsFromCanonicalAssignment(canonical);
+            bool requirementSatisfied = true;
+
+            for (const std::string& requireExpression : requireExpressions)
+            {
+                const CookResult<int64_t> exprResult = EvaluateExpression(requireExpression, symbols, sink);
+                if (!exprResult) [[unlikely]]
+                {
+                    return std::unexpected(exprResult.error());
+                }
+
+                // require expression evaluated to false, meaning the current assignment does not satisfy this
+                // requirement
+                if (exprResult.value() == 0)
+                {
+                    requirementSatisfied = false;
+                    break;
+                }
+            }
+
+            // if the requirement was not satisfied, skip this assignment
+            // (making it a "hole" in this slot in the variant space)
+            if (!requirementSatisfied)
+            {
+                continue;
+            }
+        }
+
         const int32_t index = ComputeVariantIndex(canonical);
         variantSet.Variants.emplace_back(std::move(assignment), std::move(canonical), index);
     }
@@ -345,22 +387,20 @@ CookError PermutationSpace::ValidateConstraints(DiagnosticSink& sink) const
             auto iter = std::ranges::find(axesNames, identifier);
             if (iter == axesNames.end())
             {
-                const CookError error = ReportError(
+                return ReportError(
                     sink,
                     CookError::PermutationConstraintUnknownSymbol,
                     std::format("Axis '{}' used unknown symbol {} in ActiveWhen", curr.Name, identifier));
-                return error;
             }
 
             const std::ptrdiff_t index = std::distance(axesNames.begin(), iter);
             if (index >= i)
             {
                 const std::string& forwardRefName = axesNames[index];
-                const CookError error = ReportError(
+                return ReportError(
                     sink,
                     CookError::PermutationConstraintForwardReference,
                     std::format("Axis '{}' has a forward reference to axis '{}'", curr.Name, forwardRefName));
-                return error;
             }
 
             const PermutationAxis& referenced = axes[static_cast<size_t>(index)];
@@ -374,6 +414,42 @@ CookError PermutationSpace::ValidateConstraints(DiagnosticSink& sink) const
                     std::format("Axis '{}' references axis '{}' which has a non-empty ActiveWhen condition",
                                 curr.Name,
                                 referencedName));
+            }
+        }
+    }
+
+    // next loop: validate Requires expressions
+    // no forward-reference rule with Requires, but the checks are otherwise similar to ActiveWhen
+    for (const std::string& requireExpr : requireExpressions)
+    {
+        const auto exprIdentifiers = CollectExpressionIdentifiers(requireExpr, sink);
+        if (!exprIdentifiers)
+        {
+            return ReportError(sink,
+                               CookError::PermutationConstraintInvalidExpression,
+                               std::format("Invalid Requires expression '{}'", requireExpr));
+        }
+
+        for (const std::string& identifier : *exprIdentifiers)
+        {
+            auto foundIter = std::ranges::find(axesNames, identifier);
+            if (foundIter == axesNames.end())
+            {
+                return ReportError(
+                    sink,
+                    CookError::PermutationConstraintUnknownSymbol,
+                    std::format("Requires expression '{}' uses unknown symbol {}", requireExpr, identifier));
+            }
+
+            const std::ptrdiff_t index = std::distance(axesNames.begin(), foundIter);
+            const PermutationAxis& referenced = axes[static_cast<size_t>(index)];
+            if (!referenced.ActiveWhen.empty())
+            {
+                ReportWarning(
+                    sink,
+                    std::format("Requires expression '{}' references axis '{}' which has a non-empty ActiveWhen condition",
+                                requireExpr,
+                                referenced.Name));
             }
         }
     }
