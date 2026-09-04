@@ -44,5 +44,6 @@
             ],
             "activeWhen": "IFFT_USE_WAVE_OPS == 1"
         }
-    ]
+    ],
+    "require": []
 }
