@@ -1,5 +1,6 @@
 #include "permute/PermutationSpace.hpp"
 #include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
 #include "permute/AttributeExpression.hpp"
 #include "permute/ExternConstantScanner.hpp"
 #include "permute/PermutationAssignment.hpp"
@@ -72,7 +73,8 @@ namespace
         }
     }
 
-    [[nodiscard]] std::vector<AttrExprSymbol> SymbolsFromCanonicalAssignment(const CanonicalAssignment& assignment)
+    [[nodiscard]] std::vector<AttrExprSymbol> SymbolsFromCanonicalAssignment(
+        const CanonicalAssignment& assignment)
     {
         std::vector<AttrExprSymbol> symbols;
         symbols.reserve(assignment.size());
@@ -124,7 +126,8 @@ bool PermutationSpace::IsEmpty() const noexcept
 // this is a somewhat embarassing amount of commenting for me, but I have not done constraint satisfaction
 // formally *ever* before, and I want to make sure I understand it. these are notes for me. i am not a learned
 // woman
-CookResult<std::vector<PermutationAssignment>> PermutationSpace::EnumerateActiveCombinations(DiagnosticSink& sink) const
+CookResult<std::vector<PermutationAssignment>> PermutationSpace::EnumerateActiveCombinations(
+    DiagnosticSink& sink) const
 {
     // A module with no registered space enumerates to the one empty assignment, so there is no first
     // axis to size against. `partials` is replaced by `expanded` on every pass anyway.
@@ -142,12 +145,14 @@ CookResult<std::vector<PermutationAssignment>> PermutationSpace::EnumerateActive
         for (const PermutationAssignment& partial : partials)
         {
             bool active = true;
-            // Evaluate the ActiveWhen expression on the axis, if it exists, to determine if the axis should be active.
+            // Evaluate the ActiveWhen expression on the axis, if it exists, to determine if the axis should
+            // be active.
             if (!axis.ActiveWhen.empty())
             {
-                // canonicalize the current partial assignment to evaluate the ActiveWhen expression correctly, which
-                // works like default-substitution for missing values (i.e, if this value depends on an axis that's
-                // previously deactivated, the canonicalization will provide a default value for it)
+                // canonicalize the current partial assignment to evaluate the ActiveWhen expression
+                // correctly, which works like default-substitution for missing values (i.e, if this value
+                // depends on an axis that's previously deactivated, the canonicalization will provide a
+                // default value for it)
                 const CanonicalAssignment canonical = CanonicalizeAssignment(partial);
                 const std::vector<AttrExprSymbol> symbols = SymbolsFromCanonicalAssignment(canonical);
                 // now evaluate the actual expression
@@ -276,7 +281,8 @@ int32_t PermutationSpace::ComputeVariantSpaceSize() const noexcept
 }
 
 CookError PermutationSpace::VerifyAxisNamesAreDeclared(std::span<const std::string_view> source_texts,
-                                                       std::string_view module_name) const
+                                                       std::string_view module_name,
+                                                       DiagnosticSink& sink) const
 {
     int32_t undeclaredCount = 0;
 
@@ -295,12 +301,13 @@ CookError PermutationSpace::VerifyAxisNamesAreDeclared(std::span<const std::stri
         if (!declared)
         {
             ++undeclaredCount;
-            std::println(stderr,
-                         "[shader_cooker] axis '{}' has no matching `extern static const` declaration "
-                         "in module {}. Slang links this symbol, nothing references it, the shader "
-                         "keeps its default, and every variant cooks identical output.",
-                         axis.Name,
-                         module_name);
+            const std::string warningStr =
+                std::format("Axis '{}' has no matching `extern static const` declaration "
+                            "in module {}. Slang links this symbol, nothing references it, the shader "
+                            "keeps its default, and every variant cooks identical output.",
+                            axis.Name,
+                            module_name);
+            ReportWarning(sink, warningStr);
         }
     }
 
@@ -312,8 +319,71 @@ CookError PermutationSpace::VerifyAxisNamesAreDeclared(std::span<const std::stri
     return CookError::Success;
 }
 
+CookError PermutationSpace::ValidateConstraints(DiagnosticSink& sink) const
+{
+    // since we'll want to use indices to refer to axes, this makes it easier
+    auto axesNames = axes | std::views::transform(&PermutationAxis::Name);
+
+    for (std::ptrdiff_t i = 0; std::cmp_less(i, axes.size()); ++i)
+    {
+        const PermutationAxis& curr = axes[static_cast<size_t>(i)];
+        if (curr.ActiveWhen.empty())
+        {
+            continue;
+        }
+
+        auto activeWhenResult = CollectExpressionIdentifiers(curr.ActiveWhen, sink);
+        if (!activeWhenResult)
+        {
+            return CookError::PermutationConstraintInvalidExpression;
+        }
+
+        const std::vector<std::string>& identifiers = *activeWhenResult;
+        // first error-out case: is there a discrepancy between the identifiers and the declared axes?
+        for (const std::string& identifier : identifiers)
+        {
+            auto iter = std::ranges::find(axesNames, identifier);
+            if (iter == axesNames.end())
+            {
+                const CookError error = ReportError(
+                    sink,
+                    CookError::PermutationConstraintUnknownSymbol,
+                    std::format("Axis '{}' used unknown symbol {} in ActiveWhen", curr.Name, identifier));
+                return error;
+            }
+
+            const std::ptrdiff_t index = std::distance(axesNames.begin(), iter);
+            if (index >= i)
+            {
+                const std::string& forwardRefName = axesNames[index];
+                const CookError error = ReportError(
+                    sink,
+                    CookError::PermutationConstraintForwardReference,
+                    std::format("Axis '{}' has a forward reference to axis '{}'", curr.Name, forwardRefName));
+                return error;
+            }
+
+            const PermutationAxis& referenced = axes[static_cast<size_t>(index)];
+            // check to see if the referenced axis has a non-empty ActiveWhen: explain the default
+            // substitution, that this axis may be made inactive by another axis's ActiveWhen condition.
+            if (!referenced.ActiveWhen.empty())
+            {
+                const std::string& referencedName = referenced.Name;
+                ReportWarning(
+                    sink,
+                    std::format("Axis '{}' references axis '{}' which has a non-empty ActiveWhen condition",
+                                curr.Name,
+                                referencedName));
+            }
+        }
+    }
+
+    return CookError::Success;
+}
+
 void PermutationSpace::ReportUndrivenExternConstants(std::span<const std::string_view> source_texts,
-                                                     std::string_view module_name) const
+                                                     std::string_view module_name,
+                                                     DiagnosticSink& sink) const
 {
     auto axesView = axes | std::views::transform(&PermutationAxis::Name);
     std::unordered_set<std::string_view> axesNames(axesView.begin(), axesView.end());
@@ -325,7 +395,7 @@ void PermutationSpace::ReportUndrivenExternConstants(std::span<const std::string
 
     for (const std::string_view source : source_texts)
     {
-        auto declared = ScanExternConstants(source);
+        std::vector<ExternConstantDeclaration> declared = ScanExternConstants(source);
         undriven.append_range(declared | std::views::filter(filterUndriven) | std::views::as_rvalue);
     }
 
@@ -333,13 +403,13 @@ void PermutationSpace::ReportUndrivenExternConstants(std::span<const std::string
     std::string report;
     for (const ExternConstantDeclaration& decl : undriven)
     {
-        report += std::format("[shader_cooker] '{}' in module {} is declared extern but no axis "
-                              "drives it. It keeps its declared default in every variant.\n",
-                              decl.Name,
-                              module_name);
+        const std::string warningStr =
+            std::format("extern constant '{}' in module {} is declared extern but no axis "
+                        "drives it. It keeps its declared default in every variant.",
+                        decl.Name,
+                        module_name);
+        ReportWarning(sink, warningStr);
     }
-
-    std::println(stderr, "{}", report);
 }
 
 CookResult<std::vector<ExternConstantDefault>> PermutationSpace::CollectUndrivenExternDefaults(

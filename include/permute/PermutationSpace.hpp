@@ -94,12 +94,15 @@ public:
      * symbol nobody references, leaves the shader on its default, and errors nowhere -- this will result in
      * a set of variants with duplicate source code and behavior, when we explicitly don't want that. */
     [[nodiscard]] CookError VerifyAxisNamesAreDeclared(std::span<const std::string_view> source_texts,
-                                                       std::string_view module_name) const;
+                                                       std::string_view module_name,
+                                                       DiagnosticSink& sink) const;
+    [[nodiscard]] CookError ValidateConstraints(DiagnosticSink& sink) const;
     /**The other direction: an `extern` constant that no axis drives keeps its default in every variant.
      * This is what our resource sizing annotations rely on, in the Slang compiler machinery (though they
      * don't actually affect source code: they just carry through to the data we extract still) */
     void ReportUndrivenExternConstants(std::span<const std::string_view> source_texts,
-                                       std::string_view module_name) const;
+                                       std::string_view module_name,
+                                       DiagnosticSink& sink) const;
     [[nodiscard]] CookResult<std::vector<ExternConstantDefault>> CollectUndrivenExternDefaults(
         std::span<const std::string_view> source_texts, DiagnosticSink& sink) const;
 private:

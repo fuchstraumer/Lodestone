@@ -113,7 +113,7 @@ namespace
 
     void ReportUnreferencedBindings(const CompiledVariant& variant)
     {
-        std::vector<uint8_t> used(variant.Bindings.size(), uint8_t{0});
+        std::vector<uint8_t> used(variant.Bindings.size(), uint8_t{ 0 });
         for (const CompiledEntryPoint& entryPoint : variant.EntryPoints)
         {
             for (const auto& bindingIndex : entryPoint.Reflection.UsedBindingIndices)
@@ -208,8 +208,7 @@ namespace
      * The source table has a second opinion, and until this check the layout table had none.
      * `CheckManifestLayout` compares the manifest against the table it was written from, so it can
      * prove the serialization is faithful and cannot see a wrong collapse. */
-    CookError VerifyLayoutRoundTrip(const CookedModule& module,
-                                           std::span<const CompiledVariant> compiled)
+    CookError VerifyLayoutRoundTrip(const CookedModule& module, std::span<const CompiledVariant> compiled)
     {
         uint32_t mismatches = 0u;
 
@@ -245,8 +244,7 @@ namespace
         return CookError::Success;
     }
 
-    CookError VerifyLibraryRoundTrip(const CookedModule& module,
-                                            std::span<const CompiledVariant> compiled)
+    CookError VerifyLibraryRoundTrip(const CookedModule& module, std::span<const CompiledVariant> compiled)
     {
         if (module.Variants.size() != compiled.size())
         {
@@ -293,8 +291,7 @@ namespace
         return CookError::Success;
     }
 
-    CookError EmitLibraryModules(const std::vector<CookedModule>& modules,
-                                 OutputSink& sink)
+    CookError EmitLibraryModules(const std::vector<CookedModule>& modules, OutputSink& sink)
     {
         for (const CookedModule& module : modules)
         {
@@ -310,7 +307,7 @@ namespace
             {
                 return std::string(module_name) + ".ldmanifest";
             };
-            
+
             manifestResult = sink.WriteArtifact(makeManifestFileName(module.Name), manifest);
             if (manifestResult != CookError::Success)
             {
@@ -359,11 +356,11 @@ namespace
     /** Builds the compiler for one module, and checks everything that must hold before the first
      * variant compiles. */
     CookError PrepareModuleCompiler(const CookerOptions& options,
-                                           const std::filesystem::path& module_path,
-                                           const TargetProfile& target_profile,
-                                           DiagnosticSink& diagnostics,
-                                           SlangCompiler& compiler,
-                                           const PermutationSpace*& out_space)
+                                    const std::filesystem::path& module_path,
+                                    const TargetProfile& target_profile,
+                                    DiagnosticSink& diagnostics,
+                                    SlangCompiler& compiler,
+                                    const PermutationSpace*& out_space)
     {
         SlangCompilerCreateInfo createInfo;
         createInfo.ModulePath = module_path;
@@ -372,8 +369,7 @@ namespace
         createInfo.MultithreadVariantBuild = options.MultithreadEntryPointCodegen;
         createInfo.AccessModel = PlacementKindFromAccessModel(target_profile.Access);
 
-        if (auto initializeResult = compiler.Initialize(createInfo, diagnostics);
-            !initializeResult)
+        if (auto initializeResult = compiler.Initialize(createInfo, diagnostics); !initializeResult)
         {
             return initializeResult;
         }
@@ -388,14 +384,21 @@ namespace
 
         const std::vector<std::string_view> sourceViews{ compiler.ModuleSourceStringViews() };
 
-        if (const CookError axisResult = out_space->VerifyAxisNamesAreDeclared(sourceViews, moduleName);
+        if (const CookError axisResult =
+                out_space->VerifyAxisNamesAreDeclared(sourceViews, moduleName, diagnostics);
             !axisResult)
         {
             return axisResult;
         }
 
+        // verify constraints on space are valid
+        if (const CookError constraintResult = out_space->ValidateConstraints(diagnostics); !constraintResult)
+        {
+            return constraintResult;
+        }
+
         // No error checking needed as ReportUndrivenExternConstants now returns void
-        out_space->ReportUndrivenExternConstants(sourceViews, moduleName);
+        out_space->ReportUndrivenExternConstants(sourceViews, moduleName, diagnostics);
 
         return CookError::Success;
     }
@@ -470,7 +473,8 @@ namespace
                 return result.error();
             }
 
-            const ResolveContext context = MakeResolveContext(currVariant.Canonical, raw_module.ExternDefaults);
+            const ResolveContext context =
+                MakeResolveContext(currVariant.Canonical, raw_module.ExternDefaults);
             CookResult<CompiledVariant> variantResult = ResolveVariant(result.value(), context, sink);
             if (!variantResult)
             {
@@ -549,11 +553,11 @@ namespace
     }
 
     CookError CookModule(const CookerOptions& options,
-                                const std::filesystem::path& module_path,
-                                OutputSink& sink,
-                                DiagnosticSink& diagnostics,
-                                CookedLibrary& out_library,
-                                CookStatistics& statistics)
+                         const std::filesystem::path& module_path,
+                         OutputSink& sink,
+                         DiagnosticSink& diagnostics,
+                         CookedLibrary& out_library,
+                         CookStatistics& statistics)
     {
         // `ParseCommandLine` already rejected a name no profile answers to, so this cannot be null.
         const TargetProfile* target = FindTargetProfile(options.TargetName);
@@ -564,7 +568,8 @@ namespace
 
         SlangCompiler compiler;
         const PermutationSpace* space = nullptr;
-        CookError prepareResult = PrepareModuleCompiler(options, module_path, *target, diagnostics, compiler, space);
+        CookError prepareResult =
+            PrepareModuleCompiler(options, module_path, *target, diagnostics, compiler, space);
         if (!prepareResult)
         {
             return prepareResult;
