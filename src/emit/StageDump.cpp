@@ -538,6 +538,14 @@ std::string DumpPermutationSpace(std::string_view module_name, const Permutation
     }
     writer.EndArray();
 
+    writer.Key("require");
+    writer.BeginArray();
+    for (const std::string& requireExpr : space.RequireExpressions())
+    {
+        writer.String(requireExpr);
+    }
+    writer.EndArray();
+
     writer.EndObject();
     return FinishDocument(writer);
 }
