@@ -72,8 +72,8 @@ argument it exits 1 on `NoOutputSpecified`, which reads like a failure rather th
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
-Thirteen test targets exist. Ten are unit tests, and each one proves a claim the repository makes.
-None of them needs Slang, a compiler, or an asset, and all ten together run in under one second.
+Fifteen test targets exist. Twelve are unit tests, and each one proves a claim the repository makes.
+None of them needs Slang, a compiler, or an asset, and all twelve together run in under one second.
 
 | Target | Proves |
 |---|---|
@@ -87,6 +87,8 @@ None of them needs Slang, a compiler, or an asset, and all ten together run in u
 | `DedupeInfluenceTest` | Dedup changes what the tables cost and never what the cook measures. It builds one module in both arms and checks that the axis influence agrees, and that the measurement reads every group of variants. |
 | `DiagnosticParserTest` | The parser reads Slang's machine-readable diagnostic form into a record. It names no Slang type, so it needs no compiler. |
 | `ResolveStageTest` | Stage 4 resolves a hand-built `RawVariant` with no Slang present. This test is the proof that the stage 3 and stage 4 split worked, and before phase D step D5 it could not be written at all. |
+| `AccessModelRejectTest` | The target's access model rejects a resource it cannot express. A pointer member under a bound access model fails the cook and names the resource, and a control module still cooks. |
+| `PermutationConstraintTest` | The axis constraint engine. `ActiveWhen` gates an axis the way the old parent link did, `Require` prunes a forbidden combination, and the load check rejects a forward reference, an unknown symbol, and a malformed expression. |
 
 An error check prints a diagnostic to `stderr` on purpose. Read the last line for the result.
 

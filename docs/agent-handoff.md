@@ -10,15 +10,17 @@ Text in this file follows ASD-STE100.
 
 ## 1. State on 2026-09-01
 
-**The compiler split is complete and the pipeline works.** Fourteen test targets pass. The count
-rose by one, because phase E step E0c added `AccessModelRejectTest`.
+**The compiler split is complete and the pipeline works, and steps E1 and E2 have since landed.** The
+suite becomes fifteen test targets once E2's verifier, `PermutationConstraintTest`, lands; it is the
+one E2 piece still being written, so a fresh checkout shows fourteen, all green. Phase E step E0c
+added `AccessModelRejectTest`.
 
 | Configuration | Build | Tests |
 |---|---|---|
 | RelWithDebInfo, `ninja-clang-cl` | green | 14 of 14 |
 
-Eleven targets are unit tests. Three are cooks. `scripts\run-tests.bat` reports `all targets
-passed`.
+Eleven targets are unit tests today, twelve once `PermutationConstraintTest` lands. Three are cooks.
+`scripts\run-tests.bat` reports `all targets passed`.
 
 **Only the clang tree was rebuilt on 2026-09-01.** `build/ninja-msvc` went with the rest of `build/`
 and has not been configured since. Build it before you trust a claim about MSVC.
@@ -232,9 +234,9 @@ module instead of reading the file. Fact 10 in §4 states which modules belong i
 
 ---
 
-## 8. The next task: phase E step E2
+## 8. The next task: phase E step E3
 
-`docs/phase-e-data-driven-permutations.md` holds the plan. **Steps E0a, E0b, E0c, E0, and E1 are
+`docs/phase-e-data-driven-permutations.md` holds the plan. **Steps E0a, E0b, E0c, E0, E1, and E2 are
 complete, and item D2 of §10 is settled.** Nothing in that document is open for a decision.
 
 **E1 is done, on 2026-09-01.** The attribute expression evaluator gained a comparison level, a
@@ -245,15 +247,18 @@ not short circuit, because the parser evaluates as it descends; the class commen
 `AttributeExpression.cpp` records the one effect this has. All six stage dumps stayed byte identical,
 because no shader uses a comparison yet.
 
-**E2 is next.** §6 and the §11 table of that document. It adds `AxisValueDomain`, `AxisKind`,
-`EarliestBindingTime`, `ActiveWhen`, and `Require` to the axis model, with `k_ModuleSpaces` still the
-source. The space dump is the check, and §10 D2 settled the shape it compares against.
+**E2 is done, on 2026-09-04.** The axis model gained `AxisValueDomain`, `AxisKind`, and
+`EarliestBindingTime`, and `ActiveWhen` replaced `ParentIndex`. `ValidateConstraints` runs at load and
+takes the descending-graph rule: an `ActiveWhen` may name only an axis declared before it, so a cycle
+cannot be written and a forward reference fails at load. `Require` prunes a forbidden combination
+during enumeration. The space dump now carries the filled enum fields, an `activeWhen` string in place
+of `parent`/`requiredParentValue`, and a space-level `require` array; the other five dumps stayed byte
+identical, because `OceanFft` cooks the same variant set. `PermutationConstraintTest` is the one
+remaining E2 piece.
 
-One requirement in §6 is easy to miss. An `ActiveWhen` expression can name other axes, and those
-axes can carry expressions of their own. The axes therefore form a directed graph, and
-canonicalization must evaluate them in topological order. A cycle must fail when the registry loads,
-and never during a cook. The cycle check rides with E2, because the axis-to-axis reference that a
-cycle needs does not exist until `ActiveWhen` does.
+**E3 is next.** §7 and the §11 table. It makes enumeration depth-first with constraint propagation,
+and the `Require` filter E2 added becomes a propagated prune. The variants dump must stay byte
+identical, so E3 changes speed and never output.
 
 **`docs/phase-e-interface-spike.md` holds the E0 answers.** Read it before E7. Three results matter
 early: a link-time `extern` type works and uses the mechanism the constant axis already uses, an

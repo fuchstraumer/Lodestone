@@ -297,7 +297,7 @@ of a false `&&` still fails, where C would not reach it. That guard is rare in a
 loud failure is the safer default. Revisit this only if a constraint needs it.
 
 About 80 new lines. The existing tests stay green. **The evaluator landed in E1 on 2026-09-01.** The
-constraint kinds below, `ActiveWhen` and `Require`, are E2.
+constraint kinds below, `ActiveWhen` and `Require`, landed in E2 on 2026-09-04.
 
 ### Two constraint kinds, and no more
 
@@ -314,12 +314,16 @@ causes most kconfig defect reports, and it exists there for backward compatibili
 ### One requirement that is easy to miss
 
 An `ActiveWhen` expression can name other axes, and those axes can carry `ActiveWhen` expressions of
-their own. **The axes therefore form a directed graph, and canonicalization must evaluate them in
-topological order.** A cycle must fail when the registry loads, and not during a cook. The error must
-name every axis in the cycle.
+their own. **E2 took the descending-graph rule: an `ActiveWhen` may name only an axis declared before
+it.** Declaration order is then a valid evaluation order, and a cycle cannot be written down, because
+every reference points backward. `ValidateConstraints` rejects a forward reference at load and names
+both axes, rejects an identifier that no axis declares, and warns when an `ActiveWhen` reads an axis
+that is itself conditional. This is stricter than a free graph with a topological sort, and it is the
+opinionated choice: a constraint graph that only narrows is easier to reason about and harder to
+explode.
 
-`ParentIndex` is a single index today, so a cycle is nearly impossible to write by accident. With
-expressions it is easy. Add the cycle check in the same step as the constraint language.
+`ParentIndex` was a single index, so a cycle was nearly impossible to write by accident. The
+backward-only rule keeps that property while letting the parent become an expression.
 
 ---
 
@@ -549,10 +553,12 @@ done. D2 is settled, and section 10 D2 records what it still owes E2.
 The riskiest change in phase E replaces `k_ModuleSpaces` with data. A stable JSON shape for the
 stage 1 dump turns that job into "produce the same JSON from a different source".
 
-**The author chose the first answer. The three fields are written now, as nulls.** `WriteAxis` in
-`src/emit/StageDump.cpp` emits `kind`, `earliestBindingTime`, and `valueDomain` between the name and
-the values. E2 fills them. E2 therefore changes a value and never the shape of the object, and the
-known good dump stays a byte comparison for the step that most needs one.
+**The author chose the first answer, and E2 has now filled it in.** `WriteAxis` in
+`src/emit/StageDump.cpp` emits `kind`, `earliestBindingTime`, and `valueDomain`, which E2 changed from
+nulls to the enum names. E2 also replaced the axis's `parent`/`requiredParentValue` keys with a single
+`activeWhen` string, and added a space-level `require` array. Those last two are shape changes beyond
+the three fields D2 pre-provisioned, so each was a deliberate `--accept` after reading the diff, and
+the other five dumps stayed byte identical because `OceanFft` cooks the identical variant set.
 
 `tests/known_good/OceanFft.stage-space.json` holds the new shape. The change added nine lines, which
 is three fields for each of three axes, and nothing else moved.
@@ -650,7 +656,7 @@ change **what**. Each one adds capability that no golden file covers.
 | E0c | Reject a pointer type under a bound access model, from §3c. **Done 2026-09-01** | `AccessModelRejectTest`, on `PointerMember.slang` | low |
 | E0 | Slang interface spike, with citations. **Done 2026-09-01** | `docs/phase-e-interface-spike.md` | none |
 | E1 | Comparison and logical levels in `AttributeExpression`. **Done 2026-09-01** | `AttributeExpressionTest`, plus the six dumps unchanged | low |
-| E2 | `AxisValueDomain`, `AxisKind`, `EarliestBindingTime`, `ActiveWhen`, `Require`, axis DAG, cycle check. `k_ModuleSpaces` stays the source | The space dump, **once §10 D2 is settled** | medium |
+| E2 | `AxisValueDomain`, `AxisKind`, `EarliestBindingTime`, `ActiveWhen` (backward-only), `Require`. `k_ModuleSpaces` stays the source. **Done 2026-09-04; `PermutationConstraintTest` pending** | The space dump (enum fields, `activeWhen`, `require`), the five other dumps unchanged, then `PermutationConstraintTest` | medium |
 | E3 | Depth-first enumeration with constraint propagation | **The variants dump is byte identical** | medium |
 | E4 | Sorted key table and binary search, in place of the storage index. Add the per-variant capability requirement to the manifest | Round trips, and the emitted tables shrink | **high** |
 | E5 | Rename the JSON target, then the reader, the policy file, per-target sections, `CookValues`, `CookWhen` | Round trip against `JsonWriter` | medium |
@@ -658,8 +664,8 @@ change **what**. Each one adds capability that no golden file covers.
 | E7 | Interface axes. E0 removed the enum fallback | A new test shader | medium |
 | E8 | Documents, and the measured numbers again | — | none |
 
-**E0c, E0, and E1 are complete.** E2 is the next step. Everything else in the constraint path depends
-on E2.
+**E0c, E0, E1, and E2 are complete** — E2's `PermutationConstraintTest` is the wrap-up in progress.
+**E3 is next.** It makes enumeration depth-first, and the `Require` filter becomes a propagated prune.
 
 **E4 needs care.** It changes the emitted C++, the manifest variant table, and the arithmetic of the
 cooker at one time. The round trips find an error, and the stage dumps say where.
