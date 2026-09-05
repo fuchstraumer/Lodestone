@@ -656,7 +656,7 @@ change **what**. Each one adds capability that no golden file covers.
 | E0c | Reject a pointer type under a bound access model, from §3c. **Done 2026-09-01** | `AccessModelRejectTest`, on `PointerMember.slang` | low |
 | E0 | Slang interface spike, with citations. **Done 2026-09-01** | `docs/phase-e-interface-spike.md` | none |
 | E1 | Comparison and logical levels in `AttributeExpression`. **Done 2026-09-01** | `AttributeExpressionTest`, plus the six dumps unchanged | low |
-| E2 | `AxisValueDomain`, `AxisKind`, `EarliestBindingTime`, `ActiveWhen` (backward-only), `Require`. `k_ModuleSpaces` stays the source. **Done 2026-09-04; `PermutationConstraintTest` pending** | The space dump (enum fields, `activeWhen`, `require`), the five other dumps unchanged, then `PermutationConstraintTest` | medium |
+| E2 | `AxisValueDomain`, `AxisKind`, `EarliestBindingTime`, `ActiveWhen` (backward-only), `Require`. `k_ModuleSpaces` stays the source. **Done 2026-09-04; `PermutationConstraintTest` written and green** | The space dump (enum fields, `activeWhen`, `require`), the five other dumps unchanged, then `PermutationConstraintTest` | medium |
 | E3 | Depth-first enumeration with constraint propagation | **The variants dump is byte identical** | medium |
 | E4 | Sorted key table and binary search, in place of the storage index. Add the per-variant capability requirement to the manifest | Round trips, and the emitted tables shrink | **high** |
 | E5 | Rename the JSON target, then the reader, the policy file, per-target sections, `CookValues`, `CookWhen` | Round trip against `JsonWriter` | medium |
@@ -664,7 +664,8 @@ change **what**. Each one adds capability that no golden file covers.
 | E7 | Interface axes. E0 removed the enum fallback | A new test shader | medium |
 | E8 | Documents, and the measured numbers again | — | none |
 
-**E0c, E0, E1, and E2 are complete** — E2's `PermutationConstraintTest` is the wrap-up in progress.
+**E0c, E0, E1, and E2 are complete** — E2's `PermutationConstraintTest` is written and green. **E3 is
+next.**
 **E3 is next.** It makes enumeration depth-first, and the `Require` filter becomes a propagated prune.
 
 **E4 needs care.** It changes the emitted C++, the manifest variant table, and the arithmetic of the

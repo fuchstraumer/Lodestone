@@ -140,7 +140,7 @@ private:
                                     std::string message,
                                     std::source_location location = std::source_location::current());
 void ReportWarning(DiagnosticSink& sink, std::string message, std::source_location location = std::source_location::current());
-void ReportInfo(DiagnosticSink& sink, std::string message, std::source_location location = std::source_location::current());
+void ReportInfo(DiagnosticSink& sink, std::string message);
 
 } // namespace lodestone
 

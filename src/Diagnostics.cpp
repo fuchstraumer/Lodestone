@@ -78,13 +78,25 @@ void StderrDiagnosticSink::Report(const Diagnostic& diagnostic)
         ++failureCount;
     }
 
-    std::println(stderr,
-                 "[shader_cooker] {}{}{}: {} [{}]",
-                 FormatLocation(diagnostic),
-                 ToString(diagnostic.Severity),
-                 FormatCode(diagnostic),
-                 diagnostic.Message,
-                 diagnostic.Context);
+    if (diagnostic.Severity != DiagnosticSeverity::Note)
+    {
+        std::println(stderr,
+                    "[shader_cooker] {}{}{}: {} [{}]",
+                    FormatLocation(diagnostic),
+                    ToString(diagnostic.Severity),
+                    FormatCode(diagnostic),
+                    diagnostic.Message,
+                    diagnostic.Context);
+    }
+    else
+    {
+        std::println(stderr,
+                    "[shader_cooker] {}{}{}: {}",
+                    FormatLocation(diagnostic),
+                    ToString(diagnostic.Severity),
+                    FormatCode(diagnostic),
+                    diagnostic.Message);
+    }
 
     for (const DiagnosticNote& note : diagnostic.Related)
     {
@@ -154,13 +166,17 @@ void RecordingDiagnosticSink::Reset() noexcept
 void ReportToSink(DiagnosticSink& sink,
                   DiagnosticSeverity severity,
                   std::string message,
-                  std::source_location location = std::source_location::current())
+                  std::source_location location)
 {
     Diagnostic diag;
     diag.Severity = severity;
     diag.Message = std::move(message);
-    diag.Context = std::format(
-        "{} {}:L{}", location.file_name(), location.function_name(), location.line());
+    // don't attach source location for notes/info logs: it's not needed or helpful
+    if (severity != DiagnosticSeverity::Note)
+    {
+        diag.Context = std::format(
+            "{} {}:L{}", location.file_name(), location.function_name(), location.line());
+    }
     sink.Report(std::move(diag));
 }
 
@@ -178,9 +194,9 @@ void ReportWarning(DiagnosticSink& sink, std::string message, std::source_locati
     ReportToSink(sink, DiagnosticSeverity::Warning, std::move(message), location);
 }
 
-void ReportInfo(DiagnosticSink& sink, std::string message, std::source_location location)
+void ReportInfo(DiagnosticSink& sink, std::string message)
 {
-    ReportToSink(sink, DiagnosticSeverity::Note, std::move(message), location);
+    ReportToSink(sink, DiagnosticSeverity::Note, std::move(message), {});
 }
 
 } // namespace lodestone

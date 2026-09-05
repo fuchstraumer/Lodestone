@@ -2,25 +2,26 @@
 
 Written on 2026-08-22. Rewritten on 2026-08-28, after the compiler split finished. Updated on
 2026-09-01, after six build faults were fixed, the C++ emitter was removed, and phase E steps E0c and
-E0 completed. This document records the state, the measured facts, and the next task. Read it first.
+E0 completed. Updated again on 2026-09-04, after phase E steps E1 and E2 landed and
+`PermutationConstraintTest` was verified. This document records the state, the measured facts, and the
+next task. Read it first.
 
 Text in this file follows ASD-STE100.
 
 ---
 
-## 1. State on 2026-09-01
+## 1. State on 2026-09-04
 
-**The compiler split is complete and the pipeline works, and steps E1 and E2 have since landed.** The
-suite becomes fifteen test targets once E2's verifier, `PermutationConstraintTest`, lands; it is the
-one E2 piece still being written, so a fresh checkout shows fourteen, all green. Phase E step E0c
-added `AccessModelRejectTest`.
+**The compiler split is complete and the pipeline works, and steps E1 and E2 have landed.** E2's
+verifier, `PermutationConstraintTest`, is written and green, so the suite is fifteen test targets.
+Phase E step E0c added `AccessModelRejectTest`.
 
 | Configuration | Build | Tests |
 |---|---|---|
-| RelWithDebInfo, `ninja-clang-cl` | green | 14 of 14 |
+| RelWithDebInfo, `ninja-clang-cl` | green | 15 of 15 |
 
-Eleven targets are unit tests today, twelve once `PermutationConstraintTest` lands. Three are cooks.
-`scripts\run-tests.bat` reports `all targets passed`.
+Twelve targets are unit tests, and three are cooks. `scripts\run-tests.bat` reports
+`all targets passed`, and `python scripts/check-known-good.py` reports all six stage dumps match.
 
 **Only the clang tree was rebuilt on 2026-09-01.** `build/ninja-msvc` went with the rest of `build/`
 and has not been configured since. Build it before you trust a claim about MSVC.
@@ -29,11 +30,12 @@ and has not been configured since. Build it before you trust a claim about MSVC.
 
 A green cook of `OceanFft` reports 35 variants over an index space of 56, 105 entry point variants,
 77 unique sources, 4 resources, 1 resource list, 7 footprint lists, and 2 visibility lists, and it
-emits 663 KiB of WGSL. Those numbers are the regression check, and they were confirmed again on
-2026-09-01. The whole cook then took 1080 ms in RelWithDebInfo.
+emits 663 KiB of WGSL. Those numbers are the regression check. The whole cook took 1080 ms in
+RelWithDebInfo on 2026-09-01, and `CookTest` was still green on 2026-09-04.
 
 **`python scripts/check-known-good.py` is the finer check.** It cooks a module and compares each of
-the six stage dumps against `tests/known_good/`. Those files are current as of 2026-09-01. Run it
+the six stage dumps against `tests/known_good/`. Those files are current as of 2026-09-04, when all
+six matched a fresh RelWithDebInfo cook. Run it
 after a change to reflection, to a stage, or to a dump. It found a reflection regression on the day
 it was written, and section 13 records that.
 
@@ -253,8 +255,9 @@ takes the descending-graph rule: an `ActiveWhen` may name only an axis declared 
 cannot be written and a forward reference fails at load. `Require` prunes a forbidden combination
 during enumeration. The space dump now carries the filled enum fields, an `activeWhen` string in place
 of `parent`/`requiredParentValue`, and a space-level `require` array; the other five dumps stayed byte
-identical, because `OceanFft` cooks the same variant set. `PermutationConstraintTest` is the one
-remaining E2 piece.
+identical, because `OceanFft` cooks the same variant set. `PermutationConstraintTest` proves the
+engine: it gates an axis with `ActiveWhen`, prunes a combination with `Require`, and rejects a forward
+reference, an unknown symbol, and a malformed expression at load. It is written and green.
 
 **E3 is next.** §7 and the §11 table. It makes enumeration depth-first with constraint propagation,
 and the `Require` filter E2 added becomes a propagated prune. The variants dump must stay byte

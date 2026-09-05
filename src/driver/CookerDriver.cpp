@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <expected>
 #include <filesystem>
+#include <format>
 #include <functional>
 #include <iterator>
 #include <memory>
@@ -64,36 +65,38 @@ namespace
         return canonicalCacheDirectory;
     }
 
-    void ReportEntryPointReflection(const CompiledVariant& variant, size_t entry_point_index)
+    void ReportEntryPointReflection(const CompiledVariant& variant,
+                                    size_t entry_point_index,
+                                    DiagnosticSink& diagnostics)
     {
         const CompiledEntryPoint& entryPoint = variant.EntryPoints[entry_point_index];
-        std::println(stderr,
-                     "[shader_cooker]   {}{} [{}] workgroup {}x{}x{}",
-                     entryPoint.Name,
-                     entryPoint.VariantSuffix,
-                     ToString(entryPoint.Reflection.Stage),
-                     entryPoint.Reflection.Workgroup.X,
-                     entryPoint.Reflection.Workgroup.Y,
-                     entryPoint.Reflection.Workgroup.Z);
+        const std::string entryPointInfoStr = std::format("  {}{} [{}] workgroup {}x{}x{}",
+                                                          entryPoint.Name,
+                                                          entryPoint.VariantSuffix,
+                                                          ToString(entryPoint.Reflection.Stage),
+                                                          entryPoint.Reflection.Workgroup.X,
+                                                          entryPoint.Reflection.Workgroup.Y,
+                                                          entryPoint.Reflection.Workgroup.Z);
+        ReportInfo(diagnostics, entryPointInfoStr);
 
         for (const ResolvedBindingView& resolved : BuildEntryPointLayoutView(variant, entry_point_index))
         {
-            std::println(stderr,
-                         "[shader_cooker]     {}{}",
-                         DescribeBinding(*resolved.Resource),
-                         DescribeFootprint(*resolved.Footprint));
+            const std::string bindingInfoStr = std::format("    {}{}",
+                                                           DescribeBinding(*resolved.Resource),
+                                                           DescribeFootprint(*resolved.Footprint));
+            ReportInfo(diagnostics, bindingInfoStr);
 
             const std::string members = DescribeUniformMembers(*resolved.Resource);
             if (!members.empty())
             {
-                std::print(stderr, "{}", members);
+                ReportInfo(diagnostics, members);
             }
         }
 
         const std::string raster = DescribeRasterState(entryPoint.Reflection.Raster);
         if (!raster.empty())
         {
-            std::print(stderr, "{}", raster);
+            ReportInfo(diagnostics, raster);
         }
     }
 
@@ -111,7 +114,7 @@ namespace
                std::ranges::to<std::vector<const ReflectedBinding*>>();
     }
 
-    void ReportUnreferencedBindings(const CompiledVariant& variant)
+    void ReportUnreferencedBindings(const CompiledVariant& variant, DiagnosticSink& diagnostics)
     {
         std::vector<uint8_t> used(variant.Bindings.size(), uint8_t{ 0 });
         for (const CompiledEntryPoint& entryPoint : variant.EntryPoints)
@@ -126,11 +129,11 @@ namespace
         {
             if (!static_cast<bool>(isUsed))
             {
-                std::println(
-                    stderr,
-                    "[shader_cooker] unreferenced binding in [{}]: {} is declared but no entrypoint reads it",
-                    variant.VariantDescription,
-                    DescribeBinding(variant.Bindings[static_cast<size_t>(index)]));
+                ReportWarning(
+                    diagnostics,
+                    std::format("unreferenced binding in [{}]: {} is declared but no entrypoint reads it",
+                                variant.VariantDescription,
+                                DescribeBinding(variant.Bindings[static_cast<size_t>(index)])));
             }
         }
     }
@@ -154,7 +157,9 @@ namespace
      * The target decides how to read its own output. A target with no validator returns no
      * mismatches, and that is honest only because `PrepareModuleCompiler` already said the target
      * supplies none. */
-    uint32_t ValidateResolvedLibrary(const TargetProfile& target, const CompiledVariant& variant)
+    uint32_t ValidateResolvedLibrary(const TargetProfile& target,
+                                     const CompiledVariant& variant,
+                                     DiagnosticSink& diagnostics)
     {
         if (target.Validator == nullptr)
         {
@@ -172,13 +177,14 @@ namespace
             if (!comparison.Matches)
             {
                 ++mismatchCount;
-                std::println(stderr,
-                             "[shader_cooker] REFLECTION MISMATCH in {}{} ({}) for target {}:\n{}",
-                             entryPoint.Name,
-                             entryPoint.VariantSuffix,
-                             variant.VariantDescription,
-                             target.Name,
-                             comparison.Report);
+                const std::string warningStr =
+                    std::format("REFLECTION MISMATCH in {}{} ({}) for target {}:\n{}",
+                                entryPoint.Name,
+                                entryPoint.VariantSuffix,
+                                variant.VariantDescription,
+                                target.Name,
+                                comparison.Report);
+                ReportWarning(diagnostics, warningStr);
             }
         }
 
@@ -208,9 +214,11 @@ namespace
      * The source table has a second opinion, and until this check the layout table had none.
      * `CheckManifestLayout` compares the manifest against the table it was written from, so it can
      * prove the serialization is faithful and cannot see a wrong collapse. */
-    CookError VerifyLayoutRoundTrip(const CookedModule& module, std::span<const CompiledVariant> compiled)
+    CookError VerifyLayoutRoundTrip(const CookedModule& module,
+                                    std::span<const CompiledVariant> compiled,
+                                    DiagnosticSink& diagnostics)
     {
-        uint32_t mismatches = 0u;
+        CookError lastError = CookError::Success;
 
         for (const LibraryVariant& variant : module.Variants)
         {
@@ -227,45 +235,39 @@ namespace
                     continue;
                 }
 
-                std::println(stderr,
-                             "[shader_cooker] LAYOUT ROUND TRIP FAILED for {} [{}]: the tables return "
-                             "different bindings than the compiler produced",
-                             origin->EntryPoints[i].Name,
-                             variant.Description);
-                ++mismatches;
+                const std::string errStr = std::format("LAYOUT ROUND TRIP FAILED for {} [{}]: the tables "
+                                                       "return different bindings than the compiler produced",
+                                                       origin->EntryPoints[i].Name,
+                                                       variant.Description);
+                lastError = ReportError(diagnostics, CookError::LibraryRoundTripFailed, errStr);
             }
         }
 
-        if (mismatches != 0u)
-        {
-            return CookError::LibraryRoundTripFailed;
-        }
-
-        return CookError::Success;
+        return lastError;
     }
 
-    CookError VerifyLibraryRoundTrip(const CookedModule& module, std::span<const CompiledVariant> compiled)
+    CookError VerifyLibraryRoundTrip(const CookedModule& module,
+                                     std::span<const CompiledVariant> compiled,
+                                     DiagnosticSink& diagnostics)
     {
         if (module.Variants.size() != compiled.size())
         {
-            std::println(stderr,
-                         "[shader_cooker] module {} holds {} variants but the cook produced {}",
-                         module.Name,
-                         module.Variants.size(),
-                         compiled.size());
-            return CookError::LibraryRoundTripFailed;
+            const std::string errStr = std::format("module {} holds {} variants but the cook produced {}",
+                                                   module.Name,
+                                                   module.Variants.size(),
+                                                   compiled.size());
+            return ReportError(diagnostics, CookError::LibraryRoundTripFailed, errStr);
         }
 
-        uint32_t mismatches = 0u;
+        CookError lastError = CookError::Success;
         for (const LibraryVariant& variant : module.Variants)
         {
             const CompiledVariant* origin = FindCompiledVariant(compiled, variant.Index);
             if (origin == nullptr)
             {
-                std::println(stderr,
-                             "[shader_cooker] variant index {} is in the library but not in the cook",
-                             variant.Index);
-                ++mismatches;
+                const std::string errStr =
+                    std::format("variant index {} is in the library but not in the cook", variant.Index);
+                lastError = ReportError(diagnostics, CookError::LibraryRoundTripFailed, errStr);
                 continue;
             }
 
@@ -273,22 +275,16 @@ namespace
             {
                 if (ResolveSource(module, variant, i) != origin->EntryPoints[i].Code)
                 {
-                    std::println(stderr,
-                                 "[shader_cooker] ROUND TRIP FAILED for {} [{}]: the table returns "
-                                 "different text than the compiler produced",
-                                 origin->EntryPoints[i].Name,
-                                 variant.Description);
-                    ++mismatches;
+                    const std::string errStr = std::format("ROUND TRIP FAILED for {} [{}]: the table returns "
+                                                           "different text than the compiler produced",
+                                                           origin->EntryPoints[i].Name,
+                                                           variant.Description);
+                    lastError = ReportError(diagnostics, CookError::LibraryRoundTripFailed, errStr);
                 }
             }
         }
 
-        if (mismatches != 0u)
-        {
-            return CookError::LibraryRoundTripFailed;
-        }
-
-        return CookError::Success;
+        return lastError;
     }
 
     CookError EmitLibraryModules(const std::vector<CookedModule>& modules, OutputSink& sink)
@@ -369,16 +365,16 @@ namespace
         createInfo.MultithreadVariantBuild = options.MultithreadEntryPointCodegen;
         createInfo.AccessModel = PlacementKindFromAccessModel(target_profile.Access);
 
-        if (auto initializeResult = compiler.Initialize(createInfo, diagnostics); !initializeResult)
+        const CookError initializeResult = compiler.Initialize(createInfo, diagnostics);
+        if (!initializeResult)
         {
             return initializeResult;
         }
 
         const std::string_view moduleName = compiler.ModuleName();
-        std::println(stderr,
-                     "[shader_cooker] module {} declares {} entrypoints",
-                     moduleName,
-                     compiler.EntryPointCount());
+        const std::string infoStr =
+            std::format("module {} declares {} entrypoints", moduleName, compiler.EntryPointCount());
+        ReportInfo(diagnostics, infoStr);
 
         out_space = FindPermutationSpaceForModule(moduleName);
 
@@ -415,17 +411,19 @@ namespace
         }
     }
 
-    void ReportVariantIfRequested(const CookerOptions& options, const CompiledVariant& variant)
+    void ReportVariantIfRequested(const CookerOptions& options,
+                                  const CompiledVariant& variant,
+                                  DiagnosticSink& diagnostics)
     {
         if (!options.ReportReflection)
         {
             return;
         }
 
-        std::println(stderr, "[shader_cooker] variant [{}]", variant.VariantDescription);
+        ReportInfo(diagnostics, std::format("variant [{}]", variant.VariantDescription));
         for (size_t i = 0u; i < variant.EntryPoints.size(); ++i)
         {
-            ReportEntryPointReflection(variant, i);
+            ReportEntryPointReflection(variant, i, diagnostics);
         }
     }
 
@@ -456,33 +454,31 @@ namespace
                                                   RawModule& raw_module,
                                                   std::vector<CompiledVariant>& out_module_variants,
                                                   CookStatistics& statistics,
-                                                  DiagnosticSink& sink)
+                                                  DiagnosticSink& diagnostics)
     {
         const bool keepRawVariants = IsStageDumpRequested(options, StageDumpKind::Raw);
-        auto compileResultsList = compiler.Compile(variant_set.Variants, sink);
+        auto compileResultsList = compiler.Compile(variant_set.Variants, diagnostics);
 
         for (auto&& [idx, result] : std::views::enumerate(compileResultsList))
         {
             const auto& currVariant = variant_set.Variants[idx];
             if (!result)
             {
-                std::println(stderr,
-                             "[shader_cooker] variant [{}] failed: {}",
-                             DescribeAssignment(currVariant.Canonical),
-                             ToString(result.error()));
-                return result.error();
+                const std::string errStr = std::format("variant [{}] failed: {}",
+                                                       DescribeAssignment(currVariant.Canonical),
+                                                       ToString(result.error()));
+                return ReportError(diagnostics, result.error(), errStr);
             }
 
             const ResolveContext context =
                 MakeResolveContext(currVariant.Canonical, raw_module.ExternDefaults);
-            CookResult<CompiledVariant> variantResult = ResolveVariant(result.value(), context, sink);
+            CookResult<CompiledVariant> variantResult = ResolveVariant(result.value(), context, diagnostics);
             if (!variantResult)
             {
-                std::println(stderr,
-                             "[shader_cooker] variant [{}] failed: {}",
-                             DescribeAssignment(currVariant.Canonical),
-                             ToString(variantResult.error()));
-                return variantResult.error();
+                const std::string errStr = std::format("variant [{}] failed: {}",
+                                                       DescribeAssignment(currVariant.Canonical),
+                                                       ToString(variantResult.error()));
+                return ReportError(diagnostics, variantResult.error(), errStr);
             }
 
             if (keepRawVariants)
@@ -492,16 +488,16 @@ namespace
 
             const CompiledVariant& variant = variantResult.value();
             RecordVariantStatistics(variant, statistics);
-            ReportVariantIfRequested(options, variant);
+            ReportVariantIfRequested(options, variant, diagnostics);
 
             if (options.ValidateAgainstEmittedText)
             {
-                statistics.ReflectionMismatches += ValidateResolvedLibrary(target, variant);
+                statistics.ReflectionMismatches += ValidateResolvedLibrary(target, variant, diagnostics);
             }
 
             if (options.ReportReflection)
             {
-                ReportUnreferencedBindings(variant);
+                ReportUnreferencedBindings(variant, diagnostics);
             }
 
             CaptureEntryPointsOnce(interned_module, variant);
@@ -521,26 +517,27 @@ namespace
 
     /**@brief Take `InternedModule` and package it into `CookedModule`. */
     CookResult<CookedModule> FinalizeModule(InternedModule&& interned_module,
-                                            std::span<const CompiledVariant> module_variants)
+                                            std::span<const CompiledVariant> module_variants,
+                                            DiagnosticSink& diagnostics)
     {
         CookedModule cookedModule = FreezeModuleTables(std::move(interned_module));
-        const CookError roundTripResult = VerifyLibraryRoundTrip(cookedModule, module_variants);
+        const CookError roundTripResult = VerifyLibraryRoundTrip(cookedModule, module_variants, diagnostics);
         if (!roundTripResult)
         {
             return std::unexpected(roundTripResult);
         }
 
-        const CookError layoutResult = VerifyLayoutRoundTrip(cookedModule, module_variants);
+        const CookError layoutResult = VerifyLayoutRoundTrip(cookedModule, module_variants, diagnostics);
         if (!layoutResult)
         {
             return std::unexpected(layoutResult);
         }
 
-        std::println(stderr,
-                     "[shader_cooker] module {} round trip verified: {} variants resolve to the text "
-                     "the compiler produced",
-                     cookedModule.Name,
-                     cookedModule.Variants.size());
+        const std::string roundTripStr = std::format("module {} round trip verified: {} "
+                                                     "variants resolve to the text the compiler produced",
+                                                     cookedModule.Name,
+                                                     cookedModule.Variants.size());
+        ReportInfo(diagnostics, roundTripStr);
 
         const ModuleInfluence influence = ComputeAxisInfluence(cookedModule);
         const CookError policyError = EnforceModulePolicy(cookedModule, influence);
@@ -559,7 +556,7 @@ namespace
                          CookedLibrary& out_library,
                          CookStatistics& statistics)
     {
-        // `ParseCommandLine` already rejected a name no profile answers to, so this cannot be null.
+        // `ParseCommandLine` already rejected invalid target names, so this cannot be null.
         const TargetProfile* target = FindTargetProfile(options.TargetName);
         if (target == nullptr)
         {
@@ -568,21 +565,21 @@ namespace
 
         SlangCompiler compiler;
         const PermutationSpace* space = nullptr;
-        CookError prepareResult =
+        const CookError prepareResult =
             PrepareModuleCompiler(options, module_path, *target, diagnostics, compiler, space);
         if (!prepareResult)
         {
             return prepareResult;
         }
 
-        // Said once for each module, because a cook that checked nothing must not look like a cook
-        // that checked and agreed.
-        std::println(stderr,
-                     "[shader_cooker] target {} ({} access), cross-check {}",
-                     target->Name,
-                     ToString(target->Access),
-                     DescribeCrossCheckState(*target, options));
+        // print check state because it makes sure unchecked cooks don't look like checked ones
+        const std::string crossCheckStr = std::format("target {} ({} access), cross-check {}",
+                                                      target->Name,
+                                                      ToString(target->Access),
+                                                      DescribeCrossCheckState(*target, options));
+        ReportInfo(diagnostics, crossCheckStr);
 
+        // expand permutation space into the final set of variants this build will be constructing
         const CookResult<VariantSet> variantSet = space->EnumerateVariants(diagnostics);
         if (!variantSet)
         {
@@ -590,16 +587,18 @@ namespace
         }
 
         const std::string_view moduleName = compiler.ModuleName();
-        std::println(stderr,
-                     "[shader_cooker] module {} expands to {} variants over an index space of {}",
-                     moduleName,
-                     variantSet.value().Variants.size(),
-                     variantSet.value().SpaceSize);
+        const std::string variantStatsStr =
+            std::format("module {} expands to {} variants over an index space of {}",
+                        moduleName,
+                        variantSet.value().Variants.size(),
+                        variantSet.value().SpaceSize);
+        ReportInfo(diagnostics, variantStatsStr);
 
         auto dumpPermutationSpace = [&moduleName, &space]()
         {
             return DumpPermutationSpace(moduleName, *space);
         };
+
         const CookError spaceDumpResult =
             WriteStageDumpIfRequested(options, sink, moduleName, StageDumpKind::Space, dumpPermutationSpace);
         if (spaceDumpResult != CookError::Success)
@@ -611,6 +610,7 @@ namespace
         {
             return DumpVariantSet(moduleName, variantSet.value());
         };
+
         const CookError variantDumpResult =
             WriteStageDumpIfRequested(options, sink, moduleName, StageDumpKind::Variants, dumpVariantSet);
         if (variantDumpResult != CookError::Success)
@@ -686,7 +686,7 @@ namespace
             return internedDumpResult;
         }
 
-        CookResult<CookedModule> finalized = FinalizeModule(std::move(internedModule), moduleVariants);
+        CookResult<CookedModule> finalized = FinalizeModule(std::move(internedModule), moduleVariants, diagnostics);
         if (!finalized)
         {
             return finalized.error();
@@ -712,7 +712,9 @@ namespace
 
 } // namespace
 
-CookResult<CookStatistics> RunCookOnce(const CookerOptions& options, OutputSink& sink)
+CookResult<CookStatistics> RunCookOnce(const CookerOptions& options,
+                                       OutputSink& sink,
+                                       DiagnosticSink& diagnostics)
 {
     const std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
     const std::expected<std::filesystem::path, std::error_code> cacheDirectoryResult =
@@ -725,13 +727,11 @@ CookResult<CookStatistics> RunCookOnce(const CookerOptions& options, OutputSink&
 
     CookStatistics statistics;
     CookedLibrary library;
-    // One sink for the whole cook, so a failure count spans every module rather than resetting at
-    // each one.
-    StderrDiagnosticSink diagnostics;
 
     for (const std::filesystem::path& modulePath : options.ModulePaths)
     {
-        std::println(stderr, "[shader_cooker] cooking {}", modulePath.string());
+        const std::string cookingStr = std::format("cooking {}", modulePath.string());
+        ReportInfo(diagnostics, cookingStr);
         const CookError moduleResult =
             CookModule(options, modulePath, sink, diagnostics, library, statistics);
         if (!moduleResult)
@@ -765,22 +765,24 @@ namespace
      * interner numbers entries in first-encounter order, so two cooks of one input must agree byte
      * for byte. A difference means an unordered container's iteration order reached the output, which
      * otherwise shows up months later as a rebuild that changes nothing. */
-    CookResult<CookStatistics> RunCookTwiceAndCompare(const CookerOptions& options, OutputSink& sink)
+    CookResult<CookStatistics> RunCookTwiceAndCompare(const CookerOptions& options,
+                                                      OutputSink& sink,
+                                                      DiagnosticSink& diagnostics)
     {
-        std::println(stderr, "[shader_cooker] determinism check: cooking twice into memory");
+        ReportInfo(diagnostics, "determinism check: cooking twice into memory");
 
         // Both memory sinks take the real sink's primary name. The emitter builds every companion
         // artifact name from it, so a different name here would make the check compare a different
         // set of file names than the cook it stands in for.
         MemoryOutputSink first{ sink.PrimaryName() };
-        const CookResult<CookStatistics> firstResult = RunCookOnce(options, first);
+        const CookResult<CookStatistics> firstResult = RunCookOnce(options, first, diagnostics);
         if (!firstResult)
         {
             return firstResult;
         }
 
         MemoryOutputSink second{ sink.PrimaryName() };
-        const CookResult<CookStatistics> secondResult = RunCookOnce(options, second);
+        const CookResult<CookStatistics> secondResult = RunCookOnce(options, second, diagnostics);
         if (!secondResult)
         {
             return secondResult;
@@ -788,17 +790,18 @@ namespace
 
         if (first.GetContent() != second.GetContent())
         {
-            std::println(stderr, "[shader_cooker] DETERMINISM FAILED: the header differs between cooks");
-            return std::unexpected(CookError::CookNotDeterministic);
+            return std::unexpected(ReportError(diagnostics,
+                                               CookError::CookNotDeterministic,
+                                               "DETERMINISM FAILED: the header differs between cooks"));
         }
 
         if (first.GetArtifacts().size() != second.GetArtifacts().size())
         {
-            std::println(stderr,
-                         "[shader_cooker] DETERMINISM FAILED: {} artifacts, then {}",
-                         first.GetArtifacts().size(),
-                         second.GetArtifacts().size());
-            return std::unexpected(CookError::CookNotDeterministic);
+            const std::string errStr =
+                std::format("Determinism Failed: first pass had {} artifacts, second had {}",
+                            first.GetArtifacts().size(),
+                            second.GetArtifacts().size());
+            return std::unexpected(ReportError(diagnostics, CookError::CookNotDeterministic, errStr));
         }
 
         for (const auto& [name, content] : first.GetArtifacts())
@@ -806,14 +809,14 @@ namespace
             const auto other = second.GetArtifacts().find(name);
             if (other == second.GetArtifacts().end() || other->second != content)
             {
-                std::println(stderr, "[shader_cooker] DETERMINISM FAILED: {} differs between cooks", name);
-                return std::unexpected(CookError::CookNotDeterministic);
+                const std::string errStr = std::format("DETERMINISM FAILED: {} differs between cooks", name);
+                return std::unexpected(ReportError(diagnostics, CookError::CookNotDeterministic, errStr));
             }
         }
 
-        std::println(stderr,
-                     "[shader_cooker] determinism verified: {} artifacts identical across two cooks",
-                     first.GetArtifacts().size() + 1u);
+        const std::string determinismStr = std::format("determinism verified: {} artifacts identical across two cooks",
+                                                       first.GetArtifacts().size() + 1u);
+        ReportInfo(diagnostics, determinismStr);
 
         const CookError writeResult = sink.Write(first.GetContent());
         if (writeResult != CookError::Success)
@@ -837,12 +840,15 @@ namespace
 
 CookResult<CookStatistics> RunCook(const CookerOptions& options, OutputSink& sink)
 {
+    // create one diag sink for the *whole* cook
+    StderrDiagnosticSink diagnostics;
+
     if (options.VerifyDeterministic)
     {
-        return RunCookTwiceAndCompare(options, sink);
+        return RunCookTwiceAndCompare(options, sink, diagnostics);
     }
 
-    return RunCookOnce(options, sink);
+    return RunCookOnce(options, sink, diagnostics);
 }
 
 } // namespace lodestone

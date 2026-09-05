@@ -9,6 +9,8 @@
 namespace lodestone
 {
 
+/** @brief A binding is a *concrete* assignment of a value to an axis,
+  * it's a real assignment that has actually been evaluated. */
 struct PermutationBinding
 {
     const PermutationAxis* Axis{ nullptr };
