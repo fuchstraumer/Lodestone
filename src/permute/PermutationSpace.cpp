@@ -22,6 +22,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -213,6 +214,51 @@ CookResult<std::vector<PermutationAssignment>> PermutationSpace::EnumerateActive
 
 CookResult<VariantSet> PermutationSpace::EnumerateVariants(DiagnosticSink& sink) const
 {
+    // constructing this with ranges/views so we can make it const, which couldn't
+    // happen with ye olde for loop. kinda neat.
+    const std::unordered_map<std::string_view, std::ptrdiff_t> axisIndexMap = 
+        axes |
+        std::views::enumerate |
+        std::views::transform(
+            [](const auto& pair)
+            {
+                auto [index, axis] = pair;
+                return std::pair(axis.Name, index);
+            }) |
+        std::ranges::to<std::unordered_map<std::string_view, std::ptrdiff_t>>();
+    
+
+
+    std::unordered_map<std::ptrdiff_t, std::vector<std::string_view>> requireReadyAt;
+    std::vector<std::string_view> requireReadyAtStart;
+    
+    for (const std::string& expr : requireExpressions)
+    {
+        const auto exprEval = CollectExpressionIdentifiers(expr, sink);
+        // errors should've already been handled in validation step, done earlier
+        if (!exprEval) [[unlikely]]
+        {
+            return std::unexpected(exprEval.error());
+        }
+
+        if (exprEval->empty())
+        {
+            requireReadyAtStart.push_back(expr);
+        }
+        else
+        {
+            // find the deepest axis index referenced by this require expression, and store that
+            std::ptrdiff_t deepest = 0;
+            for (const std::string& identifier : *exprEval)
+            {
+                deepest = std::max(deepest, axisIndexMap.at(identifier));
+            }
+            // we could just use a vector of expressions for each depth, but I expect this map to remain
+            // pretty darn sparse, so a vector is a bit of a waste (and this isn't the hot path really)
+            requireReadyAt[deepest].push_back(expr);
+        }
+    }
+
     CookResult<std::vector<PermutationAssignment>> enumerateActiveResult = EnumerateActiveCombinations(sink);
     if (!enumerateActiveResult)
     {
@@ -363,94 +409,20 @@ CookError PermutationSpace::VerifyAxisNamesAreDeclared(std::span<const std::stri
 CookError PermutationSpace::ValidateConstraints(DiagnosticSink& sink) const
 {
     // since we'll want to use indices to refer to axes, this makes it easier
-    auto axesNames = axes | std::views::transform(&PermutationAxis::Name);
+    const std::vector<std::string_view> axesNames = axes |
+                                                    std::views::transform(&PermutationAxis::Name) |
+                                                    std::ranges::to<std::vector<std::string_view>>();
 
-    for (std::ptrdiff_t i = 0; std::cmp_less(i, axes.size()); ++i)
+    const CookError activeWhenValidationResult = validateActiveWhen(axesNames, sink);
+    if (!activeWhenValidationResult)
     {
-        const PermutationAxis& curr = axes[static_cast<size_t>(i)];
-        if (curr.ActiveWhen.empty())
-        {
-            continue;
-        }
-
-        auto activeWhenResult = CollectExpressionIdentifiers(curr.ActiveWhen, sink);
-        if (!activeWhenResult)
-        {
-            return CookError::PermutationConstraintInvalidExpression;
-        }
-
-        const std::vector<std::string>& identifiers = *activeWhenResult;
-        // first error-out case: is there a discrepancy between the identifiers and the declared axes?
-        for (const std::string& identifier : identifiers)
-        {
-            auto iter = std::ranges::find(axesNames, identifier);
-            if (iter == axesNames.end())
-            {
-                return ReportError(
-                    sink,
-                    CookError::PermutationConstraintUnknownSymbol,
-                    std::format("Axis '{}' used unknown symbol {} in ActiveWhen", curr.Name, identifier));
-            }
-
-            const std::ptrdiff_t index = std::distance(axesNames.begin(), iter);
-            if (index >= i)
-            {
-                const std::string& forwardRefName = axesNames[index];
-                return ReportError(
-                    sink,
-                    CookError::PermutationConstraintForwardReference,
-                    std::format("Axis '{}' has a forward reference to axis '{}'", curr.Name, forwardRefName));
-            }
-
-            const PermutationAxis& referenced = axes[static_cast<size_t>(index)];
-            // check to see if the referenced axis has a non-empty ActiveWhen: explain the default
-            // substitution, that this axis may be made inactive by another axis's ActiveWhen condition.
-            if (!referenced.ActiveWhen.empty())
-            {
-                const std::string& referencedName = referenced.Name;
-                ReportWarning(
-                    sink,
-                    std::format("Axis '{}' references axis '{}' which has a non-empty ActiveWhen condition",
-                                curr.Name,
-                                referencedName));
-            }
-        }
+        return activeWhenValidationResult;
     }
 
-    // next loop: validate Requires expressions
-    // no forward-reference rule with Requires, but the checks are otherwise similar to ActiveWhen
-    for (const std::string& requireExpr : requireExpressions)
+    const CookError requiresValidationResult = validateRequires(axesNames, sink);
+    if (!requiresValidationResult)
     {
-        const auto exprIdentifiers = CollectExpressionIdentifiers(requireExpr, sink);
-        if (!exprIdentifiers)
-        {
-            return ReportError(sink,
-                               CookError::PermutationConstraintInvalidExpression,
-                               std::format("Invalid Requires expression '{}'", requireExpr));
-        }
-
-        for (const std::string& identifier : *exprIdentifiers)
-        {
-            auto foundIter = std::ranges::find(axesNames, identifier);
-            if (foundIter == axesNames.end())
-            {
-                return ReportError(
-                    sink,
-                    CookError::PermutationConstraintUnknownSymbol,
-                    std::format("Requires expression '{}' uses unknown symbol {}", requireExpr, identifier));
-            }
-
-            const std::ptrdiff_t index = std::distance(axesNames.begin(), foundIter);
-            const PermutationAxis& referenced = axes[static_cast<size_t>(index)];
-            if (!referenced.ActiveWhen.empty())
-            {
-                ReportWarning(
-                    sink,
-                    std::format("Requires expression '{}' references axis '{}' which has a non-empty ActiveWhen condition",
-                                requireExpr,
-                                referenced.Name));
-            }
-        }
+        return requiresValidationResult;
     }
 
     return CookError::Success;
@@ -533,6 +505,113 @@ CookResult<std::vector<ExternConstantDefault>> PermutationSpace::CollectUndriven
     }
 
     return defaults;
+}
+
+CookError PermutationSpace::validateActiveWhen(const std::vector<std::string_view>& axes_names,
+                                               DiagnosticSink& sink) const
+{
+    for (std::ptrdiff_t i = 0; std::cmp_less(i, axes.size()); ++i)
+    {
+        const PermutationAxis& curr = axes[static_cast<size_t>(i)];
+        if (curr.ActiveWhen.empty())
+        {
+            continue;
+        }
+
+        auto activeWhenResult = CollectExpressionIdentifiers(curr.ActiveWhen, sink);
+        if (!activeWhenResult)
+        {
+            return CookError::PermutationConstraintInvalidExpression;
+        }
+
+        const std::vector<std::string>& identifiers = *activeWhenResult;
+        // first error-out case: is there a discrepancy between the identifiers and the declared axes?
+        for (const std::string& identifier : identifiers)
+        {
+            auto iter = std::ranges::find(axes_names, identifier);
+            if (iter == axes_names.end())
+            {
+                return ReportError(
+                    sink,
+                    CookError::PermutationConstraintUnknownSymbol,
+                    std::format("Axis '{}' used unknown symbol {} in ActiveWhen", curr.Name, identifier));
+            }
+
+            const std::ptrdiff_t index = std::distance(axes_names.begin(), iter);
+            if (index >= i)
+            {
+                const std::string_view& forwardRefName = axes_names[static_cast<size_t>(index)];
+                return ReportError(
+                    sink,
+                    CookError::PermutationConstraintForwardReference,
+                    std::format("Axis '{}' has a forward reference to axis '{}'", curr.Name, forwardRefName));
+            }
+
+            const PermutationAxis& referenced = axes[static_cast<size_t>(index)];
+            // check to see if the referenced axis has a non-empty ActiveWhen: explain the default
+            // substitution, that this axis may be made inactive by another axis's ActiveWhen condition.
+            if (!referenced.ActiveWhen.empty())
+            {
+                const std::string_view& referencedName = referenced.Name;
+                ReportWarning(
+                    sink,
+                    std::format("Axis '{}' references axis '{}' which has a non-empty ActiveWhen condition",
+                                curr.Name,
+                                referencedName));
+            }
+        }
+    }
+
+    return CookError::Success;
+}
+
+CookError PermutationSpace::validateRequires(const std::vector<std::string_view>& axes_names,
+                                             DiagnosticSink& sink) const
+{
+    for (const std::string& requireExpr : requireExpressions)
+    {
+        const auto exprIdentifiers = CollectExpressionIdentifiers(requireExpr, sink);
+        if (!exprIdentifiers)
+        {
+            return ReportError(sink,
+                               CookError::PermutationConstraintInvalidExpression,
+                               std::format("Invalid Requires expression '{}'", requireExpr));
+        }
+
+        for (const std::string& identifier : *exprIdentifiers)
+        {
+            auto foundIter = std::ranges::find(axes_names, identifier);
+            if (foundIter == axes_names.end())
+            {
+                return ReportError(
+                    sink,
+                    CookError::PermutationConstraintUnknownSymbol,
+                    std::format("Requires expression '{}' uses unknown symbol {}", requireExpr, identifier));
+            }
+
+            const std::ptrdiff_t index = std::distance(axes_names.begin(), foundIter);
+            const PermutationAxis& referenced = axes[static_cast<size_t>(index)];
+            if (!referenced.ActiveWhen.empty())
+            {
+                ReportWarning(
+                    sink,
+                    std::format("Requires expression '{}' references axis '{}' which has a non-empty ActiveWhen condition",
+                                requireExpr,
+                                referenced.Name));
+            }
+        }
+    }
+    return CookError::Success;
+}
+
+CookError PermutationSpace::expandFrom(size_t depth,
+                                       PermutationAssignment& partial,
+                                       const std::unordered_map<std::ptrdiff_t,
+                                       std::vector<std::string_view>>& require_ready_at,
+                                       std::vector<VariantDescriptor>& expanded,
+                                       DiagnosticSink& sink)
+{
+    
 }
 
 } // namespace lodestone

@@ -1,4 +1,5 @@
 #pragma once
+#include <unordered_map>
 #ifndef LODESTONE_PERMUTATION_SPACE_HPP
 #define LODESTONE_PERMUTATION_SPACE_HPP
 #include "CookerErrors.hpp"
@@ -109,6 +110,19 @@ public:
     [[nodiscard]] CookResult<std::vector<ExternConstantDefault>> CollectUndrivenExternDefaults(
         std::span<const std::string_view> source_texts, DiagnosticSink& sink) const;
 private:
+    
+    CookError validateActiveWhen(
+        const std::vector<std::string_view>& axes_names,
+        DiagnosticSink& sink) const;
+    CookError validateRequires(
+        const std::vector<std::string_view>& axes_names,
+        DiagnosticSink& sink) const;
+
+    CookError expandFrom(size_t depth,
+                         PermutationAssignment& partial,
+                         const std::unordered_map<std::ptrdiff_t,
+                         std::vector<std::string_view>>& require_ready_at,
+                         std::vector<VariantDescriptor>& expanded, DiagnosticSink& sink);
     std::string name;
     std::vector<PermutationAxis> axes;
     std::vector<std::string> requireExpressions;
