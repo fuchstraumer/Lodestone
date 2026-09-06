@@ -444,22 +444,6 @@ namespace
         return 0u;
     }
 
-    uint32_t CheckVariantBudget(const CookedModule& module, const ModulePolicy& policy)
-    {
-        if (policy.MaxVariants == 0u || module.Variants.size() <= policy.MaxVariants)
-        {
-            return 0u;
-        }
-
-        std::println(stderr,
-                     "[shader_cooker] module {} expands to {} variants, over its budget of {}. Raise "
-                     "the budget on purpose, or take an axis out.",
-                     module.Name,
-                     module.Variants.size(),
-                     policy.MaxVariants);
-        return 1u;
-    }
-
 } // namespace
 
 CookError EnforceModulePolicy(const CookedModule& module, const ModuleInfluence& influence)
@@ -470,7 +454,9 @@ CookError EnforceModulePolicy(const CookedModule& module, const ModuleInfluence&
         return CookError::Success;
     }
 
-    uint32_t violations = CheckVariantBudget(module, *policy);
+    // we used to check max variants setting here, but that got pulled up to 
+    // early-out from permutation space expansion if exceeded instead
+    uint32_t violations = 0u; 
 
     for (const ExpectedAxisInfluence& expected : policy->ExpectedInfluence)
     {

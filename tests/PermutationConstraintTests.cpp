@@ -34,7 +34,7 @@ void TestActiveWhenGating(TestRunner& runner)
                                     "GATE == 1" };
     const PermutationSpace space{ "Gated", { gateAxis, widthAxis } };
 
-    const auto variants = space.EnumerateVariants(sink);
+    const auto variants = space.EnumerateVariants(0u, sink);
     runner.Check(variants.has_value(), "Enumeration succeeds.");
     // check variant count: should be 3 (GATE=false, GATE=true with WIDTH=16, GATE=true with WIDTH=32)
     runner.Check(variants && variants->Variants.size() == 3, "Correct number of variants.");
@@ -56,8 +56,8 @@ void TestRequirePruning(TestRunner& runner)
     const PermutationSpace gated  { "TileGated",   makeAxes(),
                                     { "TILE * TILE * REG <= 65536" } };          // forbids 32x128 = 131072
 
-    const auto full   = control.EnumerateVariants(sink);
-    const auto pruned = gated.EnumerateVariants(sink);
+    const auto full   = control.EnumerateVariants(0u, sink);
+    const auto pruned = gated.EnumerateVariants(0u, sink);
     runner.Check(full && full->Variants.size() == 9u, "Control cooks the full variant grid");
     runner.Check(pruned && pruned->Variants.size() == 8u, "Require drops exactly one cell");
 }
@@ -118,7 +118,7 @@ void TestDefaultSubstitutionWarning(TestRunner& runner)
     runner.Check(space.ValidateConstraints(sink) == CookError::Success, "a conditional chain still validates");
 
     const bool warned = std::ranges::any_of(sink.Records(),
-        [](const auto& d){ return d.Severity == DiagnosticSeverity::Warning; });
+        [](const auto& diag){ return diag.Severity == DiagnosticSeverity::Warning; });
     runner.Check(warned, "referencing a conditional axis warns about default substitution");
 }
 

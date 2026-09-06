@@ -30,7 +30,6 @@
 namespace lodestone
 {
 
-
 namespace
 {
 
@@ -179,7 +178,7 @@ std::span<const std::string> PermutationSpace::RequireExpressions() const noexce
     return requireExpressions;
 }
 
-CookResult<VariantSet> PermutationSpace::EnumerateVariants(DiagnosticSink& sink) const
+CookResult<VariantSet> PermutationSpace::EnumerateVariants(const size_t max_variant_count, DiagnosticSink& sink) const
 {
     // constructing this with ranges/views so we can make it const, which couldn't
     // happen with ye olde for loop. kinda neat.
@@ -217,7 +216,7 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(DiagnosticSink& sink)
 
     PermutationAssignment partial;
     std::vector<VariantDescriptor> descriptors;
-    const CookError walkResult = expandFrom(0, partial, requireReadyAt, descriptors, sink);
+    const CookError walkResult = expandFrom(0, partial, requireReadyAt, descriptors, max_variant_count, sink);
     if (!walkResult)
     {
         return std::unexpected(walkResult);
@@ -536,6 +535,7 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
                                        PermutationAssignment& partial,
                                        const RequireReadyMap& require_ready_at,
                                        std::vector<VariantDescriptor>& expanded,
+                                       const size_t max_variant_count,
                                        DiagnosticSink& sink) const
 {
     // canonicalize the current partial assignment here, since it will be 
@@ -547,6 +547,14 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
         // completed a full permutation assignment, add it to the expanded list
         const int32_t index = ComputeVariantIndex(canonical);
         expanded.emplace_back(PermutationAssignment{ partial }, std::move(canonical), index);
+        if ((max_variant_count > 0) && (expanded.size() >= max_variant_count)) [[unlikely]]
+        {
+            const std::string errorMessage = std::format("Permutation variant budget exceeded (max {} variants)", max_variant_count);
+            return ReportError(
+                sink,
+                CookError::PermutationVariantBudgetExceeded,
+                errorMessage);
+        }
         return CookError::Success;
     }
 
@@ -584,7 +592,7 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
         }
 
         // continue expanding the next axis
-        return expandFrom(depth + 1, partial, require_ready_at, expanded, sink);
+        return expandFrom(depth + 1, partial, require_ready_at, expanded, max_variant_count, sink);
     }
 
     // axis is active: expand partial to include all possible values of this axis
@@ -603,7 +611,7 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
 
         if (keepAxis.value())
         {
-            const CookError subtree = expandFrom(depth + 1, partial, require_ready_at, expanded, sink);
+            const CookError subtree = expandFrom(depth + 1, partial, require_ready_at, expanded, max_variant_count, sink);
             if (!subtree)
             {
                 partial.pop_back();

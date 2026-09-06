@@ -94,7 +94,7 @@ int main()
     lodestone::tests::TestRunner runner{ "PermutationIndexTests" };
     lodestone::StderrDiagnosticSink sink;
 
-    const CookResult<VariantSet> enumerated = k_TestSpace.EnumerateVariants(sink);
+    const CookResult<VariantSet> enumerated = k_TestSpace.EnumerateVariants(0u, sink);
     if (!enumerated)
     {
         runner.Check(false, "the test space enumerates");
@@ -198,7 +198,7 @@ int main()
 
     runner.BeginSection("a module with no registered space still cooks");
     const PermutationSpace emptySpace{ "", {} };
-    const CookResult<VariantSet> emptyVariants = emptySpace.EnumerateVariants(sink);
+    const CookResult<VariantSet> emptyVariants = emptySpace.EnumerateVariants(0u, sink);
 
     runner.Check(emptyVariants.has_value(), "an empty space enumerates rather than fails");
     if (emptyVariants)

@@ -91,7 +91,7 @@ public:
     [[nodiscard]] bool IsEmpty() const noexcept;
     [[nodiscard]] std::span<const std::string> RequireExpressions() const noexcept;
 
-    [[nodiscard]] CookResult<VariantSet> EnumerateVariants(DiagnosticSink& sink) const;
+    [[nodiscard]] CookResult<VariantSet> EnumerateVariants(size_t max_variant_count, DiagnosticSink& sink) const;
     [[nodiscard]] CanonicalAssignment CanonicalizeAssignment(const PermutationAssignment& assignment) const;
     [[nodiscard]] int32_t ComputeVariantIndex(const CanonicalAssignment& canonical) const;
     [[nodiscard]] int32_t ComputeVariantSpaceSize() const noexcept;
@@ -123,6 +123,7 @@ private:
                          PermutationAssignment& partial,
                          const RequireReadyMap& require_ready_at,
                          std::vector<VariantDescriptor>& expanded,
+                         size_t max_variant_count,
                          DiagnosticSink& sink) const;
     
     std::string name;

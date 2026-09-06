@@ -12,6 +12,7 @@
 #include "model/ResolveStage.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "permute/PermutationAssignment.hpp"
+#include "permute/PermutationPolicy.hpp"
 #include "permute/PermutationRegistry.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "target/TargetProfile.hpp"
@@ -24,9 +25,7 @@
 #include <filesystem>
 #include <format>
 #include <functional>
-#include <iterator>
 #include <memory>
-#include <print>
 #include <ranges>
 #include <ratio>
 #include <span>
@@ -579,14 +578,18 @@ namespace
                                                       DescribeCrossCheckState(*target, options));
         ReportInfo(diagnostics, crossCheckStr);
 
+        // get policy now, to get max variant count so enumeration can check against it
+        const std::string_view moduleName = compiler.ModuleName();
+        const ModulePolicy* policy = FindPolicyForModule(moduleName);
+
         // expand permutation space into the final set of variants this build will be constructing
-        const CookResult<VariantSet> variantSet = space->EnumerateVariants(diagnostics);
+        const CookResult<VariantSet> variantSet =
+            space->EnumerateVariants(static_cast<size_t>(policy->MaxVariants), diagnostics);
         if (!variantSet)
         {
             return variantSet.error();
         }
 
-        const std::string_view moduleName = compiler.ModuleName();
         const std::string variantStatsStr =
             std::format("module {} expands to {} variants over an index space of {}",
                         moduleName,

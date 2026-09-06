@@ -299,7 +299,7 @@ void CheckVariantDump(lodestone::tests::TestRunner& runner, DiagnosticSink& sink
 
     const PermutationSpace space{ "TinyModule", { MakeBoolAxis("USE_FOO") } };
 
-    const CookResult<VariantSet> variantSet = space.EnumerateVariants(sink);
+    const CookResult<VariantSet> variantSet = space.EnumerateVariants(0u, sink);
     runner.Check(variantSet.has_value(), "the space enumerates");
     if (!variantSet)
     {
