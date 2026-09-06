@@ -1,8 +1,8 @@
 #pragma once
-#include <unordered_map>
 #ifndef LODESTONE_PERMUTATION_SPACE_HPP
 #define LODESTONE_PERMUTATION_SPACE_HPP
 #include "CookerErrors.hpp"
+#include "permute/AttributeExpression.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 
@@ -12,6 +12,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace lodestone
@@ -19,6 +20,7 @@ namespace lodestone
 
 class PermutationSpace;
 class DiagnosticSink;
+using RequireReadyMap = std::unordered_map<std::ptrdiff_t, std::vector<std::string_view>>;
 
 struct ExternConstantDefault
 {
@@ -89,7 +91,6 @@ public:
     [[nodiscard]] bool IsEmpty() const noexcept;
     [[nodiscard]] std::span<const std::string> RequireExpressions() const noexcept;
 
-    [[nodiscard]] CookResult<std::vector<PermutationAssignment>> EnumerateActiveCombinations(DiagnosticSink& sink) const;
     [[nodiscard]] CookResult<VariantSet> EnumerateVariants(DiagnosticSink& sink) const;
     [[nodiscard]] CanonicalAssignment CanonicalizeAssignment(const PermutationAssignment& assignment) const;
     [[nodiscard]] int32_t ComputeVariantIndex(const CanonicalAssignment& canonical) const;
@@ -118,11 +119,12 @@ private:
         const std::vector<std::string_view>& axes_names,
         DiagnosticSink& sink) const;
 
-    CookError expandFrom(size_t depth,
+    CookError expandFrom(std::ptrdiff_t depth,
                          PermutationAssignment& partial,
-                         const std::unordered_map<std::ptrdiff_t,
-                         std::vector<std::string_view>>& require_ready_at,
-                         std::vector<VariantDescriptor>& expanded, DiagnosticSink& sink);
+                         const RequireReadyMap& require_ready_at,
+                         std::vector<VariantDescriptor>& expanded,
+                         DiagnosticSink& sink) const;
+    
     std::string name;
     std::vector<PermutationAxis> axes;
     std::vector<std::string> requireExpressions;

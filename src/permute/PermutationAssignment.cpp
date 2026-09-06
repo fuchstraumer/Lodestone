@@ -23,6 +23,26 @@ const PermutationBinding& CanonicalAssignment::operator[](std::size_t index) con
     return values[index];
 }
 
+CanonicalAssignment::iterator CanonicalAssignment::begin() noexcept
+{
+    return values.begin();
+}
+
+CanonicalAssignment::const_iterator CanonicalAssignment::begin() const noexcept
+{
+    return values.cbegin();
+}
+
+CanonicalAssignment::iterator CanonicalAssignment::end() noexcept
+{
+    return values.end();
+}
+
+CanonicalAssignment::const_iterator CanonicalAssignment::end() const noexcept
+{
+    return values.cend();
+}
+
 CanonicalAssignment::CanonicalAssignment(PermutationAssignment&& canonical) noexcept
     : values{ std::move(canonical) }
 {

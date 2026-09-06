@@ -3,6 +3,7 @@
 #define LODESTONE_PERMUTATION_ASSIGNMENT_HPP
 #include "permute/PermutationValue.hpp"
 #include "permute/PermutationAxis.hpp"
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -28,15 +29,26 @@ public:
     CanonicalAssignment() noexcept = default;
 
     [[nodiscard]] operator const PermutationAssignment&() const noexcept;
-    [[nodiscard]] std::size_t size() const noexcept; //NOLINT(readability-identifier-naming)
-    [[nodiscard]] const PermutationBinding& operator[](std::size_t index) const noexcept;
+
+    // (clang annoyingly complains bc we don't match our clang-format, but these are stl-compat overrides) 
+    //NOLINTBEGIN(readability-identifier-naming)
+    [[nodiscard]] std::size_t size() const noexcept;
+    using value_type = PermutationBinding;
+    using iterator = PermutationAssignment::iterator;
+    using const_iterator = PermutationAssignment::const_iterator;
+    using const_reference = PermutationAssignment::const_reference;
+    [[nodiscard]] const_reference operator[](std::size_t index) const noexcept;
+    [[nodiscard]] iterator begin() noexcept;
+    [[nodiscard]] const_iterator begin() const noexcept;
+    [[nodiscard]] iterator end() noexcept;
+    [[nodiscard]] const_iterator end() const noexcept;
+    //NOLINTEND(readability-identifier-naming)
 
 private:
     // friend class is ugly, but this lets us allow exactly one way to build a CanonicalAssignment, so 
     // that's worth it
     friend class PermutationSpace;
     explicit CanonicalAssignment(PermutationAssignment&& canonical) noexcept;
-
     PermutationAssignment values;
 };
 

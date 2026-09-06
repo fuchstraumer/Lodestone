@@ -30,6 +30,7 @@
 namespace lodestone
 {
 
+
 namespace
 {
 
@@ -78,15 +79,60 @@ namespace
     {
         std::vector<AttrExprSymbol> symbols;
         symbols.reserve(assignment.size());
-
-        for (size_t i = 0; i < assignment.size(); ++i)
+        for (const auto& binding : assignment)
         {
-            const PermutationBinding& binding = assignment[i];
             symbols.emplace_back(binding.Axis->Name, PermutationValueToInt64(binding.Value));
         }
-
         return symbols;
     }
+
+    [[nodiscard]] CookResult<bool> EvaluateActiveWhen(const PermutationAxis& axis,
+                                                      const std::vector<AttrExprSymbol>& symbols,
+                                                      DiagnosticSink& sink)
+    {
+        const CookResult<int64_t> result = EvaluateExpression(axis.ActiveWhen, symbols, sink);
+        if (!result) [[unlikely]]
+        {
+            const std::string errStr =
+                std::format("Failed to evaluate ActiveWhen expression '{}' for axis '{}'",
+                            axis.ActiveWhen,
+                            axis.Name);
+            return std::unexpected(ReportError(sink, result.error(), errStr));
+        }
+
+        return static_cast<bool>(result.value());
+    }
+
+    [[nodiscard]] CookResult<bool> CheckRequires(std::ptrdiff_t depth,
+                                                 const std::vector<AttrExprSymbol>& symbols,
+                                                 const RequireReadyMap& require_ready_at,
+                                                 DiagnosticSink& sink)
+    {
+        const auto iter = require_ready_at.find(depth);
+        if (iter == require_ready_at.end())
+        {
+            return true;
+        }
+
+        const std::vector<std::string_view>& requireExpressions = iter->second;
+        for (const std::string_view& requireExpr : requireExpressions)
+        {
+            const CookResult<int64_t> result = EvaluateExpression(requireExpr, symbols, sink);
+            if (!result) [[unlikely]]
+            {
+                const std::string errStr = std::format("Failed to evaluate require expression '{}'", requireExpr);
+                return std::unexpected(ReportError(sink, result.error(), errStr));
+            }
+
+            if (result.value() == 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
 
 } // namespace
 
@@ -133,85 +179,6 @@ std::span<const std::string> PermutationSpace::RequireExpressions() const noexce
     return requireExpressions;
 }
 
-// perform CCSP with classic backtracking, but skip any axis whose parent is not active
-// this is a somewhat embarassing amount of commenting for me, but I have not done constraint satisfaction
-// formally *ever* before, and I want to make sure I understand it. these are notes for me. i am not a learned
-// woman
-CookResult<std::vector<PermutationAssignment>> PermutationSpace::EnumerateActiveCombinations(
-    DiagnosticSink& sink) const
-{
-    // A module with no registered space enumerates to the one empty assignment, so there is no first
-    // axis to size against. `partials` is replaced by `expanded` on every pass anyway.
-    std::vector<PermutationAssignment> partials{ PermutationAssignment{} };
-    for (const PermutationAxis& axis : axes)
-    {
-        // Despite having to do recursive work here, we can at least reserve the right amount of space. I
-        // guess.
-        std::vector<PermutationAssignment> expanded;
-        expanded.reserve(partials.size() * static_cast<size_t>(axis.NumValues()));
-        // For the current axis, we need to traverse every partial assignment (incomplete combination) we have
-        // thus far and expand/evaluate it for the current axis. This is a breadth-first search of the
-        // combination space, and we will continue to expand the partials until we have a complete assignment
-        // for every axis in the space.
-        for (const PermutationAssignment& partial : partials)
-        {
-            bool active = true;
-            // Evaluate the ActiveWhen expression on the axis, if it exists, to determine if the axis should
-            // be active.
-            if (!axis.ActiveWhen.empty())
-            {
-                // canonicalize the current partial assignment to evaluate the ActiveWhen expression
-                // correctly, which works like default-substitution for missing values (i.e, if this value
-                // depends on an axis that's previously deactivated, the canonicalization will provide a
-                // default value for it)
-                const CanonicalAssignment canonical = CanonicalizeAssignment(partial);
-                const std::vector<AttrExprSymbol> symbols = SymbolsFromCanonicalAssignment(canonical);
-                // now evaluate the actual expression
-                const CookResult<int64_t> isActive = EvaluateExpression(axis.ActiveWhen, symbols, sink);
-                if (!isActive) [[unlikely]]
-                {
-                    return std::unexpected(isActive.error());
-                }
-                else [[likely]]
-                {
-                    // if active, the result should be != 0
-                    active = static_cast<bool>(isActive.value());
-                }
-            }
-
-            if (!active)
-            {
-                // axis is inactive, so we just carry forward the current partial without expanding this axis
-                // canonicalization will fill it with the default later, as needed
-                expanded.emplace_back(partial);
-                continue;
-            }
-
-            // Expand the current axis, evaluating/instantiating it for each of it's values
-            // We store the axis (the abstract half) and the *value* (the concrete half). This
-            // defines a *Binding* or unique instantiation of the axis for this current partial.
-            // (thus a binding is just {abstract [axis*], concrete [value]})
-            for (const PermutationValue& value : axis.GetValues())
-            {
-                // at each depth, we take the current partial as our starting point (as that's how
-                // breadth-first constraint satisfaction like this works best for our data)
-                PermutationAssignment next = partial;
-                next.push_back(PermutationBinding{ .Axis = &axis, .Value = value });
-                // note: we need expanded separate as we are using partials as the source of truth for
-                // the current depth, and we don't want to modify it while iterating. the overwrite
-                // has to come at the end
-                expanded.push_back(std::move(next));
-            }
-        }
-
-        // now that we're done reading partials, we can overwrite it with the expanded set of partials at the
-        // current depth... to use at the next depth.
-        partials = std::move(expanded);
-    }
-
-    return partials;
-}
-
 CookResult<VariantSet> PermutationSpace::EnumerateVariants(DiagnosticSink& sink) const
 {
     // constructing this with ranges/views so we can make it const, which couldn't
@@ -222,93 +189,44 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(DiagnosticSink& sink)
         std::views::transform(
             [](const auto& pair)
             {
+                // important: explicitly construct string_view, otherwise the map
+                // might construct a view pointing to a temp string copy made here
                 auto [index, axis] = pair;
-                return std::pair(axis.Name, index);
+                return std::pair(std::string_view{ axis.Name }, index);
             }) |
         std::ranges::to<std::unordered_map<std::string_view, std::ptrdiff_t>>();
     
-
-
-    std::unordered_map<std::ptrdiff_t, std::vector<std::string_view>> requireReadyAt;
-    std::vector<std::string_view> requireReadyAtStart;
-    
+    // build require-ready-at-depth map - this helps save some legwork during the already
+    // hot recursive enumeration of permutations
+    RequireReadyMap requireReadyAt;
     for (const std::string& expr : requireExpressions)
     {
         const auto exprEval = CollectExpressionIdentifiers(expr, sink);
         // errors should've already been handled in validation step, done earlier
-        if (!exprEval) [[unlikely]]
+        // skip error checking bc we *know* the expressions have already been validated
+
+        // find the deepest axis index referenced by this require expression, and store that
+        std::ptrdiff_t deepest = 0;
+        for (const std::string& identifier : *exprEval)
         {
-            return std::unexpected(exprEval.error());
+            deepest = std::max(deepest, axisIndexMap.at(identifier));
         }
 
-        if (exprEval->empty())
-        {
-            requireReadyAtStart.push_back(expr);
-        }
-        else
-        {
-            // find the deepest axis index referenced by this require expression, and store that
-            std::ptrdiff_t deepest = 0;
-            for (const std::string& identifier : *exprEval)
-            {
-                deepest = std::max(deepest, axisIndexMap.at(identifier));
-            }
-            // we could just use a vector of expressions for each depth, but I expect this map to remain
-            // pretty darn sparse, so a vector is a bit of a waste (and this isn't the hot path really)
-            requireReadyAt[deepest].push_back(expr);
-        }
+        requireReadyAt[deepest].push_back(expr);
     }
 
-    CookResult<std::vector<PermutationAssignment>> enumerateActiveResult = EnumerateActiveCombinations(sink);
-    if (!enumerateActiveResult)
+    PermutationAssignment partial;
+    std::vector<VariantDescriptor> descriptors;
+    const CookError walkResult = expandFrom(0, partial, requireReadyAt, descriptors, sink);
+    if (!walkResult)
     {
-        return std::unexpected(enumerateActiveResult.error());
+        return std::unexpected(walkResult);
     }
-
-    std::vector<PermutationAssignment> active{ std::move(enumerateActiveResult.value()) };
 
     VariantSet variantSet;
     variantSet.Space = this;
     variantSet.SpaceSize = ComputeVariantSpaceSize();
-    variantSet.Variants.reserve(active.size());
-
-    for (PermutationAssignment& assignment : active)
-    {
-        CanonicalAssignment canonical = CanonicalizeAssignment(assignment);
-
-        if (!requireExpressions.empty())
-        {
-            const std::vector<AttrExprSymbol> symbols = SymbolsFromCanonicalAssignment(canonical);
-            bool requirementSatisfied = true;
-
-            for (const std::string& requireExpression : requireExpressions)
-            {
-                const CookResult<int64_t> exprResult = EvaluateExpression(requireExpression, symbols, sink);
-                if (!exprResult) [[unlikely]]
-                {
-                    return std::unexpected(exprResult.error());
-                }
-
-                // require expression evaluated to false, meaning the current assignment does not satisfy this
-                // requirement
-                if (exprResult.value() == 0)
-                {
-                    requirementSatisfied = false;
-                    break;
-                }
-            }
-
-            // if the requirement was not satisfied, skip this assignment
-            // (making it a "hole" in this slot in the variant space)
-            if (!requirementSatisfied)
-            {
-                continue;
-            }
-        }
-
-        const int32_t index = ComputeVariantIndex(canonical);
-        variantSet.Variants.emplace_back(std::move(assignment), std::move(canonical), index);
-    }
+    variantSet.Variants = std::move(descriptors);
 
     // sort first, because then uniqueness check can assume the indices are in order
     std::ranges::sort(variantSet.Variants, std::ranges::less{}, &VariantDescriptor::Index);
@@ -578,7 +496,16 @@ CookError PermutationSpace::validateRequires(const std::vector<std::string_view>
                                std::format("Invalid Requires expression '{}'", requireExpr));
         }
 
-        for (const std::string& identifier : *exprIdentifiers)
+        const std::vector<std::string>& exprIdentifiersRef = *exprIdentifiers;
+        // an empty require expression is just a constant: it shouldn't be considered valid.
+        if (exprIdentifiersRef.empty())
+        {
+            return ReportError(sink,
+                               CookError::PermutationConstraintEmptyRequireExpression,
+                               std::format("Requires expression '{}' is empty", requireExpr));
+        }
+
+        for (const std::string& identifier : exprIdentifiersRef)
         {
             auto foundIter = std::ranges::find(axes_names, identifier);
             if (foundIter == axes_names.end())
@@ -604,14 +531,91 @@ CookError PermutationSpace::validateRequires(const std::vector<std::string_view>
     return CookError::Success;
 }
 
-CookError PermutationSpace::expandFrom(size_t depth,
+//NOLINTBEGIN(misc-no-recursion)
+CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
                                        PermutationAssignment& partial,
-                                       const std::unordered_map<std::ptrdiff_t,
-                                       std::vector<std::string_view>>& require_ready_at,
+                                       const RequireReadyMap& require_ready_at,
                                        std::vector<VariantDescriptor>& expanded,
-                                       DiagnosticSink& sink)
+                                       DiagnosticSink& sink) const
 {
-    
+    // canonicalize the current partial assignment here, since it will be 
+    // used directly below, then to make symbol table for checks
+    CanonicalAssignment canonical = CanonicalizeAssignment(partial);
+
+    if (std::cmp_equal(depth, axes.size()))
+    {
+        // completed a full permutation assignment, add it to the expanded list
+        const int32_t index = ComputeVariantIndex(canonical);
+        expanded.emplace_back(PermutationAssignment{ partial }, std::move(canonical), index);
+        return CookError::Success;
+    }
+
+    const PermutationAxis& axis = axes[static_cast<size_t>(depth)];
+
+    bool active = true;
+    // both ActiveWhen and Require checks will need the symbols, get them once
+    const std::vector<AttrExprSymbol> symbols = SymbolsFromCanonicalAssignment(canonical);
+
+    if (!axis.ActiveWhen.empty())
+    {
+        const CookResult<bool> activeResult = EvaluateActiveWhen(axis, symbols, sink);
+        if (!activeResult) [[unlikely]]
+        {
+            return activeResult.error();
+        }
+
+        active = activeResult.value();
+
+    }
+
+    if (!active)
+    {
+        // axis skipped: will be canonicalized to default value
+        const CookResult<bool> requireResult = CheckRequires(depth, symbols, require_ready_at, sink);
+        if (!requireResult) [[unlikely]]
+        {
+            return requireResult.error();
+        }
+
+        if (!requireResult.value())
+        {
+            // prune the subtree
+            return CookError::Success;
+        }
+
+        // continue expanding the next axis
+        return expandFrom(depth + 1, partial, require_ready_at, expanded, sink);
+    }
+
+    // axis is active: expand partial to include all possible values of this axis
+    for (const PermutationValue& value : axis.GetValues())
+    {
+        partial.emplace_back(&axis, value);
+        // need to rebuild symbol table since partial assignment has changed
+        const CanonicalAssignment innerCanonical = CanonicalizeAssignment(partial);
+        const std::vector<AttrExprSymbol> innerSymbols = SymbolsFromCanonicalAssignment(innerCanonical);
+        const CookResult<bool> keepAxis = CheckRequires(depth, innerSymbols, require_ready_at, sink);
+        if (!keepAxis) [[unlikely]]
+        {
+            partial.pop_back();
+            return keepAxis.error();
+        }
+
+        if (keepAxis.value())
+        {
+            const CookError subtree = expandFrom(depth + 1, partial, require_ready_at, expanded, sink);
+            if (!subtree)
+            {
+                partial.pop_back();
+                return subtree;
+            }
+        }
+
+        partial.pop_back();
+    }
+
+    return CookError::Success;
 }
+//NOLINTEND(misc-no-recursion)
 
 } // namespace lodestone

@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <expected>
 #include <string_view>
-#include <source_location>
 
 namespace lodestone
 {
@@ -51,6 +50,8 @@ enum class CookError : uint16_t
     PermutationConstraintForwardReference = 84,
     PermutationConstraintUnknownSymbol = 85,
     PermutationConstraintInvalidExpression = 86,
+    PermutationConstraintEmptyRequireExpression = 87,
+    PermutationVariantBudgetExceeded = 88,
 
     LibraryRoundTripFailed = 90,
     CookNotDeterministic = 91,
