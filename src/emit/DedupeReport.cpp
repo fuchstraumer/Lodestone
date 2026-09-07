@@ -338,35 +338,6 @@ ModuleInfluence ComputeAxisInfluence(const CookedModule& module)
     return influence;
 }
 
-// I'm keeping this around in case we want to use it, but this isn't really a useful
-// query in 99.9% of cases: it was an interesting special case for our first ever
-// test content since we could use this to verify collapsing worked as expected.
-bool AllVariantsShareOneLayout(const CookedModule& module)
-{
-    bool seenOne = false;
-    ShaderLayoutView first;
-
-    for (const LibraryVariant& variant : module.Variants)
-    {
-        for (size_t i = 0u; i < variant.VisibilityIndices.size(); ++i)
-        {
-            ShaderLayoutView layout = ResolveLayoutView(module, variant, i);
-
-            if (!seenOne)
-            {
-                first = layout;
-                seenOne = true;
-            }
-            else if (layout != first)
-            {
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
 namespace
 {
 

@@ -1,4 +1,5 @@
 #pragma once
+#include "CookerErrors.hpp"
 #ifndef LODESTONE_DEDUPE_REPORT_HPP
 #define LODESTONE_DEDUPE_REPORT_HPP
 #include "model/CookedLibrary.hpp"
@@ -47,10 +48,6 @@ struct ModuleInfluence
 };
 
 ModuleInfluence ComputeAxisInfluence(const CookedModule& module);
-
-/** True when every variant of the module produced the same binding layout. The graph can then hold
- * one layout for each module instead of one for each variant. */
-bool AllVariantsShareOneLayout(const CookedModule& module);
 
 /** Compares the measured influence against what the module declared, and checks the variant budget.
  * A mismatch fails the cook and names the entry point and the axis. */
