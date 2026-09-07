@@ -72,7 +72,7 @@
             ]
         },
         {
-            "index": 4,
+            "index": 1,
             "suffix": "_128_true_16",
             "description": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -125,7 +125,7 @@
             ]
         },
         {
-            "index": 5,
+            "index": 2,
             "suffix": "_128_true_32",
             "description": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
             "canonical": [
@@ -178,7 +178,7 @@
             ]
         },
         {
-            "index": 6,
+            "index": 3,
             "suffix": "_128_true_64",
             "description": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
             "canonical": [
@@ -231,7 +231,7 @@
             ]
         },
         {
-            "index": 7,
+            "index": 4,
             "suffix": "_128_true_128",
             "description": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
             "canonical": [
@@ -284,7 +284,7 @@
             ]
         },
         {
-            "index": 8,
+            "index": 5,
             "suffix": "_256_false_16",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -337,7 +337,7 @@
             ]
         },
         {
-            "index": 12,
+            "index": 6,
             "suffix": "_256_true_16",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -390,7 +390,7 @@
             ]
         },
         {
-            "index": 13,
+            "index": 7,
             "suffix": "_256_true_32",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
             "canonical": [
@@ -443,7 +443,7 @@
             ]
         },
         {
-            "index": 14,
+            "index": 8,
             "suffix": "_256_true_64",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
             "canonical": [
@@ -496,7 +496,7 @@
             ]
         },
         {
-            "index": 15,
+            "index": 9,
             "suffix": "_256_true_128",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
             "canonical": [
@@ -549,7 +549,7 @@
             ]
         },
         {
-            "index": 16,
+            "index": 10,
             "suffix": "_512_false_16",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -602,7 +602,7 @@
             ]
         },
         {
-            "index": 20,
+            "index": 11,
             "suffix": "_512_true_16",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -655,7 +655,7 @@
             ]
         },
         {
-            "index": 21,
+            "index": 12,
             "suffix": "_512_true_32",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
             "canonical": [
@@ -708,7 +708,7 @@
             ]
         },
         {
-            "index": 22,
+            "index": 13,
             "suffix": "_512_true_64",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
             "canonical": [
@@ -761,7 +761,7 @@
             ]
         },
         {
-            "index": 23,
+            "index": 14,
             "suffix": "_512_true_128",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
             "canonical": [
@@ -814,7 +814,7 @@
             ]
         },
         {
-            "index": 24,
+            "index": 15,
             "suffix": "_1024_false_16",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -867,7 +867,7 @@
             ]
         },
         {
-            "index": 28,
+            "index": 16,
             "suffix": "_1024_true_16",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -920,7 +920,7 @@
             ]
         },
         {
-            "index": 29,
+            "index": 17,
             "suffix": "_1024_true_32",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
             "canonical": [
@@ -973,7 +973,7 @@
             ]
         },
         {
-            "index": 30,
+            "index": 18,
             "suffix": "_1024_true_64",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
             "canonical": [
@@ -1026,7 +1026,7 @@
             ]
         },
         {
-            "index": 31,
+            "index": 19,
             "suffix": "_1024_true_128",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
             "canonical": [
@@ -1079,7 +1079,7 @@
             ]
         },
         {
-            "index": 32,
+            "index": 20,
             "suffix": "_2048_false_16",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -1132,7 +1132,7 @@
             ]
         },
         {
-            "index": 36,
+            "index": 21,
             "suffix": "_2048_true_16",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -1185,7 +1185,7 @@
             ]
         },
         {
-            "index": 37,
+            "index": 22,
             "suffix": "_2048_true_32",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
             "canonical": [
@@ -1238,7 +1238,7 @@
             ]
         },
         {
-            "index": 38,
+            "index": 23,
             "suffix": "_2048_true_64",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
             "canonical": [
@@ -1291,7 +1291,7 @@
             ]
         },
         {
-            "index": 39,
+            "index": 24,
             "suffix": "_2048_true_128",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
             "canonical": [
@@ -1344,7 +1344,7 @@
             ]
         },
         {
-            "index": 40,
+            "index": 25,
             "suffix": "_4096_false_16",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -1397,7 +1397,7 @@
             ]
         },
         {
-            "index": 44,
+            "index": 26,
             "suffix": "_4096_true_16",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -1450,7 +1450,7 @@
             ]
         },
         {
-            "index": 45,
+            "index": 27,
             "suffix": "_4096_true_32",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
             "canonical": [
@@ -1503,7 +1503,7 @@
             ]
         },
         {
-            "index": 46,
+            "index": 28,
             "suffix": "_4096_true_64",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
             "canonical": [
@@ -1556,7 +1556,7 @@
             ]
         },
         {
-            "index": 47,
+            "index": 29,
             "suffix": "_4096_true_128",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
             "canonical": [
@@ -1609,7 +1609,7 @@
             ]
         },
         {
-            "index": 48,
+            "index": 30,
             "suffix": "_8192_false_16",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -1662,7 +1662,7 @@
             ]
         },
         {
-            "index": 52,
+            "index": 31,
             "suffix": "_8192_true_16",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -1715,7 +1715,7 @@
             ]
         },
         {
-            "index": 53,
+            "index": 32,
             "suffix": "_8192_true_32",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
             "canonical": [
@@ -1768,7 +1768,7 @@
             ]
         },
         {
-            "index": 54,
+            "index": 33,
             "suffix": "_8192_true_64",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
             "canonical": [
@@ -1821,7 +1821,7 @@
             ]
         },
         {
-            "index": 55,
+            "index": 34,
             "suffix": "_8192_true_128",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
             "canonical": [
@@ -1957,22 +1957,22 @@
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 4
+                        "variantIndex": 1
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 5
+                        "variantIndex": 2
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 6
+                        "variantIndex": 3
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 7
+                        "variantIndex": 4
                     }
                 ]
             },
@@ -1982,7 +1982,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 4
+                        "variantIndex": 1
                     }
                 ]
             },
@@ -1992,7 +1992,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 4
+                        "variantIndex": 1
                     }
                 ]
             },
@@ -2002,7 +2002,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 5
+                        "variantIndex": 2
                     }
                 ]
             },
@@ -2012,7 +2012,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 5
+                        "variantIndex": 2
                     }
                 ]
             },
@@ -2022,7 +2022,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 6
+                        "variantIndex": 3
                     }
                 ]
             },
@@ -2032,7 +2032,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 6
+                        "variantIndex": 3
                     }
                 ]
             },
@@ -2042,7 +2042,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 7
+                        "variantIndex": 4
                     }
                 ]
             },
@@ -2052,7 +2052,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 7
+                        "variantIndex": 4
                     }
                 ]
             },
@@ -2062,7 +2062,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 8
+                        "variantIndex": 5
                     }
                 ]
             },
@@ -2072,7 +2072,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 8
+                        "variantIndex": 5
                     }
                 ]
             },
@@ -2082,27 +2082,27 @@
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 8
+                        "variantIndex": 5
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
+                        "variantIndex": 6
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
+                        "variantIndex": 7
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
+                        "variantIndex": 8
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 15
+                        "variantIndex": 9
                     }
                 ]
             },
@@ -2112,7 +2112,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
+                        "variantIndex": 6
                     }
                 ]
             },
@@ -2122,7 +2122,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
+                        "variantIndex": 6
                     }
                 ]
             },
@@ -2132,7 +2132,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
+                        "variantIndex": 7
                     }
                 ]
             },
@@ -2142,7 +2142,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
+                        "variantIndex": 7
                     }
                 ]
             },
@@ -2152,7 +2152,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
+                        "variantIndex": 8
                     }
                 ]
             },
@@ -2162,7 +2162,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
+                        "variantIndex": 8
                     }
                 ]
             },
@@ -2172,7 +2172,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 15
+                        "variantIndex": 9
                     }
                 ]
             },
@@ -2182,7 +2182,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 15
+                        "variantIndex": 9
                     }
                 ]
             },
@@ -2192,7 +2192,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 16
+                        "variantIndex": 10
                     }
                 ]
             },
@@ -2202,7 +2202,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 16
+                        "variantIndex": 10
                     }
                 ]
             },
@@ -2212,27 +2212,27 @@
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 16
+                        "variantIndex": 10
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
+                        "variantIndex": 11
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
+                        "variantIndex": 12
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
+                        "variantIndex": 13
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
+                        "variantIndex": 14
                     }
                 ]
             },
@@ -2242,7 +2242,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
+                        "variantIndex": 11
                     }
                 ]
             },
@@ -2252,7 +2252,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
+                        "variantIndex": 11
                     }
                 ]
             },
@@ -2262,7 +2262,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
+                        "variantIndex": 12
                     }
                 ]
             },
@@ -2272,7 +2272,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
+                        "variantIndex": 12
                     }
                 ]
             },
@@ -2282,7 +2282,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
+                        "variantIndex": 13
                     }
                 ]
             },
@@ -2292,7 +2292,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
+                        "variantIndex": 13
                     }
                 ]
             },
@@ -2302,7 +2302,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
+                        "variantIndex": 14
                     }
                 ]
             },
@@ -2312,7 +2312,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
+                        "variantIndex": 14
                     }
                 ]
             },
@@ -2322,7 +2322,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
+                        "variantIndex": 15
                     }
                 ]
             },
@@ -2332,7 +2332,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
+                        "variantIndex": 15
                     }
                 ]
             },
@@ -2342,27 +2342,27 @@
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
+                        "variantIndex": 15
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
+                        "variantIndex": 16
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 29
+                        "variantIndex": 17
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 30
+                        "variantIndex": 18
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 31
+                        "variantIndex": 19
                     }
                 ]
             },
@@ -2372,7 +2372,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
+                        "variantIndex": 16
                     }
                 ]
             },
@@ -2382,7 +2382,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
+                        "variantIndex": 16
                     }
                 ]
             },
@@ -2392,7 +2392,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 29
+                        "variantIndex": 17
                     }
                 ]
             },
@@ -2402,7 +2402,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 29
+                        "variantIndex": 17
                     }
                 ]
             },
@@ -2412,7 +2412,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 30
+                        "variantIndex": 18
                     }
                 ]
             },
@@ -2422,7 +2422,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 30
+                        "variantIndex": 18
                     }
                 ]
             },
@@ -2432,7 +2432,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 31
+                        "variantIndex": 19
                     }
                 ]
             },
@@ -2442,7 +2442,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 31
+                        "variantIndex": 19
                     }
                 ]
             },
@@ -2452,7 +2452,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 32
+                        "variantIndex": 20
                     }
                 ]
             },
@@ -2462,7 +2462,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 32
+                        "variantIndex": 20
                     }
                 ]
             },
@@ -2472,27 +2472,27 @@
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 32
+                        "variantIndex": 20
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
+                        "variantIndex": 21
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
+                        "variantIndex": 22
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
+                        "variantIndex": 23
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
+                        "variantIndex": 24
                     }
                 ]
             },
@@ -2502,7 +2502,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
+                        "variantIndex": 21
                     }
                 ]
             },
@@ -2512,7 +2512,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
+                        "variantIndex": 21
                     }
                 ]
             },
@@ -2522,7 +2522,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
+                        "variantIndex": 22
                     }
                 ]
             },
@@ -2532,7 +2532,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
+                        "variantIndex": 22
                     }
                 ]
             },
@@ -2542,7 +2542,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
+                        "variantIndex": 23
                     }
                 ]
             },
@@ -2552,7 +2552,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
+                        "variantIndex": 23
                     }
                 ]
             },
@@ -2562,7 +2562,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
+                        "variantIndex": 24
                     }
                 ]
             },
@@ -2572,7 +2572,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
+                        "variantIndex": 24
                     }
                 ]
             },
@@ -2582,7 +2582,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
+                        "variantIndex": 25
                     }
                 ]
             },
@@ -2592,7 +2592,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
+                        "variantIndex": 25
                     }
                 ]
             },
@@ -2602,27 +2602,27 @@
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
+                        "variantIndex": 25
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
+                        "variantIndex": 26
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
+                        "variantIndex": 27
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
+                        "variantIndex": 28
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
+                        "variantIndex": 29
                     }
                 ]
             },
@@ -2632,7 +2632,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
+                        "variantIndex": 26
                     }
                 ]
             },
@@ -2642,7 +2642,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
+                        "variantIndex": 26
                     }
                 ]
             },
@@ -2652,7 +2652,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
+                        "variantIndex": 27
                     }
                 ]
             },
@@ -2662,7 +2662,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
+                        "variantIndex": 27
                     }
                 ]
             },
@@ -2672,7 +2672,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
+                        "variantIndex": 28
                     }
                 ]
             },
@@ -2682,7 +2682,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
+                        "variantIndex": 28
                     }
                 ]
             },
@@ -2692,7 +2692,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
+                        "variantIndex": 29
                     }
                 ]
             },
@@ -2702,7 +2702,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
+                        "variantIndex": 29
                     }
                 ]
             },
@@ -2712,7 +2712,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
+                        "variantIndex": 30
                     }
                 ]
             },
@@ -2722,7 +2722,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
+                        "variantIndex": 30
                     }
                 ]
             },
@@ -2732,27 +2732,27 @@
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
+                        "variantIndex": 30
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
+                        "variantIndex": 31
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
+                        "variantIndex": 32
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     }
                 ]
             },
@@ -2762,7 +2762,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
+                        "variantIndex": 31
                     }
                 ]
             },
@@ -2772,7 +2772,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
+                        "variantIndex": 31
                     }
                 ]
             },
@@ -2782,7 +2782,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
+                        "variantIndex": 32
                     }
                 ]
             },
@@ -2792,7 +2792,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
+                        "variantIndex": 32
                     }
                 ]
             },
@@ -2802,7 +2802,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     }
                 ]
             },
@@ -2812,7 +2812,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     }
                 ]
             },
@@ -2822,7 +2822,7 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     }
                 ]
             },
@@ -2832,7 +2832,7 @@
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     }
                 ]
             }
@@ -2849,172 +2849,172 @@
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 4
+                        "variantIndex": 1
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 5
+                        "variantIndex": 2
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 6
+                        "variantIndex": 3
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 7
+                        "variantIndex": 4
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 8
+                        "variantIndex": 5
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
+                        "variantIndex": 6
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
+                        "variantIndex": 7
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
+                        "variantIndex": 8
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 15
+                        "variantIndex": 9
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 16
+                        "variantIndex": 10
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
+                        "variantIndex": 11
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
+                        "variantIndex": 12
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
+                        "variantIndex": 13
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
+                        "variantIndex": 14
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
+                        "variantIndex": 15
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
+                        "variantIndex": 16
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 29
+                        "variantIndex": 17
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 30
+                        "variantIndex": 18
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 31
+                        "variantIndex": 19
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 32
+                        "variantIndex": 20
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
+                        "variantIndex": 21
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
+                        "variantIndex": 22
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
+                        "variantIndex": 23
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
+                        "variantIndex": 24
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
+                        "variantIndex": 25
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
+                        "variantIndex": 26
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
+                        "variantIndex": 27
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
+                        "variantIndex": 28
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
+                        "variantIndex": 29
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
+                        "variantIndex": 30
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
+                        "variantIndex": 31
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
+                        "variantIndex": 32
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     }
                 ]
             },
@@ -3029,172 +3029,172 @@
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 4
+                        "variantIndex": 1
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 5
+                        "variantIndex": 2
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 6
+                        "variantIndex": 3
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 7
+                        "variantIndex": 4
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 8
+                        "variantIndex": 5
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
+                        "variantIndex": 6
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
+                        "variantIndex": 7
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
+                        "variantIndex": 8
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 15
+                        "variantIndex": 9
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 16
+                        "variantIndex": 10
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
+                        "variantIndex": 11
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
+                        "variantIndex": 12
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
+                        "variantIndex": 13
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
+                        "variantIndex": 14
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
+                        "variantIndex": 15
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
+                        "variantIndex": 16
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 29
+                        "variantIndex": 17
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 30
+                        "variantIndex": 18
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 31
+                        "variantIndex": 19
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 32
+                        "variantIndex": 20
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
+                        "variantIndex": 21
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
+                        "variantIndex": 22
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
+                        "variantIndex": 23
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
+                        "variantIndex": 24
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
+                        "variantIndex": 25
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
+                        "variantIndex": 26
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
+                        "variantIndex": 27
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
+                        "variantIndex": 28
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
+                        "variantIndex": 29
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
+                        "variantIndex": 30
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
+                        "variantIndex": 31
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
+                        "variantIndex": 32
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     }
                 ]
             },
@@ -3209,172 +3209,172 @@
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 4
+                        "variantIndex": 1
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 5
+                        "variantIndex": 2
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 6
+                        "variantIndex": 3
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 7
+                        "variantIndex": 4
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 8
+                        "variantIndex": 5
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
+                        "variantIndex": 6
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
+                        "variantIndex": 7
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
+                        "variantIndex": 8
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 15
+                        "variantIndex": 9
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 16
+                        "variantIndex": 10
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
+                        "variantIndex": 11
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
+                        "variantIndex": 12
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
+                        "variantIndex": 13
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
+                        "variantIndex": 14
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
+                        "variantIndex": 15
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
+                        "variantIndex": 16
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 29
+                        "variantIndex": 17
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 30
+                        "variantIndex": 18
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 31
+                        "variantIndex": 19
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 32
+                        "variantIndex": 20
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
+                        "variantIndex": 21
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
+                        "variantIndex": 22
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
+                        "variantIndex": 23
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
+                        "variantIndex": 24
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
+                        "variantIndex": 25
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
+                        "variantIndex": 26
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
+                        "variantIndex": 27
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
+                        "variantIndex": 28
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
+                        "variantIndex": 29
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
+                        "variantIndex": 30
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
+                        "variantIndex": 31
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
+                        "variantIndex": 32
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     }
                 ]
             },
@@ -3389,172 +3389,172 @@
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 4
+                        "variantIndex": 1
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 5
+                        "variantIndex": 2
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 6
+                        "variantIndex": 3
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 7
+                        "variantIndex": 4
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 8
+                        "variantIndex": 5
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
+                        "variantIndex": 6
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
+                        "variantIndex": 7
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
+                        "variantIndex": 8
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 15
+                        "variantIndex": 9
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 16
+                        "variantIndex": 10
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
+                        "variantIndex": 11
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
+                        "variantIndex": 12
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
+                        "variantIndex": 13
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
+                        "variantIndex": 14
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
+                        "variantIndex": 15
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
+                        "variantIndex": 16
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 29
+                        "variantIndex": 17
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 30
+                        "variantIndex": 18
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 31
+                        "variantIndex": 19
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 32
+                        "variantIndex": 20
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
+                        "variantIndex": 21
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
+                        "variantIndex": 22
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
+                        "variantIndex": 23
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
+                        "variantIndex": 24
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
+                        "variantIndex": 25
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
+                        "variantIndex": 26
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
+                        "variantIndex": 27
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
+                        "variantIndex": 28
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
+                        "variantIndex": 29
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
+                        "variantIndex": 30
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
+                        "variantIndex": 31
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
+                        "variantIndex": 32
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     }
                 ]
             }
@@ -3571,172 +3571,172 @@
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 4
+                        "variantIndex": 1
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 5
+                        "variantIndex": 2
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 6
+                        "variantIndex": 3
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 7
+                        "variantIndex": 4
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 8
+                        "variantIndex": 5
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
+                        "variantIndex": 6
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
+                        "variantIndex": 7
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
+                        "variantIndex": 8
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 15
+                        "variantIndex": 9
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 16
+                        "variantIndex": 10
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
+                        "variantIndex": 11
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
+                        "variantIndex": 12
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
+                        "variantIndex": 13
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
+                        "variantIndex": 14
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
+                        "variantIndex": 15
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
+                        "variantIndex": 16
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 29
+                        "variantIndex": 17
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 30
+                        "variantIndex": 18
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 31
+                        "variantIndex": 19
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 32
+                        "variantIndex": 20
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
+                        "variantIndex": 21
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
+                        "variantIndex": 22
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
+                        "variantIndex": 23
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
+                        "variantIndex": 24
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
+                        "variantIndex": 25
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
+                        "variantIndex": 26
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
+                        "variantIndex": 27
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
+                        "variantIndex": 28
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
+                        "variantIndex": 29
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
+                        "variantIndex": 30
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
+                        "variantIndex": 31
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
+                        "variantIndex": 32
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     }
                 ]
             }
@@ -3753,22 +3753,22 @@
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 4
+                        "variantIndex": 1
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 5
+                        "variantIndex": 2
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 6
+                        "variantIndex": 3
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 7
+                        "variantIndex": 4
                     }
                 ]
             },
@@ -3778,27 +3778,27 @@
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 8
+                        "variantIndex": 5
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
+                        "variantIndex": 6
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
+                        "variantIndex": 7
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
+                        "variantIndex": 8
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 15
+                        "variantIndex": 9
                     }
                 ]
             },
@@ -3808,27 +3808,27 @@
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 16
+                        "variantIndex": 10
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
+                        "variantIndex": 11
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
+                        "variantIndex": 12
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
+                        "variantIndex": 13
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
+                        "variantIndex": 14
                     }
                 ]
             },
@@ -3838,27 +3838,27 @@
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
+                        "variantIndex": 15
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
+                        "variantIndex": 16
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 29
+                        "variantIndex": 17
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 30
+                        "variantIndex": 18
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 31
+                        "variantIndex": 19
                     }
                 ]
             },
@@ -3868,27 +3868,27 @@
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 32
+                        "variantIndex": 20
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
+                        "variantIndex": 21
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
+                        "variantIndex": 22
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
+                        "variantIndex": 23
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
+                        "variantIndex": 24
                     }
                 ]
             },
@@ -3898,27 +3898,27 @@
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
+                        "variantIndex": 25
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
+                        "variantIndex": 26
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
+                        "variantIndex": 27
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
+                        "variantIndex": 28
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
+                        "variantIndex": 29
                     }
                 ]
             },
@@ -3928,27 +3928,27 @@
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
+                        "variantIndex": 30
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
+                        "variantIndex": 31
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
+                        "variantIndex": 32
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     },
                     {
                         "entryPoint": "",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     }
                 ]
             }
@@ -3970,342 +3970,342 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 4
+                        "variantIndex": 1
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 1
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 2
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 2
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 3
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 3
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 4
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
                         "variantIndex": 4
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
                         "variantIndex": 5
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
                         "variantIndex": 5
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 6
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 6
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
                         "variantIndex": 7
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
                         "variantIndex": 7
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
                         "variantIndex": 8
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
                         "variantIndex": 8
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 15
+                        "variantIndex": 9
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 9
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 10
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 10
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 11
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 11
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 12
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 12
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 13
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 13
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 14
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 14
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 15
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
                         "variantIndex": 15
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 16
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 16
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 29
+                        "variantIndex": 17
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 17
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 18
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 18
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 19
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 19
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 20
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 20
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 21
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 21
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 22
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 22
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 23
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 23
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 24
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 24
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 25
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 25
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 26
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 26
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 27
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 27
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 28
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 28
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 29
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
                         "variantIndex": 29
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
                         "variantIndex": 30
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
                         "variantIndex": 30
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 31
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 31
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
                         "variantIndex": 32
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
                         "variantIndex": 32
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     }
                 ]
             },
@@ -4320,172 +4320,172 @@
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 4
+                        "variantIndex": 1
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 5
+                        "variantIndex": 2
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 6
+                        "variantIndex": 3
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 7
+                        "variantIndex": 4
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 8
+                        "variantIndex": 5
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
+                        "variantIndex": 6
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
+                        "variantIndex": 7
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
+                        "variantIndex": 8
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 15
+                        "variantIndex": 9
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 16
+                        "variantIndex": 10
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
+                        "variantIndex": 11
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
+                        "variantIndex": 12
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
+                        "variantIndex": 13
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
+                        "variantIndex": 14
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
+                        "variantIndex": 15
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
+                        "variantIndex": 16
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 29
+                        "variantIndex": 17
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 30
+                        "variantIndex": 18
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 31
+                        "variantIndex": 19
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 32
+                        "variantIndex": 20
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
+                        "variantIndex": 21
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
+                        "variantIndex": 22
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
+                        "variantIndex": 23
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
+                        "variantIndex": 24
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
+                        "variantIndex": 25
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
+                        "variantIndex": 26
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
+                        "variantIndex": 27
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
+                        "variantIndex": 28
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
+                        "variantIndex": 29
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
+                        "variantIndex": 30
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
+                        "variantIndex": 31
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
+                        "variantIndex": 32
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     }
                 ]
             }
@@ -4512,512 +4512,512 @@
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 4
+                        "variantIndex": 1
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 4
+                        "variantIndex": 1
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 1
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 2
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 2
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 2
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 3
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 3
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 3
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 4
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 4
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
                         "variantIndex": 4
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
                         "variantIndex": 5
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
                         "variantIndex": 5
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
                         "variantIndex": 5
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 6
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 6
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 6
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
                         "variantIndex": 7
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
                         "variantIndex": 7
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
                         "variantIndex": 7
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
                         "variantIndex": 8
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
                         "variantIndex": 8
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
                         "variantIndex": 8
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 12
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 13
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 14
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 15
+                        "variantIndex": 9
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 15
+                        "variantIndex": 9
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 9
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 10
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 10
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 10
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 11
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 11
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 11
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 12
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 12
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 12
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 13
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 13
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 13
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 14
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 14
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 14
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 15
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 15
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
                         "variantIndex": 15
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 16
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 16
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 16
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 20
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 21
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 22
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 23
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 24
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 28
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 29
+                        "variantIndex": 17
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 29
+                        "variantIndex": 17
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 17
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 18
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 18
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 18
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 19
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 19
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 19
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 20
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 20
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 20
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 21
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 21
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 21
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 22
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 22
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 22
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 23
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 23
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 23
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 24
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 24
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 24
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 25
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 25
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 25
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 26
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 26
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
+                        "variantIndex": 26
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 27
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 27
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
+                        "variantIndex": 27
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 28
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 28
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variantIndex": 28
+                    },
+                    {
+                        "entryPoint": "IfftRadix2CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 29
+                    },
+                    {
+                        "entryPoint": "IfftRadix4CS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variantIndex": 29
+                    },
+                    {
+                        "entryPoint": "IfftPermuteCS",
+                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
                         "variantIndex": 29
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
                         "variantIndex": 30
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
                         "variantIndex": 30
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
                         "variantIndex": 30
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 31
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 31
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
                         "variantIndex": 31
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
                         "variantIndex": 32
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
                         "variantIndex": 32
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
+                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
                         "variantIndex": 32
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 36
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 37
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 38
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 39
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 40
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 44
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 45
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 46
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 47
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 48
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
-                        "variantIndex": 52
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
-                    },
-                    {
-                        "entryPoint": "IfftRadix4CS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
-                    },
-                    {
-                        "entryPoint": "IfftPermuteCS",
-                        "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
-                        "variantIndex": 53
-                    },
-                    {
-                        "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
-                        "variantIndex": 54
+                        "variantIndex": 33
                     },
                     {
                         "entryPoint": "IfftRadix2CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     },
                     {
                         "entryPoint": "IfftRadix4CS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     },
                     {
                         "entryPoint": "IfftPermuteCS",
                         "variant": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
-                        "variantIndex": 55
+                        "variantIndex": 34
                     }
                 ]
             }

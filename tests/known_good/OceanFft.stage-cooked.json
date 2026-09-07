@@ -812,7 +812,7 @@
             ]
         },
         {
-            "index": 4,
+            "index": 1,
             "suffix": "_128_true_16",
             "description": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -865,7 +865,7 @@
             ]
         },
         {
-            "index": 5,
+            "index": 2,
             "suffix": "_128_true_32",
             "description": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
             "canonical": [
@@ -918,7 +918,7 @@
             ]
         },
         {
-            "index": 6,
+            "index": 3,
             "suffix": "_128_true_64",
             "description": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
             "canonical": [
@@ -971,7 +971,7 @@
             ]
         },
         {
-            "index": 7,
+            "index": 4,
             "suffix": "_128_true_128",
             "description": "IFFT_SIZE=128, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
             "canonical": [
@@ -1024,7 +1024,7 @@
             ]
         },
         {
-            "index": 8,
+            "index": 5,
             "suffix": "_256_false_16",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -1077,7 +1077,7 @@
             ]
         },
         {
-            "index": 12,
+            "index": 6,
             "suffix": "_256_true_16",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -1130,7 +1130,7 @@
             ]
         },
         {
-            "index": 13,
+            "index": 7,
             "suffix": "_256_true_32",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
             "canonical": [
@@ -1183,7 +1183,7 @@
             ]
         },
         {
-            "index": 14,
+            "index": 8,
             "suffix": "_256_true_64",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
             "canonical": [
@@ -1236,7 +1236,7 @@
             ]
         },
         {
-            "index": 15,
+            "index": 9,
             "suffix": "_256_true_128",
             "description": "IFFT_SIZE=256, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
             "canonical": [
@@ -1289,7 +1289,7 @@
             ]
         },
         {
-            "index": 16,
+            "index": 10,
             "suffix": "_512_false_16",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -1342,7 +1342,7 @@
             ]
         },
         {
-            "index": 20,
+            "index": 11,
             "suffix": "_512_true_16",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -1395,7 +1395,7 @@
             ]
         },
         {
-            "index": 21,
+            "index": 12,
             "suffix": "_512_true_32",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
             "canonical": [
@@ -1448,7 +1448,7 @@
             ]
         },
         {
-            "index": 22,
+            "index": 13,
             "suffix": "_512_true_64",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
             "canonical": [
@@ -1501,7 +1501,7 @@
             ]
         },
         {
-            "index": 23,
+            "index": 14,
             "suffix": "_512_true_128",
             "description": "IFFT_SIZE=512, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
             "canonical": [
@@ -1554,7 +1554,7 @@
             ]
         },
         {
-            "index": 24,
+            "index": 15,
             "suffix": "_1024_false_16",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -1607,7 +1607,7 @@
             ]
         },
         {
-            "index": 28,
+            "index": 16,
             "suffix": "_1024_true_16",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -1660,7 +1660,7 @@
             ]
         },
         {
-            "index": 29,
+            "index": 17,
             "suffix": "_1024_true_32",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
             "canonical": [
@@ -1713,7 +1713,7 @@
             ]
         },
         {
-            "index": 30,
+            "index": 18,
             "suffix": "_1024_true_64",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
             "canonical": [
@@ -1766,7 +1766,7 @@
             ]
         },
         {
-            "index": 31,
+            "index": 19,
             "suffix": "_1024_true_128",
             "description": "IFFT_SIZE=1024, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
             "canonical": [
@@ -1819,7 +1819,7 @@
             ]
         },
         {
-            "index": 32,
+            "index": 20,
             "suffix": "_2048_false_16",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -1872,7 +1872,7 @@
             ]
         },
         {
-            "index": 36,
+            "index": 21,
             "suffix": "_2048_true_16",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -1925,7 +1925,7 @@
             ]
         },
         {
-            "index": 37,
+            "index": 22,
             "suffix": "_2048_true_32",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
             "canonical": [
@@ -1978,7 +1978,7 @@
             ]
         },
         {
-            "index": 38,
+            "index": 23,
             "suffix": "_2048_true_64",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
             "canonical": [
@@ -2031,7 +2031,7 @@
             ]
         },
         {
-            "index": 39,
+            "index": 24,
             "suffix": "_2048_true_128",
             "description": "IFFT_SIZE=2048, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
             "canonical": [
@@ -2084,7 +2084,7 @@
             ]
         },
         {
-            "index": 40,
+            "index": 25,
             "suffix": "_4096_false_16",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -2137,7 +2137,7 @@
             ]
         },
         {
-            "index": 44,
+            "index": 26,
             "suffix": "_4096_true_16",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -2190,7 +2190,7 @@
             ]
         },
         {
-            "index": 45,
+            "index": 27,
             "suffix": "_4096_true_32",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
             "canonical": [
@@ -2243,7 +2243,7 @@
             ]
         },
         {
-            "index": 46,
+            "index": 28,
             "suffix": "_4096_true_64",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
             "canonical": [
@@ -2296,7 +2296,7 @@
             ]
         },
         {
-            "index": 47,
+            "index": 29,
             "suffix": "_4096_true_128",
             "description": "IFFT_SIZE=4096, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
             "canonical": [
@@ -2349,7 +2349,7 @@
             ]
         },
         {
-            "index": 48,
+            "index": 30,
             "suffix": "_8192_false_16",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=false, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -2402,7 +2402,7 @@
             ]
         },
         {
-            "index": 52,
+            "index": 31,
             "suffix": "_8192_true_16",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=16",
             "canonical": [
@@ -2455,7 +2455,7 @@
             ]
         },
         {
-            "index": 53,
+            "index": 32,
             "suffix": "_8192_true_32",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=32",
             "canonical": [
@@ -2508,7 +2508,7 @@
             ]
         },
         {
-            "index": 54,
+            "index": 33,
             "suffix": "_8192_true_64",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=64",
             "canonical": [
@@ -2561,7 +2561,7 @@
             ]
         },
         {
-            "index": 55,
+            "index": 34,
             "suffix": "_8192_true_128",
             "description": "IFFT_SIZE=8192, IFFT_USE_WAVE_OPS=true, IFFT_WAVE_SIZE=128",
             "canonical": [
