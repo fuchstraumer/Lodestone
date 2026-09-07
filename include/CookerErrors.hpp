@@ -52,6 +52,7 @@ enum class CookError : uint16_t
     PermutationConstraintInvalidExpression = 86,
     PermutationConstraintEmptyRequireExpression = 87,
     PermutationVariantBudgetExceeded = 88,
+    PermutationKeySpaceTooLarge = 89, // the key space for permutations exceeds the allowed limit (log2(i) < 64 (bits))
 
     LibraryRoundTripFailed = 90,
     CookNotDeterministic = 91,
@@ -66,6 +67,10 @@ enum class CookError : uint16_t
     ManifestVertexInputMismatch = 100,
     ManifestColorTargetMismatch = 101,
     ManifestRasterStateMismatch = 102,
+
+    ManifestShaderLayoutVariantIndicesInvalid = 110,
+    ManifestShaderLayoutVisiblityIndexInvalid = 111,
+    ManifestShaderLayoutResourceListIndexInvalid = 112,
 
 
     // output and diagnostic sink operation errors

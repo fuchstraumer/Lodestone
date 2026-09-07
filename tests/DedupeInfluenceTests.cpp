@@ -12,6 +12,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <format>
 #include <string>
 #include <string_view>
@@ -34,6 +35,39 @@ namespace
 constexpr std::string_view k_ActiveEntryPoint = "ActiveCS";
 constexpr std::string_view k_InertEntryPoint = "InertCS";
 constexpr std::string_view k_ConditionalEntryPoint = "ConditionalCS";
+
+// This used to be in DedupeReport.hpp/.cpp, but it's oddly specific and isn't really often
+// a useful metric in library code (in most cases). It's a useful test case though, so it's
+// been moved here but removed from internal library headers/source
+CookResult<bool> AllVariantsShareOneLayout(const CookedModule& module)
+{
+    bool seenOne = false;
+    ShaderLayoutView first;
+
+    for (const LibraryVariant& variant : module.Variants)
+    {
+        for (size_t i = 0u; i < variant.VisibilityIndices.size(); ++i)
+        {
+            CookResult<ShaderLayoutView> layout = ResolveLayoutView(module, variant, i);
+            if (!layout.has_value())
+            {
+                return std::unexpected(layout.error());
+            }
+
+            if (!seenOne)
+            {
+                first = layout.value();
+                seenOne = true;
+            }
+            else if (layout.value() != first)
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
 
 PermutationAxis MakeBoolAxis(std::string name)
 {
@@ -316,8 +350,10 @@ void CheckSharedLayoutAgrees(lodestone::tests::TestRunner& runner, const Permuta
 
     runner.Check(deduped.Resources.size() == 1u && raw.Resources.size() == 2u,
                  "the two arms hold the same one resource in a different number of entries");
-    runner.Check(AllVariantsShareOneLayout(deduped), "with dedup on, every permutation shares one layout");
-    runner.Check(AllVariantsShareOneLayout(raw),
+    const CookResult<bool> dedupedResult = AllVariantsShareOneLayout(deduped);
+    runner.Check(dedupedResult.has_value() ? dedupedResult.value() : false, "with dedup on, every permutation shares one layout");
+    const CookResult<bool> rawResult = AllVariantsShareOneLayout(raw);
+    runner.Check(rawResult.has_value() ? rawResult.value() : false,
                  "with dedup off, every permutation still shares one layout, because the claim is "
                  "about the content and not about the table size");
 }
@@ -328,7 +364,9 @@ void CheckSharedLayoutRejectsADifference(lodestone::tests::TestRunner& runner, c
     runner.BeginSection("the shared layout claim is falsifiable");
 
     CookedModule module = BuildSingleEntryPointModule(space, true);
-    runner.Check(AllVariantsShareOneLayout(module), "the module starts with one shared layout");
+    
+    const CookResult<bool> initialResult = AllVariantsShareOneLayout(module);
+    runner.Check(initialResult.has_value() ? initialResult.value() : false, "the module starts with one shared layout");
 
     ReflectedBinding moved = module.Resources.front();
     moved.Placement = BoundPlacement{ .Group = 0u, .Binding = 7u };
@@ -336,7 +374,8 @@ void CheckSharedLayoutRejectsADifference(lodestone::tests::TestRunner& runner, c
     module.ResourceLists.push_back(ResourceList{ static_cast<uint32_t>(module.Resources.size() - 1u) });
     module.Variants.front().ResourceListIndex = static_cast<uint32_t>(module.ResourceLists.size() - 1u);
 
-    runner.Check(!AllVariantsShareOneLayout(module), "one variant with a different layout ends the claim");
+    const CookResult<bool> finalResult = AllVariantsShareOneLayout(module);
+    runner.Check(finalResult.has_value() ? !finalResult.value() : true, "one variant with a different layout ends the claim");
 }
 
 /** The measurement must read every group of variants, not the first one it finds. */

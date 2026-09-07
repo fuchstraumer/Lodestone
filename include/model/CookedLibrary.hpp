@@ -156,13 +156,13 @@ std::string_view ResolveSource(const CookedModule& module,
 
 /**@brief Retrieve the final shader layout built for one entry point of one variant
  * within a module.*/
-ShaderLayout ResolveLayout(const CookedModule& module,
-                           const LibraryVariant& variant,
-                           size_t entry_point_index);
+CookResult<ShaderLayout> ResolveLayout(const CookedModule& module,
+                                       const LibraryVariant& variant,
+                                       size_t entry_point_index);
 
-ShaderLayoutView ResolveLayoutView(const CookedModule& module,
-                                   const LibraryVariant& variant,
-                                   size_t entry_point_index);
+CookResult<ShaderLayoutView> ResolveLayoutView(const CookedModule& module,
+                                               const LibraryVariant& variant,
+                                               size_t entry_point_index);
 
 } // namespace lodestone
 

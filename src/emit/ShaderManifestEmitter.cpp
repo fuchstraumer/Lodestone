@@ -311,7 +311,12 @@ namespace
         }
 
         const ManifestVariant& readVariant = *readVariantIter;
-        const ShaderLayoutView expectedLayout = ResolveLayoutView(module, variant, entry_point_index);
+        const CookResult<ShaderLayoutView> expectedLayoutResult = ResolveLayoutView(module, variant, entry_point_index);
+        if (!expectedLayoutResult)
+        {
+            return expectedLayoutResult.error();
+        }
+        const ShaderLayoutView& expectedLayout = *expectedLayoutResult;
 
         const std::span<const uint32_t> resources = view.ResourceList(readVariant.ResourceListIndex);
         const std::span<const ManifestFootprint> footprints =

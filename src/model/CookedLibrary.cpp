@@ -217,9 +217,9 @@ std::string_view ResolveSource(const CookedModule& module,
     return module.Sources[sourceIndex];
 }
 
-ShaderLayout ResolveLayout(const CookedModule& module,
-                           const LibraryVariant& variant,
-                           size_t entry_point_index)
+CookResult<ShaderLayout> ResolveLayout(const CookedModule& module,
+                                       const LibraryVariant& variant,
+                                       size_t entry_point_index)
 {
     // remember that visiblity indices is per-EP in this data, so if
     // input index is bigger than that list, it's not in range
@@ -227,7 +227,7 @@ ShaderLayout ResolveLayout(const CookedModule& module,
         variant.ResourceListIndex >= module.ResourceLists.size() ||
         variant.FootprintListIndex >= module.FootprintLists.size())
     {
-        return {};
+        return std::unexpected(CookError::ManifestShaderLayoutVariantIndicesInvalid);
     }
 
     // another indirection: visiblity lists are stored separately. EP idx just keys to that.
@@ -235,7 +235,7 @@ ShaderLayout ResolveLayout(const CookedModule& module,
     const uint32_t visibilityIndex = variant.VisibilityIndices[entry_point_index];
     if (visibilityIndex >= module.VisibilityLists.size())
     {
-        return {};
+        return std::unexpected(CookError::ManifestShaderLayoutVisiblityIndexInvalid);
     }
 
     const ResourceList& resources = module.ResourceLists[variant.ResourceListIndex];
@@ -248,32 +248,31 @@ ShaderLayout ResolveLayout(const CookedModule& module,
     {
         if (localRsrcIndex >= resources.size() || resources[localRsrcIndex] >= module.Resources.size())
         {
-            return {};
+            return std::unexpected(CookError::ManifestShaderLayoutResourceListIndexInvalid);
         }
 
-        ResourceFootprint footprint =
-            localRsrcIndex < footprints.size() ? footprints[localRsrcIndex] : ResourceFootprint{};
-        layout.emplace_back(module.Resources[resources[localRsrcIndex]], footprint);
+        layout.emplace_back(module.Resources[resources[localRsrcIndex]],
+                            localRsrcIndex < footprints.size() ? footprints[localRsrcIndex] : ResourceFootprint{});
     }
 
     return layout;
 }
 
-ShaderLayoutView ResolveLayoutView(const CookedModule& module,
-                                   const LibraryVariant& variant,
-                                   size_t entry_point_index)
+CookResult<ShaderLayoutView> ResolveLayoutView(const CookedModule& module,
+                                               const LibraryVariant& variant,
+                                               size_t entry_point_index)
 {
     if (entry_point_index >= variant.VisibilityIndices.size() ||
         variant.ResourceListIndex >= module.ResourceLists.size() ||
         variant.FootprintListIndex >= module.FootprintLists.size()) [[unlikely]]
     {
-        return {};
+        return std::unexpected(CookError::ManifestShaderLayoutVariantIndicesInvalid);
     }
 
     const uint32_t visibilityIndex = variant.VisibilityIndices[entry_point_index];
     if (visibilityIndex >= module.VisibilityLists.size()) [[unlikely]]
     {
-        return {};
+        return std::unexpected(CookError::ManifestShaderLayoutVisiblityIndexInvalid);
     }
 
     const ResourceList& resources = module.ResourceLists[variant.ResourceListIndex];
@@ -286,12 +285,12 @@ ShaderLayoutView ResolveLayoutView(const CookedModule& module,
         if (localRsrcIndex >= resources.size() || resources[localRsrcIndex] >= module.Resources.size())
             [[unlikely]]
         {
-            return {};
+            return std::unexpected(CookError::ManifestShaderLayoutResourceListIndexInvalid);
         }
 
-        const ResourceFootprint* footprint =
-            localRsrcIndex < footprints.size() ? &footprints[localRsrcIndex] : nullptr;
-        layoutView.emplace_back(&module.Resources[resources[localRsrcIndex]], footprint);
+
+        layoutView.emplace_back(&module.Resources[resources[localRsrcIndex]],
+                                localRsrcIndex < footprints.size() ? &footprints[localRsrcIndex] : nullptr);
     }
 
     return layoutView;

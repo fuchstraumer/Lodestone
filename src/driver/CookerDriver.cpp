@@ -229,7 +229,18 @@ namespace
 
             for (size_t i = 0u; i < origin->EntryPoints.size(); ++i)
             {
-                if (ResolveLayoutView(module, variant, i) == BuildEntryPointLayoutView(*origin, i))
+                const CookResult<ShaderLayoutView> resolved = ResolveLayoutView(module, variant, i);
+                if (!resolved)
+                {
+                    lastError = ReportError(diagnostics,
+                                            resolved.error(),
+                                            std::format("LAYOUT ROUND TRIP: could not resolve the layout for "
+                                                        "{} [{}]",
+                                                        origin->EntryPoints[i].Name,
+                                                        variant.Description));
+                    continue;
+                }
+                if (resolved.value() == BuildEntryPointLayoutView(*origin, i))
                 {
                     continue;
                 }
