@@ -21,7 +21,8 @@ Checks: >
   -bugprone-throwing-static-initialization,
   -cppcoreguidelines-non-private-member-variables-in-classes,
   -misc-non-private-member-variables-in-classes,
-  -cppcoreguidelines-pro-type-union-access
+  -cppcoreguidelines-pro-type-union-access,
+  -modernize-use-auto
 
 WarningsAsErrors: ''
 HeaderFilterRegex: '.*(src|include|client|tests)/.*'
