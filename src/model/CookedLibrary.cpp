@@ -7,6 +7,7 @@
 #include "model/ShaderDataSchema.hpp"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <expected>
@@ -14,7 +15,13 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunsafe-buffer-usage-in-container"
+#endif // __clang__
 
 namespace lodestone
 {
@@ -22,15 +29,16 @@ namespace lodestone
 ContentHashValue HashIndexList(const std::vector<uint32_t>& indices) noexcept
 {
     // this feels a little.... UB
-    std::span<const uint32_t> indicesSpan{ indices.data(), indices.size() };
-    std::span<const std::byte> indicesBytesSpan = std::as_bytes(indicesSpan);
+    const std::span<const uint32_t> indicesSpan{ indices.data(), indices.size() };
+    const std::span<const std::byte> indicesBytesSpan = std::as_bytes(indicesSpan);
     return HashBytes(indicesBytesSpan);
 }
 
 ContentHashValue HashSourceString(const std::string& source) noexcept
 {
     // make string_view from source first, then cast to std::span<const std::byte> for hashing
-    auto bytesSpan = std::as_bytes(std::span{ source.data(), source.length() });
+    const std::span<const char> sourceSpan{ source.data(), source.length() };
+    const std::span<const std::byte> bytesSpan = std::as_bytes(sourceSpan);
     return HashBytes(bytesSpan);
 }
 
@@ -49,7 +57,7 @@ ContentHashValue HashFootprintList(const std::vector<ResourceFootprint>& footpri
     thread_local StreamingHash compositeHasher;
     compositeHasher.Reset(); // originally wanted to use local array
     // reusable array for at most 4 scalar values per footprint
-    std::array<uint64_t, 4> footprintScalars;
+    std::array<uint64_t, 4> footprintScalars{ 0u, 0u, 0u, 0u }; 
     // can we construct this using ranges?
     for (const ResourceFootprint& footprint : footprints)
     {
@@ -181,6 +189,7 @@ CookedModule FreezeModuleTables(InternedModule&& interned)
     module.SpaceSize = interned.SpaceSize;
     module.EntryPoints = std::move(interned.EntryPoints);
     module.Variants = std::move(interned.Variants);
+    module.VariantKeys = std::move(interned.VariantKeys);
 
     module.Sources = interned.SourceInterner.ConsumeTable();
     module.Resources = interned.ResourceInterner.ConsumeTable();
@@ -297,3 +306,7 @@ CookResult<ShaderLayoutView> ResolveLayoutView(const CookedModule& module,
 }
 
 } // namespace lodestone
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif // __clang__

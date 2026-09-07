@@ -64,12 +64,12 @@ struct PermutationAxis
     AxisValueDomain ValueDomain{ AxisValueDomain::None };
     std::string ActiveWhen{};
 
-    [[nodiscard]] int64_t NumValues() const noexcept;
+    [[nodiscard]] uint64_t NumValues() const noexcept;
     [[nodiscard]] std::span<const PermutationValue> GetValues() const noexcept;
     [[nodiscard]] const PermutationValue& GetDefault() const noexcept;
 
 private:
-    int64_t numValues{ -1 };
+    uint64_t numValues{ 0 };
     std::array<PermutationValue, k_MaxValues> values;
 };
 

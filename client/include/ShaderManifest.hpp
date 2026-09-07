@@ -26,9 +26,7 @@ namespace lodestone
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 1u;
-/** A slot in the variant index table that no variant occupies. */
-inline constexpr uint32_t k_ShaderManifestNoIndex = 0xFFFFFFFFu;
+inline constexpr uint32_t k_ShaderManifestVersion = 2u;
 
 enum class ShaderManifestError : uint8_t
 {
@@ -52,7 +50,7 @@ std::string_view ToString(ShaderManifestError error) noexcept;
 
 /** @brief Fixed header at offset zero. Each section is an offset from the start of the file and a
  * count of records. All values are little-endian. */
-struct ShaderManifestHeader
+struct alignas(8) ShaderManifestHeader
 {
     uint32_t Magic{ 0u };
     uint32_t Version{ 0u };
@@ -94,8 +92,8 @@ struct ShaderManifestHeader
 
     uint32_t VariantTableOffset{ 0u };
     uint32_t VariantCount{ 0u };
-    uint32_t VariantIndexTableOffset{ 0u };
-    uint32_t VariantIndexCount{ 0u };
+    uint32_t VariantKeyTableOffset{ 0u };
+    uint32_t VariantKeyCount{ 0u };
 
     uint32_t AxisTableOffset{ 0u };
     uint32_t AxisCount{ 0u };
@@ -112,13 +110,13 @@ struct ShaderManifestHeader
     uint32_t UniformMemberCount{ 0u };
 };
 
-struct ManifestStringRef
+struct alignas(8) ManifestStringRef
 {
     uint32_t Offset{ 0u };
     uint32_t Length{ 0u };
 };
 
-struct ManifestSourceRef
+struct alignas(8) ManifestSourceRef
 {
     uint32_t Offset{ 0u };
     uint32_t Length{ 0u };
@@ -126,7 +124,7 @@ struct ManifestSourceRef
 
 /** @brief One resource binding. Field order puts the 8-byte members first, so the record needs no
  * padding on any target and its size stays the same on every compiler. */
-struct ManifestBinding
+struct alignas(8) ManifestBinding
 {
     uint64_t ByteSize{ 0u };
     uint32_t NameString{ 0u };
@@ -154,7 +152,7 @@ struct ManifestBinding
  * `ExtentX/Y/Z` is only valid for a texture. The latter is NOT a byte size: it is pixel dims.*/
 // todo-ship: Union ExtentX w ElementCount, or just replace ElementCount with ExtentX. That's what a buffer
 // length is anyways. This gets us to a round 16 bytes, which is nice and aligned vs 24 now
-struct ManifestFootprint
+struct alignas(8) ManifestFootprint
 {
     uint64_t ElementCount{ 0u };
     uint32_t ExtentX{ 0u };
@@ -165,20 +163,20 @@ struct ManifestFootprint
 
 /** @brief A run in an index table. Used for a resource list and for a visibility list. Variants can have
  *  different counts of resources, so this allows us to compact them efficiently in the binary schema. */
-struct ManifestRun
+struct alignas(8) ManifestRun
 {
     uint32_t First{ 0u };
     uint32_t Count{ 0u };
 };
 
-struct ManifestEntryPoint
+struct alignas(8) ManifestEntryPoint
 {
     uint32_t NameString{ 0u };
     uint32_t Stage{ 0u };
 };
 
 /** @brief What one entry point of one variant resolves to. */
-struct ManifestSlot
+struct alignas(8) ManifestSlot
 {
     uint32_t SourceIndex{ 0u };
     /** @brief Index into visibility list table: which of the variant's resources this entry point reads.*/
@@ -189,7 +187,7 @@ struct ManifestSlot
     uint32_t RasterIndex{ 0u };
 };
 
-struct ManifestVertexInput
+struct alignas(8) ManifestVertexInput
 {
     uint32_t SemanticNameString{ 0u };
     uint32_t SemanticIndex{ 0u };
@@ -199,7 +197,7 @@ struct ManifestVertexInput
     uint32_t Reserved{ 0u };
 };
 
-struct ManifestUniformMember
+struct alignas(8) ManifestUniformMember
 {
     uint32_t NameString{ 0u };
     uint32_t Offset{ 0u };
@@ -207,7 +205,7 @@ struct ManifestUniformMember
     uint32_t ArrayCount{ 1u };
 };
 
-struct ManifestColorTarget
+struct alignas(8) ManifestColorTarget
 {
     uint32_t Location{ 0u };
     uint32_t ScalarType{ 0u };
@@ -217,7 +215,7 @@ struct ManifestColorTarget
 
 /** @brief Runs of vertex inputs and color targets. A compute entry point names a raster record whose
  * counts are both zero, so every slot can name one and no accessor needs a stage test. */
-struct ManifestRaster
+struct alignas(8) ManifestRaster
 {
     uint32_t FirstVertexInput{ 0u };
     uint32_t VertexInputCount{ 0u };
@@ -227,7 +225,7 @@ struct ManifestRaster
     uint32_t Reserved{ 0u };
 };
 
-struct ManifestVariant
+struct alignas(8) ManifestVariant
 {
     uint32_t Index{ 0u };
     uint32_t FirstSlot{ 0u };
@@ -238,7 +236,7 @@ struct ManifestVariant
     uint32_t FootprintListIndex{ 0u };
 };
 
-struct ManifestAxis
+struct alignas(8) ManifestAxis
 {
     uint32_t NameString{ 0u };
     uint32_t FirstValue{ 0u };
@@ -298,6 +296,7 @@ public:
     [[nodiscard]] std::span<const uint32_t> VisibilityList(uint32_t list_index) const noexcept;
     [[nodiscard]] std::span<const ManifestEntryPoint> EntryPoints() const noexcept;
     [[nodiscard]] std::span<const ManifestVariant> Variants() const noexcept;
+    [[nodiscard]] std::span<const uint64_t> VariantKeys() const noexcept;
     [[nodiscard]] std::span<const ManifestAxis> Axes() const noexcept;
     [[nodiscard]] std::span<const int64_t> AxisValues(uint32_t axis_index) const noexcept;
 
@@ -312,7 +311,7 @@ public:
      *
      * `entry_point` is the `EntryPointId` value, so it counts from one and zero is Invalid.
      * `variant_index` is the dense index, the same number the generated library uses. */
-    [[nodiscard]] const ManifestSlot* FindSlot(uint16_t entry_point, uint32_t variant_index) const noexcept;
+    [[nodiscard]] const ManifestSlot* FindSlot(uint16_t entry_point, uint64_t variant_key) const noexcept;
     /** @brief One slot for each entry point of this variant, in entry point order. */
     [[nodiscard]] std::span<const ManifestSlot> Slots(const ManifestVariant& variant) const noexcept;
     /** @brief Every slot, in file order. */
@@ -333,7 +332,7 @@ private:
     std::span<const ManifestEntryPoint> entryPoints;
     std::span<const ManifestSlot> slots;
     std::span<const ManifestVariant> variants;
-    std::span<const uint32_t> variantIndices;
+    std::span<const uint64_t> variantKeys;
     std::span<const ManifestAxis> axes;
     std::span<const int64_t> axisValues;
     std::span<const ManifestRaster> rasterStates;

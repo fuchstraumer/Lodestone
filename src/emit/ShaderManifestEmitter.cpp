@@ -675,23 +675,6 @@ namespace
         return tables;
     }
 
-    /** Maps a dense variant index to a row of the variant table. A hole keeps k_ShaderManifestNoIndex. */
-    std::vector<uint32_t> BuildVariantIndexTable(const CookedModule& module)
-    {
-        std::vector<uint32_t> records(module.SpaceSize, k_ShaderManifestNoIndex);
-
-        for (size_t i = 0u; i < module.Variants.size(); ++i)
-        {
-            const uint32_t denseIndex = module.Variants[i].Index;
-            if (denseIndex < records.size())
-            {
-                records[denseIndex] = static_cast<uint32_t>(i);
-            }
-        }
-
-        return records;
-    }
-
     struct AxisTables
     {
         std::vector<ManifestAxis> Axes;
@@ -758,10 +741,10 @@ std::string EmitShaderManifest(const CookedModule& module)
      */
     const uint32_t moduleNameString = strings.Add(module.Name);
     const std::vector<ManifestEntryPoint> entryPointRecords = BuildEntryPointRecords(module, strings);
+    const std::vector<VariantKey>& variantKeyRecords = module.VariantKeys;
     const LayoutTables layouts = BuildLayoutTables(module, strings);
     const RasterTables rasters = BuildRasterTables(module, strings);
     const VariantTables variants = BuildVariantTables(module, strings);
-    const std::vector<uint32_t> variantIndexRecords = BuildVariantIndexTable(module);
     const AxisTables axes = BuildAxisTables(module, strings);
     const SourceTables sources = BuildSourceTables(module);
 
@@ -789,7 +772,7 @@ std::string EmitShaderManifest(const CookedModule& module)
         (rasters.ColorTargets.size() * sizeof(ManifestColorTarget)) +
         (rasters.Rasters.size() * sizeof(ManifestRaster)) + (variants.Slots.size() * sizeof(ManifestSlot)) +
         (variants.Variants.size() * sizeof(ManifestVariant)) +
-        (variantIndexRecords.size() * sizeof(decltype(variantIndexRecords)::value_type)) +
+        (variantKeyRecords.size() * sizeof(VariantKey)) +
         (axes.Axes.size() * sizeof(ManifestAxis)) +
         (axes.Values.size() * sizeof(decltype(axes.Values)::value_type));
 
@@ -836,8 +819,8 @@ std::string EmitShaderManifest(const CookedModule& module)
     header.SlotCount = static_cast<uint32_t>(variants.Slots.size());
     header.VariantTableOffset = AppendTable(bytes, variants.Variants);
     header.VariantCount = static_cast<uint32_t>(variants.Variants.size());
-    header.VariantIndexTableOffset = AppendTable(bytes, variantIndexRecords);
-    header.VariantIndexCount = static_cast<uint32_t>(variantIndexRecords.size());
+    header.VariantKeyTableOffset = AppendTable(bytes, variantKeyRecords);
+    header.VariantKeyCount = static_cast<uint32_t>(variantKeyRecords.size());
     header.AxisTableOffset = AppendTable(bytes, axes.Axes);
     header.AxisCount = static_cast<uint32_t>(axes.Axes.size());
     header.AxisValueTableOffset = AppendTable(bytes, axes.Values);

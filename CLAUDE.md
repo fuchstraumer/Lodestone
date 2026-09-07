@@ -276,6 +276,11 @@ When she proposes an optimization, establish that the cost exists before helping
 Estimate the magnitude, say so plainly if it is negligible, and redirect to where the real cost is.
 She would rather be told an idea is aimed at nothing than be helped to build it.
 
+She dislikes default arguments and adds one only when it is unavoidable. A required parameter makes
+every call site state the value it means, so `EnumerateVariants` takes its variant budget as a plain
+`size_t` and the tests pass `0u`. Do not propose a default parameter as a convenience; propose an
+explicit argument, or an overload, or a named constant the caller passes.
+
 ## Data flow, one cook
 
 `RunCook` in `src/driver/CookerDriver.cpp` is the whole loop. Read that file first. It calls each stage in

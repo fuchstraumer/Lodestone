@@ -10,11 +10,12 @@ Text in this file follows ASD-STE100.
 
 ---
 
-## 1. State on 2026-09-04
+## 1. State on 2026-09-06
 
-**The compiler split is complete and the pipeline works, and steps E1 and E2 have landed.** E2's
-verifier, `PermutationConstraintTest`, is written and green, so the suite is fifteen test targets.
-Phase E step E0c added `AccessModelRejectTest`.
+**The compiler split is complete and the pipeline works, and steps E1, E2, and E3 have landed.** E2's
+verifier, `PermutationConstraintTest`, is written and green, so the suite is fifteen test targets. E3
+made enumeration one depth-first walk with propagated `Require` pruning and an in-walk `MaxVariants`
+guard, and all six stage dumps stayed byte identical. Phase E step E0c added `AccessModelRejectTest`.
 
 | Configuration | Build | Tests |
 |---|---|---|
@@ -236,10 +237,10 @@ module instead of reading the file. Fact 10 in §4 states which modules belong i
 
 ---
 
-## 8. The next task: phase E step E3
+## 8. The next task: phase E step E4
 
-`docs/phase-e-data-driven-permutations.md` holds the plan. **Steps E0a, E0b, E0c, E0, E1, and E2 are
-complete, and item D2 of §10 is settled.** Nothing in that document is open for a decision.
+`docs/phase-e-data-driven-permutations.md` holds the plan. **Steps E0a, E0b, E0c, E0, E1, E2, and E3
+are complete, and item D2 of §10 is settled.** Nothing in that document is open for a decision.
 
 **E1 is done, on 2026-09-01.** The attribute expression evaluator gained a comparison level, a
 logical level, and unary `!`. The file `SizeExpression.{hpp,cpp}` became `AttributeExpression.{hpp,cpp}`,
@@ -259,9 +260,27 @@ identical, because `OceanFft` cooks the same variant set. `PermutationConstraint
 engine: it gates an axis with `ActiveWhen`, prunes a combination with `Require`, and rejects a forward
 reference, an unknown symbol, and a malformed expression at load. It is written and green.
 
-**E3 is next.** §7 and the §11 table. It makes enumeration depth-first with constraint propagation,
-and the `Require` filter E2 added becomes a propagated prune. The variants dump must stay byte
-identical, so E3 changes speed and never output.
+**E3 is done, on 2026-09-06.** Enumeration is now one depth-first backtracking walk, `expandFrom`, in
+`src/permute/PermutationSpace.cpp`. `EnumerateActiveCombinations` is gone, folded into the walk. Each
+`Require` is bucketed by its ready-depth — the deepest axis index it names — in a `RequireReadyMap`,
+so the walk evaluates it the instant its last operand binds and prunes the whole subtree, rather than
+filtering at the leaf. A `Require` that names no axis is now rejected at load. The `MaxVariants` budget
+is enforced during the walk, before compilation, through a new `max_variant_count` parameter on
+`EnumerateVariants` and the `PermutationVariantBudgetExceeded` error; the driver reads it from
+`FindPolicyForModule` (which returns `&k_EmptyPolicy`, budget 0 = unlimited, for an unregistered
+module). All six stage dumps stayed byte identical, because the sort by index makes visitation order
+invisible to the output. One open nit: the walk's budget test is `>=` while the post-hoc
+`CheckVariantBudget` is `<=`, so they disagree at exactly the budget; no module hits it yet.
+
+`EnumerateVariants` takes `max_variant_count` as a required parameter, not a defaulted one: the author
+dislikes default arguments and adds one only when it is unavoidable, so every call site states the
+budget it means (the tests pass `0u`).
+
+**E4 is next.** §6 and the §11 table. It replaces the mixed-radix dense index, which leaves a hole for
+every pruned or disabled combination, with Form 1: a sorted table of packed canonical keys, where the
+dense index is the position in the sorted array. Canonicalization does not change. The manifest variant
+table and the cooker arithmetic both move; the emitted C++ index function is already gone, so the copy
+that E4 used to keep in step is one site now, not three.
 
 **`docs/phase-e-interface-spike.md` holds the E0 answers.** Read it before E7. Three results matter
 early: a link-time `extern` type works and uses the mechanism the constant axis already uses, an

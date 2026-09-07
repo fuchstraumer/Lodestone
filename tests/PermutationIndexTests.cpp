@@ -137,7 +137,7 @@ int main()
     for (const VariantDescriptor& descriptor : variants.Variants)
     {
         const CanonicalAssignment canonical = k_TestSpace.CanonicalizeAssignment(descriptor.Active);
-        if (k_TestSpace.ComputeVariantIndex(canonical) != descriptor.Index)
+        if (k_TestSpace.ComputeVariantKey(canonical) != descriptor.Key)
         {
             everyRoundTripAgrees = false;
         }
@@ -183,12 +183,12 @@ int main()
     runner.Check(filled.size() == k_TestSpace.AxisCount(),
                  "a partial assignment canonicalizes to every axis");
 
-    const int32_t partialIndex = k_TestSpace.ComputeVariantIndex(filled);
+    const uint64_t partialKey = k_TestSpace.ComputeVariantKey(filled);
 
     bool matchesRealVariant = false;
     for (const VariantDescriptor& descriptor : variants.Variants)
     {
-        if (descriptor.Index == partialIndex)
+        if (descriptor.Key == partialKey)
         {
             matchesRealVariant = true;
         }

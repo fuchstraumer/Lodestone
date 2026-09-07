@@ -28,7 +28,7 @@ PermutationAxis::PermutationAxis(std::string name,
       ValueDomain(value_domain),
       ActiveWhen(std::move(active_when))
 {
-    numValues = static_cast<int64_t>(std::min(_values.size(), static_cast<size_t>(k_MaxValues)));
+    numValues = static_cast<uint64_t>(std::min(_values.size(), static_cast<size_t>(k_MaxValues)));
     std::copy_n(_values.begin(), numValues, values.begin());
 }
 
@@ -47,7 +47,7 @@ PermutationAxis::PermutationAxis(std::string name,
 {
 }
 
-int64_t PermutationAxis::NumValues() const noexcept
+uint64_t PermutationAxis::NumValues() const noexcept
 {
     return numValues;
 }

@@ -21,6 +21,7 @@ namespace lodestone
 class PermutationSpace;
 class DiagnosticSink;
 using RequireReadyMap = std::unordered_map<std::ptrdiff_t, std::vector<std::string_view>>;
+using VariantKey = uint64_t;
 
 struct ExternConstantDefault
 {
@@ -51,7 +52,8 @@ struct VariantDescriptor
 {
     PermutationAssignment Active;
     CanonicalAssignment Canonical;
-    int32_t Index{ 0 };
+    VariantKey Key{ 0 };
+    uint64_t Index{ 0 };
 };
 
 /** Everything one permutation space expands to. `SpaceSize` counts the dense index range, holes
@@ -61,7 +63,7 @@ struct VariantSet
 {
     const PermutationSpace* Space{ nullptr };
     std::vector<VariantDescriptor> Variants;
-    int32_t SpaceSize{ 0u };
+    uint64_t SpaceSize{ 0u };
 };
 
 class PermutationSpace
@@ -93,8 +95,8 @@ public:
 
     [[nodiscard]] CookResult<VariantSet> EnumerateVariants(size_t max_variant_count, DiagnosticSink& sink) const;
     [[nodiscard]] CanonicalAssignment CanonicalizeAssignment(const PermutationAssignment& assignment) const;
-    [[nodiscard]] int32_t ComputeVariantIndex(const CanonicalAssignment& canonical) const;
-    [[nodiscard]] int32_t ComputeVariantSpaceSize() const noexcept;
+    [[nodiscard]] VariantKey ComputeVariantKey(const CanonicalAssignment& canonical) const;
+    [[nodiscard]] uint64_t ComputeVariantSpaceSize() const noexcept;
     /**Every axis name must match an `extern static const` declaration in the shader. A mismatch links a
      * symbol nobody references, leaves the shader on its default, and errors nowhere -- this will result in
      * a set of variants with duplicate source code and behavior, when we explicitly don't want that. */

@@ -1,5 +1,4 @@
 #pragma once
-#include "permute/PermutationAssignment.hpp"
 #ifndef LODESTONE_COOKED_LIBRARY_HPP
 #define LODESTONE_COOKED_LIBRARY_HPP
 #include "ContentHash.hpp"
@@ -7,7 +6,9 @@
 #include "CookerErrors.hpp"
 #include "ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -38,7 +39,7 @@ struct LibraryEntryPoint
  * the binding locations for each entrypoint - which can vary for the same pointed-to resources */
 struct LibraryVariant
 {
-    uint32_t Index{ 0u };
+    uint64_t Index{ 0u };
     std::string Suffix;
     std::string Description;
     CanonicalAssignment Canonical;
@@ -88,8 +89,9 @@ struct InternedModule
 {
     std::string Name;
     const PermutationSpace* Space{ nullptr };
-    uint32_t SpaceSize{ 0u };
+    uint64_t SpaceSize{ 0u };
     std::vector<LibraryEntryPoint> EntryPoints;
+    std::vector<VariantKey> VariantKeys;
     std::vector<LibraryVariant> Variants;
     // Every interner takes the name from `k_HashName`, because the name reaches the output and a new
     // hash needs a new name. A literal here is a second place to change, and the two spellings drifted
@@ -110,7 +112,7 @@ struct CookedModule
     std::string Name;
     const PermutationSpace* Space{ nullptr };
     /** @brief Size of the dense index range, holes included. */
-    uint32_t SpaceSize{ 0u };
+    uint64_t SpaceSize{ 0u };
     std::vector<LibraryEntryPoint> EntryPoints;
     std::vector<std::string> Sources;
     std::vector<ReflectedBinding> Resources;
@@ -118,6 +120,7 @@ struct CookedModule
     std::vector<FootprintList> FootprintLists;
     std::vector<VisibilityList> VisibilityLists;
     std::vector<ReflectedRasterState> RasterStates;
+    std::vector<VariantKey> VariantKeys;
     std::vector<LibraryVariant> Variants;
 
     TableStatistics SourceTable;

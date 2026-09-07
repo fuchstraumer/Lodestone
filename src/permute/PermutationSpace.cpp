@@ -17,6 +17,7 @@
 #include <functional>
 #include <initializer_list>
 #include <iterator>
+#include <limits>
 #include <print>
 #include <ranges>
 #include <span>
@@ -47,13 +48,13 @@ namespace
         return symbols;
     }
 
-    [[nodiscard]] CookError VerifyVariantIndicesAreUnique(const std::vector<VariantDescriptor>& variants)
+    [[nodiscard]] CookError VerifyVariantKeysAreUnique(const std::vector<VariantDescriptor>& variants)
     {
         auto firstDuplicateIter =
             std::ranges::adjacent_find(variants,
                                        [](const VariantDescriptor& lhs, const VariantDescriptor& rhs)
                                        {
-                                           return lhs.Index == rhs.Index;
+                                           return lhs.Key == rhs.Key;
                                        });
 
         if (firstDuplicateIter != variants.end()) [[unlikely]]
@@ -61,9 +62,9 @@ namespace
             // get variant that caused the collision
             const VariantDescriptor& duplicate = *firstDuplicateIter;
             std::println(stderr,
-                         "[shader_cooker] two variants share index {}: [{}] collides. The mixed-radix "
+                         "[shader_cooker] two variants share key {}: [{}] collides. The mixed-radix "
                          "encoding and the enumerated set disagree.",
-                         duplicate.Index,
+                         duplicate.Key,
                          DescribeAssignment(duplicate.Canonical));
             return CookError::PermutationVariantIndexCollision;
         }
@@ -225,16 +226,29 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const size_t max_vari
     VariantSet variantSet;
     variantSet.Space = this;
     variantSet.SpaceSize = ComputeVariantSpaceSize();
+    // check if the computed space size exceeds the maximum representable variant key
+    // we'll need to change this eventually, but for now we're just using a simple uncompressed
+    // key based on the canonical assignment of the axes.
+    if (variantSet.SpaceSize == std::numeric_limits<VariantKey>::max())
+    {
+        return std::unexpected(CookError::PermutationKeySpaceTooLarge);
+    }
     variantSet.Variants = std::move(descriptors);
 
-    // sort first, because then uniqueness check can assume the indices are in order
-    std::ranges::sort(variantSet.Variants, std::ranges::less{}, &VariantDescriptor::Index);
+    // sort variants by their calculated key
+    std::ranges::sort(variantSet.Variants, std::ranges::less{}, &VariantDescriptor::Key);
 
-    const CookError verifyUnique = VerifyVariantIndicesAreUnique(variantSet.Variants);
+    const CookError verifyUnique = VerifyVariantKeysAreUnique(variantSet.Variants);
     if (verifyUnique != CookError::Success)
     {
         return std::unexpected(verifyUnique);
     }
+    // assign dense indices after sorting by key
+    for (uint64_t i = 0; std::cmp_less(i, variantSet.Variants.size()); ++i)
+    {
+        variantSet.Variants[i].Index = i;
+    }
+
 
     return variantSet;
 }
@@ -255,33 +269,38 @@ CanonicalAssignment PermutationSpace::CanonicalizeAssignment(const PermutationAs
     return CanonicalAssignment{ std::move(canonical) };
 }
 
-int32_t PermutationSpace::ComputeVariantIndex(const CanonicalAssignment& canonical) const
+VariantKey PermutationSpace::ComputeVariantKey(const CanonicalAssignment& canonical) const
 {
-    std::ptrdiff_t index = 0;
+    VariantKey result = 0;
 
     for (size_t i = 0; i < axes.size(); ++i)
     {
         // in canonical, the i-th element corresponds to the i-th axis in the space.
+        // so, the value at canonical[i] corresponds to the value of axes[i] in this assignment.
+        // (which could be the default value, or the actual concrete value)
         const PermutationValue& value = canonical[i].Value;
         const std::span<const PermutationValue> values = axes[i].GetValues();
+        // values.size() is the radix/base for this "digit" in the mixed-radix number system
+        // valueIndex is the digit itself, the coefficient in this mixed-radix number system
+        // so result accumulates the mixed-radix number representing this assignment iteratively
         const auto found = std::ranges::find(values, value);
         const std::ptrdiff_t valueIndex = std::distance(values.begin(), found);
-        index = (index * std::ssize(values)) + valueIndex;
+        result = (result * values.size()) + static_cast<VariantKey>(valueIndex);
     }
 
-    return static_cast<int32_t>(index);
+    return result;
 }
 
-int32_t PermutationSpace::ComputeVariantSpaceSize() const noexcept
+uint64_t PermutationSpace::ComputeVariantSpaceSize() const noexcept
 {
-    int64_t size = 1;
+    uint64_t size = 1;
 
     for (const auto& axis : axes)
     {
         size *= axis.NumValues();
     }
 
-    return static_cast<int32_t>(size);
+    return size;
 }
 
 CookError PermutationSpace::VerifyAxisNamesAreDeclared(std::span<const std::string_view> source_texts,
@@ -545,8 +564,10 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
     if (std::cmp_equal(depth, axes.size()))
     {
         // completed a full permutation assignment, add it to the expanded list
-        const int32_t index = ComputeVariantIndex(canonical);
-        expanded.emplace_back(PermutationAssignment{ partial }, std::move(canonical), index);
+        const VariantKey key = ComputeVariantKey(canonical);
+        // index is unset: it's the dense index in the *sorted* set, which can't be found until 
+        // all variants have been generated and sorted by key
+        expanded.emplace_back(PermutationAssignment{ partial }, std::move(canonical), key, 0u);
         if ((max_variant_count > 0) && (expanded.size() >= max_variant_count)) [[unlikely]]
         {
             const std::string errorMessage = std::format("Permutation variant budget exceeded (max {} variants)", max_variant_count);

@@ -2,16 +2,24 @@
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <expected>
+#include <iterator>
 #include <magic_enum/magic_enum.hpp>
 #include <span>
 #include <string_view>
 
 namespace lodestone
 {
+
+//NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
+#endif
 
 namespace
 {
@@ -117,7 +125,7 @@ ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std:
         TableIsInBounds(parsed.SlotTableOffset, parsed.SlotCount, sizeof(ManifestSlot), fileSize) &&
         TableIsInBounds(parsed.VariantTableOffset, parsed.VariantCount, sizeof(ManifestVariant), fileSize) &&
         TableIsInBounds(
-            parsed.VariantIndexTableOffset, parsed.VariantIndexCount, sizeof(uint32_t), fileSize) &&
+            parsed.VariantKeyTableOffset, parsed.VariantKeyCount, sizeof(uint64_t), fileSize) &&
         TableIsInBounds(parsed.AxisTableOffset, parsed.AxisCount, sizeof(ManifestAxis), fileSize) &&
         TableIsInBounds(parsed.AxisValueTableOffset, parsed.AxisValueCount, sizeof(int64_t), fileSize) &&
         TableIsInBounds(parsed.RasterTableOffset, parsed.RasterCount, sizeof(ManifestRaster), fileSize) &&
@@ -156,8 +164,8 @@ ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std:
         MakeTable<ManifestEntryPoint>(bytes, parsed.EntryPointTableOffset, parsed.EntryPointCount);
     view.slots = MakeTable<ManifestSlot>(bytes, parsed.SlotTableOffset, parsed.SlotCount);
     view.variants = MakeTable<ManifestVariant>(bytes, parsed.VariantTableOffset, parsed.VariantCount);
-    view.variantIndices =
-        MakeTable<uint32_t>(bytes, parsed.VariantIndexTableOffset, parsed.VariantIndexCount);
+    view.variantKeys =
+        MakeTable<uint64_t>(bytes, parsed.VariantKeyTableOffset, parsed.VariantKeyCount);
     view.axes = MakeTable<ManifestAxis>(bytes, parsed.AxisTableOffset, parsed.AxisCount);
     view.axisValues = MakeTable<int64_t>(bytes, parsed.AxisValueTableOffset, parsed.AxisValueCount);
     view.rasterStates = MakeTable<ManifestRaster>(bytes, parsed.RasterTableOffset, parsed.RasterCount);
@@ -365,28 +373,31 @@ std::span<const ManifestUniformMember> ShaderManifestView::UniformMembers(
     return uniformMembers.subspan(binding.FirstUniformMember, binding.UniformMemberCount);
 }
 
-const ManifestSlot* ShaderManifestView::FindSlot(uint16_t entry_point, uint32_t variant_index) const noexcept
+const ManifestSlot* ShaderManifestView::FindSlot(uint16_t entry_point, uint64_t variant_key) const noexcept
 {
-    if (entry_point == 0u || variant_index >= variantIndices.size())
+    if (entry_point == 0u)
     {
         return nullptr;
     }
 
-    const uint32_t variantSlot = variantIndices[variant_index];
-    if (variantSlot == k_ShaderManifestNoIndex || variantSlot >= variants.size())
+    const auto keyIter = std::ranges::lower_bound(variantKeys, variant_key);
+    if (keyIter == variantKeys.end() || *keyIter != variant_key)
     {
         return nullptr;
     }
+    // after the so called "phase E" changes to data driven permutations, the location of a key in the
+    // variantKeys array *is* the dense index of the variant
+    const auto variantIndex = static_cast<size_t>(std::distance(variantKeys.begin(), keyIter));
 
-    const uint32_t entryPointIndex = static_cast<uint32_t>(entry_point) - 1u;
+    const size_t entryPointIndex = static_cast<size_t>(entry_point) - 1u;
 
-    const ManifestVariant& variant = variants[variantSlot];
+    const ManifestVariant& variant = variants[variantIndex];
     if (entryPointIndex >= variant.SlotCount)
     {
         return nullptr;
     }
 
-    const uint32_t slotIndex = variant.FirstSlot + entryPointIndex;
+    const size_t slotIndex = static_cast<size_t>(variant.FirstSlot) + entryPointIndex;
     if (slotIndex >= slots.size())
     {
         return nullptr;
@@ -548,10 +559,10 @@ WorkgroupSize ManifestShaderSourceProvider::Workgroup(uint16_t entry_point,
     const ManifestSlot* slot = view.FindSlot(entry_point, variant_index);
     if (slot == nullptr)
     {
-        return WorkgroupSize{};
+        return WorkgroupSize{ .X=0, .Y=0, .Z=0 };
     }
 
-    return WorkgroupSize{ slot->WorkgroupX, slot->WorkgroupY, slot->WorkgroupZ };
+    return WorkgroupSize{ .X=slot->WorkgroupX, .Y=slot->WorkgroupY, .Z=slot->WorkgroupZ };
 }
 
 uint64_t ManifestShaderSourceProvider::Generation() const noexcept
@@ -565,3 +576,8 @@ const ShaderManifestView& ManifestShaderSourceProvider::View() const noexcept
 }
 
 } // namespace lodestone
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+//NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)

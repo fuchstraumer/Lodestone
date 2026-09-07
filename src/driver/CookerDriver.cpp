@@ -639,7 +639,10 @@ namespace
         }
         internedModule.Name = moduleName;
         internedModule.Space = space;
-        internedModule.SpaceSize = static_cast<uint32_t>(variantSet.value().SpaceSize);
+        internedModule.SpaceSize = variantSet->SpaceSize;
+        internedModule.VariantKeys = variantSet->Variants |
+                                     std::views::transform(&VariantDescriptor::Key) |
+                                     std::ranges::to<std::vector<uint64_t>>();
 
         std::vector<CompiledVariant> moduleVariants;
         moduleVariants.reserve(variantSet.value().Variants.size());
@@ -706,7 +709,7 @@ namespace
             return finalized.error();
         }
 
-        CookedModule cookedModule = std::move(finalized.value());
+        CookedModule cookedModule = std::move(*finalized);
 
         auto dumpCookedModule = [&]()
         {
