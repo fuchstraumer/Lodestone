@@ -38,7 +38,7 @@ struct ProvenanceRecord
 {
     std::string EntryPointName;
     std::string VariantDescription;
-    uint32_t VariantIndex{ 0u };
+    uint64_t VariantIndex{ 0u };
 };
 
 /** @brief The result - a lookup outcome - of interning */

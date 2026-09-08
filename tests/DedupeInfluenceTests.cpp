@@ -104,7 +104,7 @@ CompiledEntryPoint MakeEntryPoint(std::string_view name, std::string code)
 
 /** `ActiveCS` reads the first axis and nothing else. `InertCS` reads neither. So the correct answer
  * is fixed by construction, and it does not depend on how the tables were filled. */
-CompiledVariant MakeVariant(uint32_t index, bool first_axis_value, bool second_axis_value)
+CompiledVariant MakeVariant(uint64_t index, bool first_axis_value, bool second_axis_value)
 {
     CompiledVariant variant;
     variant.VariantIndex = index;
@@ -119,7 +119,7 @@ CompiledVariant MakeVariant(uint32_t index, bool first_axis_value, bool second_a
 
 /** One entry point, so the usage mask is the same on every layout. The shared layout claim is only
  * interesting when the layouts can actually be equal, and today the mask is part of the layout key. */
-CompiledVariant MakeSingleEntryPointVariant(uint32_t index, bool first_axis_value)
+CompiledVariant MakeSingleEntryPointVariant(uint64_t index, bool first_axis_value)
 {
     CompiledVariant variant;
     variant.VariantIndex = index;
@@ -150,7 +150,7 @@ CanonicalAssignment MakeAssignment(const PermutationSpace& space,
 /** `ConditionalCS` reads the first axis only when the second axis is true. So the variants that hold
  * the second axis false all share one source, and only the other group can find the first axis
  * Active. A measurement that reads one group and drops the next reports Inert here. */
-CompiledVariant MakeConditionalVariant(uint32_t index, bool first_axis_value, bool second_axis_value)
+CompiledVariant MakeConditionalVariant(uint64_t index, bool first_axis_value, bool second_axis_value)
 {
     CompiledVariant variant;
     variant.VariantIndex = index;

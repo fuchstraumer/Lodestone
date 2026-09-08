@@ -248,7 +248,7 @@ struct CompiledVariant
     std::string VariantDescription;
     /** Dense mixed-radix index over the canonical assignment. Stable across cooks, and the key the
      * rendergraph resolves a variant with. */
-    uint32_t VariantIndex{ 0u };
+    uint64_t VariantIndex{ 0u };
     /** Every program-scope binding of this variant, once. It states where it is and what it is, that's it.*/
     std::vector<ReflectedBinding> Bindings;
     /** One footprint for each entry of `Bindings`. A size expression reads the axis values, so

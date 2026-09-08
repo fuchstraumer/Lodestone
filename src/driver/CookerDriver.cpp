@@ -194,12 +194,12 @@ namespace
      * compiler produced. This is the one check that makes a wrong shader impossible to ship: an index
      * mistake, a table hole, or a bad collapse all show up here, and all of them fail the cook. */
     const CompiledVariant* FindCompiledVariant(std::span<const CompiledVariant> compiled,
-                                               uint32_t variant_index) noexcept
+                                               uint64_t variant_index) noexcept
     {
         // `compiled` is sorted in ascending order already: we can use lower_bound to find variant idx in
         // log2(n)
         auto candidateIter = std::ranges::lower_bound(
-            compiled, variant_index, std::less<uint32_t>{}, &CompiledVariant::VariantIndex);
+            compiled, variant_index, std::less<uint64_t>{}, &CompiledVariant::VariantIndex);
         if (candidateIter != compiled.end() && candidateIter->VariantIndex == variant_index)
         {
             return std::to_address(candidateIter);

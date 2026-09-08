@@ -41,7 +41,7 @@ PermutationAxis MakeBoolAxis(std::string name)
                             AxisValueDomain::Boolean };
 }
 
-CompiledVariant MakeVariant(uint32_t index, const std::string& suffix, std::string code)
+CompiledVariant MakeVariant(uint64_t index, const std::string& suffix, std::string code)
 {
     ReflectedBinding binding;
     binding.Name = "Waves";
@@ -143,7 +143,7 @@ RawModule BuildRawModule()
     module.EntryPointNames.emplace_back("MainCS");
     module.ExternDefaults.push_back(ExternConstantDefault{ .Name = "IFFT_SIZE", .Value = 256 });
 
-    for (uint32_t index = 0u; index < 2u; ++index)
+    for (uint64_t index = 0u; index < 2u; ++index)
     {
         RawVariant variant;
         variant.VariantIndex = index;

@@ -3,6 +3,7 @@
 #define LODESTONE_RAW_LIBRARY_HPP
 #include "permute/PermutationSpace.hpp"
 #include "model/ShaderDataSchema.hpp"
+#include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include <cstdint>
 #include <string>
@@ -96,7 +97,7 @@ struct RawVariant
 {
     std::string VariantSuffix;
     std::string VariantDescription;
-    uint32_t VariantIndex{ 0u };
+    uint64_t VariantIndex{ 0u };
     std::vector<RawBinding> Bindings;
     /** Unevaluated. Stage 4 turns these into numbers. */
     std::vector<RawSizeAttribute> SizeAttributes;

@@ -500,8 +500,7 @@ namespace
 
         for (const LibraryEntryPoint& entryPoint : module.EntryPoints)
         {
-            records.push_back(ManifestEntryPoint{ .NameString = strings.Add(entryPoint.Name),
-                                                  .Stage = static_cast<uint32_t>(entryPoint.Stage) });
+            records.emplace_back(strings.Add(entryPoint.Name), static_cast<uint32_t>(entryPoint.Stage));
         }
 
         return records;

@@ -164,8 +164,7 @@ ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std:
         MakeTable<ManifestEntryPoint>(bytes, parsed.EntryPointTableOffset, parsed.EntryPointCount);
     view.slots = MakeTable<ManifestSlot>(bytes, parsed.SlotTableOffset, parsed.SlotCount);
     view.variants = MakeTable<ManifestVariant>(bytes, parsed.VariantTableOffset, parsed.VariantCount);
-    view.variantKeys =
-        MakeTable<uint64_t>(bytes, parsed.VariantKeyTableOffset, parsed.VariantKeyCount);
+    view.variantKeys = MakeTable<uint64_t>(bytes, parsed.VariantKeyTableOffset, parsed.VariantKeyCount);
     view.axes = MakeTable<ManifestAxis>(bytes, parsed.AxisTableOffset, parsed.AxisCount);
     view.axisValues = MakeTable<int64_t>(bytes, parsed.AxisValueTableOffset, parsed.AxisValueCount);
     view.rasterStates = MakeTable<ManifestRaster>(bytes, parsed.RasterTableOffset, parsed.RasterCount);
