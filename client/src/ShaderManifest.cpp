@@ -181,7 +181,8 @@ namespace
     {
         auto validManifestRun = [&](const ManifestRun& run, const size_t list_size)
         {
-            return static_cast<size_t>(run.First) < list_size &&
+            // <= on first check for edge case: module with empty trailing list
+            return static_cast<size_t>(run.First) <= list_size &&
                    (static_cast<size_t>(run.First) + static_cast<size_t>(run.Count)) <= list_size;
         };
 
@@ -380,6 +381,35 @@ ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std:
 
     }
 
+    const std::span<const ManifestRaster> rasterSpan =
+        MakeTable<ManifestRaster>(bytes, parsed.RasterTableOffset, parsed.RasterCount);
+    for (const auto& raster : rasterSpan)
+    {
+        if (raster.FirstVertexInput >= parsed.VertexInputCount ||
+            raster.FirstVertexInput + raster.VertexInputCount > parsed.VertexInputCount)
+        {
+            return std::unexpected(ShaderManifestError::InvalidRasterVertexInputRange);
+        }
+
+        if (raster.FirstColorTarget >= parsed.ColorTargetCount ||
+            raster.FirstColorTarget + raster.ColorTargetCount > parsed.ColorTargetCount)
+        {
+            return std::unexpected(ShaderManifestError::InvalidRasterColorTargetRange);
+        }
+    }
+
+    const std::span<const ManifestVertexInput> vertexInputSpan =
+        MakeTable<ManifestVertexInput>(bytes, parsed.VertexInputTableOffset, parsed.VertexInputCount);
+    auto validVertexInput = [&](const ManifestVertexInput& vertex_input)
+    {
+        return vertex_input.SemanticNameString < parsed.StringCount;
+    };
+    const bool allVertexInputsValid = std::ranges::all_of(vertexInputSpan, validVertexInput);
+    if (!allVertexInputsValid)
+    {
+        return std::unexpected(ShaderManifestError::InvalidVertexInput);
+    }
+
     ShaderManifestView view;
     view.bytes = bytes;
     view.header = reinterpret_cast<const ShaderManifestHeader*>(bytes.data());
@@ -449,17 +479,7 @@ namespace
                                        std::span<const PayloadType> payloads,
                                        uint32_t run_index) noexcept
     {
-        if (run_index >= runs.size())
-        {
-            return {};
-        }
-
-        const ManifestRun& run = runs[run_index];
-        if (run.First > payloads.size() || run.Count > payloads.size() - run.First)
-        {
-            return {};
-        }
-
+        const ManifestRun& run = runs[static_cast<size_t>(run_index)];
         return payloads.subspan(run.First, run.Count);
     }
 
@@ -472,11 +492,6 @@ std::span<const ManifestSlot> ShaderManifestView::SlotTable() const noexcept
 
 std::span<const ManifestSlot> ShaderManifestView::Slots(const ManifestVariant& variant) const noexcept
 {
-    if (variant.FirstSlot > slots.size() || variant.SlotCount > slots.size() - variant.FirstSlot)
-    {
-        return {};
-    }
-
     return slots.subspan(variant.FirstSlot, variant.SlotCount);
 }
 
@@ -528,45 +543,21 @@ std::span<const int64_t> ShaderManifestView::AxisValues(uint32_t axis_index) con
 
 std::span<const ManifestVertexInput> ShaderManifestView::VertexInputs(uint32_t raster_index) const noexcept
 {
-    if (raster_index >= rasterStates.size())
-    {
-        return {};
-    }
-
+    assert(raster_index < rasterStates.size());
     const ManifestRaster& raster = rasterStates[raster_index];
-    if (raster.FirstVertexInput > vertexInputs.size() ||
-        raster.VertexInputCount > vertexInputs.size() - raster.FirstVertexInput)
-    {
-        return {};
-    }
-
     return vertexInputs.subspan(raster.FirstVertexInput, raster.VertexInputCount);
 }
 
 std::span<const ManifestColorTarget> ShaderManifestView::ColorTargets(uint32_t raster_index) const noexcept
 {
-    if (raster_index >= rasterStates.size())
-    {
-        return {};
-    }
-
+    assert(raster_index < rasterStates.size());
     const ManifestRaster& raster = rasterStates[raster_index];
-    if (raster.FirstColorTarget > colorTargets.size() ||
-        raster.ColorTargetCount > colorTargets.size() - raster.FirstColorTarget)
-    {
-        return {};
-    }
-
     return colorTargets.subspan(raster.FirstColorTarget, raster.ColorTargetCount);
 }
 
 bool ShaderManifestView::WritesFragDepth(uint32_t raster_index) const noexcept
 {
-    if (raster_index >= rasterStates.size())
-    {
-        return false;
-    }
-
+    assert(raster_index < rasterStates.size());
     return rasterStates[raster_index].WritesFragDepth != 0u;
 }
 

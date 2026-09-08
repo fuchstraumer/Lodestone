@@ -56,6 +56,9 @@ enum class ShaderManifestError : uint8_t
     InvalidSlotRasterIndex = 21,
     InvalidVariantKeyOrder = 22,
     VariantKeyVariantCountMismatch = 23,
+    InvalidRasterVertexInputRange,
+    InvalidRasterColorTargetRange,
+    InvalidVertexInput
 };
 
 template<typename T>
