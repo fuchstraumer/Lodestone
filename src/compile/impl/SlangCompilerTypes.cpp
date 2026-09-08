@@ -22,8 +22,9 @@ slang::CompilerOptionEntry ToOptionEntry(const CompilerOptionRow& row) noexcept
 
 std::vector<slang::CompilerOptionEntry> MakeCompilerOptions(uint32_t optimization_level)
 {
-    std::vector<slang::CompilerOptionEntry> options =
-        k_CompilerOptionRows | std::views::transform(ToOptionEntry) | std::ranges::to<std::vector>();
+    std::vector<slang::CompilerOptionEntry> options = k_CompilerOptionRows |
+                                                      std::views::transform(ToOptionEntry) |
+                                                      std::ranges::to<std::vector>();
 
     options.emplace_back(ToOptionEntry(
         CompilerOptionRow{ .Name = slang::CompilerOptionName::Optimization,

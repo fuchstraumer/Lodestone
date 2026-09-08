@@ -528,7 +528,7 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
     RawVariant rawVariant;
     rawVariant.VariantSuffix = MakeAssignmentSuffix(descriptor.Canonical);
     rawVariant.VariantDescription = DescribeAssignment(descriptor.Canonical);
-    rawVariant.VariantIndex = static_cast<uint32_t>(descriptor.Index);
+    rawVariant.VariantIndex = descriptor.Index;
 
     // this step extracts the global bindings, which are put into the raw variant first
     // the global bindings are sorted by placement ordering before return from this fn

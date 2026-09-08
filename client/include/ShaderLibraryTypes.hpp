@@ -68,7 +68,8 @@ enum class ShaderStageKind : uint8_t
     Mesh,
     Amplification,
     Dispatch,
-    Node
+    Node,
+    Count
 };
 
 /** @brief The shape of a bound resource, as the shader declares it. This should be viewed
@@ -233,9 +234,6 @@ struct BindingInfo
  * `Generation()` is the future hot-reload hook. A provider for baked data will always return the same value,
  * but a live provider can increment the value when any source changes - allowing users to reload
  * shaders and reset state gracefully
- *
- * todo-ship: Find a better approach for EntryPointId than setting the 0th value to 1. That's brittle
- * and breaks assumptions about indexing from zero.
  */
 class ShaderSourceProvider
 {
@@ -246,11 +244,11 @@ public:
     ShaderSourceProvider& operator=(const ShaderSourceProvider&) = delete;
 
     /** @brief WGSL for one entry point of one variant. An unknown pair returns an empty view. */
-    [[nodiscard]] virtual std::string_view Source(uint16_t entry_point,
+    [[nodiscard]] virtual std::string_view Source(uint32_t entry_point,
                                                   uint32_t variant_index) const noexcept = 0;
-    [[nodiscard]] virtual std::span<const BindingInfo> Bindings(uint16_t entry_point,
+    [[nodiscard]] virtual std::span<const BindingInfo> Bindings(uint32_t entry_point,
                                                                 uint32_t variant_index) const noexcept = 0;
-    [[nodiscard]] virtual WorkgroupSize Workgroup(uint16_t entry_point,
+    [[nodiscard]] virtual WorkgroupSize Workgroup(uint32_t entry_point,
                                                   uint32_t variant_index) const noexcept = 0;
     /** @brief Increments when any source above changes. A constant means sources never change. */
     [[nodiscard]] virtual uint64_t Generation() const noexcept = 0;

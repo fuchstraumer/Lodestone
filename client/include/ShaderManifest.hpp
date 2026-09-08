@@ -41,6 +41,21 @@ enum class ShaderManifestError : uint8_t
     /** The byte span does not start on an 8-byte boundary. The reader maps records in place, so it
      * cannot accept a span that would make a 64-bit field unaligned. */
     Misaligned = 8,
+    StringOutOfBounds = 9,
+    SourceOutOfBounds = 10,
+    ManifestBindingInvalidName = 11,
+    ManifestBindingInvalidUniforms = 12,
+    EntryPointInvalidName = 13,
+    EntryPointInvalidStage = 14,
+    InvalidResourceBindingIndex = 15,
+    InvalidResourceListRun = 16,
+    InvalidFootprintListRun = 17,
+    InvalidVisibilityListRun = 18,
+    InvalidSlotSourceIndex = 19,
+    InvalidSlotVisibilityIndex = 20,
+    InvalidSlotRasterIndex = 21,
+    InvalidVariantKeyOrder = 22,
+    VariantKeyVariantCountMismatch = 23,
 };
 
 template<typename T>
@@ -111,12 +126,6 @@ struct alignas(8) ShaderManifestHeader
 };
 
 struct alignas(8) ManifestStringRef
-{
-    uint32_t Offset{ 0u };
-    uint32_t Length{ 0u };
-};
-
-struct alignas(8) ManifestSourceRef
 {
     uint32_t Offset{ 0u };
     uint32_t Length{ 0u };
@@ -257,7 +266,6 @@ inline constexpr bool k_IsManifestRecord =
 
 static_assert(k_IsManifestRecord<ShaderManifestHeader>);
 static_assert(k_IsManifestRecord<ManifestStringRef>);
-static_assert(k_IsManifestRecord<ManifestSourceRef>);
 static_assert(k_IsManifestRecord<ManifestBinding>);
 static_assert(k_IsManifestRecord<ManifestRun>);
 static_assert(k_IsManifestRecord<ManifestFootprint>);
@@ -276,7 +284,7 @@ static_assert(k_IsManifestRecord<ManifestAxis>);
  * Open() checks the magic, the version, and that every section lies inside the file. After it returns
  * a view, no accessor can read outside the span, so the accessors stay branch-light.
  */
-class ShaderManifestView final
+class ShaderManifestView
 {
 public:
     ShaderManifestView() noexcept;
@@ -311,7 +319,7 @@ public:
      *
      * `entry_point` is the `EntryPointId` value, so it counts from one and zero is Invalid.
      * `variant_index` is the dense index, the same number the generated library uses. */
-    [[nodiscard]] const ManifestSlot* FindSlot(uint16_t entry_point, uint64_t variant_key) const noexcept;
+    [[nodiscard]] const ManifestSlot* FindSlot(uint32_t entry_point, uint64_t variant_key) const noexcept;
     /** @brief One slot for each entry point of this variant, in entry point order. */
     [[nodiscard]] std::span<const ManifestSlot> Slots(const ManifestVariant& variant) const noexcept;
     /** @brief Every slot, in file order. */
@@ -321,7 +329,7 @@ private:
     std::span<const std::byte> bytes;
     const ShaderManifestHeader* header{ nullptr };
     std::span<const ManifestStringRef> strings;
-    std::span<const ManifestSourceRef> sources;
+    std::span<const ManifestStringRef> sources;
     std::span<const ManifestBinding> bindings;
     std::span<const ManifestRun> resourceLists;
     std::span<const uint32_t> resourceIndices;
@@ -357,11 +365,11 @@ public:
     ManifestShaderSourceProvider(ShaderManifestView view, uint64_t generation) noexcept;
     ~ManifestShaderSourceProvider() override;
 
-    [[nodiscard]] std::string_view Source(uint16_t entry_point,
+    [[nodiscard]] std::string_view Source(uint32_t entry_point,
                                           uint32_t variant_index) const noexcept override;
-    [[nodiscard]] std::span<const BindingInfo> Bindings(uint16_t entry_point,
+    [[nodiscard]] std::span<const BindingInfo> Bindings(uint32_t entry_point,
                                                         uint32_t variant_index) const noexcept override;
-    [[nodiscard]] WorkgroupSize Workgroup(uint16_t entry_point,
+    [[nodiscard]] WorkgroupSize Workgroup(uint32_t entry_point,
                                           uint32_t variant_index) const noexcept override;
     [[nodiscard]] uint64_t Generation() const noexcept override;
 

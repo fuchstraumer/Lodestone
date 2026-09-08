@@ -14,13 +14,6 @@ Diagnostics:
   UnusedIncludes: Strict
   MissingIncludes: Strict
   ClangTidy:
-    Add: [ bugprone-*, performance-*, modernize-*, readability-*, cppcoreguidelines-*, misc-* ]
-    Remove: [ modernize-use-trailing-return-type, cppcoreguidelines-avoid-magic-numbers,
-              readability-magic-numbers, bugprone-easily-swappable-parameters,
-              readability-uppercase-literal-suffix, modernize-avoid-c-arrays,
-              cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
-              cppcoreguidelines-pro-bounds-pointer-arithmetic,
-              bugprone-throwing-static-initialization ]
     CheckOptions:
       # --- Types (CamelCase) ---
       readability-identifier-naming.ClassCase: CamelCase
