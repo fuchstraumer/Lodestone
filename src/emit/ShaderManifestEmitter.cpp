@@ -709,7 +709,7 @@ namespace
     struct SourceTables
     {
         std::string Blob;
-        std::vector<ManifestSourceRef> Refs;
+        std::vector<ManifestStringRef> Refs;
     };
 
     SourceTables BuildSourceTables(const CookedModule& module)
@@ -719,8 +719,7 @@ namespace
 
         for (const std::string& source : module.Sources)
         {
-            tables.Refs.push_back(ManifestSourceRef{ .Offset = static_cast<uint32_t>(tables.Blob.size()),
-                                                     .Length = static_cast<uint32_t>(source.size()) });
+            tables.Refs.emplace_back(static_cast<uint32_t>(tables.Blob.size()), static_cast<uint32_t>(source.size()));
             tables.Blob.append(source);
         }
 

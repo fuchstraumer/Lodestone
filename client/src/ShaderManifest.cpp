@@ -60,6 +60,18 @@ namespace
                                             count };
     }
 
+    /**@brief In multiple locations, we store ranges of data in "runs". Each run specifies a contiguous block of
+     * payloads, which could be themselves simple indices or POD structs. This is just a more succinct accessor for
+     * those cases  */
+    template<typename PayloadType>
+    std::span<const PayloadType> RunOf(std::span<const ManifestRun> runs,
+                                       std::span<const PayloadType> payloads,
+                                       uint32_t run_index) noexcept
+    {
+        const ManifestRun& run = runs[static_cast<size_t>(run_index)];
+        return payloads.subspan(run.First, run.Count);
+    }
+
     ShaderManifestError CheckManifestHeader(const ShaderManifestHeader& parsed,
                                             const size_t file_size) noexcept
     {
@@ -376,9 +388,47 @@ ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std:
     // less branchy logic
     const std::span<const ManifestVariant> variantSpan =
         MakeTable<ManifestVariant>(bytes, parsed.VariantTableOffset, parsed.VariantCount);
+    const std::span<const ManifestRun> resourceLists =
+        MakeTable<ManifestRun>(bytes, parsed.ResourceListTableOffset, parsed.ResourceListCount);
+    const std::span<const uint32_t> visiblityIndices = 
+        MakeTable<uint32_t>(bytes, parsed.VisibilityIndexTableOffset, parsed.VisibilityIndexCount);
+    const std::span<const ManifestRun> visibilityLists =
+        MakeTable<ManifestRun>(bytes, parsed.VisibilityListTableOffset, parsed.VisibilityListCount);
     for (const auto& variant : variantSpan)
     {
+        if (variant.FirstSlot >= parsed.SlotCount ||
+            variant.FirstSlot + variant.SlotCount > parsed.SlotCount)
+        {
+            return std::unexpected(ShaderManifestError::VariantSlotOutOfRange);
+        }
 
+        // now check the resource lists
+        if (variant.ResourceListIndex >= parsed.ResourceListCount)
+        {
+            return std::unexpected(ShaderManifestError::InvalidResourceListRun);
+        }
+
+        const std::span<const uint32_t> variantResourceIndices =
+            RunOf<const uint32_t>(resourceLists, resourceIndexList, variant.ResourceListIndex);
+        for (uint32_t i = 0u; i < variant.SlotCount; ++i)
+        {
+            const uint32_t slotIndex = variant.FirstSlot + i;
+            const ManifestSlot& currSlot = slotSpan[slotIndex];
+            const std::span<const uint32_t> slotVisibilityIndices =
+                RunOf<uint32_t>(visibilityLists, visiblityIndices, currSlot.VisibilityIndex);
+            
+            auto validVisiblityIndex = [&variantResourceIndices, &bindingSpan](const uint32_t idx)
+            {
+                // idx = index into variant index list... which is then an index into the *global* resource table
+                // (those values are the final values, a ManifestBinding entry)
+                return idx < variantResourceIndices.size() ? variantResourceIndices[idx] < bindingSpan.size() : false;
+            };
+            const bool allVisibilityIndicesValid = std::ranges::all_of(slotVisibilityIndices, validVisiblityIndex);
+            if (!allVisibilityIndicesValid)
+            {
+                return std::unexpected(ShaderManifestError::InvalidSlotVisibilityIndex);
+            }
+        }
     }
 
     const std::span<const ManifestRaster> rasterSpan =
@@ -410,13 +460,25 @@ ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std:
         return std::unexpected(ShaderManifestError::InvalidVertexInput);
     }
 
+    const std::span<const ManifestUniformMember> uniformMemberSpan =
+        MakeTable<ManifestUniformMember>(bytes, parsed.UniformMemberTableOffset, parsed.UniformMemberCount);
+    auto validUniformMember = [&](const ManifestUniformMember& uniform_member)
+    {
+        return uniform_member.NameString < parsed.StringCount;
+    };
+    const bool allUniformMembersValid = std::ranges::all_of(uniformMemberSpan, validUniformMember);
+    if (!allUniformMembersValid)
+    {
+        return std::unexpected(ShaderManifestError::InvalidUniformMember);
+    }
+
     ShaderManifestView view;
     view.bytes = bytes;
     view.header = reinterpret_cast<const ShaderManifestHeader*>(bytes.data());
     view.strings = MakeTable<ManifestStringRef>(bytes, parsed.StringTableOffset, parsed.StringCount);
     view.sources = MakeTable<ManifestStringRef>(bytes, parsed.SourceTableOffset, parsed.SourceCount);
     view.bindings = bindingSpan;
-    view.resourceLists = MakeTable<ManifestRun>(bytes, parsed.ResourceListTableOffset, parsed.ResourceListCount);
+    view.resourceLists = resourceLists;
     view.resourceIndices = resourceIndexList;
     view.footprints = MakeTable<ManifestFootprint>(bytes, parsed.FootprintTableOffset, parsed.FootprintCount);
     view.footprintLists = MakeTable<ManifestRun>(bytes, parsed.FootprintListTableOffset, parsed.FootprintListCount);
@@ -467,23 +529,6 @@ std::span<const ManifestBinding> ShaderManifestView::Bindings() const noexcept
 {
     return bindings;
 }
-
-namespace
-{
-
-    /**@brief Because resources can have varying resource usages per entrypoint and variant, we store them in
-     * runs. This function returns the span of payloads for a given run index, or an empty span if the run is
-     * invalid. */
-    template<typename PayloadType>
-    std::span<const PayloadType> RunOf(std::span<const ManifestRun> runs,
-                                       std::span<const PayloadType> payloads,
-                                       uint32_t run_index) noexcept
-    {
-        const ManifestRun& run = runs[static_cast<size_t>(run_index)];
-        return payloads.subspan(run.First, run.Count);
-    }
-
-} // namespace
 
 std::span<const ManifestSlot> ShaderManifestView::SlotTable() const noexcept
 {
@@ -647,11 +692,6 @@ void ManifestShaderSourceProvider::GatherVariantBindings(const ManifestVariant& 
 
         for (const uint32_t local : visible)
         {
-            if (local >= resources.size() || resources[local] >= records.size())
-            {
-                continue;
-            }
-
             bindingInfos.push_back(MakeBindingInfo(records[resources[local]],
                                                    local < footprints.size() ? &footprints[local] : nullptr,
                                                    member_offsets[resources[local]]));
