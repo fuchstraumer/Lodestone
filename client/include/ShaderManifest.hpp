@@ -88,7 +88,8 @@ enum class ShaderManifestTable : uint32_t
     Rasters,
     VertexInputs,
     ColorTargets,
-    UniformMembers
+    UniformMembers,
+    Count
 };
 //NOLINTEND(readability-enum-initial-value, performance-enum-size)
 
