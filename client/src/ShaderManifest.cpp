@@ -9,11 +9,13 @@
 #include <cstdint>
 #include <cstring>
 #include <expected>
+#include <format>
 #include <functional>
 #include <iterator>
 #include <magic_enum/magic_enum.hpp>
 #include <ranges>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -296,6 +298,92 @@ namespace
 std::string_view ToString(ShaderManifestErrorCode error) noexcept
 {
     return magic_enum::enum_name(error);
+}
+
+namespace
+{
+    // One human sentence per error code, in enum order so the index is the code. The static_assert
+    // pins the length to the enum, so a new code that forgets a line fails to compile rather than
+    // reporting the wrong sentence.
+    constexpr std::array<std::string_view, static_cast<size_t>(ShaderManifestErrorCode::Count)>
+        k_ErrorDescriptions{
+            "no error code was set",
+            "no error",
+            "the byte span is smaller than the manifest header",
+            "the file does not begin with the manifest magic number",
+            "the manifest version does not match this reader",
+            "the header's file size does not match the byte span",
+            "a table or blob section runs past the end of the file",
+            "an index points past the end of its table",
+            "the byte span does not start on an 8-byte boundary",
+            "a string reference points past the string blob",
+            "a source reference points past the source blob",
+            "a binding names a string past the string table",
+            "a binding's uniform member range runs past the uniform member table",
+            "an entry point names a string past the string table",
+            "an entry point has an unknown shader stage",
+            "a resource index points past the binding table",
+            "a resource list run is out of range",
+            "a footprint list run is out of range",
+            "a visibility list run is out of range",
+            "a slot's source index points past the source table",
+            "a slot's visibility index points past the visibility list table",
+            "a slot's raster index points past the raster table",
+            "the variant keys are not strictly ascending",
+            "the variant key count does not match the variant count",
+            "a variant's slot range runs past the slot table",
+            "a raster's vertex input range is out of range",
+            "a raster's color target range is out of range",
+            "a vertex input names a string past the string table",
+            "unused: a misspelled duplicate of InvalidSlotVisibilityIndex",
+            "a variant's footprint list index points past the footprint list table",
+            "a uniform member names a string past the string table",
+            "an axis names a string past the string table",
+            "an axis's value range runs past the axis value table",
+        };
+
+    static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ShaderManifestErrorCode::Count),
+                  "every ShaderManifestErrorCode needs a description; add a line when you add a code");
+} // namespace
+
+std::string DescribeShaderManifestError(const ShaderManifestError& error)
+{
+    const size_t codeIndex = static_cast<size_t>(error.Code);
+    const std::string_view description = codeIndex < k_ErrorDescriptions.size()
+                                             ? k_ErrorDescriptions[codeIndex]
+                                             : std::string_view{ "unknown error code" };
+
+    std::string out = std::format("{}: {}", magic_enum::enum_name(error.Code), description);
+
+    if (error.Table != ShaderManifestTable::Invalid)
+    {
+        out += std::format(" [table {}, record {}]", magic_enum::enum_name(error.Table), error.RecordIndex);
+    }
+
+    // `Detail` carries a different fact per code, so the ones worth spelling out get their own phrasing.
+    switch (error.Code)
+    {
+    case ShaderManifestErrorCode::VersionMismatch:
+        out += std::format(" (file is version {}, reader expects {})", error.Detail, k_ShaderManifestVersion);
+        break;
+    case ShaderManifestErrorCode::SizeMismatch:
+        out += std::format(" (header claims {} bytes)", error.Detail);
+        break;
+    case ShaderManifestErrorCode::TooSmall:
+        out += std::format(" (span is only {} bytes)", error.Detail);
+        break;
+    case ShaderManifestErrorCode::VariantKeyVariantCountMismatch:
+        out += std::format(" (variant count {})", error.Detail);
+        break;
+    default:
+        if (error.Table != ShaderManifestTable::Invalid)
+        {
+            out += std::format(" (offending value {})", error.Detail);
+        }
+        break;
+    }
+
+    return out;
 }
 
 ShaderManifestView::ShaderManifestView() noexcept = default;
@@ -587,6 +675,30 @@ ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std:
                                                         .Table = ShaderManifestTable::UniformMembers,
                                                         .RecordIndex = i,
                                                         .Detail = uniformMemberSpan[i].NameString });
+        }
+    }
+
+    // Each axis names a string and owns a run of values in the axis value table. The values themselves
+    // are plain int64 data with nothing to reference, so only the name and the run need checking.
+    const std::span<const ManifestAxis> axisSpan =
+        MakeTable<ManifestAxis>(bytes, parsed.AxisTableOffset, parsed.AxisCount);
+    for (uint32_t i = 0u; i < axisSpan.size(); ++i)
+    {
+        const ManifestAxis& axis = axisSpan[i];
+        if (axis.NameString >= parsed.StringCount)
+        {
+            return std::unexpected(ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidAxisName,
+                                                        .Table = ShaderManifestTable::Axes,
+                                                        .RecordIndex = i,
+                                                        .Detail = axis.NameString });
+        }
+
+        if (static_cast<size_t>(axis.FirstValue) + static_cast<size_t>(axis.ValueCount) > parsed.AxisValueCount)
+        {
+            return std::unexpected(ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidAxisValueRange,
+                                                        .Table = ShaderManifestTable::Axes,
+                                                        .RecordIndex = i,
+                                                        .Detail = axis.ValueCount });
         }
     }
 

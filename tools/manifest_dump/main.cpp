@@ -402,7 +402,7 @@ int main(int argc, char** argv)
         std::println(stderr,
                      "Failed to open manifest '{}': {}",
                      options.ManifestPath.string(),
-                     lodestone::ToString(viewResult.error().Code));
+                     lodestone::DescribeShaderManifestError(viewResult.error()));
         return 1;
     }
 

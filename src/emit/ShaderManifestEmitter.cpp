@@ -205,7 +205,7 @@ namespace
             std::println(stderr,
                          "[shader_cooker] module {} manifest does not open: {}",
                          module.Name,
-                         ToString(opened.error().Code));
+                         DescribeShaderManifestError(opened.error()));
             return std::unexpected(CookError::LibraryRoundTripFailed);
         }
 

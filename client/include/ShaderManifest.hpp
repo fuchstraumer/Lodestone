@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <expected>
 #include <span>
+#include <string>
 #include <string_view>
 #include <type_traits>
 #include <vector>
@@ -64,6 +65,8 @@ enum class ShaderManifestErrorCode : uint32_t
     InvalidSlotVisiblityIndex = 28,
     InvalidVariantFootprintListIndex = 29,
     InvalidUniformMember = 30,
+    InvalidAxisName = 31,
+    InvalidAxisValueRange = 32,
     Count
 };
 
@@ -111,6 +114,10 @@ template<typename T>
 using ManifestResult = std::expected<T, ShaderManifestError>;
 
 std::string_view ToString(ShaderManifestErrorCode error) noexcept;
+
+/** @brief A human-readable, one-line description of a manifest error, for a log or the console. It
+ * folds in the table, record index, and `Detail` field, so the reader states where the file is bad */
+std::string DescribeShaderManifestError(const ShaderManifestError& error);
 
 /** @brief Fixed header at offset zero. Each section is an offset from the start of the file and a
  * count of records. All values are little-endian. */
