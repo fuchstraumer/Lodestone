@@ -28,7 +28,10 @@ namespace lodestone
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
 inline constexpr uint32_t k_ShaderManifestVersion = 2u;
 
-enum class ShaderManifestErrorCode : uint8_t
+// clang-tidy complains about enums being too big, but uint32_t means
+// the error struct is 16bytes, which is great alignment and still compact
+// NOLINTBEGIN(readability-enum-initial-value, performance-enum-size)
+enum class ShaderManifestErrorCode : uint32_t
 {
     Invalid = 0,
     Success = 1,
@@ -38,8 +41,6 @@ enum class ShaderManifestErrorCode : uint8_t
     SizeMismatch = 5,
     SectionOutOfBounds = 6,
     IndexOutOfBounds = 7,
-    /** The byte span does not start on an 8-byte boundary. The reader maps records in place, so it
-     * cannot accept a span that would make a 64-bit field unaligned. */
     Misaligned = 8,
     StringOutOfBounds = 9,
     SourceOutOfBounds = 10,
@@ -62,11 +63,51 @@ enum class ShaderManifestErrorCode : uint8_t
     InvalidVertexInput = 27,
     InvalidSlotVisiblityIndex = 28,
     InvalidVariantFootprintListIndex = 29,
-    InvalidUniformMember = 30
+    InvalidUniformMember = 30,
+    Count
+};
+
+enum class ShaderManifestTable : uint32_t
+{
+    Invalid,
+    Strings,
+    Sources,
+    Bindings,
+    ResourceIndices,
+    ResourceLists,
+    Footprints,
+    FootprintLists,
+    VisibilityLists,
+    VisibilityIndices,
+    EntryPoints,
+    Slots,
+    Variants,
+    VariantKeys,
+    Axes,
+    AxisValues,
+    Rasters,
+    VertexInputs,
+    ColorTargets,
+    UniformMembers
+};
+//NOLINTEND(readability-enum-initial-value, performance-enum-size)
+
+/**@brief Contains contextual information on an error found during
+ * the parsing or validation of a shader manifest. Using the record
+ * index and the offset + the code, we can generate useful error
+ * messages. */
+struct ShaderManifestError
+{
+    ShaderManifestErrorCode Code{ ShaderManifestErrorCode::Invalid };
+    ShaderManifestTable Table{ ShaderManifestTable::Invalid };
+    // index of the offending record within the table
+    uint32_t RecordIndex{ 0u };
+    // offending value, or bound, or version: varies based on error code and table
+    uint32_t Detail{ 0u };
 };
 
 template<typename T>
-using ManifestResult = std::expected<T, ShaderManifestErrorCode>;
+using ManifestResult = std::expected<T, ShaderManifestError>;
 
 std::string_view ToString(ShaderManifestErrorCode error) noexcept;
 
