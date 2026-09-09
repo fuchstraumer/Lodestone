@@ -28,7 +28,7 @@ namespace lodestone
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
 inline constexpr uint32_t k_ShaderManifestVersion = 2u;
 
-enum class ShaderManifestError : uint8_t
+enum class ShaderManifestErrorCode : uint8_t
 {
     Invalid = 0,
     Success = 1,
@@ -61,13 +61,14 @@ enum class ShaderManifestError : uint8_t
     InvalidRasterColorTargetRange = 26,
     InvalidVertexInput = 27,
     InvalidSlotVisiblityIndex = 28,
-    InvalidUniformMember = 29
+    InvalidVariantFootprintListIndex = 29,
+    InvalidUniformMember = 30
 };
 
 template<typename T>
-using ManifestResult = std::expected<T, ShaderManifestError>;
+using ManifestResult = std::expected<T, ShaderManifestErrorCode>;
 
-std::string_view ToString(ShaderManifestError error) noexcept;
+std::string_view ToString(ShaderManifestErrorCode error) noexcept;
 
 /** @brief Fixed header at offset zero. Each section is an offset from the start of the file and a
  * count of records. All values are little-endian. */

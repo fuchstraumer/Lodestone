@@ -28,7 +28,7 @@
 
 using lodestone::CookedModule;
 using lodestone::EmitShaderManifest;
-using lodestone::ShaderManifestError;
+using lodestone::ShaderManifestErrorCode;
 using lodestone::ShaderManifestView;
 
 namespace
@@ -96,12 +96,12 @@ void WriteUint32(std::vector<std::byte>& bytes, size_t offset, uint32_t value)
     std::memcpy(bytes.data() + offset, &value, sizeof(value));
 }
 
-ShaderManifestError ErrorFrom(std::span<const std::byte> bytes)
+ShaderManifestErrorCode ErrorFrom(std::span<const std::byte> bytes)
 {
     const lodestone::ManifestResult<ShaderManifestView> opened = ShaderManifestView::Open(bytes);
     if (opened.has_value())
     {
-        return ShaderManifestError::Success;
+        return ShaderManifestErrorCode::Success;
     }
 
     return opened.error();
@@ -129,34 +129,34 @@ int main()
 
     runner.BeginSection("a short file is rejected before any field is read");
     const std::span<const std::byte> truncated{ valid.data(), sizeof(lodestone::ShaderManifestHeader) - 1u };
-    runner.Check(ErrorFrom(truncated) == ShaderManifestError::TooSmall,
+    runner.Check(ErrorFrom(truncated) == ShaderManifestErrorCode::TooSmall,
                  "a span smaller than the header is TooSmall");
 
     runner.BeginSection("a misaligned span is rejected");
     // The reader maps 64-bit fields in place, so it cannot accept a span that starts off an 8-byte
     // boundary. The valid case above proves the buffer itself starts aligned.
     const std::span<const std::byte> misaligned{ valid.data() + 1u, valid.size() - 1u };
-    runner.Check(ErrorFrom(misaligned) == ShaderManifestError::Misaligned,
+    runner.Check(ErrorFrom(misaligned) == ShaderManifestErrorCode::Misaligned,
                  "a span that starts one byte in is Misaligned");
 
     runner.BeginSection("a damaged header field is rejected by name");
     std::vector<std::byte> badMagic = valid;
     WriteUint32(badMagic, k_MagicOffset, 0xDEADBEEFu);
-    runner.Check(ErrorFrom(badMagic) == ShaderManifestError::BadMagic, "a wrong magic is BadMagic");
+    runner.Check(ErrorFrom(badMagic) == ShaderManifestErrorCode::BadMagic, "a wrong magic is BadMagic");
 
     std::vector<std::byte> badVersion = valid;
     WriteUint32(badVersion, k_VersionOffset, lodestone::k_ShaderManifestVersion + 1u);
-    runner.Check(ErrorFrom(badVersion) == ShaderManifestError::VersionMismatch,
+    runner.Check(ErrorFrom(badVersion) == ShaderManifestErrorCode::VersionMismatch,
                  "a future version is VersionMismatch");
 
     std::vector<std::byte> badSize = valid;
     WriteUint32(badSize, k_FileSizeOffset, static_cast<uint32_t>(valid.size()) + 8u);
-    runner.Check(ErrorFrom(badSize) == ShaderManifestError::SizeMismatch,
+    runner.Check(ErrorFrom(badSize) == ShaderManifestErrorCode::SizeMismatch,
                  "a header that claims more bytes than it has is SizeMismatch");
 
     std::vector<std::byte> badSection = valid;
     WriteUint32(badSection, k_StringTableOffsetOffset, static_cast<uint32_t>(valid.size()) - 1u);
-    runner.Check(ErrorFrom(badSection) == ShaderManifestError::SectionOutOfBounds,
+    runner.Check(ErrorFrom(badSection) == ShaderManifestErrorCode::SectionOutOfBounds,
                  "a section that reaches past the file is SectionOutOfBounds");
 
     return runner.Report();
