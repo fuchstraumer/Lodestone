@@ -335,7 +335,6 @@ namespace
             "a raster's vertex input range is out of range",
             "a raster's color target range is out of range",
             "a vertex input names a string past the string table",
-            "unused: a misspelled duplicate of InvalidSlotVisibilityIndex",
             "a variant's footprint list index points past the footprint list table",
             "a uniform member names a string past the string table",
             "an axis names a string past the string table",

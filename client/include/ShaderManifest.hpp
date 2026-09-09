@@ -62,11 +62,10 @@ enum class ShaderManifestErrorCode : uint32_t
     InvalidRasterVertexInputRange = 25,
     InvalidRasterColorTargetRange = 26,
     InvalidVertexInput = 27,
-    InvalidSlotVisiblityIndex = 28,
-    InvalidVariantFootprintListIndex = 29,
-    InvalidUniformMember = 30,
-    InvalidAxisName = 31,
-    InvalidAxisValueRange = 32,
+    InvalidVariantFootprintListIndex = 28,
+    InvalidUniformMember = 29,
+    InvalidAxisName = 30,
+    InvalidAxisValueRange = 31,
     Count
 };
 
