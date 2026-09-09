@@ -81,6 +81,10 @@ CookedModule MakeSmallModule()
         module.Variants.emplace_back(std::move(variant));
     }
 
+    // A v2 manifest carries one variant key per variant, strictly ascending and parallel to the
+    // variant table. This hand-built module predates that table, so give it keys the reader accepts.
+    module.VariantKeys = { 0u, 1u };
+
     return module;
 }
 
@@ -104,7 +108,7 @@ ShaderManifestErrorCode ErrorFrom(std::span<const std::byte> bytes)
         return ShaderManifestErrorCode::Success;
     }
 
-    return opened.error();
+    return opened.error().Code;
 }
 
 } // namespace
