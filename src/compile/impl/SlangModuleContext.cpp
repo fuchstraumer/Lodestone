@@ -227,7 +227,7 @@ CookError SlangModuleContext::WriteModuleCache() const
         const std::string modulePath = BuildCachedModulePath(cacheDirectory, moduleNameStr);
         if (SLANG_FAILED(module->writeToFile(modulePath.c_str())))
         {
-            return CookError::FilesystemError;
+            return CookError::FileWriteFailed;
         }
     }
 

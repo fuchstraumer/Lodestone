@@ -87,7 +87,10 @@ enum class CookError : uint16_t
 
     // start system errors
     SystemError = 200,
-    FilesystemError = 201, // will expand later
+    DirectoryDoesNotExist = 201,
+    DirectoryCouldNotBeCreated = 202,
+    FileNotFound = 203,
+    FileWriteFailed = 204,
 
     SlangErrors = 220,
     SlangCoreModuleLoadFailed = 221,

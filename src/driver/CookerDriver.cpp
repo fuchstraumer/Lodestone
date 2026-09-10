@@ -744,7 +744,7 @@ CookResult<CookStatistics> RunCookOnce(const CookerOptions& options,
 
     if (!cacheDirectoryResult)
     {
-        return std::unexpected(CookError::FilesystemError);
+        return std::unexpected(CookError::DirectoryDoesNotExist);
     }
 
     PolicyDocument policyDoc{};

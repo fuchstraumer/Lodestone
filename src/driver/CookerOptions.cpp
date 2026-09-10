@@ -247,10 +247,17 @@ namespace
         return nullptr;
     }
 
+    enum class CreateDirectory : uint8_t
+    {
+        No = 0,
+        Yes = 1
+    };
+
     /** A flag that consumes the next argument. It cannot join either table, because it moves the
      * loop index. */
     CookResult<std::filesystem::path> ReadPathArgument(std::span<const std::string_view> arguments,
-                                                       size_t& index)
+                                                       size_t& index,
+                                                       CreateDirectory create_dir)
     {
         if (index + 1u >= arguments.size())
         {
@@ -261,14 +268,42 @@ namespace
         ++index;
 
         std::filesystem::path result{ arguments[index] };
-        // in cases where the result is a file (not a dir) check that it exists here
-        // directory cases will either be created later or are expected to exist
-        if (result.has_filename() && !std::filesystem::exists(result))
+        if (!std::filesystem::exists(result))
         {
-            return std::unexpected(CookError::FilesystemError);
+            if (create_dir == CreateDirectory::Yes)
+            {
+                const bool dirCreated = std::filesystem::create_directories(result);
+                if (!dirCreated)
+                {
+                    return std::unexpected(CookError::DirectoryCouldNotBeCreated);
+                }
+            }
+            else
+            {
+                return std::unexpected(CookError::DirectoryDoesNotExist);
+            }
         }
         return result;
     }
+
+    CookResult<std::filesystem::path> ReadFileArgument(std::span<const std::string_view> arguments, size_t& index)
+    {
+        if (index + 1u >= arguments.size())
+        {
+            return std::unexpected(CookError::MalformedArgument);
+        }
+
+        ++index;
+        std::filesystem::path result{ arguments[index] };
+
+        // since this is explicitly a filename - not a directory - we should make sure it exists
+        if (result.has_filename() && !std::filesystem::exists(result))
+        {
+            return std::unexpected(CookError::FileNotFound);
+        }
+        return result;
+    }
+
 
 } // namespace
 
@@ -336,7 +371,7 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
 
         if (argument == "--output" || argument == "-o")
         {
-            const CookResult<std::filesystem::path> outputPath = ReadPathArgument(arguments, i);
+            const CookResult<std::filesystem::path> outputPath = ReadPathArgument(arguments, i, CreateDirectory::Yes);
             if (!outputPath)
             {
                 return std::unexpected(outputPath.error());
@@ -345,7 +380,7 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
         }
         else if (argument == "--cache-dir")
         {
-            const CookResult<std::filesystem::path> cacheDirectory = ReadPathArgument(arguments, i);
+            const CookResult<std::filesystem::path> cacheDirectory = ReadPathArgument(arguments, i, CreateDirectory::Yes);
             if (!cacheDirectory)
             {
                 return std::unexpected(cacheDirectory.error());
@@ -354,7 +389,7 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
         }
         else if (argument == "--policy-file")
         {
-            CookResult<std::filesystem::path> policyFile = ReadPathArgument(arguments, i);
+            CookResult<std::filesystem::path> policyFile = ReadFileArgument(arguments, i);
             if (!policyFile)
             {
                 // no policy file is fine, just continue without setting it
