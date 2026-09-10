@@ -474,37 +474,53 @@ Declaring a space is authorship. Cooking a space is policy. Unity separates `mul
 `shader_feature` for this reason, and Unreal uses `ShouldCompilePermutation` for the same reason. A
 declared axis is not always a cooked axis.
 
-**Format: JSON.** TOML reads better for a person who edits by hand, and a good TOML parser is several
-times the size. Do not use YAML.
+**Format: TOML.** A tech artist edits this file by hand, and TOML reads more plainly than JSON for
+that reader. TOML shows the structure and the hierarchy directly. A person does not manage the nesting
+and the indentation, because the format does. The old plan chose JSON, because a good TOML parser is
+larger than a JSON parser. That reason does not hold. The facade below holds the parser in one
+translation unit, so only one unit pays the size. The JSON code in this repository is a primitive
+writer for stage dumps. It is not a client serializer, and it does not read. Do not use YAML.
 
 ### The reader is a third-party library, behind a facade
 
-**A tech artist edits this file, so parse error quality is a user-facing feature.** A library gives
-byte offsets and clear messages. A quick hand-written parser gives whatever somebody wrote. The
+**A tech artist edits this file, so parse error quality is a user-facing feature.** A library gives a
+line, a column, and a clear message. A quick hand-written parser gives whatever somebody wrote. The
 author of this repository then answers the question "it says invalid and I do not know why".
 
 A writer is easy to hand-write. A parser must handle escapes, Unicode, number edge cases, and every
 malformed input a person can type. The two are not the same job.
 
-**Do not name the library in this document.** Choose it at E5 against these criteria:
+**The library is toml++ (`marzer/tomlplusplus`).** E5 chose it against these criteria:
 
-| Criterion | Why |
-|---|---|
-| No exception on the error path, or a non-throwing entry point | Every error path in this repository is `std::expected` |
-| Small compile-time cost | A very large single header costs every translation unit that sees it |
-| Byte offset and a readable message on a parse failure | The tech artist is the user |
+| Criterion | Why | toml++ |
+|---|---|---|
+| No exception on the error path, or a non-throwing entry point | Every error path in this repository is `std::expected` | `TOML_EXCEPTIONS 0` returns a `parse_result` to test |
+| Small compile-time cost | A very large single header costs every translation unit that sees it | The facade holds the header to one unit |
+| A line, a column, and a readable message on a parse failure | The tech artist is the user | `parse_error` carries a `source_region` |
+
+toml++ is header-only and needs C++17, and this repository is C++23. Its non-throwing mode returns a
+result the caller tests, so the reader needs no `try` block of its own. This matches the rule that
+every error path in this repository is `std::expected`.
 
 **Hide it behind a facade.** Use a pointer-to-implementation reader with a small key-and-value accessor. It keeps the
 third-party type out of every header. It keeps the include in one translation unit. It limits a
 later replacement to one file. `include/compile/SlangCompiler.hpp` is the standing example, because it
 names no Slang type.
 
-### The writer and the reader must not be one implementation
+### The policy file is authored by hand, so there is no policy writer
 
-Keep `JsonWriter` for writing. Take the library for reading. Two independent implementations that
-agree form **an asymmetry, and not a redundancy**. This is the shape of the WGSL scanner that checks
-Slang's reflection. A round trip through one hand-written implementation proves only that it repeats
-its own defects.
+A person writes the policy file, so this repository needs no policy writer. toml++ reads it, and
+nothing writes it. The reader has no matching writer to round-trip against, so the round-trip check
+that the JSON plan named does not apply here. **Verify the reader against a checked-in policy file
+with known contents.** This is a fixture test. The fixture states the values, and the test checks that
+the reader returns them.
+
+The JSON plan wanted a round trip, because it planned to hand-write both the writer and the reader.
+Two hand-written halves that agree prove only that they repeat one defect. That risk is gone, because
+toml++ is a third-party reader and a person is the only writer.
+
+`JsonWriter` stays. It serves the stage dumps, and the stage dumps are a separate format for a
+separate job.
 
 ### Contents
 
@@ -599,11 +615,13 @@ variant, and a `ThreadPool` spreads them across workers.
 The bootstrap compile that E6 needs is an attribute reader added to `PrepareRawModule`. It is not a
 restructure.
 
-### D1. Name the JSON target for both directions. **Half done**
+### D1. The JSON target keeps its writer name. **Settled by the TOML choice**
 
-The alias `lodestone::json` is right. The target behind it is `lodestone_json_writer`, so
-`JsonReader.cpp` would land in a target whose name says it only writes. Rename the target and keep
-the alias, at the start of E5.
+The old plan added a `JsonReader.cpp` beside the writer, so it planned to rename `lodestone_json_writer`
+to a name that fits both directions. The policy reader is now TOML, not JSON, so no reader joins that
+target. The name `lodestone_json_writer` is correct, because that target only writes, and it serves the
+stage dumps alone. The alias `lodestone::json` stays. E5 adds a new facade target for the toml++
+reader instead of renaming this one.
 
 ### D-wide. Do not add a fourth index site. **Holds**
 
@@ -658,19 +676,21 @@ change **what**. Each one adds capability that no golden file covers.
 | E1 | Comparison and logical levels in `AttributeExpression`. **Done 2026-09-01** | `AttributeExpressionTest`, plus the six dumps unchanged | low |
 | E2 | `AxisValueDomain`, `AxisKind`, `EarliestBindingTime`, `ActiveWhen` (backward-only), `Require`. `k_ModuleSpaces` stays the source. **Done 2026-09-04; `PermutationConstraintTest` written and green** | The space dump (enum fields, `activeWhen`, `require`), the five other dumps unchanged, then `PermutationConstraintTest` | medium |
 | E3 | Depth-first enumeration with constraint propagation. **Done 2026-09-06**: one `expandFrom` walk, `Require` bucketed by ready-depth in a `RequireReadyMap`, `MaxVariants` enforced in the walk | **The variants dump is byte identical** (it stayed so) | medium |
-| E4 | Sorted key table and binary search, in place of the storage index. Add the per-variant capability requirement to the manifest | Round trips, and the emitted tables shrink | **high** |
-| E5 | Rename the JSON target, then the reader, the policy file, per-target sections, `CookValues`, `CookWhen` | Round trip against `JsonWriter` | medium |
+| E4 | Sorted key table and binary search, in place of the storage index. **Done 2026-09-07**: `ComputeVariantKey` returns a `uint64` key, `EnumerateVariants` ranks the sorted keys, the manifest carries a `VariantKeys` table, and `FindSlot` uses a `lower_bound`. The per-variant capability requirement stays open | Round trips pass, and five stage dumps were re-accepted because the indices compacted | **high** |
+| E5 | The toml++ reader behind a facade, the policy file, per-target sections, `CookValues`, `CookWhen` | A fixture test reads a checked-in policy file | medium |
 | E6 | Axis attributes and the bootstrap compile. Delete `VerifyAxisNamesAreDeclared` | A cook of `OceanFft` with no registry entry | **high** |
 | E7 | Interface axes. E0 removed the enum fallback | A new test shader | medium |
 | E8 | Documents, and the measured numbers again | — | none |
 
-**E0c, E0, E1, E2, and E3 are complete** — E3 made enumeration one depth-first walk with propagated
-`Require` pruning and an in-walk `MaxVariants` guard, and the six dumps stayed byte identical. **E4 is
-next.**
+**E0c, E0, E1, E2, E3, and E4 are complete.** A diversion after E4, call it E4a, hardened the client
+trust boundary. `ShaderManifestView::Open` now validates the whole manifest graph once. The error type
+is a `ShaderManifestError` struct that names the table and the record, and `DescribeShaderManifestError`
+prints it. The manifest format version is now 2. **E5 is next.**
 
-**E4 needs care.** The emitted C++ index function is already gone with the C++ emitter, so E4 changes
-the manifest variant table and the arithmetic of the cooker, not three sites at once. The round trips
-find an error, and the stage dumps say where.
+**E5 adds the toml++ reader and the policy file.** It moves the module policy out of `k_ModuleSpaces`
+and into a TOML data file that a tech artist owns. The reader is toml++, behind a pimpl facade, in a
+new target. `JsonWriter` stays, because it serves the stage dumps and never the policy. §9 and the §11
+table hold the plan.
 
 **Run E6's acceptance test once before E6 starts.** A module with no registered space reached
 `space.front()` on an empty vector and aborted the cook until 2026-08-20. The walk (`expandFrom`, since

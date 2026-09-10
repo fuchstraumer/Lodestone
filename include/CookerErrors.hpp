@@ -79,6 +79,11 @@ enum class CookError : uint16_t
     OutputWriteFailed = 122,
     ArtifactAlreadyWritten = 123,
 
+    // policy file (TOML) checked against the module's declared axes
+    PolicyAxisNotDeclared = 130,
+    PolicyValueNotInAxis = 131,
+    PolicyCookWhenInvalid = 132,
+
     // start system errors
     SystemError = 200,
     FilesystemError = 201, // will expand later

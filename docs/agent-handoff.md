@@ -10,12 +10,15 @@ Text in this file follows ASD-STE100.
 
 ---
 
-## 1. State on 2026-09-06
+## 1. State on 2026-09-09
 
-**The compiler split is complete and the pipeline works, and steps E1, E2, and E3 have landed.** E2's
-verifier, `PermutationConstraintTest`, is written and green, so the suite is fifteen test targets. E3
-made enumeration one depth-first walk with propagated `Require` pruning and an in-walk `MaxVariants`
-guard, and all six stage dumps stayed byte identical. Phase E step E0c added `AccessModelRejectTest`.
+**The compiler split is complete and the pipeline works. Phase E steps E1, E2, E3, and E4 have landed,
+and the client-side manifest validation work (E4a) has landed with them.** E3 made enumeration one
+depth-first walk with propagated `Require` pruning and an in-walk `MaxVariants` guard. E4 replaced the
+mixed-radix storage index with a sorted key table, so a variant's dense index is now its rank. E4a made
+`ShaderManifestView::Open` validate the whole manifest graph once, so the runtime accessors trust the
+data. `PermutationConstraintTest` is written and green, so the suite is fifteen test targets. Phase E
+step E0c added `AccessModelRejectTest`.
 
 | Configuration | Build | Tests |
 |---|---|---|
@@ -237,10 +240,10 @@ module instead of reading the file. Fact 10 in §4 states which modules belong i
 
 ---
 
-## 8. The next task: phase E step E4
+## 8. The next task: phase E step E5
 
-`docs/phase-e-data-driven-permutations.md` holds the plan. **Steps E0a, E0b, E0c, E0, E1, E2, and E3
-are complete, and item D2 of §10 is settled.** Nothing in that document is open for a decision.
+`docs/phase-e-data-driven-permutations.md` holds the plan. **Steps E0a, E0b, E0c, E0, E1, E2, E3, and
+E4 are complete, and item D2 of §10 is settled.** Nothing in that document is open for a decision.
 
 **E1 is done, on 2026-09-01.** The attribute expression evaluator gained a comparison level, a
 logical level, and unary `!`. The file `SizeExpression.{hpp,cpp}` became `AttributeExpression.{hpp,cpp}`,
@@ -276,11 +279,33 @@ invisible to the output. One open nit: the walk's budget test is `>=` while the 
 dislikes default arguments and adds one only when it is unavoidable, so every call site states the
 budget it means (the tests pass `0u`).
 
-**E4 is next.** §6 and the §11 table. It replaces the mixed-radix dense index, which leaves a hole for
-every pruned or disabled combination, with Form 1: a sorted table of packed canonical keys, where the
-dense index is the position in the sorted array. Canonicalization does not change. The manifest variant
-table and the cooker arithmetic both move; the emitted C++ index function is already gone, so the copy
-that E4 used to keep in step is one site now, not three.
+**E4 is done, on 2026-09-07.** It replaced the mixed-radix storage index with a sorted table of packed
+canonical keys. A variant's dense index is now its rank in that table, so the holes are gone.
+`ComputeVariantIndex` became `ComputeVariantKey` and returns a `uint64` `VariantKey`.
+`EnumerateVariants` sorts the variants by key, then gives each one its rank. `SpaceSize` stays the
+nominal product for the report, but it no longer sizes any table. The manifest carries a `VariantKeys`
+table in place of the old hole-filled index table, and `FindSlot` finds a variant by a `lower_bound` on
+the keys. Five stage dumps changed, because the index values compacted, and `check-known-good.py`
+recorded the new dumps after a review of the diff. The `space` dump did not change.
+
+**E4a is done, on 2026-09-09. It was a diversion, not a numbered step.** It hardened the client trust
+boundary. `ShaderManifestView::Open` now validates the whole manifest graph once, at load. It runs a
+data-driven section-bounds pass, then per-table checks for the context-free indices, then one
+variant-outwards pass for the relational checks. Every runtime accessor then trusts the data:
+`FindSlot` dropped its bounds branches, and `EntryPointId` is now zero-based. The error type changed
+from a bare `ShaderManifestErrorCode` enum to a `ShaderManifestError` struct. The struct carries the
+code, the table, the record index, and a `Detail` value. `DescribeShaderManifestError` turns the struct
+into one console line, and the cooker and `manifest_dump` both use it. The manifest format version is
+now 2, because the E4 key table changed the bytes. One item stays open: the `Open` validation has no
+dedicated reject test yet.
+
+**E5 is next.** §9 and the §11 table. It adds the toml++ reader behind a pimpl facade, the policy file,
+and the per-target sections with `CookValues` and `CookWhen`. The policy moves out of `k_ModuleSpaces`
+and into a **TOML** file that a tech artist owns. The reader is toml++ (`marzer/tomlplusplus`), chosen
+for its non-throwing mode (`TOML_EXCEPTIONS 0` returns a `parse_result`) and its line-and-column parse
+errors. `JsonWriter` stays for the stage dumps, because that writer and the policy reader serve
+different jobs. The old plan chose JSON; the author reversed it on 2026-09-09, because the JSON code is
+a stage-dump writer and TOML reads more plainly for a hand author.
 
 **`docs/phase-e-interface-spike.md` holds the E0 answers.** Read it before E7. Three results matter
 early: a link-time `extern` type works and uses the mechanism the constant axis already uses, an

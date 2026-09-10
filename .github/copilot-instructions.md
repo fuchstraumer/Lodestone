@@ -66,10 +66,14 @@ Struct::Struct(int _val0, int _val1, int _val2) :
 {}
 ```
 - **Switch Statements**: if a case is going to do more than return a value or call a function, pull that logic out into a separate function with a descriptive name. If brackets would need to be inserted to initialize variables in the case: pull it out into a separate function. Treat switch statements in this usage like a table of functions to be called
-- **Comment usage**: Avoid as much as absolutely possible. Comments are no subsititude for descriptive code: I would rather have function names that are 80 characters long than comments that will rapidly drift from the source. Absolutely no comments depicting categories of code: that should be inferred from how functions are grouped (in the same order as they are declared, and in declaration order in the definition file)
+- **Comment usage**: Avoid as much as absolutely possible. Comments are no subsititute for descriptive code: I would rather have function names that are 80 characters long than comments that will rapidly drift from the source. Absolutely no comments depicting categories of code: that should be inferred from how functions are grouped (in the same order as they are declared, and in declaration order in the definition file)
 - **Local variables**: If doing repeated operations, prefer longer variable names. use `deltaX` instead of `dX`, assign variables to const during long chains of mathematical operations (almost like writing scalarized SSA code), and favor being readable over being clever or taking shortcuts. We will save shortcuts and esoteric performant code for profiling results
 - **Eagerly factor out common logic**: If some bit of code is greater than 4-5 lines and being duplicated, factor it out into a common function.
 - **`todo` comments**: Spare these for things that are actually worth having greppable as distinct work items. For things that will need to be fixed before shipping this to customers or clients who are not devs or friends: use `todo-ship`. use `todo-perf` for things that could grant sizeable performance benefits. Minimize the usage of `todo` as much as possible: we need to get to MVP, but we also don't need to fill our backlog on that road.
+
+### **Anonymous Namespace Usage**
+
+Helper functions placed in the anonymous namespace *must* be declared at the top of the file *only*, unless they are templates that cannot be defined elsewhere. The definition then *must* be at the bottom of the file. This avoids making the majority of a file that a user reads a wall of implementation details: seeing the declarations first tells them what the code will use, but focuses on the actual implementation in the object or `.cpp` as it's presented from the interfaces.
 
 Examples of well formatted code in this codebase: `Future.hpp`, `InputManager.hpp` + `InputManager.cpp`, `Context.hpp` + `Context.cpp`. 
 
@@ -192,3 +196,77 @@ for valid paths and directories.
 - Use `std::upper_bound` and `std::lower_bound` from `<algorithm>` when possible
 - Retrieve numerical constants from `<numbers>` header
 - Minimize standard library includes across module boundaries
+
+#### Ranges and Views
+ 
+Favor `std::ranges` algorithms over the unconstrained `<algorithm>` overloads. Favor a view pipeline over
+a hand-written loop when the pipeline says what the code does more clearly. This supersedes the older line
+"Used ranged-for loops with the ranges library when possible", which was too vague to act on.
+ 
+Views are correct for marshaling, reflection, manifest assembly, and any transformation between pipeline
+stages. Views are not correct in a per-frame or per-instruction loop. This library has no such loop today.
+Write for clarity first, and apply the rules below to avoid the cases that cost real time.
+ 
+- **Prefer a view when it removes a manual counter or a manual index.** `std::views::enumerate` removes an
+  index that a `continue` can desynchronize. `std::views::transform` with a pointer to a data member
+  extracts one field and compiles to one load
+- **Prefer `std::ranges::to` over a manual fill loop**, but read the reserve rule below first
+- **Write a loop instead when the pipeline needs more than three adaptors.** A deep pipeline depends on the
+  inliner, and the inliner gives up. A loop states the same thing and never surprises a reader
+##### Two families of adaptor
+ 
+Know which family an adaptor belongs to. The family decides the cost.
+ 
+- **Index adaptors** keep `sized_range` and `random_access_range`: `transform`, `take`, `drop`, `stride`,
+  `zip`, `iota`, `enumerate`, `elements`, `as_rvalue`. These cost nothing after optimization. Use them
+  freely
+- **State machine adaptors** drop `sized_range` and collapse the range category: `filter`, `join`, `split`,
+  `take_while`, `drop_while`, `chunk_by`. Each one holds a loop inside `operator++`. Use one per pipeline,
+  and put it last
+
+##### Rules
+ 
+- **Call the expensive function once.** `transform_view::operator*` reruns the callable on every
+  dereference, and it caches nothing. A `filter` after a `transform` reruns the transform for each element
+  that passes. Reorder to `filter | transform` when the predicate reads the untransformed element
+- **Use `tk::cache_latest` when you cannot reorder.** The shim in `ShaderToolsRanges.hpp` forwards to
+  `std::views::cache_latest` where the compiler has it. MSVC does not have it yet, so the shim compiles to
+  a no-op there and the transform runs twice. Add a `todo-perf` at each such site
+- **Pin the return type of a lambda that returns a container.** A deduced return type strips the reference
+  and copies the container. Write `-> const std::vector<uint32_t>&` explicitly. This mistake is silent, and
+  it also forces `join_view` to hold a cache it would not otherwise need
+- **Reserve before `insert_range`, `append_range`, or `ranges::to` when the range is not sized.** Anything
+  past a `filter` or a `join` has no size, so the container grows one reallocation at a time. Total the size
+  with `std::ranges::fold_left` and reserve once. This matches the existing rule on dynamic allocation
+- **Build a `filter` pipeline once.** `filter_view::begin()` is O(n), and the cache that hides that cost
+  resets on copy and on move. Pass the pipeline by reference. Never rebuild it inside a loop
+- **Never call `ranges::distance` or `ranges::size` on a range past a `filter`.** The call is O(n). The same
+  call in a loop condition is O(n squared)
+- **Never adapt a `std::generator` or any coroutine range.** Each increment resumes a coroutine frame, and
+  the optimizer crosses no suspension point
+- **Never put `std::function` or a virtual call inside a `transform`.** The call is opaque, so the compiler
+  cannot fold the repeated dereference. Dispatch once at the stage boundary instead
+- **Parse text with `std::string_view::find`.** `lazy_split_view` walks one character at a time and is much
+  slower than the loop it replaces
+
+##### Interaction with other rules in this file
+ 
+- **A view type has no name, and this repository forbids an implementation in a header.** Do not return a
+  raw pipeline from a function that a header declares. Declare a named functor and a type alias instead, as
+  `GatheredSpan` does, so the header names the type and the definition stays in the source file
+- **`enumerate` yields a signed index.** The type is `std::ptrdiff_t`, which agrees with the signed-by-default
+  rule. Cast once at the boundary where an unsigned serialized field needs it
+- **Bind the element by reference.** Write `for (auto&& [index, element] : std::views::enumerate(range))`.
+  A plain `auto` copies each element
+- **A view holds a reference, and it owns nothing.** Never store a pipeline in a member, and never return one
+  that outlives its source container. Materialize with `ranges::to` when the result must outlive the tables
+- **Debug builds pay for every layer.** Each adaptor is a real call at `/Od`, and MSVC is the worst case. Keep
+  pipelines shallow in any code path that a developer runs in a Debug cook
+
+##### Selecting rows from a global table
+ 
+This library stores data in global tables and stores local index lists against them. Gather through a view
+rather than materializing a vector of pointers. The index list already holds the information, and a
+`transform` over it stays sized, stays indexable, and allocates nothing. Return `const T&` from the
+projection, not `const T*`. Materialize only when the caller sorts the result, mutates it, crosses a thread
+boundary, or outlives the table.

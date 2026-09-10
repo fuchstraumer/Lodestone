@@ -1,10 +1,12 @@
 #pragma once
 #ifndef PERMUTE_POLICY_DOCUMENT_HPP
 #define PERMUTE_POLICY_DOCUMENT_HPP
+#include "CookerErrors.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <functional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -13,9 +15,10 @@
 namespace lodestone
 {
 
-/** A hash that reads any string type. A map keyed by `std::string` then accepts a `std::string_view`
- * query with no copy. The `is_transparent` tag turns on the heterogeneous overloads of
- * `unordered_map::find`, and `std::equal_to<>` supplies the comparison that matches them. */
+class PermutationSpace;
+class DiagnosticSink;
+
+// required to enable copy-free hashing of string_views when doing lookups in a map
 struct TransparentStringHash
 {
     using is_transparent = void;
@@ -25,13 +28,13 @@ struct TransparentStringHash
     }
 };
 
-/** A map from an owned name to a value, queried by a borrowed name. The map owns each key string, so a
- * `std::string_view` this document returns stays valid while the document lives. */
+/**@brief Specialization of unordered_map using the above hash to allow for string_view queries
+  * without copying the key */
 template<typename Value>
 using StringMap = std::unordered_map<std::string, Value, TransparentStringHash, std::equal_to<>>;
 
-/** The values to cook for one axis. An axis with no entry cooks every declared value. The values are
- * `int64_t`, which is the type the expression evaluator reads. A boolean lists as 0 or 1. */
+/**@brief Values to cook for the specified axis - if empty or unspecified, it uses the values
+  * in the shader source code. Booleans are 0 or 1: everything must be specified as int64_t values */
 struct AxisCookValues
 {
     std::string Axis;
@@ -41,7 +44,6 @@ struct AxisCookValues
 /** The cook policy for one module on one target profile. */
 struct TargetPolicy
 {
-    /** The variant budget for this target. Zero means no budget. */
     uint32_t MaxVariants{ 0u };
     /** The per-axis value subsets. Empty means every axis cooks every value. */
     std::vector<AxisCookValues> CookValues;
@@ -50,9 +52,8 @@ struct TargetPolicy
     std::string CookWhen;
 };
 
-/** One expected-influence statement, owned. The cooker measures the real influence and compares it
- * against this. `ExpectedAxisInfluence` in `PermutationPolicy.hpp` is the borrowed form the policy
- * check reads today. Step 3 bridges the two. */
+/**@brief PolicyInfluence is used to specify that for a given entrypoint, the named axis
+ * should have no influence on it's variant count / permutation assignments. */
 struct PolicyInfluence
 {
     std::string EntryPoint;
@@ -60,16 +61,14 @@ struct PolicyInfluence
     bool IsInert{ false };
 };
 
-/** The whole policy for one module: the influence statements, and one section for each target. */
+/**@brief Whole policy for one module: influence statements and one section for each target.*/
 struct ModulePolicyEntry
 {
     std::vector<PolicyInfluence> ExpectedInfluence;
     StringMap<TargetPolicy> Targets;
 };
 
-/** A parse failure, with a location a tech artist can act on. `Line` and `Column` are 1-based. A zero
- * means the failure carries no location. This is the minimal form. The semantic checks against the
- * declared axes are step 4. */
+/**@brief Policy parsing error with location information to make diagnosing/fixing it less painful */
 struct PolicyParseError
 {
     std::string Message;
@@ -77,22 +76,32 @@ struct PolicyParseError
     uint32_t Column{ 0u };
 };
 
-/** The parsed policy file. It owns every string, so a query returns a borrowed view that stays valid
- * for the life of the document.
- *
- * `Load` reads a TOML file through toml++. toml++ lives only in the translation unit that defines
- * `Load`, so no toml++ type appears in this header. This is the facade rule `SlangCompiler.hpp`
- * already follows for Slang. */
+template<typename T>
+using PolicyDocResult = std::expected<T, PolicyParseError>;
+
+/**@brief A parsed TOML policy file. This is used to specify expected axis influences, cooking policies,
+  *and per target overrides for axis values or enable/disable status. 
+  *@note All strings are stored and persisted internally, so string_view returns should not pose a problem*/
 class PolicyDocument
 {
 public:
-    [[nodiscard]] static std::expected<PolicyDocument, PolicyParseError> Load(std::string_view path);
-
-    /** Finds one module's policy, or `nullptr` when the file names no such module. The per-target
-     * finder with an empty fallback is step 3. */
+    [[nodiscard]] static PolicyDocResult<PolicyDocument> Load(std::string_view path);
+    // reads TOML "file" from memory - mostly used for unit tests so they don't need to have assets
+    [[nodiscard]] static PolicyDocResult<PolicyDocument> Parse(std::string_view text);
+    /**@brief Finding a policy can fail, which will return `nullptr`: this is expected and find */
     [[nodiscard]] const ModulePolicyEntry* FindModule(std::string_view module_name) const noexcept;
+    /**@brief Finds the target-specific policy: if unfound, it will return an empty policy. Downstream
+      * code then just uses this to use the axes with their values in the shader source. */
+    [[nodiscard]] const TargetPolicy& FindTargetPolicy(std::string_view module_name,
+                                                       std::string_view target_name) const noexcept;
+    [[nodiscard]] std::span<const PolicyInfluence> ExpectedInfluenceFor(std::string_view module_name) const noexcept;
+    /**@brief Verifies that `CookValues` and `CookWhen` entries in the policy are consistent with the 
+      * permutation space, i.e. lints the policy for naming and presence of axes and their values. */
+    [[nodiscard]] CookError ValidateAgainstSpace(std::string_view module_name,
+                                                 const PermutationSpace& space,
+                                                 DiagnosticSink& sink) const;
 
-    [[nodiscard]] size_t ModuleCount() const noexcept { return modules.size(); }
+    [[nodiscard]] size_t ModuleCount() const noexcept;
 
 private:
     StringMap<ModulePolicyEntry> modules;
