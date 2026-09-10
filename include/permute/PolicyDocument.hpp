@@ -2,6 +2,7 @@
 #ifndef PERMUTE_POLICY_DOCUMENT_HPP
 #define PERMUTE_POLICY_DOCUMENT_HPP
 #include "CookerErrors.hpp"
+#include "permute/PermutationValue.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -33,12 +34,12 @@ struct TransparentStringHash
 template<typename Value>
 using StringMap = std::unordered_map<std::string, Value, TransparentStringHash, std::equal_to<>>;
 
-/**@brief Values to cook for the specified axis - if empty or unspecified, it uses the values
-  * in the shader source code. Booleans are 0 or 1: everything must be specified as int64_t values */
+/**@brief Values to cook for the specified axis - uses basic typing of TOML values to make sure
+ * we construct PermutationValues explicitly, since that tremendously simplifies downstream code */
 struct AxisCookValues
 {
     std::string Axis;
-    std::vector<int64_t> Values;
+    std::vector<PermutationValue> Values;
 };
 
 /** The cook policy for one module on one target profile. */

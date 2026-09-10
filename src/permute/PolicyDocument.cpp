@@ -228,13 +228,17 @@ namespace
         cookValues.Axis = std::string{ axis_name };
         for (const toml::node& element : *values)
         {
-            if (const std::optional<int64_t> asInt = element.value<int64_t>())
+            if (const std::optional<int32_t> asInt = element.value<int32_t>())
             {
-                cookValues.Values.push_back(*asInt);
+                cookValues.Values.emplace_back(*asInt);
+            }
+            else if (const std::optional<uint32_t> asUInt = element.value<uint32_t>())
+            {
+                cookValues.Values.emplace_back(*asUInt);
             }
             else if (const std::optional<bool> asBool = element.value<bool>())
             {
-                cookValues.Values.push_back(*asBool ? 1 : 0);
+                cookValues.Values.emplace_back(*asBool);
             }
             else
             {
@@ -383,13 +387,11 @@ namespace
         return nullptr;
     }
 
-    bool AxisDeclaresValue(const PermutationAxis& axis, int64_t value)
+    bool AxisDeclaresValue(const PermutationAxis& axis, const PermutationValue value)
     {
-        return std::ranges::any_of(axis.GetValues(),
-                                   [value](const PermutationValue& declared)
-                                   {
-                                       return PermutationValueToInt64(declared) == value;
-                                   });
+        const auto axisValues = axis.GetValues();
+        auto found = std::ranges::find(axisValues, value);
+        return found != axisValues.end();
     }
 
     CookError ValidateExpectedInfluenceTable(const std::string_view module_name,
@@ -434,7 +436,7 @@ namespace
                                     module_name));
                 }
 
-                for (const int64_t value : cookValues.Values)
+                for (const PermutationValue value : cookValues.Values)
                 {
                     if (!AxisDeclaresValue(*axis, value))
                     {
@@ -444,7 +446,7 @@ namespace
                                                     "which the axis does not declare",
                                                     targetName,
                                                     cookValues.Axis,
-                                                    value));
+                                                    ValueToPrintableString(value)));
                     }
                 }
             }
