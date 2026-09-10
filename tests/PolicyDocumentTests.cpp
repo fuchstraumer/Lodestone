@@ -148,8 +148,8 @@ void TestValidationAgainstSpace(TestRunner& runner)
     runner.Check(valueNotInAxis == CookError::PolicyValueNotInAxis, "a CookValues value the axis lacks fails");
 
     const CookError cookWhenUnknownAxis =
-        validateAndCache("[OceanFft.targets.wgsl]\nCookWhen = \"NOPE == 1\"\n");
-    runner.Check(cookWhenUnknownAxis == CookError::PolicyAxisNotDeclared, "CookWhen naming an undeclared axis fails");
+        validateAndCache("[OceanFft.targets.wgsl]\nCookIf = \"NOPE == 1\"\n");
+    runner.Check(cookWhenUnknownAxis == CookError::PolicyAxisNotDeclared, "CookIf naming an undeclared axis fails");
 
     const CookError cookIfMalformed = validateAndCache("[OceanFft.targets.wgsl]\nCookIf = \"== 1\"\n");
     runner.Check(cookIfMalformed == CookError::PolicyCookIfInvalid, "a malformed CookIf fails");
