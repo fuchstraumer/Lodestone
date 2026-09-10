@@ -25,7 +25,6 @@ struct PermutationValue
     constexpr explicit PermutationValue(uint32_t value) noexcept : type(Type::UInt), uintValue(value) {}
     constexpr explicit PermutationValue(int32_t value) noexcept : type(Type::SInt), sintValue(value) {}
 
-
     [[nodiscard]] bool IsValid() const noexcept;
     [[nodiscard]] Type GetType() const noexcept;
     [[nodiscard]] bool AsBool() const noexcept;

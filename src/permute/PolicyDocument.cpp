@@ -228,17 +228,18 @@ namespace
         cookValues.Axis = std::string{ axis_name };
         for (const toml::node& element : *values)
         {
-            if (const std::optional<int32_t> asInt = element.value<int32_t>())
+            if (element.is_boolean())
             {
-                cookValues.Values.emplace_back(*asInt);
+                cookValues.Values.emplace_back(*element.value<bool>());
             }
-            else if (const std::optional<uint32_t> asUInt = element.value<uint32_t>())
+            else if (element.is_integer())
             {
-                cookValues.Values.emplace_back(*asUInt);
-            }
-            else if (const std::optional<bool> asBool = element.value<bool>())
-            {
-                cookValues.Values.emplace_back(*asBool);
+                const int64_t val = *element.value<int64_t>();
+                // TOML doesn't let us distinguish between signed or unsigned: we're going
+                // to assume unsigned
+                // todo-ship: We need to figure out how to handle this better. Either PermutationValue
+                // loses it's signed support, or we make this handle signed somehow (also maybe widen?)
+                cookValues.Values.emplace_back(static_cast<uint32_t>(val));
             }
             else
             {
