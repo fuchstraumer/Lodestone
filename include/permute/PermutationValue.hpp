@@ -16,20 +16,17 @@ struct PermutationValue
     {
         Invalid = 0,
         Bool,
-        UInt,
-        SInt
+        UInt
     };
 
     constexpr PermutationValue() noexcept : type(Type::Invalid), uintValue(static_cast<uint32_t>(0)) {}
     constexpr explicit PermutationValue(bool value) noexcept : type(Type::Bool), boolValue(value) {}
     constexpr explicit PermutationValue(uint32_t value) noexcept : type(Type::UInt), uintValue(value) {}
-    constexpr explicit PermutationValue(int32_t value) noexcept : type(Type::SInt), sintValue(value) {}
 
     [[nodiscard]] bool IsValid() const noexcept;
     [[nodiscard]] Type GetType() const noexcept;
     [[nodiscard]] bool AsBool() const noexcept;
     [[nodiscard]] uint32_t AsUInt() const noexcept;
-    [[nodiscard]] int32_t AsSInt() const noexcept;
 
     [[nodiscard]] bool operator==(const PermutationValue& other) const noexcept;
     [[nodiscard]] bool operator!=(const PermutationValue& other) const noexcept;
@@ -41,7 +38,6 @@ private:
     union
     {
         uint32_t uintValue;
-        int32_t sintValue;
         bool boolValue;
     };
     //NOLINTEND(readability-identifier-naming)

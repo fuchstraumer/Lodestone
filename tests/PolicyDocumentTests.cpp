@@ -64,7 +64,7 @@ void TestParseAndQuery(TestRunner& runner)
     runner.Check(wgsl.CookValues.size() == 1u && wgsl.CookValues[0].Axis == "IFFT_SIZE",
                  "the CookValues axis is named");
     runner.Check(wgsl.CookValues.size() == 1u && wgsl.CookValues[0].Values.size() == 2u
-                     && wgsl.CookValues[0].Values[0].AsSInt() == 256 && wgsl.CookValues[0].Values[1].AsSInt() == 512,
+                     && wgsl.CookValues[0].Values[0].AsUInt() == 256u && wgsl.CookValues[0].Values[1].AsUInt() == 512u,
                  "the CookValues integers read back in order");
 
     const auto& spirv = document.FindTargetPolicy("OceanFft", "spirv");
