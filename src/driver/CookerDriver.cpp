@@ -562,6 +562,7 @@ namespace
 
     CookError CookModule(const CookerOptions& options,
                          const std::filesystem::path& module_path,
+                         const PolicyDocument& policy_document,
                          OutputSink& sink,
                          DiagnosticSink& diagnostics,
                          CookedLibrary& out_library,
@@ -592,11 +593,11 @@ namespace
 
         // get policy now, to get max variant count so enumeration can check against it
         const std::string_view moduleName = compiler.ModuleName();
-        const ModulePolicy* policy = FindPolicyForModule(moduleName);
+        const TargetPolicy& currTargetPolicy =
+            policy_document.FindTargetPolicy(moduleName, options.TargetName);
 
         // expand permutation space into the final set of variants this build will be constructing
-        const CookResult<VariantSet> variantSet =
-            space->EnumerateVariants(static_cast<size_t>(policy->MaxVariants), diagnostics);
+        const CookResult<VariantSet> variantSet = space->EnumerateVariants(currTargetPolicy, diagnostics);
         if (!variantSet)
         {
             return variantSet.error();
@@ -781,7 +782,7 @@ CookResult<CookStatistics> RunCookOnce(const CookerOptions& options,
         const std::string cookingStr = std::format("cooking {}", modulePath.string());
         ReportInfo(diagnostics, cookingStr);
         const CookError moduleResult =
-            CookModule(options, modulePath, sink, diagnostics, library, statistics);
+            CookModule(options, modulePath, policyDoc, sink, diagnostics, library, statistics);
         if (!moduleResult)
         {
             return std::unexpected(moduleResult);
