@@ -32,7 +32,7 @@ Inert = true
 
 [OceanFft.targets.wgsl]
 MaxVariants = 64
-CookWhen = "IFFT_USE_WAVE_OPS == 1"
+CookIf = "IFFT_USE_WAVE_OPS == 1"
 
 [OceanFft.targets.wgsl.CookValues]
 IFFT_SIZE = [256, 512]
@@ -59,7 +59,7 @@ void TestParseAndQuery(TestRunner& runner)
 
     const auto& wgsl = document.FindTargetPolicy("OceanFft", "wgsl");
     runner.Check(wgsl.MaxVariants == 64u, "MaxVariants reads back");
-    runner.Check(wgsl.CookWhen == "IFFT_USE_WAVE_OPS == 1", "CookWhen reads back");
+    runner.Check(wgsl.CookIf == "IFFT_USE_WAVE_OPS == 1", "CookIf reads back");
     runner.Check(wgsl.CookValues.size() == 1u, "the target holds one CookValues axis");
     runner.Check(wgsl.CookValues.size() == 1u && wgsl.CookValues[0].Axis == "IFFT_SIZE",
                  "the CookValues axis is named");
@@ -73,7 +73,7 @@ void TestParseAndQuery(TestRunner& runner)
                  "a boolean CookValues reads back as 0 and 1");
 
     const auto& absentTarget = document.FindTargetPolicy("OceanFft", "dxil");
-    runner.Check(absentTarget.MaxVariants == 0u && absentTarget.CookValues.empty() && absentTarget.CookWhen.empty(),
+    runner.Check(absentTarget.MaxVariants == 0u && absentTarget.CookValues.empty() && absentTarget.CookIf.empty(),
                  "an absent target returns the empty policy");
     const auto& absentModule = document.FindTargetPolicy("Nope", "wgsl");
     runner.Check(absentModule.MaxVariants == 0u, "an absent module returns the empty policy");
@@ -151,8 +151,8 @@ void TestValidationAgainstSpace(TestRunner& runner)
         validateAndCache("[OceanFft.targets.wgsl]\nCookWhen = \"NOPE == 1\"\n");
     runner.Check(cookWhenUnknownAxis == CookError::PolicyAxisNotDeclared, "CookWhen naming an undeclared axis fails");
 
-    const CookError cookWhenMalformed = validateAndCache("[OceanFft.targets.wgsl]\nCookWhen = \"== 1\"\n");
-    runner.Check(cookWhenMalformed == CookError::PolicyCookWhenInvalid, "a malformed CookWhen fails");
+    const CookError cookIfMalformed = validateAndCache("[OceanFft.targets.wgsl]\nCookIf = \"== 1\"\n");
+    runner.Check(cookIfMalformed == CookError::PolicyCookIfInvalid, "a malformed CookIf fails");
 
     const CookError influenceUnknownAxis =
         validateAndCache("[[OceanFft.ExpectedInfluence]]\nEntryPoint = \"cs\"\nAxis = \"GHOST\"\n");

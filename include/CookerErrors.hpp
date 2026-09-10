@@ -82,7 +82,7 @@ enum class CookError : uint16_t
     // policy file (TOML) checked against the module's declared axes
     PolicyAxisNotDeclared = 130,
     PolicyValueNotInAxis = 131,
-    PolicyCookWhenInvalid = 132,
+    PolicyCookIfInvalid = 132,
     PolicyDocumentLoadFailed = 133,
 
     // start system errors

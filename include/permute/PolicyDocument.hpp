@@ -46,11 +46,12 @@ struct AxisCookValues
 struct TargetPolicy
 {
     uint32_t MaxVariants{ 0u };
-    /** The per-axis value subsets. Empty means every axis cooks every value. */
+    /** @brief Override values for axes in a modules permutation space */
     std::vector<AxisCookValues> CookValues;
-    /** A predicate that removes an assignment from the cook. Empty means no predicate.
-     * `EvaluateExpression` reads it, exactly as it reads a `Require`. */
-    std::string CookWhen;
+    /**@brief Conditional expression that determines the set of axis values required for cooking.
+      * e.g, if we set this to be like WaveOpsEnabled==1, it would *only* cook and build variants
+      * where the condition specified by CookIf evaluates to true.*/
+    std::string CookIf;
 };
 
 /**@brief PolicyInfluence is used to specify that for a given entrypoint, the named axis

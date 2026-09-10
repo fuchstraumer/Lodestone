@@ -266,14 +266,14 @@ namespace
             policy.MaxVariants = static_cast<uint32_t>(*value);
         }
 
-        if (const auto cookWhen = target_table["CookWhen"])
+        if (const auto cookIf = target_table["CookIf"])
         {
-            const std::optional<std::string> value = cookWhen.value<std::string>();
+            const std::optional<std::string> value = cookIf.value<std::string>();
             if (!value)
             {
-                return std::unexpected(ErrorAt(*cookWhen.node(), "CookWhen must be a string"));
+                return std::unexpected(ErrorAt(*cookIf.node(), "CookIf must be a string"));
             }
-            policy.CookWhen = *value;
+            policy.CookIf = *value;
         }
 
         if (const auto cookValues = target_table["CookValues"])
@@ -452,17 +452,17 @@ namespace
                 }
             }
 
-            if (!target.CookWhen.empty())
+            if (!target.CookIf.empty())
             {
                 const CookResult<std::vector<std::string>> identifiers =
-                    CollectExpressionIdentifiers(target.CookWhen, sink);
+                    CollectExpressionIdentifiers(target.CookIf, sink);
                 if (!identifiers)
                 {
                     return ReportError(sink,
-                                    CookError::PolicyCookWhenInvalid,
-                                    std::format("target '{}' CookWhen '{}' is not a valid expression",
+                                    CookError::PolicyCookIfInvalid,
+                                    std::format("target '{}' CookIf '{}' is not a valid expression",
                                                 targetName,
-                                                target.CookWhen));
+                                                target.CookIf));
                 }
 
                 for (const std::string& identifier : *identifiers)
@@ -471,9 +471,9 @@ namespace
                     {
                         return ReportError(sink,
                                         CookError::PolicyAxisNotDeclared,
-                                        std::format("target '{}' CookWhen '{}' uses unknown axis '{}'",
+                                        std::format("target '{}' CookIf '{}' uses unknown axis '{}'",
                                                     targetName,
-                                                    target.CookWhen,
+                                                    target.CookIf,
                                                     identifier));
                     }
                 }
