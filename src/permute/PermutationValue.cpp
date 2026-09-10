@@ -96,6 +96,7 @@ int64_t PermutationValueToInt64(const PermutationValue& value) noexcept
     case PermutationValue::Type::Invalid:
         return -1;
     }
+    return -1;
 }
 
 std::string ValueToSlangLiteral(const PermutationValue& value)
@@ -111,6 +112,7 @@ std::string ValueToSlangLiteral(const PermutationValue& value)
     case PermutationValue::Type::Invalid:
         return "invalid";
     }
+    return "invalid";
 }
 
 std::string ValueToSlangTypeName(const PermutationValue& value)

@@ -2,6 +2,7 @@
 #include "CookerErrors.hpp"
 #include "target/TargetProfile.hpp"
 
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <cstddef>
@@ -9,6 +10,8 @@
 #include <cstdio>
 #include <expected>
 #include <filesystem>
+#include <memory>
+#include <optional>
 #include <print>
 #include <span>
 #include <string>
@@ -25,7 +28,7 @@ namespace
         "Usage: lodestone --output <header.hpp> [--O<level>] [--no-validate] [--quiet]\n"
         "                 [--cache-dir <path>] [--single-threaded] [--no-dedupe]\n"
         "                 [--target=<name>] [--verify-deterministic] [--dump-stage=<name>]\n"
-        "                 <module.slang>...\n"
+        "                 [--policy-file <path>] <module.slang>...\n"
         "  --output, -o    destination header path (required)\n"
         "  --O<level>      slang optimization level: 0-3, defaults to 0\n"
         "  --target=<name> output target profile, defaults to wgsl. Names: wgsl\n"
@@ -37,7 +40,8 @@ namespace
         "  --verify-deterministic cook twice and compare all artifacts\n"
         "  --dump-stage=<name> write one stage of the pipeline as JSON, beside the other artifacts.\n"
         "                  Repeat the flag for more than one stage. Names: space, variants, raw,\n"
-        "                  resolved, interned, cooked, all.\n";
+        "                  resolved, interned, cooked, all.\n"
+        "  --policy-file <path> specify the policy file to use\n";
 
     constexpr std::string_view k_OptimizationPrefix = "--O";
     constexpr std::string_view k_TargetPrefix = "--target=";
@@ -338,6 +342,18 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
                 return std::unexpected(cacheDirectory.error());
             }
             options.ModuleCacheDirectory = cacheDirectory.value();
+        }
+        else if (argument == "--policy-file")
+        {
+            CookResult<std::filesystem::path> policyFile = ReadPathArgument(arguments, i);
+            if (!policyFile)
+            {
+                // no policy file is fine, just continue without setting it
+                options.PolicyFile = std::nullopt;
+                continue;
+            }
+
+            options.PolicyFile = *policyFile;
         }
         else if (const SwitchFlag* flag = FindSwitchFlag(argument); flag != nullptr)
         {

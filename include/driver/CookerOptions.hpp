@@ -4,6 +4,7 @@
 #include "CookerErrors.hpp"
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -58,6 +59,7 @@ struct CookerOptions
     bool VerifyDeterministic{ false };
     /** One bit for each `StageDumpKind` the cook must write. `--dump-stage` sets them. */
     uint32_t DumpStageMask{ 0u };
+    std::optional<std::filesystem::path> PolicyFile;
 };
 
 bool IsStageDumpRequested(const CookerOptions& options, StageDumpKind kind) noexcept;
