@@ -35,105 +35,17 @@ namespace lodestone
 namespace
 {
 
-    /** Lets a later extern's default read an earlier one, which is how shaders usually derive them. */
-    std::vector<AttrExprSymbol> AsAttrExprSymbols(const std::vector<ExternConstantDefault>& defaults)
-    {
-        std::vector<AttrExprSymbol> symbols;
-        symbols.reserve(defaults.size());
-
-        for (const ExternConstantDefault& entry : defaults)
-        {
-            symbols.emplace_back(entry.Name, entry.Value);
-        }
-
-        return symbols;
-    }
-
-    [[nodiscard]] CookError VerifyVariantKeysAreUnique(const std::vector<VariantDescriptor>& variants)
-    {
-        auto firstDuplicateIter =
-            std::ranges::adjacent_find(variants,
-                                       [](const VariantDescriptor& lhs, const VariantDescriptor& rhs)
-                                       {
-                                           return lhs.Key == rhs.Key;
-                                       });
-
-        if (firstDuplicateIter != variants.end()) [[unlikely]]
-        {
-            // get variant that caused the collision
-            const VariantDescriptor& duplicate = *firstDuplicateIter;
-            std::println(stderr,
-                         "[shader_cooker] two variants share key {}: [{}] collides. The mixed-radix "
-                         "encoding and the enumerated set disagree.",
-                         duplicate.Key,
-                         DescribeAssignment(duplicate.Canonical));
-            return CookError::PermutationVariantIndexCollision;
-        }
-        else [[likely]]
-        {
-            return CookError::Success;
-        }
-    }
-
+    std::vector<AttrExprSymbol> AsAttrExprSymbols(const std::vector<ExternConstantDefault>& defaults);
+    [[nodiscard]] CookError VerifyVariantKeysAreUnique(const std::vector<VariantDescriptor>& variants);
     [[nodiscard]] std::vector<AttrExprSymbol> SymbolsFromCanonicalAssignment(
-        const CanonicalAssignment& assignment)
-    {
-        std::vector<AttrExprSymbol> symbols;
-        symbols.reserve(assignment.size());
-        for (const auto& binding : assignment)
-        {
-            symbols.emplace_back(binding.Axis->Name, PermutationValueToInt64(binding.Value));
-        }
-        return symbols;
-    }
-
+        const CanonicalAssignment& assignment);
     [[nodiscard]] CookResult<bool> EvaluateActiveWhen(const PermutationAxis& axis,
                                                       const std::vector<AttrExprSymbol>& symbols,
-                                                      DiagnosticSink& sink)
-    {
-        const CookResult<int64_t> result = EvaluateExpression(axis.ActiveWhen, symbols, sink);
-        if (!result) [[unlikely]]
-        {
-            const std::string errStr =
-                std::format("Failed to evaluate ActiveWhen expression '{}' for axis '{}'",
-                            axis.ActiveWhen,
-                            axis.Name);
-            return std::unexpected(ReportError(sink, result.error(), errStr));
-        }
-
-        return static_cast<bool>(result.value());
-    }
-
+                                                      DiagnosticSink& sink);
     [[nodiscard]] CookResult<bool> CheckRequires(std::ptrdiff_t depth,
                                                  const std::vector<AttrExprSymbol>& symbols,
                                                  const RequireReadyMap& require_ready_at,
-                                                 DiagnosticSink& sink)
-    {
-        const auto iter = require_ready_at.find(depth);
-        if (iter == require_ready_at.end())
-        {
-            return true;
-        }
-
-        const std::vector<std::string_view>& requireExpressions = iter->second;
-        for (const std::string_view& requireExpr : requireExpressions)
-        {
-            const CookResult<int64_t> result = EvaluateExpression(requireExpr, symbols, sink);
-            if (!result) [[unlikely]]
-            {
-                const std::string errStr = std::format("Failed to evaluate require expression '{}'", requireExpr);
-                return std::unexpected(ReportError(sink, result.error(), errStr));
-            }
-
-            if (result.value() == 0)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
+                                                 DiagnosticSink& sink);
 
 } // namespace
 
@@ -215,6 +127,8 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetPolicy& p
 
         requireReadyAt[deepest].push_back(expr);
     }
+
+    // policy override time
 
     PermutationAssignment partial;
     std::vector<VariantDescriptor> descriptors;
@@ -647,5 +561,106 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
     return CookError::Success;
 }
 //NOLINTEND(misc-no-recursion)
+
+namespace
+{
+    std::vector<AttrExprSymbol> AsAttrExprSymbols(const std::vector<ExternConstantDefault>& defaults)
+    {
+        std::vector<AttrExprSymbol> symbols;
+        symbols.reserve(defaults.size());
+
+        for (const ExternConstantDefault& entry : defaults)
+        {
+            symbols.emplace_back(entry.Name, entry.Value);
+        }
+
+        return symbols;
+    }
+
+    [[nodiscard]] CookError VerifyVariantKeysAreUnique(const std::vector<VariantDescriptor>& variants)
+    {
+        auto firstDuplicateIter =
+            std::ranges::adjacent_find(variants,
+                                       [](const VariantDescriptor& lhs, const VariantDescriptor& rhs)
+                                       {
+                                           return lhs.Key == rhs.Key;
+                                       });
+
+        if (firstDuplicateIter != variants.end()) [[unlikely]]
+        {
+            // get variant that caused the collision
+            const VariantDescriptor& duplicate = *firstDuplicateIter;
+            std::println(stderr,
+                         "[shader_cooker] two variants share key {}: [{}] collides. The mixed-radix "
+                         "encoding and the enumerated set disagree.",
+                         duplicate.Key,
+                         DescribeAssignment(duplicate.Canonical));
+            return CookError::PermutationVariantIndexCollision;
+        }
+        else [[likely]]
+        {
+            return CookError::Success;
+        }
+    }
+
+    [[nodiscard]] std::vector<AttrExprSymbol> SymbolsFromCanonicalAssignment(
+        const CanonicalAssignment& assignment)
+    {
+        std::vector<AttrExprSymbol> symbols;
+        symbols.reserve(assignment.size());
+        for (const auto& binding : assignment)
+        {
+            symbols.emplace_back(binding.Axis->Name, PermutationValueToInt64(binding.Value));
+        }
+        return symbols;
+    }
+
+    [[nodiscard]] CookResult<bool> EvaluateActiveWhen(const PermutationAxis& axis,
+                                                      const std::vector<AttrExprSymbol>& symbols,
+                                                      DiagnosticSink& sink)
+    {
+        const CookResult<int64_t> result = EvaluateExpression(axis.ActiveWhen, symbols, sink);
+        if (!result) [[unlikely]]
+        {
+            const std::string errStr =
+                std::format("Failed to evaluate ActiveWhen expression '{}' for axis '{}'",
+                            axis.ActiveWhen,
+                            axis.Name);
+            return std::unexpected(ReportError(sink, result.error(), errStr));
+        }
+
+        return static_cast<bool>(result.value());
+    }
+
+    [[nodiscard]] CookResult<bool> CheckRequires(std::ptrdiff_t depth,
+                                                 const std::vector<AttrExprSymbol>& symbols,
+                                                 const RequireReadyMap& require_ready_at,
+                                                 DiagnosticSink& sink)
+    {
+        const auto iter = require_ready_at.find(depth);
+        if (iter == require_ready_at.end())
+        {
+            return true;
+        }
+
+        const std::vector<std::string_view>& requireExpressions = iter->second;
+        for (const std::string_view& requireExpr : requireExpressions)
+        {
+            const CookResult<int64_t> result = EvaluateExpression(requireExpr, symbols, sink);
+            if (!result) [[unlikely]]
+            {
+                const std::string errStr = std::format("Failed to evaluate require expression '{}'", requireExpr);
+                return std::unexpected(ReportError(sink, result.error(), errStr));
+            }
+
+            if (result.value() == 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
 
 } // namespace lodestone
