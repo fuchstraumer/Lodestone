@@ -130,13 +130,15 @@ set(LODESTONE_PERMUTE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationRegistry.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationSpace.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationValue.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PolicyDocument.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/AttributeExpression.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/ExternConstantScanner.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PermutationAssignment.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PermutationAxis.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PermutationRegistry.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PermutationSpace.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PermutationValue.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PermutationValue.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PolicyDocument.cpp")
 
 set(LODESTONE_TARGET_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/target/TargetProfile.hpp"
@@ -160,7 +162,8 @@ target_include_directories(lodestone PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/client/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/slang/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/magic_enum/include")
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/magic_enum/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/tomlplusplus/include")
 target_link_libraries(lodestone PRIVATE slang lodestone::client_internal xxHash::xxhash lodestone::json)
 # /Ob2 and /arch:AVX2 are MSVC spellings, and the full Clang driver rejects both. The pure Clang
 # build therefore gets the GNU spelling of the same two requests. Every other flag decision in this
