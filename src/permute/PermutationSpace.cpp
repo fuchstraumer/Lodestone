@@ -6,6 +6,7 @@
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationValue.hpp"
+#include "permute/PolicyDocument.hpp"
 
 #include <algorithm>
 #include <array>
@@ -179,7 +180,7 @@ std::span<const std::string> PermutationSpace::RequireExpressions() const noexce
     return requireExpressions;
 }
 
-CookResult<VariantSet> PermutationSpace::EnumerateVariants(const size_t max_variant_count, DiagnosticSink& sink) const
+CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetPolicy& policy, DiagnosticSink& sink) const
 {
     // constructing this with ranges/views so we can make it const, which couldn't
     // happen with ye olde for loop. kinda neat.
@@ -217,7 +218,7 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const size_t max_vari
 
     PermutationAssignment partial;
     std::vector<VariantDescriptor> descriptors;
-    const CookError walkResult = expandFrom(0, partial, requireReadyAt, descriptors, max_variant_count, sink);
+    const CookError walkResult = expandFrom(0, partial, requireReadyAt, descriptors, policy.MaxVariants, sink);
     if (!walkResult)
     {
         return std::unexpected(walkResult);

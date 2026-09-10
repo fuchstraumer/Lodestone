@@ -13,6 +13,7 @@
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "permute/PermutationValue.hpp"
+#include "permute/PolicyDocument.hpp"
 
 
 #include <array>
@@ -24,11 +25,13 @@
 #include <string_view>
 #include <utility>
 #include <vector>
-
 using namespace lodestone;
+using lodestone::TargetPolicy;
 
 namespace
 {
+
+static const TargetPolicy k_UnboundedTargetPolicy{};
 
 /** The space dump for this axis is written out in full below. Keep the axis small, because the value
  * of that golden is that a person can read it and see the whole format at once. */
@@ -299,7 +302,7 @@ void CheckVariantDump(lodestone::tests::TestRunner& runner, DiagnosticSink& sink
 
     const PermutationSpace space{ "TinyModule", { MakeBoolAxis("USE_FOO") } };
 
-    const CookResult<VariantSet> variantSet = space.EnumerateVariants(0u, sink);
+    const CookResult<VariantSet> variantSet = space.EnumerateVariants(k_UnboundedTargetPolicy, sink);
     runner.Check(variantSet.has_value(), "the space enumerates");
     if (!variantSet)
     {

@@ -3,9 +3,9 @@
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
-#include "TestHarness.hpp"
 #include "permute/PermutationValue.hpp"
-
+#include "permute/PolicyDocument.hpp"
+#include "TestHarness.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -34,11 +34,14 @@ using lodestone::PermutationBinding;
 using lodestone::PermutationSpace;
 using lodestone::PermutationValue;
 using lodestone::StderrDiagnosticSink;
+using lodestone::TargetPolicy;
 using lodestone::VariantDescriptor;
 using lodestone::VariantSet;
 
 namespace
 {
+
+static const TargetPolicy k_UnboundedTargetPolicy{};
 
 // The space owns its axes, so every axis reference below names a position in it. `ParentIndex` 1 is
 // TEST_USE_WAVE_OPS.
@@ -94,7 +97,7 @@ int main()
     lodestone::tests::TestRunner runner{ "PermutationIndexTests" };
     lodestone::StderrDiagnosticSink sink;
 
-    const CookResult<VariantSet> enumerated = k_TestSpace.EnumerateVariants(0u, sink);
+    const CookResult<VariantSet> enumerated = k_TestSpace.EnumerateVariants(k_UnboundedTargetPolicy, sink);
     if (!enumerated)
     {
         runner.Check(false, "the test space enumerates");
@@ -198,7 +201,7 @@ int main()
 
     runner.BeginSection("a module with no registered space still cooks");
     const PermutationSpace emptySpace{ "", {} };
-    const CookResult<VariantSet> emptyVariants = emptySpace.EnumerateVariants(0u, sink);
+    const CookResult<VariantSet> emptyVariants = emptySpace.EnumerateVariants(k_UnboundedTargetPolicy, sink);
 
     runner.Check(emptyVariants.has_value(), "an empty space enumerates rather than fails");
     if (emptyVariants)

@@ -1,6 +1,7 @@
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "permute/PermutationValue.hpp"
+#include "permute/PolicyDocument.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
 #include "TestHarness.hpp"
@@ -18,9 +19,12 @@ using lodestone::PermutationValue;
 using lodestone::RecordingDiagnosticSink;
 using lodestone::StderrDiagnosticSink;
 using lodestone::tests::TestRunner;
+using lodestone::TargetPolicy;
 
 namespace
 {
+
+static const TargetPolicy k_UnboundedTargetPolicy{};
 
 void TestActiveWhenGating(TestRunner& runner)
 {
@@ -34,7 +38,7 @@ void TestActiveWhenGating(TestRunner& runner)
                                     "GATE == 1" };
     const PermutationSpace space{ "Gated", { gateAxis, widthAxis } };
 
-    const auto variants = space.EnumerateVariants(0u, sink);
+    const auto variants = space.EnumerateVariants(k_UnboundedTargetPolicy, sink);
     runner.Check(variants.has_value(), "Enumeration succeeds.");
     // check variant count: should be 3 (GATE=false, GATE=true with WIDTH=16, GATE=true with WIDTH=32)
     runner.Check(variants && variants->Variants.size() == 3, "Correct number of variants.");
@@ -56,8 +60,8 @@ void TestRequirePruning(TestRunner& runner)
     const PermutationSpace gated  { "TileGated",   makeAxes(),
                                     { "TILE * TILE * REG <= 65536" } };          // forbids 32x128 = 131072
 
-    const auto full   = control.EnumerateVariants(0u, sink);
-    const auto pruned = gated.EnumerateVariants(0u, sink);
+    const auto full   = control.EnumerateVariants(k_UnboundedTargetPolicy, sink);
+    const auto pruned = gated.EnumerateVariants(k_UnboundedTargetPolicy, sink);
     runner.Check(full && full->Variants.size() == 9u, "Control cooks the full variant grid");
     runner.Check(pruned && pruned->Variants.size() == 8u, "Require drops exactly one cell");
 }

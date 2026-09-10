@@ -20,6 +20,7 @@ namespace lodestone
 
 class PermutationSpace;
 class DiagnosticSink;
+struct TargetPolicy;
 using RequireReadyMap = std::unordered_map<std::ptrdiff_t, std::vector<std::string_view>>;
 using VariantKey = uint64_t;
 
@@ -93,7 +94,7 @@ public:
     [[nodiscard]] bool IsEmpty() const noexcept;
     [[nodiscard]] std::span<const std::string> RequireExpressions() const noexcept;
 
-    [[nodiscard]] CookResult<VariantSet> EnumerateVariants(size_t max_variant_count, DiagnosticSink& sink) const;
+    [[nodiscard]] CookResult<VariantSet> EnumerateVariants(const TargetPolicy& policy, DiagnosticSink& sink) const;
     [[nodiscard]] CanonicalAssignment CanonicalizeAssignment(const PermutationAssignment& assignment) const;
     [[nodiscard]] VariantKey ComputeVariantKey(const CanonicalAssignment& canonical) const;
     [[nodiscard]] uint64_t ComputeVariantSpaceSize() const noexcept;
