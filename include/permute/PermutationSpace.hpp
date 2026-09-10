@@ -5,6 +5,7 @@
 #include "permute/AttributeExpression.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
+#include "permute/PermutationValue.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -22,6 +23,7 @@ class PermutationSpace;
 class DiagnosticSink;
 struct TargetPolicy;
 using RequireReadyMap = std::unordered_map<std::ptrdiff_t, std::vector<std::string_view>>;
+using AxisValueOverrideMap = std::unordered_map<std::ptrdiff_t, std::vector<PermutationValue>>;
 using VariantKey = uint64_t;
 
 struct ExternConstantDefault
@@ -125,6 +127,7 @@ private:
     CookError expandFrom(std::ptrdiff_t depth,
                          PermutationAssignment& partial,
                          const RequireReadyMap& require_ready_at,
+                         const AxisValueOverrideMap& axis_value_overrides,
                          std::vector<VariantDescriptor>& expanded,
                          size_t max_variant_count,
                          DiagnosticSink& sink) const;

@@ -94,9 +94,10 @@ std::span<const std::string> PermutationSpace::RequireExpressions() const noexce
 
 CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetPolicy& policy, DiagnosticSink& sink) const
 {
+    using AxisIndexMapType = std::unordered_map<std::string_view, std::ptrdiff_t, TransparentStringHash, std::equal_to<>>;
     // constructing this with ranges/views so we can make it const, which couldn't
     // happen with ye olde for loop. kinda neat.
-    const std::unordered_map<std::string_view, std::ptrdiff_t> axisIndexMap = 
+    const AxisIndexMapType axisIndexMap = 
         axes |
         std::views::enumerate |
         std::views::transform(
@@ -107,7 +108,7 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetPolicy& p
                 auto [index, axis] = pair;
                 return std::pair(std::string_view{ axis.Name }, index);
             }) |
-        std::ranges::to<std::unordered_map<std::string_view, std::ptrdiff_t>>();
+        std::ranges::to<AxisIndexMapType>();
     
     // build require-ready-at-depth map - this helps save some legwork during the already
     // hot recursive enumeration of permutations
@@ -129,10 +130,20 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetPolicy& p
     }
 
     // policy override time
+    AxisValueOverrideMap axisValueOverrides;
+    for (const AxisCookValues& axisValues : policy.CookValues)
+    {
+        const auto iter = axisIndexMap.find(axisValues.Axis);
+        if (iter != axisIndexMap.end())
+        {
+            const std::ptrdiff_t axisIndex = iter->second;
+            axisValueOverrides[axisIndex] = axisValues.Values;
+        }
+    }
 
     PermutationAssignment partial;
     std::vector<VariantDescriptor> descriptors;
-    const CookError walkResult = expandFrom(0, partial, requireReadyAt, descriptors, policy.MaxVariants, sink);
+    const CookError walkResult = expandFrom(0, partial, requireReadyAt, axisValueOverrides, descriptors, policy.MaxVariants, sink);
     if (!walkResult)
     {
         return std::unexpected(walkResult);
@@ -468,6 +479,7 @@ CookError PermutationSpace::validateRequires(const std::vector<std::string_view>
 CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
                                        PermutationAssignment& partial,
                                        const RequireReadyMap& require_ready_at,
+                                       const AxisValueOverrideMap& axis_value_overrides,
                                        std::vector<VariantDescriptor>& expanded,
                                        const size_t max_variant_count,
                                        DiagnosticSink& sink) const
@@ -528,11 +540,26 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
         }
 
         // continue expanding the next axis
-        return expandFrom(depth + 1, partial, require_ready_at, expanded, max_variant_count, sink);
+        return expandFrom(depth + 1,
+                          partial,
+                          require_ready_at,
+                          axis_value_overrides,
+                          expanded,
+                          max_variant_count,
+                          sink);
     }
 
     // axis is active: expand partial to include all possible values of this axis
-    for (const PermutationValue& value : axis.GetValues())
+    std::span<const PermutationValue> axisValues = axis.GetValues();
+    // check override map: if there is an override for this axis, only use the specified values
+    const auto overrideIt = axis_value_overrides.find(depth);
+    if (overrideIt != axis_value_overrides.end())
+    {
+        // overrides are just permutation values, and also persist throughout this expansion: just swap span
+        axisValues = std::span<const PermutationValue>(overrideIt->second.data(), overrideIt->second.size());
+    }
+
+    for (const PermutationValue& value : axisValues)
     {
         partial.emplace_back(&axis, value);
         // need to rebuild symbol table since partial assignment has changed
@@ -547,7 +574,13 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
 
         if (keepAxis.value())
         {
-            const CookError subtree = expandFrom(depth + 1, partial, require_ready_at, expanded, max_variant_count, sink);
+            const CookError subtree = expandFrom(depth + 1,
+                                                 partial,
+                                                 require_ready_at,
+                                                 axis_value_overrides,
+                                                 expanded,
+                                                 max_variant_count,
+                                                 sink);
             if (!subtree)
             {
                 partial.pop_back();
