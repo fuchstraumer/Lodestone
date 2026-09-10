@@ -19,7 +19,7 @@ void TestRunner::BeginSection(std::string_view name) noexcept
     sectionHeadingPrinted = false;
 }
 
-void TestRunner::Check(bool condition, std::string_view description) noexcept
+void TestRunner::Check(bool condition, std::string_view description, std::source_location location) noexcept
 {
     ++checksRun;
     if (condition)
@@ -27,7 +27,7 @@ void TestRunner::Check(bool condition, std::string_view description) noexcept
         return;
     }
     ++failures;
-    reportFailure(description);
+    reportFailure(description, location);
 }
 
 int TestRunner::Report() const noexcept
@@ -47,7 +47,7 @@ size_t TestRunner::Failures() const noexcept
     return failures;
 }
 
-void TestRunner::reportFailure(std::string_view description) noexcept
+void TestRunner::reportFailure(std::string_view description, const std::source_location& location) noexcept
 {
     if (!sectionHeadingPrinted && !currentSection.empty())
     {
@@ -55,6 +55,8 @@ void TestRunner::reportFailure(std::string_view description) noexcept
         sectionHeadingPrinted = true;
     }
     std::println("    FAIL: {}", description);
+    // print source location first, to help find where the error occurred
+    std::println("    at {}:{} in {}", location.file_name(), location.line(), location.function_name());
 }
 
 } // namespace lodestone::tests
