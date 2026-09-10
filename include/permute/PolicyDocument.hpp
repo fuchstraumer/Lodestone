@@ -69,6 +69,7 @@ struct ModulePolicyEntry
 };
 
 /**@brief Policy parsing error with location information to make diagnosing/fixing it less painful */
+//todo-ship: This needs to either reuse Diagnostic's range object, or have a conversion operator
 struct PolicyParseError
 {
     std::string Message;

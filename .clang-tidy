@@ -23,7 +23,8 @@ Checks: >
   -misc-non-private-member-variables-in-classes,
   -cppcoreguidelines-pro-type-union-access,
   -modernize-use-auto,
-  -readability-avoid-const-params-in-decls
+  -readability-avoid-const-params-in-decls,
+  -modernize-use-designated-initializers
 
 WarningsAsErrors: ''
 HeaderFilterRegex: '.*(src|include|client|tests)/.*'

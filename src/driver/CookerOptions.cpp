@@ -257,8 +257,17 @@ namespace
             return std::unexpected(CookError::MalformedArgument);
         }
 
+        // increment index, because the actual path/filename is the next argument
         ++index;
-        return std::filesystem::path{ arguments[index] };
+
+        std::filesystem::path result{ arguments[index] };
+        // in cases where the result is a file (not a dir) check that it exists here
+        // directory cases will either be created later or are expected to exist
+        if (result.has_filename() && !std::filesystem::exists(result))
+        {
+            return std::unexpected(CookError::FilesystemError);
+        }
+        return result;
     }
 
 } // namespace

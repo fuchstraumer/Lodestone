@@ -83,6 +83,7 @@ enum class CookError : uint16_t
     PolicyAxisNotDeclared = 130,
     PolicyValueNotInAxis = 131,
     PolicyCookWhenInvalid = 132,
+    PolicyDocumentLoadFailed = 133,
 
     // start system errors
     SystemError = 200,

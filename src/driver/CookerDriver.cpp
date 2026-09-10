@@ -15,6 +15,7 @@
 #include "permute/PermutationPolicy.hpp"
 #include "permute/PermutationRegistry.hpp"
 #include "permute/PermutationSpace.hpp"
+#include "permute/PolicyDocument.hpp"
 #include "target/TargetProfile.hpp"
 
 #include <algorithm>
@@ -740,6 +741,36 @@ CookResult<CookStatistics> RunCookOnce(const CookerOptions& options,
     if (!cacheDirectoryResult)
     {
         return std::unexpected(CookError::FilesystemError);
+    }
+
+    PolicyDocument policyDoc{};
+    if (options.PolicyFile)
+    {
+        const std::filesystem::path& policyFilePath = *options.PolicyFile;
+        const std::string policyFilePathStr = policyFilePath.string();
+        PolicyDocResult<PolicyDocument> policyDocResult = PolicyDocument::Load(policyFilePathStr);
+        if (!policyDocResult)
+        {
+            // this will have to be cleaned up before too long, what a mess
+            const PolicyParseError& policyError = policyDocResult.error();
+            Diagnostic policyDiag
+            {
+                .Severity=DiagnosticSeverity::Fatal,
+                .Code="CookError::PolicyDocumentLoadFailed",
+                .File=policyFilePath.string(),
+                .Range=
+                {
+                    .StartLine=static_cast<int32_t>(policyError.Line),
+                    .StartColumn=static_cast<int32_t>(policyError.Column)
+                },
+                .Message=policyError.Message,
+                .Context="RunCookOnce",
+                .Related={}
+            };
+            diagnostics.Report(std::move(policyDiag));
+            return std::unexpected(CookError::PolicyDocumentLoadFailed);
+        }
+        policyDoc = std::move(*policyDocResult);
     }
 
     CookStatistics statistics;
