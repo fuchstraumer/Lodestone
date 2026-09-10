@@ -316,8 +316,8 @@ void CheckInfluenceAgrees(lodestone::tests::TestRunner& runner,
 {
     runner.BeginSection("influence does not depend on dedup");
 
-    const ModuleInfluence dedupedInfluence = ComputeAxisInfluence(deduped);
-    const ModuleInfluence rawInfluence = ComputeAxisInfluence(raw);
+    const ModuleInfluence dedupedInfluence = ComputeActualInfluence(deduped);
+    const ModuleInfluence rawInfluence = ComputeActualInfluence(raw);
 
     runner.Check(InfluenceOf(dedupedInfluence, k_ActiveEntryPoint, 0u) == AxisInfluence::Active,
                  "with dedup on, the axis the shader reads is Active");
@@ -384,7 +384,7 @@ void CheckEveryGroupIsMeasured(lodestone::tests::TestRunner& runner, const Permu
     runner.BeginSection("influence reads every group");
 
     const CookedModule module = BuildConditionalModule(space);
-    const ModuleInfluence influence = ComputeAxisInfluence(module);
+    const ModuleInfluence influence = ComputeActualInfluence(module);
 
     runner.Check(InfluenceOf(influence, k_ConditionalEntryPoint, 0u) == AxisInfluence::Active,
                  "the first axis is Active, and only the second group of variants says so");

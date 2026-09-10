@@ -15,6 +15,7 @@ using lodestone::PermutationAxis;
 using lodestone::PermutationSpace;
 using lodestone::PermutationValue;
 using lodestone::PolicyDocument;
+using lodestone::RecordingDiagnosticSink;
 using lodestone::StderrDiagnosticSink;
 using lodestone::tests::TestRunner;
 
@@ -63,12 +64,12 @@ void TestParseAndQuery(TestRunner& runner)
     runner.Check(wgsl.CookValues.size() == 1u && wgsl.CookValues[0].Axis == "IFFT_SIZE",
                  "the CookValues axis is named");
     runner.Check(wgsl.CookValues.size() == 1u && wgsl.CookValues[0].Values.size() == 2u
-                     && wgsl.CookValues[0].Values[0] == 256 && wgsl.CookValues[0].Values[1] == 512,
+                     && wgsl.CookValues[0].Values[0].AsSInt() == 256 && wgsl.CookValues[0].Values[1].AsSInt() == 512,
                  "the CookValues integers read back in order");
 
     const auto& spirv = document.FindTargetPolicy("OceanFft", "spirv");
     runner.Check(spirv.CookValues.size() == 1u && spirv.CookValues[0].Values.size() == 2u
-                     && spirv.CookValues[0].Values[0] == 0 && spirv.CookValues[0].Values[1] == 1,
+                     && !spirv.CookValues[0].Values[0].AsBool() && spirv.CookValues[0].Values[1].AsBool(),
                  "a boolean CookValues reads back as 0 and 1");
 
     const auto& absentTarget = document.FindTargetPolicy("OceanFft", "dxil");
@@ -116,7 +117,7 @@ void TestValidationAgainstSpace(TestRunner& runner)
                                         AxisKind::Tuning, EarliestBindingTime::Cook, AxisValueDomain::Integral };
     const PermutationSpace space{ "OceanFft", { sizeAxis, waveOpsAxis, waveSizeAxis } };
 
-    auto validate = [&space](std::string_view toml) -> CookError
+    auto validateAndPrint = [&space](std::string_view toml) -> CookError
     {
         StderrDiagnosticSink sink;
         const auto document = PolicyDocument::Parse(toml);
@@ -127,23 +128,34 @@ void TestValidationAgainstSpace(TestRunner& runner)
         return document->ValidateAgainstSpace("OceanFft", space, sink);
     };
 
-    runner.Check(validate(k_ValidPolicy) == CookError::Success, "a policy that names real axes and values validates");
+    auto validateAndCache = [&space](std::string_view toml) -> CookError
+    {
+        RecordingDiagnosticSink sink;
+        const auto document = PolicyDocument::Parse(toml);
+        if (!document)
+        {
+            return CookError::Invalid; // these inputs parse; a failure here fails the check below
+        }
+        return document->ValidateAgainstSpace("OceanFft", space, sink);
+    };
 
-    const CookError unknownCookAxis = validate("[OceanFft.targets.wgsl.CookValues]\nIFFT_SZ = [256]\n");
+    runner.Check(validateAndPrint(k_ValidPolicy) == CookError::Success, "a policy that names real axes and values validates");
+
+    const CookError unknownCookAxis = validateAndCache("[OceanFft.targets.wgsl.CookValues]\nIFFT_SZ = [256]\n");
     runner.Check(unknownCookAxis == CookError::PolicyAxisNotDeclared, "CookValues on an undeclared axis fails");
 
-    const CookError valueNotInAxis = validate("[OceanFft.targets.wgsl.CookValues]\nIFFT_SIZE = [999]\n");
+    const CookError valueNotInAxis = validateAndCache("[OceanFft.targets.wgsl.CookValues]\nIFFT_SIZE = [999]\n");
     runner.Check(valueNotInAxis == CookError::PolicyValueNotInAxis, "a CookValues value the axis lacks fails");
 
     const CookError cookWhenUnknownAxis =
-        validate("[OceanFft.targets.wgsl]\nCookWhen = \"NOPE == 1\"\n");
+        validateAndCache("[OceanFft.targets.wgsl]\nCookWhen = \"NOPE == 1\"\n");
     runner.Check(cookWhenUnknownAxis == CookError::PolicyAxisNotDeclared, "CookWhen naming an undeclared axis fails");
 
-    const CookError cookWhenMalformed = validate("[OceanFft.targets.wgsl]\nCookWhen = \"== 1\"\n");
+    const CookError cookWhenMalformed = validateAndCache("[OceanFft.targets.wgsl]\nCookWhen = \"== 1\"\n");
     runner.Check(cookWhenMalformed == CookError::PolicyCookWhenInvalid, "a malformed CookWhen fails");
 
     const CookError influenceUnknownAxis =
-        validate("[[OceanFft.ExpectedInfluence]]\nEntryPoint = \"cs\"\nAxis = \"GHOST\"\n");
+        validateAndCache("[[OceanFft.ExpectedInfluence]]\nEntryPoint = \"cs\"\nAxis = \"GHOST\"\n");
     runner.Check(influenceUnknownAxis == CookError::PolicyAxisNotDeclared,
                  "ExpectedInfluence on an undeclared axis fails");
 
