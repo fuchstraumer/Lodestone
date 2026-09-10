@@ -115,6 +115,22 @@ std::string ValueToSlangLiteral(const PermutationValue& value)
     return "invalid";
 }
 
+std::string ValueToPrintableString(const PermutationValue& value) noexcept
+{
+    switch (value.GetType())
+    {
+    case PermutationValue::Type::Bool:
+        return value.AsBool() ? "true" : "false";
+    case PermutationValue::Type::UInt:
+        return std::format("{}", value.AsUInt());
+    case PermutationValue::Type::SInt:
+        return std::format("{}", value.AsSInt());
+    case PermutationValue::Type::Invalid:
+        return "invalid";
+    }
+    return "invalid";
+}
+
 std::string ValueToSlangTypeName(const PermutationValue& value)
 {
     switch (value.GetType())

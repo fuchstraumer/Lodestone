@@ -51,6 +51,7 @@ private:
 /** Widens any axis value to the integer type the size-expression evaluator works in. A `bool` axis
  * becomes 0 or 1, which is what a shader comparing it against a constant would see. */
 int64_t PermutationValueToInt64(const PermutationValue& value) noexcept;
+std::string ValueToPrintableString(const PermutationValue& value) noexcept;
 std::string ValueToSlangLiteral(const PermutationValue& value);
 std::string ValueToSlangTypeName(const PermutationValue& value);
 std::string MakeExportedConstantSource(std::string_view axis_name, const PermutationValue& value);
