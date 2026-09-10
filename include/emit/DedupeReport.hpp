@@ -1,9 +1,12 @@
 #pragma once
-#include "CookerErrors.hpp"
 #ifndef LODESTONE_DEDUPE_REPORT_HPP
 #define LODESTONE_DEDUPE_REPORT_HPP
+#include "CookerErrors.hpp"
 #include "model/CookedLibrary.hpp"
+#include <cstdint>
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 /**
@@ -22,6 +25,8 @@
  */
 namespace lodestone
 {
+
+struct PolicyInfluence;
 
 enum class AxisInfluence : uint8_t
 {
@@ -47,11 +52,9 @@ struct ModuleInfluence
     std::vector<EntryPointInfluence> EntryPoints;
 };
 
-ModuleInfluence ComputeAxisInfluence(const CookedModule& module);
+ModuleInfluence ComputeActualInfluence(const CookedModule& module);
 
-/** Compares the measured influence against what the module declared, and checks the variant budget.
- * A mismatch fails the cook and names the entry point and the axis. */
-CookError EnforceModulePolicy(const CookedModule& module, const ModuleInfluence& influence);
+CookError EnforceModulePolicy(const CookedModule& module, std::span<const PolicyInfluence> influences) noexcept;
 
 std::string GenerateDedupeReport(const CookedLibrary& library);
 

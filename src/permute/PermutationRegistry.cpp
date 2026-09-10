@@ -1,6 +1,5 @@
 #include "permute/PermutationRegistry.hpp"
 #include "permute/PermutationAxis.hpp"
-#include "permute/PermutationPolicy.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "permute/PermutationValue.hpp"
 
@@ -52,17 +51,16 @@ namespace
     const PermutationSpace k_EmptySpace{ "", {} };
 
 
-    const ModulePolicy k_EmptyPolicy{};
 
     struct ModuleSpaceEntry
     {
         std::string_view ModuleName;
         const PermutationSpace* Space;
-        const ModulePolicy* Policy;
+        const void* Policy;
     };
 
     const std::array<ModuleSpaceEntry, 1> k_ModuleSpaces{ ModuleSpaceEntry{
-        .ModuleName = "OceanFft", .Space = &k_OceanFftSpace, .Policy = &k_EmptyPolicy } };
+        .ModuleName = "OceanFft", .Space = &k_OceanFftSpace, .Policy = nullptr } };
 
 } // namespace
 

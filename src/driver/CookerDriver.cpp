@@ -12,7 +12,6 @@
 #include "model/ResolveStage.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "permute/PermutationAssignment.hpp"
-#include "permute/PermutationPolicy.hpp"
 #include "permute/PermutationRegistry.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "permute/PolicyDocument.hpp"
@@ -529,6 +528,7 @@ namespace
     /**@brief Take `InternedModule` and package it into `CookedModule`. */
     CookResult<CookedModule> FinalizeModule(InternedModule&& interned_module,
                                             std::span<const CompiledVariant> module_variants,
+                                            std::span<const PolicyInfluence> policy_influences,
                                             DiagnosticSink& diagnostics)
     {
         CookedModule cookedModule = FreezeModuleTables(std::move(interned_module));
@@ -550,8 +550,7 @@ namespace
                                                      cookedModule.Variants.size());
         ReportInfo(diagnostics, roundTripStr);
 
-        const ModuleInfluence influence = ComputeAxisInfluence(cookedModule);
-        const CookError policyError = EnforceModulePolicy(cookedModule, influence);
+        const CookError policyError = EnforceModulePolicy(cookedModule, policy_influences);
         if (!policyError)
         {
             return std::unexpected(policyError);
@@ -705,7 +704,11 @@ namespace
             return internedDumpResult;
         }
 
-        CookResult<CookedModule> finalized = FinalizeModule(std::move(internedModule), moduleVariants, diagnostics);
+        const std::span<const PolicyInfluence> policyInfluences = policy_document.ExpectedInfluenceFor(moduleName);
+        CookResult<CookedModule> finalized = FinalizeModule(std::move(internedModule),
+                                                            moduleVariants,
+                                                            policyInfluences,
+                                                            diagnostics);
         if (!finalized)
         {
             return finalized.error();

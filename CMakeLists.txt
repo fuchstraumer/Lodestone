@@ -126,7 +126,6 @@ set(LODESTONE_PERMUTE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/ExternConstantScanner.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationAssignment.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationAxis.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationPolicy.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationRegistry.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationSpace.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationValue.hpp"
