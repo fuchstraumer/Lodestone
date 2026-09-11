@@ -37,7 +37,7 @@ private:
     //NOLINTBEGIN(readability-identifier-naming)
     union
     {
-        uint32_t uintValue;
+        uint32_t uintValue{ 0u };
         bool boolValue;
     };
     //NOLINTEND(readability-identifier-naming)
