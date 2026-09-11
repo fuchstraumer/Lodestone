@@ -11,9 +11,6 @@ namespace lodestone
 {
 
 class PermutationSpace;
-struct ModulePolicy;
-
-[[nodiscard]] const ModulePolicy* FindPolicyForModule(std::string_view module_name) noexcept;
 [[nodiscard]] const PermutationSpace* FindPermutationSpaceForModule(std::string_view module_name) noexcept;
 
 } // namespace lodestone
