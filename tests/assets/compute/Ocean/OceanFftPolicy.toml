@@ -1,12 +1,5 @@
-[[OceanFft.ExpectedInfluence]]
-EntryPoint = "IfftPermuteCS"
-Axis = "IFFT_USE_WAVE_OPS"
-Inert = true
-
-[[OceanFft.ExpectedInfluence]]
-EntryPoint = "IfftPermuteCS"
-Axis = "IFFT_WAVE_SIZE"
-Inert = true
+[OceanFft.InertAxesForEntryPoints]
+IfftPermuteCS = ["IFFT_USE_WAVE_OPS", "IFFT_WAVE_SIZE"]
 
 [OceanFft.targets.wgsl]
 MaxVariants = 64
