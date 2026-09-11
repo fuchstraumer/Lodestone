@@ -10,6 +10,7 @@
 #include "slang.h"
 #include "slang-com-ptr.h"
 #include <cstddef>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <string>
@@ -63,7 +64,7 @@ private:
     // when multiple sources can invoke this code. this makes things more consistent and repeatable.
     [[nodiscard]] CookError buildSlangComponents();
 
-    [[nodiscard]] CookResult<RawAxisDeclaration> buildAxisDecl(slang::DeclReflection* reflection);
+    [[nodiscard]] CookResult<std::optional<RawAxisDeclaration>> buildAxisDecl(slang::DeclReflection* reflection);
     [[nodiscard]] CookResult<std::string> extractSingleAttribute(slang::DeclReflection* decl_reflection,
                                                                  slang::Attribute* attribute,
                                                                  std::string_view attr_name);

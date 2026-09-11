@@ -16,6 +16,7 @@
 #include <fstream>
 #include <ios>
 #include <iterator>
+#include <optional>
 #include <ranges>
 #include <span>
 #include <string>
@@ -174,12 +175,24 @@ CookResult<std::span<const RawAxisDeclaration>> SlangModuleContext::ReadDeclared
                 slang::DeclReflection* child = moduleReflection->getChild(static_cast<unsigned int>(j));
                 if ((child != nullptr) && child->getKind() == slang::DeclReflection::Kind::Variable)
                 {
-                    CookResult<RawAxisDeclaration> axisDeclResult = buildAxisDecl(child);
+                    // this is ugly, because we need to both bubble up errors from source code (so CookResult<T>),
+                    // but also there are going to be variables that just aren't axes... so we need std::optional<>
+                    // to succinctly return values that aren't invalid, but aren't an axis either. sorry its ugly :(
+                    //NOLINTBEGIN(readability-else-after-return)
+                    auto axisDeclResult = buildAxisDecl(child);
                     if (!axisDeclResult)
                     {
                         return std::unexpected(axisDeclResult.error());
                     }
-                    axisDeclarations.emplace_back(std::move(*axisDeclResult));
+                    else if (axisDeclResult->has_value() && (*axisDeclResult == std::nullopt))
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        axisDeclarations.emplace_back(std::move(*axisDeclResult.value()));
+                    }
+                    //NOLINTEND(readability-else-after-return)
                 }
             }
         }
@@ -393,25 +406,38 @@ CookError SlangModuleContext::buildSlangComponents()
     return CookError::Success;
 }
 
-CookResult<RawAxisDeclaration> SlangModuleContext::buildAxisDecl(slang::DeclReflection* reflection)
+CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(slang::DeclReflection* reflection)
 {
-    RawAxisDeclaration result{};
     slang::VariableReflection* variableReflection = reflection->asVariable();
     if (variableReflection == nullptr)
     {
         return std::unexpected(CookError::AttributeExpressionParseFailed);
     }
 
-    const char* variableName = variableReflection->getName();
-    result.Name = variableName;
-
     slang::Attribute* booleanAxisAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_boolean_axis");
+    slang::Attribute* valuesAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_axis_values");
+    // early out: if neither attribute is present, this is not an axis declaration
+    if ((booleanAxisAttr == nullptr) && (valuesAttr == nullptr))
+    {
+        return std::nullopt;
+    }
+
+    // another early out: if there isn't a valid name, we can't reference this by name either!
+    // I think this is more likely to be an outright error if the attributes failed though, so
+    // we don't return nullopt here
+    const char* variableName = variableReflection->getName();
+    if (variableName == nullptr)
+    {
+        return std::unexpected(CookError::SlangGetVariableNameFailed);
+    }
+
+    RawAxisDeclaration result{};
     if (booleanAxisAttr != nullptr)
     {
         result.IsBooleanAxis = true;
     }
 
-    slang::Attribute* valuesAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_axis_values");
+    result.Name = variableName;
     if (valuesAttr != nullptr)
     {
         // can't have both a values attribute and a boolean axis: the two are mutually exclusive
@@ -433,9 +459,6 @@ CookResult<RawAxisDeclaration> SlangModuleContext::buildAxisDecl(slang::DeclRefl
 
         result.AxisValues = std::move(*valuesResult);
     }
-    
-    // todo: can we assert that either IsBooleanAxis is true or AxisValues is non-empty? We can't really
-    // filter for attributes that only affect axes though, so we could end up validating on some other attribute
 
     // ActiveWhen, totally optional
     slang::Attribute* activeWhenAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_active_when");
@@ -471,7 +494,7 @@ CookResult<RawAxisDeclaration> SlangModuleContext::buildAxisDecl(slang::DeclRefl
     slang::SourceLocation sourceLoc;
     if (SLANG_SUCCEEDED(session->getDeclSourceLocation(reflection, &sourceLoc)))
     {
-        result.SourceFile = sourceLoc.filePath;
+        result.SourceFile = sourceLoc.filePath != nullptr ? sourceLoc.filePath : "<unknown>";
         result.SourceLine = static_cast<int32_t>(sourceLoc.line);
         result.SourceColumn = static_cast<int32_t>(sourceLoc.column);
     }

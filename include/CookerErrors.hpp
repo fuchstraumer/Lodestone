@@ -99,6 +99,7 @@ enum class CookError : uint16_t
     SlangCoreModuleBuildFailed = 222,
     SlangGetAttributeValueStrFailed = 223,
     SlangGetSourceLocationFailed = 224,
+    SlangGetVariableNameFailed = 225,
 };
 
 constexpr bool operator!(CookError error) noexcept
