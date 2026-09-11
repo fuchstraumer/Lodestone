@@ -79,9 +79,11 @@ set(LODESTONE_COMPILE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/RawLibrary.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/SlangCompiler.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/SlangDiagnosticParser.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/SymbolTable.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/RawLibrary.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/SlangCompiler.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/SlangDiagnosticParser.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/SlangDiagnosticParser.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/SymbolTable.cpp")
 
 set(LODESTONE_COMPILE_IMPL_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangCompilerTypes.hpp"
