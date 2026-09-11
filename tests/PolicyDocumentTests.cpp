@@ -25,10 +25,8 @@ namespace
 // A complete file: one module, expected influence, and two target sections. The spirv section lists a
 // boolean axis, so it proves a boolean reads back as 0 and 1.
 constexpr std::string_view k_ValidPolicy = R"toml(
-[[OceanFft.ExpectedInfluence]]
-EntryPoint = "IfftPermuteCS"
-Axis = "IFFT_USE_WAVE_OPS"
-Inert = true
+[OceanFft.InertAxesForEntryPoints]
+IfftPermuteCS = ["IFFT_USE_WAVE_OPS", "IFFT_WAVE_SIZE"]
 
 [OceanFft.targets.wgsl]
 MaxVariants = 64
@@ -78,11 +76,10 @@ void TestParseAndQuery(TestRunner& runner)
     const auto& absentModule = document.FindTargetPolicy("Nope", "wgsl");
     runner.Check(absentModule.MaxVariants == 0u, "an absent module returns the empty policy");
 
-    const auto influence = document.ExpectedInfluenceFor("OceanFft");
-    runner.Check(influence.size() == 1u, "one influence statement reads back");
-    runner.Check(influence.size() == 1u && influence[0].Axis == "IFFT_USE_WAVE_OPS" && influence[0].IsInert,
-                 "the influence statement reads back its axis and flag");
-    runner.Check(document.ExpectedInfluenceFor("Nope").empty(), "an absent module has no influence");
+    const auto inertAxes = document.InertAxesForEntryPoint("OceanFft", "IfftPermuteCS");
+    runner.Check(inertAxes.size() == 2u && (inertAxes[0] == "IFFT_USE_WAVE_OPS") && (inertAxes[1] == "IFFT_WAVE_SIZE"),
+                 "InertAxes are preserved, and contain both axes disabled");
+    runner.Check(document.InertAxesForEntryPoint("Nope", "IfftPermuteCS").empty(), "an absent module has no influence");
 }
 
 void TestParseRejections(TestRunner& runner)
@@ -154,10 +151,10 @@ void TestValidationAgainstSpace(TestRunner& runner)
     const CookError cookIfMalformed = validateAndCache("[OceanFft.targets.wgsl]\nCookIf = \"== 1\"\n");
     runner.Check(cookIfMalformed == CookError::PolicyCookIfInvalid, "a malformed CookIf fails");
 
-    const CookError influenceUnknownAxis =
-        validateAndCache("[[OceanFft.ExpectedInfluence]]\nEntryPoint = \"cs\"\nAxis = \"GHOST\"\n");
-    runner.Check(influenceUnknownAxis == CookError::PolicyAxisNotDeclared,
-                 "ExpectedInfluence on an undeclared axis fails");
+    const CookError inertAxisUnknownAxis =
+        validateAndCache("[OceanFft.InertAxesForEntryPoints]\ncs = [\"GHOST\"]\n");
+    runner.Check(inertAxisUnknownAxis == CookError::PolicyAxisNotDeclared,
+                 "InertAxesForEntryPoints on an undeclared axis fails");
 
     const CookError absentModuleValidates = [&space]
     {

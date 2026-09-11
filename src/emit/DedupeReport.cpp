@@ -3,6 +3,7 @@
 #include "model/ContentInterner.hpp"
 #include "model/CookedLibrary.hpp"
 #include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationRegistry.hpp"
@@ -15,6 +16,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <format>
+#include <iterator>
 #include <numeric>
 #include <optional>
 #include <print>
@@ -22,6 +24,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -67,12 +70,6 @@ namespace
      * distinct source, which is quadratic and gives the same answer. */
     std::vector<SourceCollapse> CollectSourceCollapses(const CookedModule& module, size_t entry_point_index);
     std::string EmitProvenance(const CookedModule& module);
-    const EntryPointInfluence* FindEntryPointInfluence(const ModuleInfluence& influence,
-                                                       std::string_view entry_point_name) noexcept;
-    std::optional<size_t> FindAxisIndex(const PermutationSpace& space, std::string_view axis_name) noexcept;
-    uint32_t CheckExpectedInfluence(const CookedModule& module,
-                                    const ModuleInfluence& actual_influence,
-                                    const PolicyInfluence& expected_influence);
 
 } // namespace
 
@@ -170,26 +167,64 @@ ModuleInfluence ComputeActualInfluence(const CookedModule& module)
     return influence;
 }
 
-CookError EnforceModulePolicy(const CookedModule& module, std::span<const PolicyInfluence> influences) noexcept
+CookError EnforceModulePolicy(const CookedModule& module,
+                              const ModulePolicyEntry& policy,
+                              DiagnosticSink& diagnostics) noexcept
 {
-    if (influences.empty())
+    if (policy.InertAxesForEntryPoints.empty())
     {
         return CookError::Success;
     }
-    // we used to check max variants setting here, but that got pulled up to 
-    // early-out from permutation space expansion if exceeded instead
-    uint32_t violations = 0u; 
 
-    ModuleInfluence actualInfluence = ComputeActualInfluence(module);
+    const StringMap<std::vector<std::string>>& expectedInfluence = policy.InertAxesForEntryPoints;
+    // pull out the keys: we only want to iterate over the entry points we actually have policy data on
+    auto inertEntryPoints = expectedInfluence |
+                            std::views::keys |
+                            std::views::transform([](const auto& key) { return std::string_view{ key }; }) |
+                            std::ranges::to<std::vector<std::string_view>>();
+    std::ranges::sort(inertEntryPoints);
 
-    for (const PolicyInfluence& expectedInfluence : influences)
+    // preconstruct a map of axis names to axis indices for quick lookup
+    std::unordered_map<std::string_view, std::ptrdiff_t> axisNameToIndex;
+    for (auto&& [idx, axis] : std::views::enumerate(module.Space->Axes()))
     {
-        violations += CheckExpectedInfluence(module, actualInfluence, expectedInfluence);
+        axisNameToIndex[axis.Name] = idx;
     }
-
-    if (violations != 0u)
+    
+    // get the influence information for every entry point in the module
+    ModuleInfluence actualInfluence = ComputeActualInfluence(module);
+    // at some point, we should have ComputeActualInfluence use inertEntryPoints as a filter itself, instead of here
+    auto relevantEntryPoints = actualInfluence.EntryPoints |
+                               std::views::filter([&](const EntryPointInfluence& enpt)
+                               {
+                                   return std::ranges::binary_search(inertEntryPoints, std::string_view{ enpt.EntryPointName });
+                               });
+    
+    for (const EntryPointInfluence& entryPointInfluence : relevantEntryPoints)
     {
-        return CookError::ModulePolicyViolated;
+        const std::vector<std::string>& expectedInertAxes = expectedInfluence.at(entryPointInfluence.EntryPointName);
+        // extract axes that should be inert but aren't
+        auto filterFailingAxis = [&axisNameToIndex, &entryPointInfluence](const std::string_view& axis_name)
+        {
+            const std::ptrdiff_t axisIndex = axisNameToIndex.at(axis_name);
+            return entryPointInfluence.Axes[static_cast<size_t>(axisIndex)] != AxisInfluence::Inert;
+        };
+
+        auto failingAxes = expectedInertAxes |
+                           std::views::filter(filterFailingAxis);
+
+        if (!std::ranges::empty(failingAxes))
+        {
+            CookError runningErr = CookError::Invalid;
+            for (std::string_view failingAxis : failingAxes)
+            {
+                const std::string errorStr = std::format("Entry point '{}' has axis '{}' expected to be inert but is not.",
+                                                         entryPointInfluence.EntryPointName,
+                                                         failingAxis);
+                runningErr = ReportError(diagnostics, CookError::PolicyInertAxisNotInertWhenCooked, errorStr);
+            }
+            return runningErr;
+        }
     }
 
     return CookError::Success;
@@ -450,76 +485,6 @@ namespace
         return emitted;
     }
 
-    const EntryPointInfluence* FindEntryPointInfluence(const ModuleInfluence& influence,
-                                                       std::string_view entry_point_name) noexcept
-    {
-        for (const EntryPointInfluence& candidate : influence.EntryPoints)
-        {
-            if (candidate.EntryPointName == entry_point_name)
-            {
-                return &candidate;
-            }
-        }
-
-        return nullptr;
-    }
-
-    std::optional<size_t> FindAxisIndex(const PermutationSpace& space, std::string_view axis_name) noexcept
-    {
-        for (auto&& [idx, axis] : std::views::enumerate(space.Axes()))
-        {
-            if (axis.Name == axis_name)
-            {
-                return static_cast<size_t>(idx);
-            }
-        }
-        return std::nullopt;
-    }
-
-    uint32_t CheckExpectedInfluence(const CookedModule& module,
-                                    const ModuleInfluence& actual_influence,
-                                    const PolicyInfluence& expected_influence)
-    {
-        const EntryPointInfluence* entry =
-            FindEntryPointInfluence(actual_influence, expected_influence.EntryPoint);
-        if (entry == nullptr)
-        {
-            std::println(stderr,
-                         "[shader_cooker] module {} declares an expectation for entrypoint '{}', which "
-                         "does not exist",
-                         module.Name,
-                         expected_influence.EntryPoint);
-            return 1u;
-        }
-
-        const std::optional<size_t> axisIndex = FindAxisIndex(*module.Space, expected_influence.Axis);
-        if (!axisIndex.has_value() || axisIndex.value() >= entry->Axes.size())
-        {
-            std::println(stderr,
-                         "[shader_cooker] module {} declares an expectation for axis '{}', which is not "
-                         "in its permutation space",
-                         module.Name,
-                         expected_influence.Axis);
-            return 1u;
-        }
-
-        const AxisInfluence measured = entry->Axes[axisIndex.value()];
-        const bool measuredInert = measured == AxisInfluence::Inert;
-
-        if (measured != AxisInfluence::Undetermined && measuredInert != expected_influence.IsInert)
-        {
-            std::println(stderr,
-                         "[shader_cooker] INFLUENCE CHANGED: axis '{}' is {} for {}, but the module "
-                         "declares it {}. The permutation space now costs something different.",
-                         expected_influence.Axis,
-                         ToString(measured),
-                         expected_influence.EntryPoint,
-                         expected_influence.IsInert ? "Inert" : "Active");
-            return 1u;
-        }
-
-        return 0u;
-    }
 }
 
 } // namespace lodestone

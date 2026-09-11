@@ -54,19 +54,10 @@ struct TargetPolicy
     std::string CookIf;
 };
 
-/**@brief PolicyInfluence is used to specify that for a given entrypoint, the named axis
- * should have no influence on it's variant count / permutation assignments. */
-struct PolicyInfluence
-{
-    std::string EntryPoint;
-    std::string Axis;
-    bool IsInert{ false };
-};
-
 /**@brief Whole policy for one module: influence statements and one section for each target.*/
 struct ModulePolicyEntry
 {
-    std::vector<PolicyInfluence> ExpectedInfluence;
+    StringMap<std::vector<std::string>> InertAxesForEntryPoints;
     StringMap<TargetPolicy> Targets;
 };
 
@@ -97,7 +88,8 @@ public:
       * code then just uses this to use the axes with their values in the shader source. */
     [[nodiscard]] const TargetPolicy& FindTargetPolicy(std::string_view module_name,
                                                        std::string_view target_name) const noexcept;
-    [[nodiscard]] std::span<const PolicyInfluence> ExpectedInfluenceFor(std::string_view module_name) const noexcept;
+    [[nodiscard]] std::span<const std::string> InertAxesForEntryPoint(std::string_view module_name,
+                                                                std::string_view entry_point_name) const noexcept;
     /**@brief Verifies that `CookValues` and `CookWhen` entries in the policy are consistent with the 
       * permutation space, i.e. lints the policy for naming and presence of axes and their values. */
     [[nodiscard]] CookError ValidateAgainstSpace(std::string_view module_name,

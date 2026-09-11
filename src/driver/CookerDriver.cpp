@@ -528,7 +528,7 @@ namespace
     /**@brief Take `InternedModule` and package it into `CookedModule`. */
     CookResult<CookedModule> FinalizeModule(InternedModule&& interned_module,
                                             std::span<const CompiledVariant> module_variants,
-                                            std::span<const PolicyInfluence> policy_influences,
+                                            const ModulePolicyEntry& module_policy,
                                             DiagnosticSink& diagnostics)
     {
         CookedModule cookedModule = FreezeModuleTables(std::move(interned_module));
@@ -549,11 +549,14 @@ namespace
                                                      cookedModule.Name,
                                                      cookedModule.Variants.size());
         ReportInfo(diagnostics, roundTripStr);
-
-        const CookError policyError = EnforceModulePolicy(cookedModule, policy_influences);
-        if (!policyError)
+        // only check module policy if there are inert axes specified for entry points
+        if (!module_policy.InertAxesForEntryPoints.empty())
         {
-            return std::unexpected(policyError);
+            const CookError policyError = EnforceModulePolicy(cookedModule, module_policy, diagnostics);
+            if (!policyError)
+            {
+                return std::unexpected(policyError);
+            }
         }
 
         return cookedModule;
@@ -704,10 +707,11 @@ namespace
             return internedDumpResult;
         }
 
-        const std::span<const PolicyInfluence> policyInfluences = policy_document.ExpectedInfluenceFor(moduleName);
+        const ModulePolicyEntry* modulePolicyPtr = policy_document.FindModule(moduleName);
+        const ModulePolicyEntry& modulePolicy = modulePolicyPtr != nullptr ? *modulePolicyPtr : ModulePolicyEntry{};
         CookResult<CookedModule> finalized = FinalizeModule(std::move(internedModule),
                                                             moduleVariants,
-                                                            policyInfluences,
+                                                            modulePolicy,
                                                             diagnostics);
         if (!finalized)
         {

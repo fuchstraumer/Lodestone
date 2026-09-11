@@ -26,7 +26,8 @@
 namespace lodestone
 {
 
-struct PolicyInfluence;
+struct ModulePolicyEntry;
+class DiagnosticSink;
 
 enum class AxisInfluence : uint8_t
 {
@@ -54,7 +55,7 @@ struct ModuleInfluence
 
 ModuleInfluence ComputeActualInfluence(const CookedModule& module);
 
-CookError EnforceModulePolicy(const CookedModule& module, std::span<const PolicyInfluence> influences) noexcept;
+CookError EnforceModulePolicy(const CookedModule& module, const ModulePolicyEntry& policy, DiagnosticSink& diagnostics) noexcept;
 
 std::string GenerateDedupeReport(const CookedLibrary& library);
 

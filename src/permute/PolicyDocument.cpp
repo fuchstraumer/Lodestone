@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <expected>
 #include <format>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -32,7 +33,7 @@ namespace
     // Builds a parse error that points at a node. toml++ records a source region for every node, so a
     // wrong type reports the line and the column of the offending value.
     PolicyParseError ErrorAt(const toml::node& node, std::string message);
-    PolicyDocResult<std::vector<PolicyInfluence>> ReadInfluence(const toml::table& module_table);
+    PolicyDocResult<StringMap<std::vector<std::string>>> ReadInertAxes(const toml::table& module_table);
     PolicyDocResult<AxisCookValues> ReadAxisCookValues(std::string_view axis_name,
                                                        const toml::node& values_node);
     PolicyDocResult<TargetPolicy> ReadTargetPolicy(const toml::table& target_table);
@@ -44,7 +45,7 @@ namespace
     bool AxisDeclaresValue(const PermutationAxis& axis, int64_t value);
     CookError ValidateExpectedInfluenceTable(const std::string_view module_name,
                                              const std::span<const PermutationAxis> axes,
-                                             const std::span<const PolicyInfluence> influences,
+                                             const std::span<const std::string> inert_axes,
                                              DiagnosticSink& sink);
     CookError ValidateTargetAndAxisValues(const std::string_view module_name,
                                           const StringMap<TargetPolicy>& targets,
@@ -120,15 +121,25 @@ const TargetPolicy& PolicyDocument::FindTargetPolicy(std::string_view module_nam
     return found->second;
 }
 
-std::span<const PolicyInfluence> PolicyDocument::ExpectedInfluenceFor(
-    std::string_view module_name) const noexcept
+std::span<const std::string> PolicyDocument::InertAxesForEntryPoint(std::string_view module_name,
+                                                                    std::string_view entry_point_name) const noexcept
 {
     const ModulePolicyEntry* entry = FindModule(module_name);
     if (entry == nullptr)
     {
         return {};
     }
-    return entry->ExpectedInfluence;
+
+    const auto found = entry->InertAxesForEntryPoints.find(entry_point_name);
+    if (found == entry->InertAxesForEntryPoints.end())
+    {
+        return {};
+    }
+    else
+    {
+        const std::vector<std::string>& names = found->second;
+        return names;
+    }
 }
 
 CookError PolicyDocument::ValidateAgainstSpace(std::string_view module_name,
@@ -142,15 +153,37 @@ CookError PolicyDocument::ValidateAgainstSpace(std::string_view module_name,
         return CookError::Success;
     }
 
-    CookError error = ValidateExpectedInfluenceTable(module_name, space.Axes(), entry->ExpectedInfluence, sink);
-    if (!error)
+    // collate all of the inert axes for the current module
+    auto inertAxesStrs = entry->InertAxesForEntryPoints | std::views::values | std::views::join;
+    // use views so we don't copy a bunch
+    std::vector<std::string_view> inertAxesNames(inertAxesStrs.begin(), inertAxesStrs.end());
+    // now filter out to only uniques
+    std::ranges::sort(inertAxesNames);
+    auto [firstToErase, lastToErase] = std::ranges::unique(inertAxesNames);
+    inertAxesNames.erase(firstToErase, lastToErase);
+
+    // now extract names from axes
+    auto allAxesStrs = space.Axes() |
+                       std::views::transform([](const PermutationAxis& axis) { return std::string_view{ axis.Name }; }) |
+                       std::ranges::to<std::vector<std::string_view>>();
+    std::ranges::sort(allAxesStrs);
+
+    // find if there are any names in inertAxesNames that are not present in allAxesStrs
+    std::vector<std::string_view> missingAxes;
+    std::ranges::set_difference(inertAxesNames, allAxesStrs, std::back_inserter(missingAxes));
+    if (!missingAxes.empty())
     {
-        return error;
+        CookError err = CookError::Invalid;
+        for (const auto& axis : missingAxes)
+        {
+            const std::string errStr = std::format("Inert axis '{}' is not present in the permutation space", axis);
+            err = ReportError(sink, CookError::PolicyAxisNotDeclared, errStr);
+        }
+        return err;
     }
 
-    error = ValidateTargetAndAxisValues(module_name, entry->Targets, space.Axes(), sink);
+    return ValidateTargetAndAxisValues(module_name, entry->Targets, space.Axes(), sink);
 
-    return error;
 }
 
 size_t PolicyDocument::ModuleCount() const noexcept
@@ -170,48 +203,41 @@ namespace
                                  .Column = region.begin.column };
     }
 
-    PolicyDocResult<std::vector<PolicyInfluence>> ReadInfluence(const toml::table& module_table)
+    PolicyDocResult<StringMap<std::vector<std::string>>> ReadInertAxes(const toml::table& module_table)
     {
-        std::vector<PolicyInfluence> influence;
-
-        const auto node = module_table["ExpectedInfluence"];
-        if (!node)
+        StringMap<std::vector<std::string>> inertAxes;
+        const auto node = module_table["InertAxesForEntryPoints"];
+        if (node && node.is_table())
         {
-            return influence; // absent, so the module states no expected influence
-        }
-
-        const toml::array* entries = node.as_array();
-        if (entries == nullptr)
-        {
-            return std::unexpected(ErrorAt(*node.node(), "ExpectedInfluence must be an array of tables"));
-        }
-
-        for (const toml::node& element : *entries)
-        {
-            const toml::table* record = element.as_table();
-            if (record == nullptr)
+            const toml::table* table = node.as_table();
+            if (table == nullptr)
             {
-                return std::unexpected(ErrorAt(element, "each ExpectedInfluence entry must be a table"));
+                return std::unexpected(ErrorAt(*node.node(), "InertAxesForEntryPoints must be a table"));
             }
-
-            const std::optional<std::string> entryPoint = (*record)["EntryPoint"].value<std::string>();
-            const std::optional<std::string> axis = (*record)["Axis"].value<std::string>();
-            if (!entryPoint)
+            
+            for (const auto& [entryPointKey, axisNamesNode] : *table)
             {
-                return std::unexpected(ErrorAt(element, "ExpectedInfluence entry needs a string EntryPoint"));
+                const std::string entryPointName{ entryPointKey.str() };
+                const toml::array* axisNamesArray = axisNamesNode.as_array();
+                if (axisNamesArray == nullptr)
+                {
+                    return std::unexpected(ErrorAt(axisNamesNode, "InertAxesForEntryPoints entries must be arrays"));
+                }
+                else
+                {
+                    std::vector<std::string> axisNames;
+                    for (const toml::node& element : *axisNamesArray)
+                    {
+                        if (const std::optional<std::string> str = element.value<std::string>())
+                        {
+                            axisNames.push_back(*str);
+                        }
+                    }
+                    inertAxes.emplace(entryPointName, std::move(axisNames));
+                }
             }
-            if (!axis)
-            {
-                return std::unexpected(ErrorAt(element, "ExpectedInfluence entry needs a string Axis"));
-            }
-
-            influence.push_back(
-                PolicyInfluence{ .EntryPoint = *entryPoint,
-                                 .Axis = *axis,
-                                 .IsInert = (*record)["Inert"].value<bool>().value_or(true) });
         }
-
-        return influence;
+        return inertAxes;
     }
 
     PolicyDocResult<AxisCookValues> ReadAxisCookValues(std::string_view axis_name,
@@ -356,13 +382,13 @@ namespace
             }
 
             ModulePolicyEntry entry;
-
-            PolicyDocResult<std::vector<PolicyInfluence>> influence = ReadInfluence(*moduleTable);
-            if (!influence)
+            PolicyDocResult<StringMap<std::vector<std::string>>> inertAxes = ReadInertAxes(*moduleTable);
+            if (!inertAxes)
             {
-                return std::unexpected(std::move(influence.error()));
+                return std::unexpected(std::move(inertAxes.error()));
             }
-            entry.ExpectedInfluence = std::move(*influence);
+
+            entry.InertAxesForEntryPoints = std::move(*inertAxes);
 
             PolicyDocResult<StringMap<TargetPolicy>> targets = ReadTargets(*moduleTable);
             if (!targets)
@@ -397,18 +423,18 @@ namespace
 
     CookError ValidateExpectedInfluenceTable(const std::string_view module_name,
                                              const std::span<const PermutationAxis> axes,
-                                             const std::span<const PolicyInfluence> influences,
+                                             const std::span<std::string> influences,
                                              DiagnosticSink& sink)
     {
-        for (const PolicyInfluence& influence : influences)
+        for (const std::string& axisName : influences)
         {
-            if (FindDeclaredAxis(axes, influence.Axis) == nullptr)
+            if (FindDeclaredAxis(axes, axisName) == nullptr)
             {
                 return ReportError(
                     sink,
                     CookError::PolicyAxisNotDeclared,
                     std::format("ExpectedInfluence names axis '{}', which module '{}' does not declare",
-                                influence.Axis,
+                                axisName,
                                 module_name));
             }
         }
