@@ -6,7 +6,7 @@ import LodestoneAttributes;
 // and we aren't doing runtime reflection at all!)
 internal const static uint IFFT_COMMON_BIND_LOC = 0;
 
-[lodestone_element_count("IFFT_SIZE * IFFT_SIZE * IFFT_NUM_WAVE_CASCADES")]
+[ls_element_count("IFFT_SIZE * IFFT_SIZE * IFFT_NUM_WAVE_CASCADES")]
 uniform RWStructuredBuffer<half4> IfftInput;
 ConstantBuffer<IfftParameters> IfftParams;
 uniform Texture1D<half2> IfftSinCosLUT;

@@ -65,7 +65,7 @@ Third, we need to make it as hard as we can for the CPU and GPU to disagree abou
 As an example, consider declaring an input to a compute shader - in this case one of my IFFT shaders - where we parametrize the size as a variant axis, along with a cascade count. Shader authors can write the following:
 
 ```slang
-[lodestone_element_count("IFFT_SIZE * IFFT_SIZE * IFFT_NUM_WAVE_CASCADES")]
+[ls_element_count("IFFT_SIZE * IFFT_SIZE * IFFT_NUM_WAVE_CASCADES")]
 uniform RWStructuredBuffer<half4> IfftInput;
 ```
 

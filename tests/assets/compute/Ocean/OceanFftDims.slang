@@ -1,15 +1,17 @@
 implementing OceanFft;
-// This file declares the extern permutation variables that control subgroup sizing (or how the shader
-// interprets it to be set at least), the FFT dimensions, the number of fused stages in wave ops,
-// wave cascade count, thread count per WG, and elements processed per thread.
+
+[ls_axis_values("128, 256, 512, 1024")]
+[ls_axis_kind("tuning")]
 extern static const uint IFFT_SIZE = 512u;
+
+[ls_axis_values("true, false")][ls_axis_kind("capability")]
+extern static const bool IFFT_USE_WAVE_OPS = true;
+
+[ls_axis_values("32, 64, 128")][ls_axis_kind("tuning")][ls_axis_active_when("IFFT_USE_WAVE_OPS==1")]
+extern static const uint IFFT_WAVE_SIZE = 32u;
+
 // unlikely we define this one differently
 extern static const uint IFFT_NUM_WAVE_CASCADES = 4u;
-// permutation parameter
-extern static const bool IFFT_USE_WAVE_OPS = true;
-// permutation parameter - I will not use wave ops when size < 32u, but we will permute this as 32,64,128
-// surprising number of devices can do 128!
-extern static const uint IFFT_WAVE_SIZE = 32u;
 
 // these are no all downstream of the above
 internal const static uint IFFT_LOG2_SIZE = firstbithigh(IFFT_SIZE);

@@ -111,12 +111,12 @@ with the emitted WGSL, both round trips read back the same bytes, and two cooks 
 Each cook writes one shared header and one shared dedupe report, so each module cooks on its own.
 One cook of all three would leave no artifact of `OceanFft` byte identical.
 
-Add a test with `add_lodestone_unit_test(<Name> <Name>.cpp)`. Add `TEST_ARGS <args>` after the sources
+Add a test with `add_ls_unit_test(<Name> <Name>.cpp)`. Add `TEST_ARGS <args>` after the sources
 when the test needs a command line.
 
 ## Running the cooker
 
-`tools/cooker_console` is the CLI. It builds `lodestone_cooker_console`, and phase D step D1b added
+`tools/cooker_console` is the CLI. It builds `ls_cooker_console`, and phase D step D1b added
 it. `lodestone` itself stays a static library: the tool parses a command line, builds a
 `FileOutputSink`, and calls `RunCook`. `CookTest.cpp` drives the same three calls with a command line
 that `tests/CMakeLists.txt` supplies.
@@ -438,15 +438,15 @@ gaps, and the design accepts them.
 
 A size travels as a string, and this is not a style choice. Slang folds an attribute integer argument
 at compile time, but the permutation constants are `extern static const` and fold at link time.
-`[lodestone_element_count(IFFT_SIZE * 4)]` therefore fails to compile. A string argument reaches reflection
+`[ls_element_count(IFFT_SIZE * 4)]` therefore fails to compile. A string argument reaches reflection
 untouched, and `EvaluateExpression` does the arithmetic once for each variant. The same evaluator now
 reads an axis constraint expression as well, which is why it lives in `permute/AttributeExpression.hpp`
 and not the old `SizeExpression.hpp`. Phase E step E1 gave it comparison and logical operators for the
 constraint language.
 
-The attribute declarations are in `tests/assets/LodestoneAttributes.slang`: `lodestone_element_count`,
-`lodestone_extent_2d`, `lodestone_extent_3d`. Slang has no optional attribute parameters, so each arity needs its
-own name. The README shows `lodestone_element_count`; the code says `lodestone_element_count`.
+The attribute declarations are in `tests/assets/LodestoneAttributes.slang`: `ls_element_count`,
+`ls_extent_2d`, `ls_extent_3d`. Slang has no optional attribute parameters, so each arity needs its
+own name. The README shows `ls_element_count`; the code says `ls_element_count`.
 
 ## Where to register a module
 
@@ -485,7 +485,7 @@ This repository was extracted from an engine named `velox`. The C++ rename to `l
 complete. No `velox` name remains in `src/`, `include/`, `client/`, `tests/`, or `tools/`.
 
 The shader side keeps the old prefix on purpose. `tests/assets/LodestoneAttributes.slang` declares
-`module VeloxAttributes` and the `lodestone_element_count`, `lodestone_extent_2d`, and `lodestone_extent_3d` attributes.
+`module VeloxAttributes` and the `ls_element_count`, `ls_extent_2d`, and `ls_extent_3d` attributes.
 Those names are part of the shader-side contract, and `src/compile/impl/SlangReflector.cpp` reads
 them by string. A rename there touches every test shader, so treat it as its own task.
 

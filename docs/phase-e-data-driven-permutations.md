@@ -216,7 +216,7 @@ Use both defenses:
 
 ## 5. Where a declaration lives
 
-Put the axis on the declaration, as an attribute, exactly as `[lodestone_element_count]` does.
+Put the axis on the declaration, as an attribute, exactly as `[ls_element_count]` does.
 
 ```slang
 [vx_axis_values("128, 256, 512, 1024")]

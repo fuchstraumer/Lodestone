@@ -12,7 +12,6 @@
 #include "model/ResolveStage.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "permute/PermutationAssignment.hpp"
-#include "permute/PermutationRegistry.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "permute/PolicyDocument.hpp"
 #include "target/TargetProfile.hpp"
@@ -366,7 +365,7 @@ namespace
                                     const TargetProfile& target_profile,
                                     DiagnosticSink& diagnostics,
                                     SlangCompiler& compiler,
-                                    const PermutationSpace*& out_space)
+                                    std::unique_ptr<PermutationSpace>& out_space)
     {
         SlangCompilerCreateInfo createInfo;
         createInfo.ModulePath = module_path;
@@ -385,8 +384,6 @@ namespace
         const std::string infoStr =
             std::format("module {} declares {} entrypoints", moduleName, compiler.EntryPointCount());
         ReportInfo(diagnostics, infoStr);
-
-        out_space = FindPermutationSpaceForModule(moduleName);
 
         const std::vector<std::string_view> sourceViews{ compiler.ModuleSourceStringViews() };
 
@@ -578,7 +575,7 @@ namespace
         }
 
         SlangCompiler compiler;
-        const PermutationSpace* space = nullptr;
+        std::unique_ptr<PermutationSpace> permutationSpace{ nullptr };
         const CookError prepareResult =
             PrepareModuleCompiler(options, module_path, *target, diagnostics, compiler, space);
         if (!prepareResult)

@@ -201,10 +201,10 @@ struct BindingInfo
     StorageTextureAccess StorageAccess{ StorageTextureAccess::Invalid };
     SamplerBindingType SamplerType{ SamplerBindingType::Invalid };
 
-    /** @brief Element count from a `[lodestone_element_count]` annotation, already evaluated for this
+    /** @brief Element count from a `[ls_element_count]` annotation, already evaluated for this
      * variant. Zero means the shader did not annotate the resource, so the caller must give a size. */
     uint64_t DerivedElementCount{ 0u };
-    /** @brief Texture extent from a `[lodestone_extent_2d]` or `[lodestone_extent_3d]` annotation. Zero width means
+    /** @brief Texture extent from a `[ls_extent_2d]` or `[ls_extent_3d]` annotation. Zero width means
      * the shader did not annotate the resource. This means the caller must drive and set the sizing.*/
     uint32_t DerivedExtentX{ 0u };
     uint32_t DerivedExtentY{ 0u };
