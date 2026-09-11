@@ -576,9 +576,9 @@ CookResult<std::vector<std::string>> CollectExpressionIdentifiers(std::string_vi
     return parser.ConsumeIdentifiers();
 }
 
+} // namespace lodestone
+
 #ifdef __clang__
 #pragma clang diagnostic pop
 // NOLINTEND(misc-no-recursion)
 #endif
-
-} // namespace lodestone

@@ -216,7 +216,7 @@ Use both defenses:
 
 ## 5. Where a declaration lives
 
-Put the axis on the declaration, as an attribute, exactly as `[vx_element_count]` does.
+Put the axis on the declaration, as an attribute, exactly as `[lodestone_element_count]` does.
 
 ```slang
 [vx_axis_values("128, 256, 512, 1024")]
@@ -242,7 +242,12 @@ because the axis **is** the declaration. No second name exists.
 This is the strongest argument for phase E. It is larger than the ergonomics.
 
 Inheritance also follows. The bootstrap compile reads the dependency closure, so an axis declared in
-`CommonLighting.slang` reaches every module that imports it.
+`CommonLighting.slang` reaches every module that imports it. `docs/phase-e-attribute-spike.md` measured
+this on 2026-09-11 and confirms it, with one correction to the mechanism: an imported axis does not
+appear in the importing module's own reflection. The reader iterates the session's loaded modules
+(`getLoadedModuleCount`/`getLoadedModule`), because each module reflection holds only its own decls.
+That is also why the symbol-reachability defense below is required, and not optional: every importer
+inherits every axis in its closure.
 
 ### The cost, and one rule that makes it sound
 
@@ -524,16 +529,19 @@ separate job.
 
 ### Contents
 
-| Key | Meaning | Source today |
+| Key | Meaning | Landed as |
 |---|---|---|
-| `MaxVariants` | The variant budget | `k_OceanFftPolicy` in C++ |
-| `ExpectedInfluence` | Which axes must be inert for which entry point | `k_OceanFftPolicy` in C++ |
-| `CookValues` | The subset of the values of an axis to cook | New. This is `shader_feature` |
-| `CookWhen` | A predicate that removes an assignment from the cook | New. This is `ShouldCompilePermutation` |
+| `MaxVariants` | The variant budget for a target | A key in each target section |
+| `InertAxesForEntryPoints` | Which axes must be inert for which entry point | A table keyed by entry point name |
+| `CookValues` | The subset of the values of an axis to cook | A table keyed by axis name. This is `shader_feature` |
+| `CookIf` | A predicate that keeps only the assignments it accepts | A string. This is `ShouldCompilePermutation` |
 
-`CookValues` and `CookWhen` use the evaluator of section 6. One grammar, three uses.
+`CookValues` and `CookIf` use the evaluator of section 6. One grammar, three uses. E5 renamed
+`CookWhen` to `CookIf`, because the word states the keep direction, and it renamed `ExpectedInfluence`
+to `InertAxesForEntryPoints`, because a per-entry-point list of inert axes reads as the intent and
+saves typing.
 
-The `todo.md` item about parameter domain and device properties belongs in `CookWhen`. A predicate over
+The `todo.md` item about parameter domain and device properties belongs in `CookIf`. A predicate over
 a named platform profile removes the assignments the target cannot run. It needs no mechanism beyond
 a few symbols in the table of the evaluator.
 
@@ -677,20 +685,30 @@ change **what**. Each one adds capability that no golden file covers.
 | E2 | `AxisValueDomain`, `AxisKind`, `EarliestBindingTime`, `ActiveWhen` (backward-only), `Require`. `k_ModuleSpaces` stays the source. **Done 2026-09-04; `PermutationConstraintTest` written and green** | The space dump (enum fields, `activeWhen`, `require`), the five other dumps unchanged, then `PermutationConstraintTest` | medium |
 | E3 | Depth-first enumeration with constraint propagation. **Done 2026-09-06**: one `expandFrom` walk, `Require` bucketed by ready-depth in a `RequireReadyMap`, `MaxVariants` enforced in the walk | **The variants dump is byte identical** (it stayed so) | medium |
 | E4 | Sorted key table and binary search, in place of the storage index. **Done 2026-09-07**: `ComputeVariantKey` returns a `uint64` key, `EnumerateVariants` ranks the sorted keys, the manifest carries a `VariantKeys` table, and `FindSlot` uses a `lower_bound`. The per-variant capability requirement stays open | Round trips pass, and five stage dumps were re-accepted because the indices compacted | **high** |
-| E5 | The toml++ reader behind a facade, the policy file, per-target sections, `CookValues`, `CookWhen` | A fixture test reads a checked-in policy file | medium |
+| E5 | The toml++ reader behind a facade, the policy file, per-target sections, `CookValues`, `CookIf` (was `CookWhen`), `InertAxesForEntryPoints` (was `ExpectedInfluence`). **Done 2026-09-11** | `PolicyDocumentTest`; the six dumps unchanged, because the cook reads no policy yet | medium |
 | E6 | Axis attributes and the bootstrap compile. Delete `VerifyAxisNamesAreDeclared` | A cook of `OceanFft` with no registry entry | **high** |
 | E7 | Interface axes. E0 removed the enum fallback | A new test shader | medium |
 | E8 | Documents, and the measured numbers again | — | none |
 
-**E0c, E0, E1, E2, E3, and E4 are complete.** A diversion after E4, call it E4a, hardened the client
-trust boundary. `ShaderManifestView::Open` now validates the whole manifest graph once. The error type
-is a `ShaderManifestError` struct that names the table and the record, and `DescribeShaderManifestError`
-prints it. The manifest format version is now 2. **E5 is next.**
+**E0c, E0, E1, E2, E3, E4, and E5 are complete.** A diversion after E4, call it E4a, hardened the
+client trust boundary. `ShaderManifestView::Open` now validates the whole manifest graph once. The
+error type is a `ShaderManifestError` struct that names the table and the record, and
+`DescribeShaderManifestError` prints it. The manifest format version is now 2.
 
-**E5 adds the toml++ reader and the policy file.** It moves the module policy out of `k_ModuleSpaces`
-and into a TOML data file that a tech artist owns. The reader is toml++, behind a pimpl facade, in a
-new target. `JsonWriter` stays, because it serves the stage dumps and never the policy. §9 and the §11
-table hold the plan.
+**E5 moved the policy into a TOML file.** A `PolicyDocument` reads the file through toml++, behind a
+facade in `src/permute/PolicyDocument.cpp`. Each module names an `InertAxesForEntryPoints` table and one
+section for each target profile, and a target section carries `MaxVariants`, `CookValues`, and `CookIf`.
+`EnumerateVariants` takes a `const TargetPolicy&` and applies `CookValues` and `CookIf` in the walk.
+`ValidateAgainstSpace` checks the file against the declared axes, and the driver runs it before
+enumeration. `PermutationValue` lost its signed alternative. The registry lost its policy half, and
+`PermutationPolicy.hpp` is gone. The cook reads no policy file yet, on purpose: a pruning policy would
+renumber the E4 ranks and change five dumps, so `CookTest` passes no `--policy-file` and the dumps stay
+stable. **E6 is next.**
+
+**E6 moves the axis declaration into the shader.** It puts the axis on the `extern static const` line as
+an attribute, adds the bootstrap compile that reads it, then deletes `k_ModuleSpaces` and
+`VerifyAxisNamesAreDeclared`. After it, an axis name cannot drift from its declaration, because only one
+name exists.
 
 **Run E6's acceptance test once before E6 starts.** A module with no registered space reached
 `space.front()` on an empty vector and aborted the cook until 2026-08-20. The walk (`expandFrom`, since

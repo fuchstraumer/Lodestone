@@ -438,15 +438,15 @@ gaps, and the design accepts them.
 
 A size travels as a string, and this is not a style choice. Slang folds an attribute integer argument
 at compile time, but the permutation constants are `extern static const` and fold at link time.
-`[vx_element_count(IFFT_SIZE * 4)]` therefore fails to compile. A string argument reaches reflection
+`[lodestone_element_count(IFFT_SIZE * 4)]` therefore fails to compile. A string argument reaches reflection
 untouched, and `EvaluateExpression` does the arithmetic once for each variant. The same evaluator now
 reads an axis constraint expression as well, which is why it lives in `permute/AttributeExpression.hpp`
 and not the old `SizeExpression.hpp`. Phase E step E1 gave it comparison and logical operators for the
 constraint language.
 
-The attribute declarations are in `tests/assets/LodestoneAttributes.slang`: `vx_element_count`,
-`vx_extent_2d`, `vx_extent_3d`. Slang has no optional attribute parameters, so each arity needs its
-own name. The README shows `lodestone_element_count`; the code says `vx_element_count`.
+The attribute declarations are in `tests/assets/LodestoneAttributes.slang`: `lodestone_element_count`,
+`lodestone_extent_2d`, `lodestone_extent_3d`. Slang has no optional attribute parameters, so each arity needs its
+own name. The README shows `lodestone_element_count`; the code says `lodestone_element_count`.
 
 ## Where to register a module
 
@@ -485,7 +485,7 @@ This repository was extracted from an engine named `velox`. The C++ rename to `l
 complete. No `velox` name remains in `src/`, `include/`, `client/`, `tests/`, or `tools/`.
 
 The shader side keeps the old prefix on purpose. `tests/assets/LodestoneAttributes.slang` declares
-`module VeloxAttributes` and the `vx_element_count`, `vx_extent_2d`, and `vx_extent_3d` attributes.
+`module VeloxAttributes` and the `lodestone_element_count`, `lodestone_extent_2d`, and `lodestone_extent_3d` attributes.
 Those names are part of the shader-side contract, and `src/compile/impl/SlangReflector.cpp` reads
 them by string. A rename there touches every test shader, so treat it as its own task.
 

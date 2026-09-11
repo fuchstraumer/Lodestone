@@ -23,7 +23,7 @@ import LodestoneAttributes;
 
 struct Material
 {
-    [vx_extent_2d("256", "128")]
+    [lodestone_extent_2d("256", "128")]
     Texture2D<float4> AlbedoMap;
     SamplerState Sampler;
 };

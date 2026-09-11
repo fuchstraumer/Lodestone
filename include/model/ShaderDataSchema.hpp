@@ -47,7 +47,7 @@ const BoundPlacement* GetBoundPlacement(const ResourcePlacement& placement) noex
  * bound resources, but not really relevant for the others since those switch their "locations" to runtime */
 bool PlacementLess(const ResourcePlacement& lhs, const ResourcePlacement& rhs) noexcept;
 
-/**@brief How many elements a buffer holds, dynamically evaluated from a `[vx_element_count]` attribute. */
+/**@brief How many elements a buffer holds, dynamically evaluated from a `[lodestone_element_count]` attribute. */
 struct BufferFootprint
 {
     uint64_t ElementCount{ 0u };
@@ -56,7 +56,7 @@ struct BufferFootprint
     friend bool operator==(const BufferFootprint&, const BufferFootprint&) = default;
 };
 
-/**@brief The extent a texture is created with, from a `[vx_extent_2d]` or `[vx_extent_3d]` attribute.
+/**@brief The extent a texture is created with, from a `[lodestone_extent_2d]` or `[lodestone_extent_3d]` attribute.
  *
  * @note Briefly, it's important to realize why this isn't a byte size: textures are formatted, so every
  * graphics API only wants the texture dimensions. We don't have format fields yet.

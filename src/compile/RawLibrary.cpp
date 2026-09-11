@@ -14,11 +14,11 @@ std::string_view ToString(RawSizeAttributeKind kind) noexcept
     switch (kind)
     {
     case RawSizeAttributeKind::ElementCount:
-        return "vx_element_count";
+        return "lodestone_element_count";
     case RawSizeAttributeKind::Extent2d:
-        return "vx_extent_2d";
+        return "lodestone_extent_2d";
     case RawSizeAttributeKind::Extent3d:
-        return "vx_extent_3d";
+        return "lodestone_extent_3d";
     case RawSizeAttributeKind::Invalid:
         return "Invalid";
     }

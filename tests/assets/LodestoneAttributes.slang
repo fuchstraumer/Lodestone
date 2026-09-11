@@ -6,7 +6,7 @@ module VeloxAttributes;
 //
 // Every size travels as a string, and this is not a style choice. Slang folds an attribute's integer
 // argument at compile time, but the permutation constants are `extern static const` and only fold at
-// link time, so `[vx_element_count(IFFT_SIZE * IFFT_SIZE)]` fails to compile outright. A string
+// link time, so `[lodestone_element_count(IFFT_SIZE * IFFT_SIZE)]` fails to compile outright. A string
 // argument reaches reflection untouched, and the cooker evaluates it once per variant against the
 // axis values it already holds.
 //
@@ -20,14 +20,14 @@ module VeloxAttributes;
 /** Number of elements in a structured buffer. The cooker multiplies this by the reflected element
  * stride, so the stride is never written by hand and cannot drift. */
 [__AttributeUsage(_AttributeTargets.Var)]
-public struct vx_element_countAttribute
+public struct lodestone_element_countAttribute
 {
     public string expression;
 };
 
 /** Width and height of a 2D texture, in texels. */
 [__AttributeUsage(_AttributeTargets.Var)]
-public struct vx_extent_2dAttribute
+public struct lodestone_extent_2dAttribute
 {
     public string width;
     public string height;
@@ -35,7 +35,7 @@ public struct vx_extent_2dAttribute
 
 /** Width, height, and depth or array layer count of a 3D or array texture. */
 [__AttributeUsage(_AttributeTargets.Var)]
-public struct vx_extent_3dAttribute
+public struct lodestone_extent_3dAttribute
 {
     public string width;
     public string height;

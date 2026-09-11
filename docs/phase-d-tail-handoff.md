@@ -236,7 +236,7 @@ the global scope alone, and each entry point appends the indices of the rows it 
 
 **A `[vx_*]` annotation cannot be written on an entry point parameter, and step 5 of §1c assumed it
 could.** The walk does call `CollectRawSizeAttributes` for an entry point range, so the code path is
-there. Slang rejects the attribute before it: `[vx_extent_2d("256", "128")] uniform Texture2D<float4>
+there. Slang rejects the attribute before it: `[lodestone_extent_2d("256", "128")] uniform Texture2D<float4>
 albedoMap` fails with `E31002: invalid attribute placement`.
 
 `LodestoneAttributes.slang` declares each attribute with `[__AttributeUsage(_AttributeTargets.Var)]`,
@@ -363,7 +363,7 @@ unreachable, because a block always carries a descriptor set index of -1 and the
     9  AlbedoMap    scope="entryPointParams_detail"   group 6 binding 0   Texture
     10 Sampler      scope="entryPointParams_detail"   group 6 binding 1   Sampler
 
-Four rows are named `AlbedoMap`, and only the scope tells them apart. The `[vx_extent_2d]` annotation
+Four rows are named `AlbedoMap`, and only the scope tells them apart. The `[lodestone_extent_2d]` annotation
 on the field of the block reaches stage 4 three times, once for each block of that type.
 
 Every `OceanFft` artifact and both stage dumps are byte identical to the state before E0b.

@@ -10,21 +10,22 @@ Text in this file follows ASD-STE100.
 
 ---
 
-## 1. State on 2026-09-09
+## 1. State on 2026-09-11
 
-**The compiler split is complete and the pipeline works. Phase E steps E1, E2, E3, and E4 have landed,
-and the client-side manifest validation work (E4a) has landed with them.** E3 made enumeration one
-depth-first walk with propagated `Require` pruning and an in-walk `MaxVariants` guard. E4 replaced the
-mixed-radix storage index with a sorted key table, so a variant's dense index is now its rank. E4a made
-`ShaderManifestView::Open` validate the whole manifest graph once, so the runtime accessors trust the
-data. `PermutationConstraintTest` is written and green, so the suite is fifteen test targets. Phase E
-step E0c added `AccessModelRejectTest`.
+**The compiler split is complete and the pipeline works. Phase E steps E1, E2, E3, E4, and E5 have
+landed, and the client-side manifest validation work (E4a) has landed with them.** E3 made enumeration
+one depth-first walk with propagated `Require` pruning and an in-walk `MaxVariants` guard. E4 replaced
+the mixed-radix storage index with a sorted key table, so a variant's dense index is now its rank. E4a
+made `ShaderManifestView::Open` validate the whole manifest graph once, so the runtime accessors trust
+the data. E5 moved the cook policy out of the compiled-in registry and into a TOML file that a
+`PolicyDocument` reads. `PolicyDocumentTest` proves the reader, so the suite is sixteen test targets.
+Phase E step E0c added `AccessModelRejectTest`.
 
 | Configuration | Build | Tests |
 |---|---|---|
-| RelWithDebInfo, `ninja-clang-cl` | green | 15 of 15 |
+| RelWithDebInfo, `ninja-clang-cl` | green | 16 of 16 |
 
-Twelve targets are unit tests, and three are cooks. `scripts\run-tests.bat` reports
+Thirteen targets are unit tests, and three are cooks. `scripts\run-tests.bat` reports
 `all targets passed`, and `python scripts/check-known-good.py` reports all six stage dumps match.
 
 **Only the clang tree was rebuilt on 2026-09-01.** `build/ninja-msvc` went with the rest of `build/`
@@ -240,10 +241,10 @@ module instead of reading the file. Fact 10 in §4 states which modules belong i
 
 ---
 
-## 8. The next task: phase E step E5
+## 8. The next task: phase E step E6
 
-`docs/phase-e-data-driven-permutations.md` holds the plan. **Steps E0a, E0b, E0c, E0, E1, E2, E3, and
-E4 are complete, and item D2 of §10 is settled.** Nothing in that document is open for a decision.
+`docs/phase-e-data-driven-permutations.md` holds the plan. **Steps E0a, E0b, E0c, E0, E1, E2, E3, E4,
+and E5 are complete, and item D2 of §10 is settled.** Nothing in that document is open for a decision.
 
 **E1 is done, on 2026-09-01.** The attribute expression evaluator gained a comparison level, a
 logical level, and unary `!`. The file `SizeExpression.{hpp,cpp}` became `AttributeExpression.{hpp,cpp}`,
@@ -274,10 +275,14 @@ is enforced during the walk, before compilation, through a new `max_variant_coun
 module). All six stage dumps stayed byte identical, because the sort by index makes visitation order
 invisible to the output. One open nit: the walk's budget test is `>=` while the post-hoc
 `CheckVariantBudget` is `<=`, so they disagree at exactly the budget; no module hits it yet.
+(E5 changed this signature. `EnumerateVariants` now takes a `const TargetPolicy&`, and
+`FindPolicyForModule` and `k_EmptyPolicy` are gone. The budget is `TargetPolicy::MaxVariants`, and 0
+still means unlimited.)
 
-`EnumerateVariants` takes `max_variant_count` as a required parameter, not a defaulted one: the author
-dislikes default arguments and adds one only when it is unavoidable, so every call site states the
-budget it means (the tests pass `0u`).
+`EnumerateVariants` takes its policy as a required parameter, not a defaulted one: the author dislikes
+default arguments, so every call site states the policy it means. E3 passed a `max_variant_count`
+`size_t`; E5 replaced it with a `const TargetPolicy&`, and the tests pass a named
+`k_UnboundedTargetPolicy`.
 
 **E4 is done, on 2026-09-07.** It replaced the mixed-radix storage index with a sorted table of packed
 canonical keys. A variant's dense index is now its rank in that table, so the holes are gone.
@@ -299,13 +304,43 @@ into one console line, and the cooker and `manifest_dump` both use it. The manif
 now 2, because the E4 key table changed the bytes. One item stays open: the `Open` validation has no
 dedicated reject test yet.
 
-**E5 is next.** §9 and the §11 table. It adds the toml++ reader behind a pimpl facade, the policy file,
-and the per-target sections with `CookValues` and `CookWhen`. The policy moves out of `k_ModuleSpaces`
-and into a **TOML** file that a tech artist owns. The reader is toml++ (`marzer/tomlplusplus`), chosen
-for its non-throwing mode (`TOML_EXCEPTIONS 0` returns a `parse_result`) and its line-and-column parse
-errors. `JsonWriter` stays for the stage dumps, because that writer and the policy reader serve
-different jobs. The old plan chose JSON; the author reversed it on 2026-09-09, because the JSON code is
-a stage-dump writer and TOML reads more plainly for a hand author.
+**E5 is done, on 2026-09-11.** The cook policy moved out of the compiled-in registry and into a TOML
+file. A `PolicyDocument` reads the file through toml++ (`marzer/tomlplusplus`), behind a facade: no
+toml++ type leaves `src/permute/PolicyDocument.cpp`. Each module names an `InertAxesForEntryPoints`
+table and one section for each target profile. A target section carries `MaxVariants`, a `CookValues`
+allow-list, and a `CookIf` predicate. `CookValues` restricts an axis to a subset of its declared
+values. `CookIf` keeps only the assignments the predicate accepts, and it reuses `EvaluateExpression`,
+exactly as `Require` does. `EnumerateVariants` now takes a `const TargetPolicy&` and applies both
+filters in the walk. `PolicyDocument::ValidateAgainstSpace` checks every axis name and value in the file
+against the declared space, and the driver runs it before enumeration. The `--policy-file` option names
+the file, and it fills `CookerOptions::PolicyFile`. `PermutationValue` lost its signed alternative,
+because a TOML integer has one integer type and an axis value is a non-negative magnitude; a boolean now
+reads first, and an integer builds a `uint`. The registry lost its policy half: `FindPolicyForModule`,
+`k_OceanFftPolicy`, the old `ModulePolicy` and `ExpectedAxisInfluence` types, and `PermutationPolicy.hpp`
+are all gone. `EnforceModulePolicy` now reads its expectations from a `ModulePolicyEntry` the driver
+hands it. `PolicyDocumentTest` proves the reader, the query surface, and the space validation.
+
+**The cook reads no policy file yet, on purpose.** The `OceanFft` policy file exists on disk and is
+correct, but `CookTest` passes no `--policy-file`. A policy that pruned `OceanFft` would change the
+variant set, renumber the E4 ranks, and change five stage dumps. So the driver loads an empty
+`PolicyDocument` for the suite, every filter is inert, and all six dumps stay byte identical.
+`PolicyDocumentTest` covers the reader on its own. Wire the file into the cook only with a non-pruning
+policy, or accept the new dumps on purpose.
+
+**E6 is next.** It moves the axis declaration onto the `extern static const` line in the shader, as an
+attribute, and it adds the bootstrap compile that reads the attributes. `src/permute/PermutationRegistry.cpp`
+and its `k_ModuleSpaces` table are then deleted whole, and `VerifyAxisNamesAreDeclared` goes with them,
+because the axis becomes the declaration and no second name exists. §11 of
+`docs/phase-e-data-driven-permutations.md` holds the step, and §5 holds the reasoning.
+
+**`docs/phase-e-attribute-spike.md` holds the E6 probe results. Read it before E6.** Two probes on
+2026-09-11 resolved the high-risk Slang unknown. First, an axis attribute reads back through reflection
+with a real source location: an `extern static const` is a `Variable` decl, `findAttributeByName` reads
+each `vx_axis_*` string, and `getDeclSourceLocation` gives file, line, and column. Second, and it
+changes the walk: an imported axis does **not** appear in the importing module's own reflection. The
+reader must iterate the session's loaded modules (`getLoadedModuleCount`/`getLoadedModule`), because
+each module holds only its own decls. Heritability still holds, because loading a shader loads its
+import closure, so the symbol-reachability prune of §5 becomes required, not optional.
 
 **`docs/phase-e-interface-spike.md` holds the E0 answers.** Read it before E7. Three results matter
 early: a link-time `extern` type works and uses the mechanism the constant axis already uses, an
@@ -316,12 +351,10 @@ you read it:
 
 - The axis declaration moves onto the `extern static const` in the shader, as an attribute. That is
   what removes the drift rule 6 of `CLAUDE.md` guards against, by making the name impossible to state
-  twice.
-- The policy moves into a data file a tech artist owns.
+  twice. E6 does this.
 - `src/permute/PermutationRegistry.cpp` and its `k_ModuleSpaces` table are deleted whole by step E6.
-  Only `OceanFft` has a row today.
-- The mixed radix index is replaced by a ranking index. §6 of that document says take form 1, a
-  sorted key table with a binary search, and it names the three places an index is implemented.
+  Only `OceanFft` has a row today, and E5 already stripped that row's policy pointer.
+- E7 adds interface axes. §8 of that document holds the spike answers.
 
 ---
 

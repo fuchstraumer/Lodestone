@@ -6,16 +6,16 @@ import LodestoneAttributes;
 import ddCommon;
 
 // Single source of truth for the resources of each volume tiled forward entry point.
-// Each vx_element_count expression names constants from VtfConfig.slang. The cooker multiplies the
+// Each lodestone_element_count expression names constants from VtfConfig.slang. The cooker multiplies the
 // count by the reflected element stride, so no byte size is written by hand.
 
 public struct VtfUpdateLightsResources
 {
-    [vx_element_count("VTF_MAX_POINT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS")]
     RWStructuredBuffer<PointLight> PointLights;
-    [vx_element_count("VTF_MAX_SPOT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_SPOT_LIGHTS")]
     RWStructuredBuffer<SpotLight> SpotLights;
-    [vx_element_count("VTF_MAX_DIRECTIONAL_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_DIRECTIONAL_LIGHTS")]
     RWStructuredBuffer<DirectionalLight> DirectionalLights;
     ConstantBuffer<LightCounts> Counts;
     ConstantBuffer<CommonMatrices> Matrices;
@@ -24,32 +24,32 @@ public struct VtfUpdateLightsResources
 public struct VtfReduceLightAABBsResources
 {
     ConstantBuffer<LightCounts> Counts;
-    [vx_element_count("VTF_MAX_POINT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS")]
     StructuredBuffer<PointLight> PointLights;
-    [vx_element_count("VTF_MAX_SPOT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_SPOT_LIGHTS")]
     StructuredBuffer<SpotLight> SpotLights;
     // Pass 0 writes one AABB for each thread group. Pass 1 reads them and writes one AABB at index 0.
-    [vx_element_count("VTF_MAX_POINT_LIGHTS / VTF_REDUCE_LIGHTS_NUM_THREADS + 1")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS / VTF_REDUCE_LIGHTS_NUM_THREADS + 1")]
     RWStructuredBuffer<AABB> LightAABBs;
     ConstantBuffer<ReduceLightAABBParams> Params;
 }
 
 public struct VtfMortonCodesResources
 {
-    [vx_element_count("VTF_MAX_POINT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS")]
     StructuredBuffer<PointLight> PointLights;
-    [vx_element_count("VTF_MAX_SPOT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_SPOT_LIGHTS")]
     StructuredBuffer<SpotLight> SpotLights;
-    [vx_element_count("VTF_MAX_POINT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS")]
     RWStructuredBuffer<uint> PointLightIndices;
-    [vx_element_count("VTF_MAX_SPOT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_SPOT_LIGHTS")]
     RWStructuredBuffer<uint> SpotLightIndices;
-    [vx_element_count("VTF_MAX_POINT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS")]
     RWStructuredBuffer<uint> PointLightMortonCodes;
-    [vx_element_count("VTF_MAX_SPOT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_SPOT_LIGHTS")]
     RWStructuredBuffer<uint> SpotLightMortonCodes;
     ConstantBuffer<LightCounts> Counts;
-    [vx_element_count("VTF_MAX_POINT_LIGHTS / VTF_REDUCE_LIGHTS_NUM_THREADS + 1")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS / VTF_REDUCE_LIGHTS_NUM_THREADS + 1")]
     StructuredBuffer<AABB> LightAABBs;
 }
 
@@ -57,13 +57,13 @@ public struct VtfMortonCodesResources
 // light indices.
 public struct VtfSortResources
 {
-    [vx_element_count("VTF_MAX_POINT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS")]
     StructuredBuffer<uint> InputKeys;
-    [vx_element_count("VTF_MAX_POINT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS")]
     StructuredBuffer<uint> InputValues;
-    [vx_element_count("VTF_MAX_POINT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS")]
     RWStructuredBuffer<uint> OutputKeys;
-    [vx_element_count("VTF_MAX_POINT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS")]
     RWStructuredBuffer<uint> OutputValues;
     // One partition for each thread group, plus one end marker for each sort group.
     //
@@ -71,7 +71,7 @@ public struct VtfSortResources
     // 10 entries. The first pass needs the most, because it holds the most sort groups: the chunks
     // start at the radix sort chunk size, so the count is bounded by the element count divided by that
     // chunk size. At 8192 lights the first pass needs 32, and the buffer held 10.
-    [vx_element_count("VTF_MAX_POINT_LIGHTS / VTF_RADIX_SORT_NUM_THREADS + 2")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS / VTF_RADIX_SORT_NUM_THREADS + 2")]
     RWStructuredBuffer<uint> MergePathPartitions;
     ConstantBuffer<SortParams> Params;
 }
@@ -80,59 +80,59 @@ public struct VtfBuildBvhResources
 {
     // A 32-ary tree of 7 levels holds 34636833 nodes. The count below covers the levels that the light
     // capacity actually needs, which is the sum of the powers of the branching factor.
-    [vx_element_count("(VTF_MAX_POINT_LIGHTS * VTF_BVH_BRANCHING) / (VTF_BVH_BRANCHING - 1) + 1")]
+    [lodestone_element_count("(VTF_MAX_POINT_LIGHTS * VTF_BVH_BRANCHING) / (VTF_BVH_BRANCHING - 1) + 1")]
     RWStructuredBuffer<AABB> PointLightBVH;
-    [vx_element_count("(VTF_MAX_SPOT_LIGHTS * VTF_BVH_BRANCHING) / (VTF_BVH_BRANCHING - 1) + 1")]
+    [lodestone_element_count("(VTF_MAX_SPOT_LIGHTS * VTF_BVH_BRANCHING) / (VTF_BVH_BRANCHING - 1) + 1")]
     RWStructuredBuffer<AABB> SpotLightBVH;
-    [vx_element_count("VTF_MAX_POINT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS")]
     StructuredBuffer<PointLight> PointLights;
-    [vx_element_count("VTF_MAX_SPOT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_SPOT_LIGHTS")]
     StructuredBuffer<SpotLight> SpotLights;
     ConstantBuffer<BVHParams> BvhParams;
     ConstantBuffer<LightCounts> Counts;
-    [vx_element_count("VTF_MAX_POINT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS")]
     StructuredBuffer<uint> PointLightIndices;
-    [vx_element_count("VTF_MAX_SPOT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_SPOT_LIGHTS")]
     StructuredBuffer<uint> SpotLightIndices;
 }
 
 public struct VtfAssignLightsResources
 {
-    [vx_element_count("VTF_CLUSTER_COUNT")]
+    [lodestone_element_count("VTF_CLUSTER_COUNT")]
     StructuredBuffer<uint> UniqueClusters;
-    [vx_element_count("VTF_CLUSTER_COUNT")]
+    [lodestone_element_count("VTF_CLUSTER_COUNT")]
     StructuredBuffer<AABB> ClusterAABBs;
     ConstantBuffer<BVHParams> BvhParams;
     ConstantBuffer<LightCounts> Counts;
-    [vx_element_count("VTF_MAX_POINT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS")]
     StructuredBuffer<PointLight> PointLights;
-    [vx_element_count("VTF_MAX_SPOT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_SPOT_LIGHTS")]
     StructuredBuffer<SpotLight> SpotLights;
-    [vx_element_count("(VTF_MAX_POINT_LIGHTS * VTF_BVH_BRANCHING) / (VTF_BVH_BRANCHING - 1) + 1")]
+    [lodestone_element_count("(VTF_MAX_POINT_LIGHTS * VTF_BVH_BRANCHING) / (VTF_BVH_BRANCHING - 1) + 1")]
     StructuredBuffer<AABB> PointLightBVH;
-    [vx_element_count("(VTF_MAX_SPOT_LIGHTS * VTF_BVH_BRANCHING) / (VTF_BVH_BRANCHING - 1) + 1")]
+    [lodestone_element_count("(VTF_MAX_SPOT_LIGHTS * VTF_BVH_BRANCHING) / (VTF_BVH_BRANCHING - 1) + 1")]
     StructuredBuffer<AABB> SpotLightBVH;
-    [vx_element_count("VTF_MAX_POINT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS")]
     StructuredBuffer<uint> PointLightIndices;
-    [vx_element_count("VTF_MAX_SPOT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_SPOT_LIGHTS")]
     StructuredBuffer<uint> SpotLightIndices;
     // Worst case is every cluster holding a full light list.
-    [vx_element_count("VTF_CLUSTER_COUNT * VTF_MAX_LIGHTS_PER_CLUSTER")]
+    [lodestone_element_count("VTF_CLUSTER_COUNT * VTF_MAX_LIGHTS_PER_CLUSTER")]
     RWStructuredBuffer<uint> PointLightIndexList;
-    [vx_element_count("VTF_CLUSTER_COUNT * VTF_MAX_LIGHTS_PER_CLUSTER")]
+    [lodestone_element_count("VTF_CLUSTER_COUNT * VTF_MAX_LIGHTS_PER_CLUSTER")]
     RWStructuredBuffer<uint> SpotLightIndexList;
     // fix: the grid was a uint buffer that the code indexed at [i * 2] and [i * 2 + 1]. A uint2 states
     // the pair, so an offset can never be read as a count.
-    [vx_element_count("VTF_CLUSTER_COUNT")]
+    [lodestone_element_count("VTF_CLUSTER_COUNT")]
     RWStructuredBuffer<uint2> PointLightGrid;
-    [vx_element_count("VTF_CLUSTER_COUNT")]
+    [lodestone_element_count("VTF_CLUSTER_COUNT")]
     RWStructuredBuffer<uint2> SpotLightGrid;
     // The element type is Atomic<uint> and not uint. WGSL has no atomic operation on a plain storage
     // element, so a buffer that any shader increments must say so in its type. Slang then emits
     // `array<atomic<u32>>` and the free function InterlockedAdd is not needed.
-    [vx_element_count("1")]
+    [lodestone_element_count("1")]
     RWStructuredBuffer<Atomic<uint>> PointLightIndexCounter;
-    [vx_element_count("1")]
+    [lodestone_element_count("1")]
     RWStructuredBuffer<Atomic<uint>> SpotLightIndexCounter;
 }
 
@@ -140,29 +140,29 @@ public struct VtfClusterAABBsResources
 {
     ConstantBuffer<ClusterData> Clusters;
     ConstantBuffer<CommonMatrices> Matrices;
-    [vx_element_count("VTF_CLUSTER_COUNT")]
+    [lodestone_element_count("VTF_CLUSTER_COUNT")]
     RWStructuredBuffer<AABB> ClusterAABBs;
 }
 
 public struct VtfFindUniqueClustersResources
 {
     // fix: the flags were a uint8_t buffer. WGSL has no 8-bit storage type, so one uint holds one flag.
-    [vx_element_count("VTF_CLUSTER_COUNT")]
+    [lodestone_element_count("VTF_CLUSTER_COUNT")]
     RWStructuredBuffer<uint> ClusterFlags;
     // Atomic<uint>, for the reason given on the light index counters below.
-    [vx_element_count("1")]
+    [lodestone_element_count("1")]
     RWStructuredBuffer<Atomic<uint>> UniqueClustersCounter;
-    [vx_element_count("VTF_CLUSTER_COUNT")]
+    [lodestone_element_count("VTF_CLUSTER_COUNT")]
     RWStructuredBuffer<uint> UniqueClusters;
 }
 
 public struct VtfClusterIndirectArgsResources
 {
-    [vx_element_count("1")]
+    [lodestone_element_count("1")]
     StructuredBuffer<uint> UniqueClustersCounter;
-    [vx_element_count("1")]
+    [lodestone_element_count("1")]
     RWStructuredBuffer<ComputeIndirectArgs> IndirectArgs;
-    [vx_element_count("1")]
+    [lodestone_element_count("1")]
     RWStructuredBuffer<DrawIndirectArgs> DebugClustersIndirectArgs;
 }
 
@@ -180,25 +180,25 @@ public struct VtfClusterSamplesResources
 {
     ConstantBuffer<ClusterData> Clusters;
     ConstantBuffer<CommonMatrices> Matrices;
-    [vx_element_count("VTF_CLUSTER_COUNT")]
+    [lodestone_element_count("VTF_CLUSTER_COUNT")]
     RWStructuredBuffer<uint> ClusterFlags;
 }
 
 public struct VtfDebugClustersResources
 {
     ConstantBuffer<CommonMatrices> Matrices;
-    [vx_element_count("VTF_CLUSTER_COUNT")]
+    [lodestone_element_count("VTF_CLUSTER_COUNT")]
     StructuredBuffer<uint> UniqueClusters;
-    [vx_element_count("VTF_CLUSTER_COUNT")]
+    [lodestone_element_count("VTF_CLUSTER_COUNT")]
     StructuredBuffer<AABB> ClusterAABBs;
 }
 
 public struct VtfDebugLightsResources
 {
     ConstantBuffer<CommonMatrices> Matrices;
-    [vx_element_count("VTF_MAX_POINT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_POINT_LIGHTS")]
     StructuredBuffer<PointLight> PointLights;
-    [vx_element_count("VTF_MAX_SPOT_LIGHTS")]
+    [lodestone_element_count("VTF_MAX_SPOT_LIGHTS")]
     StructuredBuffer<SpotLight> SpotLights;
 }
 

@@ -51,7 +51,7 @@ void ClearCS(uint3 threadId: SV_DispatchThreadID)
 // `entryPointParams_`, and this one emits under `entryPointParams_material_`.
 struct MaterialParams
 {
-    [vx_extent_2d("256", "128")]
+    [lodestone_extent_2d("256", "128")]
     Texture2D<float4> albedoMap;
     SamplerState albedoSampler;
 };

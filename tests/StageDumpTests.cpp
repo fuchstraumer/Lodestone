@@ -342,7 +342,7 @@ void CheckRawPrimitives(lodestone::tests::TestRunner& runner)
     runner.Check(ArgumentCountOf(RawSizeAttributeKind::Extent3d) == 3u, "a 3d extent takes three");
     runner.Check(ArgumentCountOf(RawSizeAttributeKind::Invalid) == 0u, "the invalid kind takes none");
 
-    runner.Check(ToString(RawSizeAttributeKind::ElementCount) == "vx_element_count",
+    runner.Check(ToString(RawSizeAttributeKind::ElementCount) == "lodestone_element_count",
                  "a kind names the attribute the shader author writes");
 }
 
@@ -358,7 +358,7 @@ void CheckRawDump(lodestone::tests::TestRunner& runner)
 
     runner.Check(Contains(dump, R"("model": "Bound")"),
                  "placement states which access model it belongs to, so another model can join it");
-    runner.Check(Contains(dump, R"("attribute": "vx_element_count")"), "an attribute names itself");
+    runner.Check(Contains(dump, R"("attribute": "lodestone_element_count")"), "an attribute names itself");
     runner.Check(Contains(dump, R"("IFFT_SIZE * 4")"),
                  "the attribute argument is still the string the author wrote. Stage 3 carries it and "
                  "does not understand it");
