@@ -71,6 +71,7 @@ set(LODESTONE_CLIENT_SOURCES
 set(LODESTONE_COMMON_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/CookerErrors.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/Diagnostics.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/TransparentHash.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/CookerErrors.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Diagnostics.cpp")
 

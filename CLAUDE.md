@@ -272,9 +272,19 @@ with a design decision without evidence that it was hers.
 The author reserves implementation work she finds enjoyable. When she says she wants to write
 something, plan it and explain it, and do not write the code for her.
 
-When she proposes an optimization, establish that the cost exists before helping her implement it.
-Estimate the magnitude, say so plainly if it is negligible, and redirect to where the real cost is.
-She would rather be told an idea is aimed at nothing than be helped to build it.
+When she proposes an optimization, judge it on two questions only: is it actually faster, and is its
+implementation cost reasonable against the saving? If the answer to either is no, say so plainly — she
+would rather be told an idea is aimed at nothing than be helped to build it. But that is the whole test.
+
+**Do not reject or discount an optimization on the grounds that the Slang compile dominates the cost.**
+That reflex is wrong here for three reasons: the "order of magnitude" numbers were measured before the
+thread-pool change (they threaded `getEntryPointCode` alone, not variants across a pool) and were never
+profiled in a real release build, so the true ratio is unknown and likely smaller; a cleaner approach
+that is also faster with a low implementation cost is worth taking whether or not Slang dwarfs it; and
+the goal of this layer is to be a near-zero-overhead abstraction over Slang. A near-free advanced
+feature set over Slang is the product, so overhead added "because Slang is slower anyway" is death by a
+thousand cuts, not a saved effort. State a cost when you have measured one. Do not invoke Slang's cost
+to avoid making the cooker's own code fast and clean.
 
 She dislikes default arguments and adds one only when it is unavoidable. A required parameter makes
 every call site state the value it means, so `EnumerateVariants` takes its variant budget as a plain

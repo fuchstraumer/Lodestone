@@ -7,6 +7,7 @@
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifest.hpp"
 #include "permute/PermutationValue.hpp"
+#include "TransparentHash.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -40,15 +41,6 @@ namespace
     // will rapidly become a huge cost as variant count increases
     class StringTableBuilder
     {
-        struct StringViewHash
-        {
-            std::size_t operator()(std::string_view text) const noexcept
-            {
-                return std::hash<std::string_view>{}(text);
-            }
-            //NOLINTNEXTLINE(readability-identifier-naming)
-            using is_transparent = void;
-        };
     public:
         StringTableBuilder()
         {
@@ -83,7 +75,7 @@ namespace
         }
 
     private:
-        std::unordered_map<std::string, uint32_t, StringViewHash, std::equal_to<>> lookup;
+        std::unordered_map<std::string, uint32_t, TransparentStringHash, std::equal_to<>> lookup;
         std::vector<ManifestStringRef> references;
         std::string blob;
     };

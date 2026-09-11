@@ -5,7 +5,9 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 /**
@@ -96,7 +98,7 @@ public:
 
         if (!dedupeEnabled)
         {
-            return Append(std::move(payload), std::move(origin));
+            return append(std::move(payload), std::move(origin));
         }
 
         const ContentHashValue hash = hashFunction(payload);
@@ -116,7 +118,7 @@ public:
             ++statistics.HashCollisions;
         }
 
-        const InternResult appended = Append(std::move(payload), std::move(origin));
+        const InternResult appended = append(std::move(payload), std::move(origin));
         bucket.push_back(appended.Index);
         return appended;
     }
@@ -154,18 +156,18 @@ public:
     }
 
 private:
-    InternResult Append(PayloadType&& payload, ProvenanceRecord&& origin)
+    InternResult append(PayloadType&& payload, ProvenanceRecord&& origin)
     {
         const uint32_t index = static_cast<uint32_t>(uniqueEntries.size());
-        uniqueEntries.emplace_back(std::forward<PayloadType>(payload));
-        origins.emplace_back(std::vector<ProvenanceRecord>{ std::forward<ProvenanceRecord>(origin) });
+        uniqueEntries.emplace_back(std::move(payload));
+        origins.emplace_back(std::vector<ProvenanceRecord>{ std::move(origin) });
         statistics.UniqueEntries = static_cast<uint32_t>(uniqueEntries.size());
         return InternResult{ index, true };
     }
 
     HashFunction hashFunction;
     std::string_view hashName;
-    bool dedupeEnabled;
+    bool dedupeEnabled{ true };
     std::unordered_map<ContentHashValue, std::vector<uint32_t>> buckets;
     std::vector<PayloadType> uniqueEntries;
     std::vector<std::vector<ProvenanceRecord>> origins;

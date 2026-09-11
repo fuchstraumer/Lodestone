@@ -3,6 +3,7 @@
 #define PERMUTE_POLICY_DOCUMENT_HPP
 #include "CookerErrors.hpp"
 #include "permute/PermutationValue.hpp"
+#include "TransparentHash.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -19,15 +20,6 @@ namespace lodestone
 class PermutationSpace;
 class DiagnosticSink;
 
-// required to enable copy-free hashing of string_views when doing lookups in a map
-struct TransparentStringHash
-{
-    using is_transparent = void;
-    [[nodiscard]] size_t operator()(std::string_view text) const noexcept
-    {
-        return std::hash<std::string_view>{}(text);
-    }
-};
 
 /**@brief Specialization of unordered_map using the above hash to allow for string_view queries
   * without copying the key */
