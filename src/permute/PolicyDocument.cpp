@@ -42,11 +42,6 @@ namespace
     PolicyParseError MakeParseError(const toml::parse_result& result);
     PolicyDocResult<StringMap<ModulePolicyEntry>> BuildModules(const toml::table& root);
     const PermutationAxis* FindDeclaredAxis(std::span<const PermutationAxis> axes, std::string_view name);
-    bool AxisDeclaresValue(const PermutationAxis& axis, int64_t value);
-    CookError ValidateExpectedInfluenceTable(const std::string_view module_name,
-                                             const std::span<const PermutationAxis> axes,
-                                             const std::span<const std::string> inert_axes,
-                                             DiagnosticSink& sink);
     CookError ValidateTargetAndAxisValues(const std::string_view module_name,
                                           const StringMap<TargetPolicy>& targets,
                                           const std::span<const PermutationAxis> axes,
@@ -421,27 +416,6 @@ namespace
         return found != axisValues.end();
     }
 
-    CookError ValidateExpectedInfluenceTable(const std::string_view module_name,
-                                             const std::span<const PermutationAxis> axes,
-                                             const std::span<std::string> influences,
-                                             DiagnosticSink& sink)
-    {
-        for (const std::string& axisName : influences)
-        {
-            if (FindDeclaredAxis(axes, axisName) == nullptr)
-            {
-                return ReportError(
-                    sink,
-                    CookError::PolicyAxisNotDeclared,
-                    std::format("ExpectedInfluence names axis '{}', which module '{}' does not declare",
-                                axisName,
-                                module_name));
-            }
-        }
-
-        return CookError::Success;
-    }
-
     CookError ValidateTargetAndAxisValues(const std::string_view module_name,
                                           const StringMap<TargetPolicy>& targets,
                                           const std::span<const PermutationAxis> axes,
@@ -454,13 +428,12 @@ namespace
                 const PermutationAxis* axis = FindDeclaredAxis(axes, cookValues.Axis);
                 if (axis == nullptr)
                 {
-                    return ReportError(
-                        sink,
-                        CookError::PolicyAxisNotDeclared,
-                        std::format("target '{}' CookValues names axis '{}', which module '{}' does not declare",
-                                    targetName,
-                                    cookValues.Axis,
-                                    module_name));
+                    return ReportError(sink,
+                                       CookError::PolicyAxisNotDeclared,
+                                       std::format("target '{}' CookValues names axis '{}', which module '{}' does not declare",
+                                       targetName,
+                                       cookValues.Axis,
+                                       module_name));
                 }
 
                 for (const PermutationValue value : cookValues.Values)
@@ -468,12 +441,12 @@ namespace
                     if (!AxisDeclaresValue(*axis, value))
                     {
                         return ReportError(sink,
-                                        CookError::PolicyValueNotInAxis,
-                                        std::format("target '{}' CookValues for axis '{}' lists value {}, "
-                                                    "which the axis does not declare",
-                                                    targetName,
-                                                    cookValues.Axis,
-                                                    ValueToPrintableString(value)));
+                                           CookError::PolicyValueNotInAxis,
+                                           std::format("target '{}' CookValues for axis '{}' lists value {}, "
+                                                       "which the axis does not declare",
+                                                       targetName,
+                                                       cookValues.Axis,
+                                                       ValueToPrintableString(value)));
                     }
                 }
             }
@@ -485,10 +458,10 @@ namespace
                 if (!identifiers)
                 {
                     return ReportError(sink,
-                                    CookError::PolicyCookIfInvalid,
-                                    std::format("target '{}' CookIf '{}' is not a valid expression",
-                                                targetName,
-                                                target.CookIf));
+                                       CookError::PolicyCookIfInvalid,
+                                       std::format("target '{}' CookIf '{}' is not a valid expression",
+                                                   targetName,
+                                                   target.CookIf));
                 }
 
                 for (const std::string& identifier : *identifiers)
@@ -496,11 +469,11 @@ namespace
                     if (FindDeclaredAxis(axes, identifier) == nullptr)
                     {
                         return ReportError(sink,
-                                        CookError::PolicyAxisNotDeclared,
-                                        std::format("target '{}' CookIf '{}' uses unknown axis '{}'",
-                                                    targetName,
-                                                    target.CookIf,
-                                                    identifier));
+                                           CookError::PolicyAxisNotDeclared,
+                                           std::format("target '{}' CookIf '{}' uses unknown axis '{}'",
+                                                       targetName,
+                                                       target.CookIf,
+                                                       identifier));
                     }
                 }
             }
