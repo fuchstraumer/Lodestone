@@ -598,6 +598,13 @@ namespace
         const TargetPolicy& currTargetPolicy =
             policy_document.FindTargetPolicy(moduleName, options.TargetName);
 
+        // validate policy against active permutation space
+        const CookError policyValidationResult = policy_document.ValidateAgainstSpace(moduleName, *space, diagnostics);
+        if (!policyValidationResult)
+        {
+            return policyValidationResult;
+        }
+        
         // expand permutation space into the final set of variants this build will be constructing
         const CookResult<VariantSet> variantSet = space->EnumerateVariants(currTargetPolicy, diagnostics);
         if (!variantSet)
