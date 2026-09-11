@@ -4,6 +4,7 @@
 #include "CookerErrors.hpp"
 #include "SlangCompilerTypes.hpp"
 #include "Diagnostics.hpp"
+#include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "slang.h"
@@ -31,6 +32,7 @@ public:
 
     [[nodiscard]] CookError Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink);
     [[nodiscard]] CookError RunBootstrap();
+    [[nodiscard]] CookResult<std::span<const RawAxisDeclaration>> ReadDeclaredAxes();
     [[nodiscard]] slang::IGlobalSession* GlobalSession() const noexcept;
     [[nodiscard]] slang::ISession* Session() const noexcept;
     [[nodiscard]] std::vector<slang::IComponentType*> BaseComponents() const noexcept;
@@ -61,6 +63,11 @@ private:
     // when multiple sources can invoke this code. this makes things more consistent and repeatable.
     [[nodiscard]] CookError buildSlangComponents();
 
+    [[nodiscard]] CookResult<RawAxisDeclaration> buildAxisDecl(slang::DeclReflection* reflection);
+    [[nodiscard]] CookResult<std::string> extractSingleAttribute(slang::DeclReflection* decl_reflection,
+                                                                 slang::Attribute* attribute,
+                                                                 std::string_view attr_name);
+
     std::string cacheDirectory;
     Slang::ComPtr<slang::IGlobalSession> globalSession;
     Slang::ComPtr<slang::ISession> session;
@@ -72,6 +79,7 @@ private:
     std::vector<std::string> moduleSourceStrings;
     PlacementKind placementKind{ PlacementKind::None };
     DiagnosticSink* diagnosticSink{ nullptr };
+    std::vector<RawAxisDeclaration> axisDeclarations;
 };
 }
 

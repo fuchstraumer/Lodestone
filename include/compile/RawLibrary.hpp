@@ -42,11 +42,10 @@ std::string_view ToString(RawSizeAttributeKind kind) noexcept;
 /** How many arguments the attribute of this kind takes. */
 uint32_t ArgumentCountOf(RawSizeAttributeKind kind) noexcept;
 
-/** One `[vx_*]` annotation, exactly as the shader author wrote it.
+/** One `[ls_*]` annotation, exactly as the shader author wrote it.
  *
- * A size travels as a string because Slang folds an attribute integer argument at compile time, while
- * the permutation constants are `extern static const` and fold at link time. So the argument reaches
- * reflection untouched, and stage 4 does the arithmetic once for each variant. */
+ * Size attributes travel as strings because it's the only way to stop slang
+ * from evaluating them for us - so this lets us evaluate them when we want to. */
 struct RawSizeAttribute
 {
     /** Index into `RawVariant::Bindings`. */
@@ -55,10 +54,23 @@ struct RawSizeAttribute
     std::vector<std::string> Arguments;
 };
 
+struct RawAxisDeclaration
+{
+    std::string Name;
+    bool IsBooleanAxis{ false }; // axis with ls_boolean_axis attribute
+    std::string AxisValues; // unparsed ls_axis_values arg
+    std::string ActiveWhen; // unparsed ls_axis_active_when
+    std::string Kind; // unparsed ls_axis_kind arg
+    std::string SourceFile;
+    int32_t SourceLine;
+    int32_t SourceColumn;
+};
+
+
 /** What a resource is, and where it lives. Not how much of it, and not who reads it.
  *
  * `ElementStride` and `ByteSize` come from the type layout rather than from an annotation, so they are
- * properties of the declared type and stay here. The footprint an author asked for with a `[vx_*]`
+ * properties of the declared type and stay here. The footprint an author asked for with a `[ls_*]`
  * annotation is per variant, and it travels in `RawVariant::SizeAttributes`. */
 struct RawBinding
 {

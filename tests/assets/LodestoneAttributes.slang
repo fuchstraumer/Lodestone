@@ -42,6 +42,12 @@ public struct ls_extent_3dAttribute
     public string depth;
 };
 
+/** shortcut to declare a boolean axis, which will only produce true/false values in permutation space */
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct ls_boolean_axisAttribute
+{
+};
+
 /** List of values used for an axis constraint */
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct ls_axis_valuesAttribute

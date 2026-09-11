@@ -1,7 +1,8 @@
 #include "SlangModuleContext.hpp"
-#include "CookerErrors.hpp"
 #include "SlangCompilerTypes.hpp"
+#include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
+#include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -9,7 +10,9 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <ios>
 #include <iterator>
@@ -17,22 +20,24 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
-
-namespace
-{
-std::string BuildCachedModulePath(std::string_view cache_directory, std::string_view module_name)
-{
-    std::string result{ cache_directory };
-    result += "/";
-    result += module_name;
-    result += ".slang-module";
-    return result;
-}
-} // namespace
 
 namespace lodestone
 {
+
+namespace
+{
+    std::string BuildCachedModulePath(std::string_view cache_directory, std::string_view module_name)
+    {
+        std::string result{ cache_directory };
+        result += "/";
+        result += module_name;
+        result += ".slang-module";
+        return result;
+    }
+
+}
 
 constexpr bool k_UseSlangWorkaround = true;
 
@@ -147,6 +152,40 @@ CookError SlangModuleContext::RunBootstrap()
     }
 
     return bootstrapResult;
+}
+
+CookResult<std::span<const RawAxisDeclaration>> SlangModuleContext::ReadDeclaredAxes()
+{
+    if (!axisDeclarations.empty())
+    {
+        return axisDeclarations;
+    }
+
+    const int64_t loadedModuleCount = static_cast<int64_t>(session->getLoadedModuleCount());
+    for (int64_t i = 0; i < loadedModuleCount; ++i)
+    {
+        slang::IModule* module = session->getLoadedModule(i);
+        slang::DeclReflection* moduleReflection = module->getModuleReflection();
+        if (moduleReflection != nullptr)
+        {
+            const int64_t childCount = static_cast<int64_t>(moduleReflection->getChildrenCount());
+            for (int64_t j = 0; j < childCount; ++j)
+            {
+                slang::DeclReflection* child = moduleReflection->getChild(static_cast<unsigned int>(j));
+                if ((child != nullptr) && child->getKind() == slang::DeclReflection::Kind::Variable)
+                {
+                    CookResult<RawAxisDeclaration> axisDeclResult = buildAxisDecl(child);
+                    if (!axisDeclResult)
+                    {
+                        return std::unexpected(axisDeclResult.error());
+                    }
+                    axisDeclarations.emplace_back(std::move(*axisDeclResult));
+                }
+            }
+        }
+    }
+    
+    return axisDeclarations;
 }
 
 slang::IGlobalSession* SlangModuleContext::GlobalSession() const noexcept
@@ -352,6 +391,124 @@ CookError SlangModuleContext::buildSlangComponents()
     }
 
     return CookError::Success;
+}
+
+CookResult<RawAxisDeclaration> SlangModuleContext::buildAxisDecl(slang::DeclReflection* reflection)
+{
+    RawAxisDeclaration result{};
+    slang::VariableReflection* variableReflection = reflection->asVariable();
+    if (variableReflection == nullptr)
+    {
+        return std::unexpected(CookError::AttributeExpressionParseFailed);
+    }
+
+    const char* variableName = variableReflection->getName();
+    result.Name = variableName;
+
+    slang::Attribute* booleanAxisAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_boolean_axis");
+    if (booleanAxisAttr != nullptr)
+    {
+        result.IsBooleanAxis = true;
+    }
+
+    slang::Attribute* valuesAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_axis_values");
+    if (valuesAttr != nullptr)
+    {
+        // can't have both a values attribute and a boolean axis: the two are mutually exclusive
+        if (result.IsBooleanAxis)
+        {
+            const std::string errStr =
+                std::format("Variable '{}' cannot have both a boolean axis and axis values", variableName);
+            return std::unexpected(ReportError(*diagnosticSink,
+                                                    CookError::AttributeExpressionParseFailed,
+                                                    errStr));
+        }
+
+        CookResult<std::string> valuesResult =
+            extractSingleAttribute(reflection, valuesAttr, "ls_axis_values");
+        if (!valuesResult.has_value())
+        {
+            return std::unexpected(valuesResult.error());
+        }
+
+        result.AxisValues = std::move(*valuesResult);
+    }
+    
+    // todo: can we assert that either IsBooleanAxis is true or AxisValues is non-empty? We can't really
+    // filter for attributes that only affect axes though, so we could end up validating on some other attribute
+
+    // ActiveWhen, totally optional
+    slang::Attribute* activeWhenAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_active_when");
+    if (activeWhenAttr != nullptr)
+    {
+        CookResult<std::string> activeWhenResult =
+            extractSingleAttribute(reflection, activeWhenAttr, "ls_active_when");
+        if (!activeWhenResult.has_value())
+        {
+            return std::unexpected(activeWhenResult.error());
+        }
+
+        result.ActiveWhen = std::move(*activeWhenResult);
+    }
+
+    // Kind, also optional 
+    slang::Attribute* kindAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_axis_kind");
+    if (kindAttr != nullptr)
+    {
+        CookResult<std::string> kindResult =
+            extractSingleAttribute(reflection, kindAttr, "ls_axis_kind");
+        if (!kindResult.has_value())
+        {
+            return std::unexpected(kindResult.error());
+        }
+
+        result.Kind = std::move(*kindResult);
+    }
+
+    // even in case of success, get source location to have around for validation and reporting later 
+    // (in case we have later failures in parsing the expression strings, which happens at a layer
+    // intentionally without any visibility into slang types!)
+    slang::SourceLocation sourceLoc;
+    if (SLANG_SUCCEEDED(session->getDeclSourceLocation(reflection, &sourceLoc)))
+    {
+        result.SourceFile = sourceLoc.filePath;
+        result.SourceLine = static_cast<int32_t>(sourceLoc.line);
+        result.SourceColumn = static_cast<int32_t>(sourceLoc.column);
+    }
+    else
+    {
+        const std::string errStr = std::format("Failed to get source location for axis declaration {}", result.Name);
+        return std::unexpected(ReportError(*diagnosticSink,
+                                           CookError::SlangGetSourceLocationFailed,
+                                           errStr));
+    }
+
+    return result;
+}
+
+CookResult<std::string> SlangModuleContext::extractSingleAttribute(slang::DeclReflection* reflection,
+                                                                   slang::Attribute* attribute,
+                                                                   std::string_view attr_name)
+{
+    size_t length = 0u;
+    const char* text = attribute->getArgumentValueString(0u, &length);
+
+    if (text == nullptr)
+    {
+        slang::SourceLocation sourceLoc;
+        std::string errStr = std::format("Failed to read value for attribute {}", attr_name);
+        if (SLANG_SUCCEEDED(session->getDeclSourceLocation(reflection, &sourceLoc)))
+        {
+            const std::string sourceLocStr =
+                std::format("{} L{}:C{}", sourceLoc.filePath, sourceLoc.line, sourceLoc.column);
+            errStr += " at " + sourceLocStr;
+        }
+        return std::unexpected(ReportError(*diagnosticSink,
+                                           CookError::SlangGetAttributeValueStrFailed,
+                                           errStr));
+    }
+
+    return std::string(text, length);
 }
 
 } // namespace lodestone
