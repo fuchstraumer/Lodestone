@@ -192,8 +192,8 @@ CookError EnforceModulePolicy(const CookedModule& module,
     }
     
     // get the influence information for every entry point in the module
+    // todo-ship: simplify ComputeActualInfluence's work by using inertEntrryPoints as a filter there as well
     ModuleInfluence actualInfluence = ComputeActualInfluence(module);
-    // at some point, we should have ComputeActualInfluence use inertEntryPoints as a filter itself, instead of here
     auto relevantEntryPoints = actualInfluence.EntryPoints |
                                std::views::filter([&](const EntryPointInfluence& enpt)
                                {

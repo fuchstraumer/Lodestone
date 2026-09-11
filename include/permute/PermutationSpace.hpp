@@ -127,9 +127,9 @@ private:
     CookError expandFrom(std::ptrdiff_t depth,
                          PermutationAssignment& partial,
                          const RequireReadyMap& require_ready_at,
+                         const TargetPolicy& policy,
                          const AxisValueOverrideMap& axis_value_overrides,
                          std::vector<VariantDescriptor>& expanded,
-                         size_t max_variant_count,
                          DiagnosticSink& sink) const;
     
     std::string name;

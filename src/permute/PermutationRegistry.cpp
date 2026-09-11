@@ -50,8 +50,6 @@ namespace
 
     const PermutationSpace k_EmptySpace{ "", {} };
 
-
-
     struct ModuleSpaceEntry
     {
         std::string_view ModuleName;

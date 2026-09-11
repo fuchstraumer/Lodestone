@@ -143,7 +143,7 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetPolicy& p
 
     PermutationAssignment partial;
     std::vector<VariantDescriptor> descriptors;
-    const CookError walkResult = expandFrom(0, partial, requireReadyAt, axisValueOverrides, descriptors, policy.MaxVariants, sink);
+    const CookError walkResult = expandFrom(0, partial, requireReadyAt, policy, axisValueOverrides, descriptors, sink);
     if (!walkResult)
     {
         return std::unexpected(walkResult);
@@ -479,9 +479,9 @@ CookError PermutationSpace::validateRequires(const std::vector<std::string_view>
 CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
                                        PermutationAssignment& partial,
                                        const RequireReadyMap& require_ready_at,
+                                       const TargetPolicy& policy,
                                        const AxisValueOverrideMap& axis_value_overrides,
                                        std::vector<VariantDescriptor>& expanded,
-                                       const size_t max_variant_count,
                                        DiagnosticSink& sink) const
 {
     // canonicalize the current partial assignment here, since it will be 
@@ -490,18 +490,34 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
 
     if (std::cmp_equal(depth, axes.size()))
     {
+        // check CookIf to see if this full permutation assignment should even be included
+        if (!policy.CookIf.empty())
+        {
+            const std::vector<AttrExprSymbol> symbols = SymbolsFromCanonicalAssignment(canonical);
+            const CookResult<int64_t> cookIfResult = EvaluateExpression(policy.CookIf, symbols, sink);
+            if (!cookIfResult) [[unlikely]]
+            {
+                return cookIfResult.error();
+            }
+            
+            // the CookIf expression evaluated to false, so this particular variant is being excluded from cook
+            if (*cookIfResult == 0)
+            {
+                return CookError::Success;
+            }
+        }
+
         // completed a full permutation assignment, add it to the expanded list
         const VariantKey key = ComputeVariantKey(canonical);
         // index is unset: it's the dense index in the *sorted* set, which can't be found until 
         // all variants have been generated and sorted by key
         expanded.emplace_back(PermutationAssignment{ partial }, std::move(canonical), key, 0u);
-        if ((max_variant_count > 0) && (expanded.size() >= max_variant_count)) [[unlikely]]
+        if ((policy.MaxVariants > 0) && (expanded.size() >= policy.MaxVariants)) [[unlikely]]
         {
-            const std::string errorMessage = std::format("Permutation variant budget exceeded (max {} variants)", max_variant_count);
-            return ReportError(
-                sink,
-                CookError::PermutationVariantBudgetExceeded,
-                errorMessage);
+            const std::string errorMessage = std::format("Permutation variant budget exceeded (max {} variants)", policy.MaxVariants);
+            return ReportError(sink,
+                               CookError::PermutationVariantBudgetExceeded,
+                               errorMessage);
         }
         return CookError::Success;
     }
@@ -512,16 +528,20 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
     // both ActiveWhen and Require checks will need the symbols, get them once
     const std::vector<AttrExprSymbol> symbols = SymbolsFromCanonicalAssignment(canonical);
 
+    // if active when expression is on this axis, we need to evaluate it to see if this 
+    // axis should be considered active or not
+    // (also recall we ensured ActiveWhen only has backwards deps, so on a recursive walk
+    // like this it's valid to check now)
     if (!axis.ActiveWhen.empty())
     {
         const CookResult<bool> activeResult = EvaluateActiveWhen(axis, symbols, sink);
         if (!activeResult) [[unlikely]]
         {
+            // message about the error already logged in EvaluateActiveWhen, just pass error up
             return activeResult.error();
         }
 
         active = activeResult.value();
-
     }
 
     if (!active)
@@ -543,9 +563,9 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
         return expandFrom(depth + 1,
                           partial,
                           require_ready_at,
+                          policy,
                           axis_value_overrides,
                           expanded,
-                          max_variant_count,
                           sink);
     }
 
@@ -577,9 +597,9 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
             const CookError subtree = expandFrom(depth + 1,
                                                  partial,
                                                  require_ready_at,
+                                                 policy,
                                                  axis_value_overrides,
                                                  expanded,
-                                                 max_variant_count,
                                                  sink);
             if (!subtree)
             {
