@@ -1,6 +1,7 @@
 #include "permute/PermutationSpace.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
+#include "compile/RawLibrary.hpp"
 #include "permute/AttributeExpression.hpp"
 #include "permute/ExternConstantScanner.hpp"
 #include "permute/PermutationAssignment.hpp"
@@ -10,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -19,11 +21,13 @@
 #include <initializer_list>
 #include <iterator>
 #include <limits>
+#include <magic_enum/magic_enum.hpp>
 #include <print>
 #include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -46,6 +50,8 @@ namespace
                                                  const std::vector<AttrExprSymbol>& symbols,
                                                  const RequireReadyMap& require_ready_at,
                                                  DiagnosticSink& sink);
+    [[nodiscard]] AxisKind AxisKindFromString(std::string_view str);
+    [[nodiscard]] CookResult<std::vector<PermutationValue>> ValuesFromStr(const std::string_view str);
 
 } // namespace
 
@@ -615,6 +621,48 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
 }
 //NOLINTEND(misc-no-recursion)
 
+CookResult<PermutationSpace> BuildPermutationSpace(std::string name, 
+                                                   std::span<const RawAxisDeclaration> raw_axes,
+                                                   std::span<const std::string_view> reachable_sources,
+                                                   DiagnosticSink& sink)
+{
+    // First step: build the axes.
+    std::vector<PermutationAxis> axes;
+    for (const RawAxisDeclaration& rawAxis : raw_axes)
+    {
+        const AxisKind kind = AxisKindFromString(rawAxis.Kind);
+        // values extraction - fork on boolean, if not boolean it's just a comma split
+        std::vector<PermutationValue> values;
+        AxisValueDomain valueDomain{ AxisValueDomain::None };
+        if (rawAxis.IsBooleanAxis)
+        {
+            constexpr static std::array<PermutationValue, 2> k_BoolValues
+            {
+                PermutationValue{ false }, PermutationValue{ true }
+            };
+            values.append_range(k_BoolValues);
+            valueDomain = AxisValueDomain::Boolean;
+        }
+        else
+        {
+            CookResult<std::vector<PermutationValue>> splitValues = SplitCommaSeparatedValues(rawAxis.Values);
+            if (!splitValues)
+            {
+                return std::unexpected(splitValues.error());
+            }
+            values = std::move(*splitValues);
+            valueDomain = AxisValueDomain::Integral;
+        }
+
+        axes.emplace_back(rawAxis.Name,
+                          values,
+                          kind,
+                          EarliestBindingTime::Cook,
+                          valueDomain,
+                          rawAxis.ActiveWhen);
+    }
+}
+
 namespace
 {
     std::vector<AttrExprSymbol> AsAttrExprSymbols(const std::vector<ExternConstantDefault>& defaults)
@@ -630,7 +678,7 @@ namespace
         return symbols;
     }
 
-    [[nodiscard]] CookError VerifyVariantKeysAreUnique(const std::vector<VariantDescriptor>& variants)
+    CookError VerifyVariantKeysAreUnique(const std::vector<VariantDescriptor>& variants)
     {
         auto firstDuplicateIter =
             std::ranges::adjacent_find(variants,
@@ -656,7 +704,7 @@ namespace
         }
     }
 
-    [[nodiscard]] std::vector<AttrExprSymbol> SymbolsFromCanonicalAssignment(
+    std::vector<AttrExprSymbol> SymbolsFromCanonicalAssignment(
         const CanonicalAssignment& assignment)
     {
         std::vector<AttrExprSymbol> symbols;
@@ -668,9 +716,9 @@ namespace
         return symbols;
     }
 
-    [[nodiscard]] CookResult<bool> EvaluateActiveWhen(const PermutationAxis& axis,
-                                                      const std::vector<AttrExprSymbol>& symbols,
-                                                      DiagnosticSink& sink)
+    CookResult<bool> EvaluateActiveWhen(const PermutationAxis& axis,
+                                        const std::vector<AttrExprSymbol>& symbols,
+                                        DiagnosticSink& sink)
     {
         const CookResult<int64_t> result = EvaluateExpression(axis.ActiveWhen, symbols, sink);
         if (!result) [[unlikely]]
@@ -685,10 +733,10 @@ namespace
         return static_cast<bool>(result.value());
     }
 
-    [[nodiscard]] CookResult<bool> CheckRequires(std::ptrdiff_t depth,
-                                                 const std::vector<AttrExprSymbol>& symbols,
-                                                 const RequireReadyMap& require_ready_at,
-                                                 DiagnosticSink& sink)
+    CookResult<bool> CheckRequires(std::ptrdiff_t depth,
+                                   const std::vector<AttrExprSymbol>& symbols,
+                                   const RequireReadyMap& require_ready_at,
+                                   DiagnosticSink& sink)
     {
         const auto iter = require_ready_at.find(depth);
         if (iter == require_ready_at.end())
@@ -714,6 +762,58 @@ namespace
 
         return true;
     }
+
+    AxisKind AxisKindFromString(std::string_view str)
+    {
+        if (str.empty())
+        {
+            return AxisKind::None;
+        }
+        else
+        {
+            std::optional<AxisKind> kind = magic_enum::enum_cast<AxisKind>(str);
+            if (kind.has_value())
+            {
+                return kind.value();
+            }
+            else
+            {
+                return AxisKind::None;
+            }
+        }
+    }
+
+    CookResult<std::vector<PermutationValue>> ValuesFromStr(const std::string_view str,
+                                                            DiagnosticSink& sink)
+    {
+        std::vector<PermutationValue> values;
+
+        auto csvView = str |
+                       std::views::split(',') |
+                       std::ranges::to<std::vector<std::string_view>>();
+
+        values.reserve(std::size(csvView));
+        
+        for (std::string_view valueStr : csvView)
+        {
+            uint32_t value{ 0u };
+            std::from_chars_result result = std::from_chars(valueStr.data(),
+                                                            valueStr.data() + valueStr.size(),
+                                                            value);
+            if (result.ec != std::errc())
+            {
+                const std::string_view sysErrStr = magic_enum::enum_name(result.ec);
+                const std::string errStr =
+                    std::format("Failed to parse value '{}', error code: {}", valueStr, sysErrStr);
+                return std::unexpected(ReportError(sink, CookError::FromCharsFailed, errStr));
+            }
+            
+            values.emplace_back(value);
+        }
+
+        return values;
+    }
 }
 
 } // namespace lodestone
+

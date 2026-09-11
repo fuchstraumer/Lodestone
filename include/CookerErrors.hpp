@@ -92,6 +92,7 @@ enum class CookError : uint16_t
     DirectoryCouldNotBeCreated = 202,
     FileNotFound = 203,
     FileWriteFailed = 204,
+    FromCharsFailed = 205,
 
     SlangErrors = 220,
     SlangCoreModuleLoadFailed = 221,

@@ -137,6 +137,11 @@ private:
     std::vector<std::string> requireExpressions;
 };
 
+CookResult<PermutationSpace> BuildPermutationSpace(std::string name, 
+                                                   std::span<const struct RawAxisDeclaration> raw_axes,
+                                                   std::span<const std::string_view> reachable_sources,
+                                                   DiagnosticSink& sink);
+
 } // namespace lodestone
 
 #endif // !LODESTONE_PERMUTATION_SPACE_HPP
