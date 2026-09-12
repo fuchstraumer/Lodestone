@@ -166,6 +166,7 @@ namespace lodestone
             {
                 ExternConstantDeclaration decl = ExtractExternConst(line);
                 externConsts.emplace(decl);
+                continue;
             }
 
             // chunk_by works great here, since this is single pass: it's just a subview,
