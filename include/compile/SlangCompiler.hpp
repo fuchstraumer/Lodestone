@@ -2,7 +2,8 @@
 #ifndef LODESTONE_SLANG_COMPILER_HPP
 #define LODESTONE_SLANG_COMPILER_HPP
 #include "CookerErrors.hpp"
-#include "RawLibrary.hpp"
+#include "compile/RawLibrary.hpp"
+#include "compile/SymbolTable.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "ShaderLibraryTypes.hpp"
 
@@ -10,6 +11,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -33,6 +35,8 @@ struct SlangCompilerCreateInfo
     /**@brief If multithreading enabled, it's important to specify expected batch size.
      * As session creation is expensive, using all threads for low variant counts oversubscribes and slows the build. */
     size_t ExpectedBatchSize{ 0u };
+    /**@brief Optional symbol table to inherit from for multi-module builds. */
+    std::optional<SymbolTable> InheritedSymbolTable;
     PlacementKind AccessModel;
 };
 
@@ -59,9 +63,11 @@ public:
     [[nodiscard]] const std::vector<std::string>& ModuleSourceStrings() const noexcept;
     [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
     [[nodiscard]] std::span<const RawAxisDeclaration> AxisDeclarations() const noexcept;
+    [[nodiscard]] const SymbolTable& GetSymbolTable() const noexcept;
 
 private:
     DiagnosticSink* diagnosticSink{ nullptr };
+    SymbolTable symbolTable;
     std::unique_ptr<ThreadPool> compilePool{ nullptr };
     std::unique_ptr<SlangModuleContext> bootstrapContext{ nullptr };
 };

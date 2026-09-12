@@ -37,6 +37,11 @@ CookError SlangCompiler::Initialize(SlangCompilerCreateInfo create_info, Diagnos
     diagnosticSink = &sink;
     compilePool = std::make_unique<ThreadPool>();
     bootstrapContext = std::make_unique<SlangModuleContext>();
+    if (create_info.InheritedSymbolTable)
+    {
+        // inherit initial set of symbols
+        symbolTable = *create_info.InheritedSymbolTable;
+    }
 
     CookError initResult = bootstrapContext->Initialize(create_info, sink);
     if (initResult != CookError::Success)
@@ -58,6 +63,14 @@ CookError SlangCompiler::Initialize(SlangCompilerCreateInfo create_info, Diagnos
         return initResult;
     }
 
+    // todo-ship: With multi-module builds, we'll absolutely want to have a way to "inherit" or share
+    // symbol tables with multiple compilers. can probably pass this as optional createInfo member
+    const std::string_view moduleName = bootstrapContext->ModuleName();
+    for (const std::string& sourceStr : bootstrapContext->ModuleSourceStrings())
+    {
+        symbolTable.AddSource(moduleName, sourceStr);
+    }
+    
     return initResult;
 }
 
@@ -89,12 +102,12 @@ SlangCompiler::CompileResultList SlangCompiler::Compile(const std::vector<Varian
 
 std::string_view SlangCompiler::ModuleName() const noexcept
 {
-    return bootstrapContext ? bootstrapContext->ModuleName() : std::string_view{};
+    return bootstrapContext->ModuleName();
 }
 
 size_t SlangCompiler::EntryPointCount() const noexcept
 {
-    return bootstrapContext ? bootstrapContext->EntryPointNames().size() : 0;
+    return bootstrapContext->EntryPointNames().size();
 }
 
 const std::vector<std::string>& SlangCompiler::EntryPointNames() const noexcept
