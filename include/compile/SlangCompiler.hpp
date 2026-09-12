@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -57,6 +58,7 @@ public:
     [[nodiscard]] const std::vector<std::string>& EntryPointNames() const noexcept;
     [[nodiscard]] const std::vector<std::string>& ModuleSourceStrings() const noexcept;
     [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
+    [[nodiscard]] std::span<const RawAxisDeclaration> AxisDeclarations() const noexcept;
 
 private:
     DiagnosticSink* diagnosticSink{ nullptr };

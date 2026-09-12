@@ -14,6 +14,7 @@
 #include <expected>
 #include <memory>
 #include <slang.h>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -109,6 +110,19 @@ const std::vector<std::string>& SlangCompiler::ModuleSourceStrings() const noexc
 std::vector<std::string_view> SlangCompiler::ModuleSourceStringViews() const noexcept
 {
     return bootstrapContext->ModuleSourceStringViews();
+}
+
+std::span<const RawAxisDeclaration> SlangCompiler::AxisDeclarations() const noexcept
+{
+    auto result = bootstrapContext->ReadDeclaredAxes();
+    if (result)
+    {
+        return *result;
+    }
+    else
+    {
+        return std::span<const RawAxisDeclaration>{};
+    }
 }
 
 } // namespace lodestone
