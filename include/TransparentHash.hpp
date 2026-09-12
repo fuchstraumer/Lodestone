@@ -5,7 +5,8 @@
 #include <string_view>
 
 namespace lodestone
-{  
+{
+
 // required to enable copy-free hashing of string_views when doing lookups in a map
 struct TransparentStringHash
 {

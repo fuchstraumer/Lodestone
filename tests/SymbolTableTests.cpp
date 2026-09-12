@@ -1,9 +1,11 @@
 #include "compile/SymbolTable.hpp"
 #include "TestHarness.hpp"
+#include <cstddef>
 #include <string_view>
 #include <vector>
 
 using lodestone::SymbolTable;
+using lodestone::ExternConstantDeclaration;
 using lodestone::tests::TestRunner;
 
 namespace
@@ -17,6 +19,16 @@ std::vector<std::string_view> Missing(const SymbolTable& table,
                                       std::vector<std::string_view> tokens)
 {
     return table.MissingTokens(modules, tokens);
+}
+
+bool DeclarationMatches(const std::vector<ExternConstantDeclaration>& found,
+                        size_t index,
+                        std::string_view name,
+                        std::string_view value)
+{
+    return index < found.size() &&
+           found[index].Name == name &&
+           found[index].Value == value;
 }
 
 // A whole `extern static const` line is dropped, in any keyword order. A line that carries only some of
@@ -129,6 +141,39 @@ void TestAccumulationAndUnknownModule(TestRunner& runner)
                  "an unknown module holds no tokens, so the token is missing");
 }
 
+// Now the symbol table does double duty as the extern const scanner, make sure it matches the expected behavior
+// that used to be in the ExternConstScanner.
+void TestExternConstExtraction(TestRunner& runner)
+{
+    constexpr std::string_view k_Source = R"(module OceanFft;
+
+    extern static const uint IFFT_SIZE = 256;
+    extern const static bool IFFT_USE_WAVE_OPS = false;
+    const static extern uint IFFT_NUM_WAVE_CASCADES = IFFT_SIZE * 4;
+
+    static const uint NOT_EXTERN = 8;
+    extern static const uint IFFT_SIZE_LOG2;
+
+    RWStructuredBuffer<float4> OutputSpectrum;
+    )";
+
+    SymbolTable table;
+    table.AddSource("OceanFft", k_Source);
+
+    const std::vector<ExternConstantDeclaration> externs = table.ExternConstantsForModule("OceanFft");
+    runner.Check(externs.size() == 3u, "A line needs extern static const and = to be recognized.");
+    runner.Check(DeclarationMatches(externs, 0u, "IFFT_SIZE", "256"), "an integer default reads back");
+    runner.Check(DeclarationMatches(externs, 1u, "IFFT_USE_WAVE_OPS", "false"), "a bool default reads back");
+    runner.Check(DeclarationMatches(externs, 2u, "IFFT_NUM_WAVE_CASCADES", "IFFT_SIZE * 4"),
+                 "a default that names an earlier constant keeps its whole expression");
+
+    constexpr std::string_view k_IdentifierExtractionSrc = "extern static const uint SPACED    =   42 ; \n";
+    table.AddSource("Identifiers", k_IdentifierExtractionSrc);
+    const std::vector<ExternConstantDeclaration> identifiersExterns = table.ExternConstantsForModule("Identifiers");
+    runner.Check(identifiersExterns.size() == 1u, "Should extract the single extern static const declaration.");
+    runner.Check(DeclarationMatches(identifiersExterns, 0u, "SPACED", "42"), "The extracted declaration should match the source.");
+}
+
 } // namespace
 
 int main()
@@ -138,5 +183,6 @@ int main()
     TestKeywordStripping(runner);
     TestAxisReachability(runner);
     TestAccumulationAndUnknownModule(runner);
+    TestExternConstExtraction(runner);
     return runner.Report();
 }
