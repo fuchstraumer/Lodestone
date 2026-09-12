@@ -3,6 +3,7 @@
 #include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangDiagnosticParser.hpp"
+#include "compile/SymbolTable.hpp"
 #include "impl/SlangCompilerTypes.hpp"
 #include "impl/SlangModuleContext.hpp"
 #include "impl/ThreadPool.hpp"
@@ -82,7 +83,7 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
     }
     const std::vector<std::string_view> sourceViews = bootstrapContext->ModuleSourceStringViews();
     CookResult<std::vector<ExternConstantDefault>> defaults =
-        space.CollectUndrivenExternDefaults(sourceViews, *diagnosticSink);
+        space.CollectUndrivenExternDefaults(ModuleName(), GetSymbolTable(), *diagnosticSink);
     if (!defaults)
     {
         return std::unexpected(defaults.error());
@@ -136,6 +137,11 @@ std::span<const RawAxisDeclaration> SlangCompiler::AxisDeclarations() const noex
     {
         return std::span<const RawAxisDeclaration>{};
     }
+}
+
+const SymbolTable& SlangCompiler::GetSymbolTable() const noexcept
+{
+    return symbolTable;
 }
 
 } // namespace lodestone

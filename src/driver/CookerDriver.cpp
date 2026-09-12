@@ -564,21 +564,12 @@ namespace
             return prepareResult;
         }
 
-        // todo-ship: To support multi-module builds, we'll need to build this symbol table at a higher level
-        // It supports multiple modules by partioning on module names, which for now is just unused
-        SymbolTable identifierTable;
-        const std::vector<std::string>& moduleSources = compiler.ModuleSourceStrings();
-        for (const std::string& source : moduleSources)
-        {
-            identifierTable.AddSource(compiler.ModuleName(), source);
-        }
-
         // now we can build the permutation space
         // todo-ship: this only contains one module name, bc as per comment above we're waiting to expand
         // this to multi-modules
         std::string_view localModuleNmae = compiler.ModuleName();
         std::span<std::string_view> moduleNameSpan{ &localModuleNmae, 1 };
-        CookResult<PermutationSpace> spaceResult = BuildPermutationSpace(identifierTable,
+        CookResult<PermutationSpace> spaceResult = BuildPermutationSpace(compiler.GetSymbolTable(),
                                                                          moduleNameSpan,
                                                                          compiler.AxisDeclarations(),
                                                                          diagnostics);
