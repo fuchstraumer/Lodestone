@@ -20,6 +20,10 @@ namespace lodestone
     {
         std::string_view Name;
         std::string_view Value;
+        constexpr bool operator==(const ExternConstantDeclaration& other) const noexcept
+        {
+            return Name == other.Name && Value == other.Value;
+        }
     };
 
     struct ExternConstHash
@@ -30,8 +34,8 @@ namespace lodestone
             // but not nearly as collision-prone as a simple xor of the two hashes
             std::size_t hash1 = std::hash<std::string_view>{}(decl.Name);
             std::size_t hash2 = std::hash<std::string_view>{}(decl.Value);
-            constexpr static std::size_t goldenRatioFract = 0x9e3779b9;
-            return hash1 ^ (hash2 + goldenRatioFract + (hash1 << 6) + (hash1 >> 2));
+            constexpr static std::size_t k_GoldenRatioFract = 0x9e3779b9;
+            return hash1 ^ (hash2 + k_GoldenRatioFract + (hash1 << 6) + (hash1 >> 2));
         }
     };
 
@@ -49,6 +53,8 @@ namespace lodestone
         /** @brief Returns the set of tokens not found in the symbol tables for the given modules */
         [[nodiscard]] std::vector<std::string_view> MissingTokens(std::span<std::string_view> module_names,
                                                                   std::span<std::string_view> tokens) const;
+        /** @brief Returns the set of extern constant declarations not found in the symbol tables for the given module */
+        [[nodiscard]] std::vector<ExternConstantDeclaration> ExternConstantsForModule(std::string_view module_name) const;
     private:
         using TokenSet = std::unordered_set<std::string_view>;
         std::unordered_map<std::string_view, TokenSet, TransparentStringHash, std::equal_to<>> tokenMap;

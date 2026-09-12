@@ -210,4 +210,15 @@ namespace lodestone
         
         return missing;
     }
+
+    std::vector<ExternConstantDeclaration> SymbolTable::ExternConstantsForModule(std::string_view module_name) const
+    {
+        const auto iter = externConstMap.find(module_name);
+        if (iter != externConstMap.end())
+        {
+            const ExternConstSet& externConsts = iter->second;
+            return std::vector<ExternConstantDeclaration>(externConsts.begin(), externConsts.end());
+        }
+        return {};
+    }
 }
