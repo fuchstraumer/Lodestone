@@ -89,7 +89,8 @@ public:
     [[nodiscard]] bool IsEmpty() const noexcept;
     [[nodiscard]] std::span<const std::string> RequireExpressions() const noexcept;
 
-    [[nodiscard]] CookResult<VariantSet> EnumerateVariants(const TargetPolicy& policy, DiagnosticSink& sink) const;
+    [[nodiscard]] CookResult<VariantSet> EnumerateVariants(const TargetPolicy& policy,
+                                                           DiagnosticSink& sink) const;
     [[nodiscard]] CanonicalAssignment CanonicalizeAssignment(const PermutationAssignment& assignment) const;
     [[nodiscard]] VariantKey ComputeVariantKey(const CanonicalAssignment& canonical) const;
     [[nodiscard]] uint64_t ComputeVariantSpaceSize() const noexcept;
@@ -97,19 +98,15 @@ public:
     /**The other direction: an `extern` constant that no axis drives keeps its default in every variant.
      * This is what our resource sizing annotations rely on, in the Slang compiler machinery (though they
      * don't actually affect source code: they just carry through to the data we extract still) */
-    void ReportUndrivenExternConstants(std::span<const std::string_view> source_texts,
-                                       std::string_view module_name,
+    void ReportUndrivenExternConstants(std::string_view module_name,
+                                       const SymbolTable& symbol_table,
                                        DiagnosticSink& sink) const;
     [[nodiscard]] CookResult<std::vector<ExternConstantDefault>> CollectUndrivenExternDefaults(
-        std::span<const std::string_view> source_texts, DiagnosticSink& sink) const;
+        std::string_view module_name, const SymbolTable& symbol_table, DiagnosticSink& sink) const;
+
 private:
-    
-    CookError validateActiveWhen(
-        const std::vector<std::string_view>& axes_names,
-        DiagnosticSink& sink) const;
-    CookError validateRequires(
-        const std::vector<std::string_view>& axes_names,
-        DiagnosticSink& sink) const;
+    CookError validateActiveWhen(const std::vector<std::string_view>& axes_names, DiagnosticSink& sink) const;
+    CookError validateRequires(const std::vector<std::string_view>& axes_names, DiagnosticSink& sink) const;
 
     CookError expandFrom(std::ptrdiff_t depth,
                          PermutationAssignment& partial,

@@ -241,23 +241,21 @@ CookError PermutationSpace::ValidateConstraints(DiagnosticSink& sink) const
     return CookError::Success;
 }
 
-void PermutationSpace::ReportUndrivenExternConstants(std::span<const std::string_view> source_texts,
-                                                     std::string_view module_name,
+void PermutationSpace::ReportUndrivenExternConstants(std::string_view module_name,
+                                                     const SymbolTable& symbol_table,
                                                      DiagnosticSink& sink) const
 {
     auto axesView = axes | std::views::transform(&PermutationAxis::Name);
     std::unordered_set<std::string_view> axesNames(axesView.begin(), axesView.end());
-    std::vector<ExternConstantDeclaration> undriven;
+    
     auto filterUndriven = [&axesNames](const ExternConstantDeclaration& decl)
     {
         return !axesNames.contains(decl.Name);
     };
 
-    for (const std::string_view source : source_texts)
-    {
-        std::vector<ExternConstantDeclaration> declared = ScanExternConstants(source);
-        undriven.append_range(declared | std::views::filter(filterUndriven) | std::views::as_rvalue);
-    }
+    std::vector<ExternConstantDeclaration> externConstants = symbol_table.ExternConstantsForModule(module_name);
+    // now filter undriven extern constants based on whether they are driven by any axis
+    auto undriven = externConstants | std::views::filter(filterUndriven);
 
     // build report string
     std::string report;
@@ -273,7 +271,7 @@ void PermutationSpace::ReportUndrivenExternConstants(std::span<const std::string
 }
 
 CookResult<std::vector<ExternConstantDefault>> PermutationSpace::CollectUndrivenExternDefaults(
-    std::span<const std::string_view> source_texts, DiagnosticSink& sink) const
+    std::string_view module_name, const SymbolTable& symbol_table, DiagnosticSink& sink) const
 {
     std::vector<ExternConstantDefault> defaults;
 
@@ -285,32 +283,30 @@ CookResult<std::vector<ExternConstantDefault>> PermutationSpace::CollectUndriven
     {
         return !axesNames.contains(decl.Name);
     };
-    for (const std::string_view source : source_texts)
-    {
-        auto declared = ScanExternConstants(source);
-        undriven.append_range(declared | std::views::filter(filterUndriven) | std::views::as_rvalue);
-    }
+
+    undriven = symbol_table.ExternConstantsForModule(module_name) |
+               std::views::filter(filterUndriven) |
+               std::ranges::to<std::vector<ExternConstantDeclaration>>();
 
     defaults.reserve(undriven.size());
 
     for (const auto& [constName, valueText] : undriven)
     {
-        const std::string_view trimmed = TrimWhitespace(valueText);
-        if (trimmed == "true" || trimmed == "false")
+        if (valueText == "true" || valueText == "false")
         {
-            defaults.emplace_back(std::string{ constName }, trimmed == "true" ? 1 : 0);
+            defaults.emplace_back(std::string{ constName }, valueText == "true" ? 1 : 0);
             continue;
         }
 
         const std::vector<AttrExprSymbol> known = AsAttrExprSymbols(defaults);
-        const CookResult<int64_t> value = EvaluateExpression(trimmed, known, sink);
+        const CookResult<int64_t> value = EvaluateExpression(valueText, known, sink);
         if (!value)
         {
             std::println(stderr,
                          "[shader_cooker] could not read the default of extern constant '{}' from "
                          "'{}'. A size expression naming it would silently disagree with the shader.",
                          constName,
-                         trimmed);
+                         valueText);
             return std::unexpected(value.error());
         }
 
