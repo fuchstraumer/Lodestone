@@ -4,7 +4,6 @@
 #include "compile/RawLibrary.hpp"
 #include "compile/SymbolTable.hpp"
 #include "permute/AttributeExpression.hpp"
-#include "permute/ExternConstantScanner.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationValue.hpp"

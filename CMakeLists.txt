@@ -126,14 +126,12 @@ set(LODESTONE_MODEL_SOURCES
 
 set(LODESTONE_PERMUTE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/AttributeExpression.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/ExternConstantScanner.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationAssignment.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationAxis.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationSpace.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationValue.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PolicyDocument.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/AttributeExpression.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/ExternConstantScanner.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PermutationAssignment.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PermutationAxis.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PermutationSpace.cpp"

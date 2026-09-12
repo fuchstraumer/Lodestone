@@ -93,12 +93,6 @@ public:
     [[nodiscard]] CanonicalAssignment CanonicalizeAssignment(const PermutationAssignment& assignment) const;
     [[nodiscard]] VariantKey ComputeVariantKey(const CanonicalAssignment& canonical) const;
     [[nodiscard]] uint64_t ComputeVariantSpaceSize() const noexcept;
-    /**Every axis name must match an `extern static const` declaration in the shader. A mismatch links a
-     * symbol nobody references, leaves the shader on its default, and errors nowhere -- this will result in
-     * a set of variants with duplicate source code and behavior, when we explicitly don't want that. */
-    [[nodiscard]] CookError VerifyAxisNamesAreDeclared(std::span<const std::string_view> source_texts,
-                                                       std::string_view module_name,
-                                                       DiagnosticSink& sink) const;
     [[nodiscard]] CookError ValidateConstraints(DiagnosticSink& sink) const;
     /**The other direction: an `extern` constant that no axis drives keeps its default in every variant.
      * This is what our resource sizing annotations rely on, in the Slang compiler machinery (though they
