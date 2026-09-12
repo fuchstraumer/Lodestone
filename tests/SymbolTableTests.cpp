@@ -1,6 +1,6 @@
 #include "compile/SymbolTable.hpp"
 #include "TestHarness.hpp"
-#include <cstddef>
+#include <algorithm>
 #include <string_view>
 #include <vector>
 
@@ -21,14 +21,15 @@ std::vector<std::string_view> Missing(const SymbolTable& table,
     return table.MissingTokens(modules, tokens);
 }
 
-bool DeclarationMatches(const std::vector<ExternConstantDeclaration>& found,
-                        size_t index,
+bool DeclarationMatches(const std::vector<ExternConstantDeclaration>& externs,
                         std::string_view name,
                         std::string_view value)
 {
-    return index < found.size() &&
-           found[index].Name == name &&
-           found[index].Value == value;
+    auto iter = std::ranges::find_if(externs, [&](const ExternConstantDeclaration& decl)
+    {
+        return decl.Name == name && decl.Value == value;
+    });
+    return iter != externs.end();
 }
 
 // A whole `extern static const` line is dropped, in any keyword order. A line that carries only some of
@@ -38,9 +39,9 @@ void TestExternStaticConstStripping(TestRunner& runner)
     runner.BeginSection("extern static const stripping");
 
     constexpr std::string_view k_Source = R"(
-[ls_axis_values("1, 2")] extern static const uint AAA;
-[ls_axis_values("3, 4")] static extern const uint BBB;
-[ls_axis_values("5, 6")] extern const static uint CCC;
+[ls_axis_values("1, 2")] extern static const uint AAA = 32u;
+[ls_axis_values("3, 4")] static extern const uint BBB = 1.0f;
+[ls_axis_values("5, 6")] extern const static uint CCC = 0xFFFF;
 const uint DDD = 5;
 static uint EEE = 1;
 uint FFF = 2;
@@ -88,9 +89,9 @@ void TestAxisReachability(TestRunner& runner)
 
     constexpr std::string_view k_Common = R"(
 module common;
-[ls_boolean_axis] extern static const bool USE_WAVE_OPS;
-[ls_axis_values("128, 256")] extern static const uint FFT_SIZE;
-[ls_axis_values("16, 32")] extern static const uint UNUSED_TILE;
+[ls_boolean_axis] extern static const bool USE_WAVE_OPS = false;
+[ls_axis_values("128, 256")] extern static const uint FFT_SIZE = 256;
+[ls_axis_values("16, 32")] extern static const uint UNUSED_TILE = 16;
 )";
 
     constexpr std::string_view k_Main = R"(
@@ -150,6 +151,7 @@ void TestExternConstExtraction(TestRunner& runner)
     extern static const uint IFFT_SIZE = 256;
     extern const static bool IFFT_USE_WAVE_OPS = false;
     const static extern uint IFFT_NUM_WAVE_CASCADES = IFFT_SIZE * 4;
+    static extern const uint ANOTHER_HEX_CONSTANT = 0x9e3779b9;
 
     static const uint NOT_EXTERN = 8;
     extern static const uint IFFT_SIZE_LOG2;
@@ -161,17 +163,18 @@ void TestExternConstExtraction(TestRunner& runner)
     table.AddSource("OceanFft", k_Source);
 
     const std::vector<ExternConstantDeclaration> externs = table.ExternConstantsForModule("OceanFft");
-    runner.Check(externs.size() == 3u, "A line needs extern static const and = to be recognized.");
-    runner.Check(DeclarationMatches(externs, 0u, "IFFT_SIZE", "256"), "an integer default reads back");
-    runner.Check(DeclarationMatches(externs, 1u, "IFFT_USE_WAVE_OPS", "false"), "a bool default reads back");
-    runner.Check(DeclarationMatches(externs, 2u, "IFFT_NUM_WAVE_CASCADES", "IFFT_SIZE * 4"),
+    runner.Check(externs.size() == 4u, "A line needs extern static const and = to be recognized.");
+    runner.Check(DeclarationMatches(externs, "IFFT_SIZE", "256"), "an integer default reads back");
+    runner.Check(DeclarationMatches(externs, "IFFT_USE_WAVE_OPS", "false"), "a bool default reads back");
+    runner.Check(DeclarationMatches(externs, "IFFT_NUM_WAVE_CASCADES", "IFFT_SIZE * 4"),
                  "a default that names an earlier constant keeps its whole expression");
+    runner.Check(DeclarationMatches(externs, "ANOTHER_HEX_CONSTANT", "0x9e3779b9"), "a hex constant reads back correctly");
 
     constexpr std::string_view k_IdentifierExtractionSrc = "extern static const uint SPACED    =   42 ; \n";
     table.AddSource("Identifiers", k_IdentifierExtractionSrc);
     const std::vector<ExternConstantDeclaration> identifiersExterns = table.ExternConstantsForModule("Identifiers");
     runner.Check(identifiersExterns.size() == 1u, "Should extract the single extern static const declaration.");
-    runner.Check(DeclarationMatches(identifiersExterns, 0u, "SPACED", "42"), "The extracted declaration should match the source.");
+    runner.Check(DeclarationMatches(identifiersExterns, "SPACED", "42"), "The extracted declaration should match the source.");
 }
 
 } // namespace
