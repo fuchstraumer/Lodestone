@@ -112,7 +112,7 @@ void TestValidationAgainstSpace(TestRunner& runner)
                                         { PermutationValue{ 16u }, PermutationValue{ 32u },
                                           PermutationValue{ 64u }, PermutationValue{ 128u } },
                                         AxisKind::Tuning, EarliestBindingTime::Cook, AxisValueDomain::Integral };
-    const PermutationSpace space{ "OceanFft", { sizeAxis, waveOpsAxis, waveSizeAxis } };
+    const PermutationSpace space{ { sizeAxis, waveOpsAxis, waveSizeAxis } };
 
     auto validateAndPrint = [&space](std::string_view toml) -> CookError
     {

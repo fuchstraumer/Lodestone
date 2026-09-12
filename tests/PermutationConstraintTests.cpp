@@ -36,7 +36,7 @@ void TestActiveWhenGating(TestRunner& runner)
     const PermutationAxis widthAxis{ "WIDTH", { PermutationValue{ 16u }, PermutationValue{ 32u } },
                                     AxisKind::Tuning, EarliestBindingTime::Cook, AxisValueDomain::Integral,
                                     "GATE == 1" };
-    const PermutationSpace space{ "Gated", { gateAxis, widthAxis } };
+    const PermutationSpace space{ { gateAxis, widthAxis } };
 
     const auto variants = space.EnumerateVariants(k_UnboundedTargetPolicy, sink);
     runner.Check(variants.has_value(), "Enumeration succeeds.");
@@ -56,8 +56,8 @@ void TestRequirePruning(TestRunner& runner)
 
     auto makeAxes = [&]{ return std::initializer_list<PermutationAxis>{ tileAxis, regAxis }; };
 
-    const PermutationSpace control{ "TileControl", makeAxes() };                 // no Require
-    const PermutationSpace gated  { "TileGated",   makeAxes(),
+    const PermutationSpace control{ makeAxes() };                                // no Require
+    const PermutationSpace gated  { makeAxes(),
                                     { "TILE * TILE * REG <= 65536" } };          // forbids 32x128 = 131072
 
     const auto full   = control.EnumerateVariants(k_UnboundedTargetPolicy, sink);
@@ -77,7 +77,7 @@ void TestValidationRejections(TestRunner& runner)
                                          AxisKind::Capability, EarliestBindingTime::Cook, AxisValueDomain::Boolean, "LATE == 1" };
         const PermutationAxis lateAxis{ "LATE",  { PermutationValue{ false }, PermutationValue{ true } },
                                         AxisKind::Capability, EarliestBindingTime::Cook, AxisValueDomain::Boolean };
-        const PermutationSpace space{ "Fwd", { earlyAxis, lateAxis } };
+        const PermutationSpace space{ { earlyAxis, lateAxis } };
         runner.Check(space.ValidateConstraints(sink) == CookError::PermutationConstraintForwardReference,
                      "a forward reference fails at load");
     }
@@ -87,7 +87,7 @@ void TestValidationRejections(TestRunner& runner)
         StderrDiagnosticSink sink;
         const PermutationAxis axis{ "AXIS", { PermutationValue{ false }, PermutationValue{ true } },
                                     AxisKind::Capability, EarliestBindingTime::Cook, AxisValueDomain::Boolean, "NOPE == 1" };
-        const PermutationSpace space{ "UnknownSymbol", { axis } };
+        const PermutationSpace space{ { axis } };
         runner.Check(space.ValidateConstraints(sink) == CookError::PermutationConstraintUnknownSymbol,
                      "an unknown symbol fails validation");
     }
@@ -97,7 +97,7 @@ void TestValidationRejections(TestRunner& runner)
         StderrDiagnosticSink sink;
         const PermutationAxis axis{ "AXIS", { PermutationValue{ false }, PermutationValue{ true } },
                                     AxisKind::Capability, EarliestBindingTime::Cook, AxisValueDomain::Boolean, "== 1" };
-        const PermutationSpace space{ "MalformedExpression", { axis } };
+        const PermutationSpace space{ { axis } };
         runner.Check(space.ValidateConstraints(sink) == CookError::PermutationConstraintInvalidExpression,
                      "a malformed expression fails validation");
     }
@@ -117,7 +117,7 @@ void TestDefaultSubstitutionWarning(TestRunner& runner)
                                    AxisKind::Capability, EarliestBindingTime::Cook, AxisValueDomain::Boolean, "GATE == 1" };
     const PermutationAxis leafAxis{ "LEAF", { PermutationValue{ 16u }, PermutationValue{ 32u } },
                                    AxisKind::Tuning, EarliestBindingTime::Cook, AxisValueDomain::Integral, "MID == 1" };
-    const PermutationSpace space{ "Chain", { gateAxis, midAxis, leafAxis } };
+    const PermutationSpace space{ { gateAxis, midAxis, leafAxis } };
 
     runner.Check(space.ValidateConstraints(sink) == CookError::Success, "a conditional chain still validates");
 

@@ -46,7 +46,6 @@ static const TargetPolicy k_UnboundedTargetPolicy{};
 // The space owns its axes, so every axis reference below names a position in it. `ParentIndex` 1 is
 // TEST_USE_WAVE_OPS.
 const PermutationSpace k_TestSpace{
-    "TestSpace",
     { PermutationAxis{ "TEST_SIZE",
                        { PermutationValue{ 128u },
                          PermutationValue{ 256u },
@@ -200,7 +199,7 @@ int main()
     runner.Check(matchesRealVariant, "the partial assignment names a variant the cook produced");
 
     runner.BeginSection("a module with no registered space still cooks");
-    const PermutationSpace emptySpace{ "", {} };
+    const PermutationSpace emptySpace{ {} };
     const CookResult<VariantSet> emptyVariants = emptySpace.EnumerateVariants(k_UnboundedTargetPolicy, sink);
 
     runner.Check(emptyVariants.has_value(), "an empty space enumerates rather than fails");

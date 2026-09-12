@@ -398,7 +398,7 @@ int main()
 {
     lodestone::tests::TestRunner runner{ "DedupeInfluence" };
 
-    const PermutationSpace space{ "TestSpace", { MakeBoolAxis("AXIS_A"), MakeBoolAxis("AXIS_B") } };
+    const PermutationSpace space{ { MakeBoolAxis("AXIS_A"), MakeBoolAxis("AXIS_B") } };
 
     const CookedModule deduped = BuildModule(space, true);
     const CookedModule raw = BuildModule(space, false);

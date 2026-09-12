@@ -74,7 +74,7 @@ CompiledVariant MakeVariant(uint64_t index, const std::string& suffix, std::stri
 }
 
 /** This module registers no axis, so every variant canonicalizes against a space with no axes. */
-const PermutationSpace k_EmptySpace{ "", {} };
+const PermutationSpace k_EmptySpace{ {} };
 
 /** Two variants with different text and one shared layout. The cooked dump must therefore report two
  * sources and one layout, which is the collapse the interner performed. */
@@ -250,7 +250,7 @@ void CheckSpaceDump(lodestone::tests::TestRunner& runner)
 {
     runner.BeginSection("space dump");
 
-    const PermutationSpace space{ "TinyModule", { MakeBoolAxis("USE_FOO") } };
+    const PermutationSpace space{ { MakeBoolAxis("USE_FOO") } };
 
     const std::string expected = R"({
     "stage": "space",
@@ -288,7 +288,7 @@ void CheckDependentAxisDump(lodestone::tests::TestRunner& runner)
     PermutationAxis child = MakeBoolAxis("FOO_DETAIL");
     child.ActiveWhen = std::string{ "USE_FOO == 1" };
 
-    const PermutationSpace space{ "TinyModule", { MakeBoolAxis("USE_FOO"), std::move(child) } };
+    const PermutationSpace space{ { MakeBoolAxis("USE_FOO"), std::move(child) } };
     const std::string dump = DumpPermutationSpace("TinyModule", space);
 
     runner.Check(Contains(dump, R"("activeWhen": "USE_FOO == 1")"), "a dependent axis uses activeWhen");
@@ -300,7 +300,7 @@ void CheckVariantDump(lodestone::tests::TestRunner& runner, DiagnosticSink& sink
 {
     runner.BeginSection("variants dump");
 
-    const PermutationSpace space{ "TinyModule", { MakeBoolAxis("USE_FOO") } };
+    const PermutationSpace space{ { MakeBoolAxis("USE_FOO") } };
 
     const CookResult<VariantSet> variantSet = space.EnumerateVariants(k_UnboundedTargetPolicy, sink);
     runner.Check(variantSet.has_value(), "the space enumerates");

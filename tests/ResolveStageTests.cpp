@@ -60,8 +60,7 @@ namespace
 
 // The axes and the defaults are file scope because `ResolveContext` holds `std::string_view` names.
 // The strings must outlive every context this file builds.
-const PermutationSpace k_Space{ "IfftTest",
-                                { PermutationAxis{ "IFFT_SIZE",
+const PermutationSpace k_Space{ { PermutationAxis{ "IFFT_SIZE",
                                                    { PermutationValue{ 256u }, PermutationValue{ 512u } },
                                                    lodestone::AxisKind::Tuning,
                                                    lodestone::EarliestBindingTime::Cook,

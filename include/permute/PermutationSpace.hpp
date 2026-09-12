@@ -10,7 +10,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <initializer_list>
 #include <span>
 #include <string>
 #include <string_view>
@@ -85,7 +84,6 @@ public:
     PermutationSpace(PermutationSpace&&) noexcept = default;
     PermutationSpace& operator=(PermutationSpace&&) noexcept = default;
 
-    [[nodiscard]] std::string_view Name() const noexcept;
     [[nodiscard]] std::span<const PermutationAxis> Axes() const noexcept;
     [[nodiscard]] std::size_t AxisCount() const noexcept;
     [[nodiscard]] bool IsEmpty() const noexcept;

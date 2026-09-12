@@ -2,6 +2,7 @@
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
+#include "compile/SymbolTable.hpp"
 #include "permute/AttributeExpression.hpp"
 #include "permute/ExternConstantScanner.hpp"
 #include "permute/PermutationAssignment.hpp"
@@ -18,7 +19,6 @@
 #include <expected>
 #include <format>
 #include <functional>
-#include <initializer_list>
 #include <iterator>
 #include <limits>
 #include <magic_enum/magic_enum.hpp>
@@ -218,45 +218,6 @@ uint64_t PermutationSpace::ComputeVariantSpaceSize() const noexcept
     }
 
     return size;
-}
-
-CookError PermutationSpace::VerifyAxisNamesAreDeclared(std::span<const std::string_view> source_texts,
-                                                       std::string_view module_name,
-                                                       DiagnosticSink& sink) const
-{
-    int32_t undeclaredCount = 0;
-
-    for (const PermutationAxis& axis : axes)
-    {
-        bool declared = false;
-        for (const std::string_view source : source_texts)
-        {
-            if (DeclaresExternConstantNamed(source, axis.Name))
-            {
-                declared = true;
-                break;
-            }
-        }
-
-        if (!declared)
-        {
-            ++undeclaredCount;
-            const std::string warningStr =
-                std::format("Axis '{}' has no matching `extern static const` declaration "
-                            "in module {}. Slang links this symbol, nothing references it, the shader "
-                            "keeps its default, and every variant cooks identical output.",
-                            axis.Name,
-                            module_name);
-            ReportWarning(sink, warningStr);
-        }
-    }
-
-    if (undeclaredCount > 0)
-    {
-        return CookError::PermutationAxisNotDeclared;
-    }
-
-    return CookError::Success;
 }
 
 CookError PermutationSpace::ValidateConstraints(DiagnosticSink& sink) const
@@ -611,11 +572,48 @@ CookResult<PermutationSpace> BuildPermutationSpace(const SymbolTable& symbol_tab
                                                    std::span<const RawAxisDeclaration> raw_axes,
                                                    DiagnosticSink& sink)
 {
-    // First step: 
+    // First step: prune axes in raw axes that aren't actually used
+    auto extractNameStrView = [](const RawAxisDeclaration& raw_axis)
+    {
+        return std::string_view{ raw_axis.Name };
+    };
+    std::vector<std::string_view> axisNamesVec = raw_axes |
+                                                 std::views::transform(extractNameStrView) |
+                                                 std::ranges::to<std::vector<std::string_view>>();
+    std::vector<std::string_view> missingAxisNames = symbol_table.MissingTokens(module_names, axisNamesVec);
 
-    // Second step: build the axes.
+    // build the condensed span - use views and filter to remove the axes from raw_axes that aren't
+    // used in any of the source code for the given modules.
+    auto filteredAxes = raw_axes |
+                        std::views::filter([&missingAxisNames](const RawAxisDeclaration& raw_axis)
+                        {
+                            return std::ranges::find(missingAxisNames, raw_axis.Name) == missingAxisNames.end();
+                        });
+    
+    // Just for info sake (and because we can filter this), if missingAxisNames is not empty, we can log which axes were missing.
+    if (!missingAxisNames.empty())
+    {
+        auto foldStrNames = [](std::span<std::string_view> names)
+        {
+            return std::ranges::fold_left(names, std::string{}, [](std::string acc, std::string_view name)
+            {
+                if (!acc.empty())
+                {
+                    acc += ", ";
+                }
+                acc += name;
+                return acc;
+            });
+        };
+
+        std::string messageStr =
+            std::format("The following axes were declared but not used in any module: {}", foldStrNames(missingAxisNames));
+        ReportInfo(sink, std::move(messageStr));
+    }
+
+    // Second step: build the axes, using the filtered list of only the axes that are actually used
     std::vector<PermutationAxis> axes;
-    for (const RawAxisDeclaration& rawAxis : raw_axes)
+    for (const RawAxisDeclaration& rawAxis : filteredAxes)
     {
         const AxisKind kind = AxisKindFromString(rawAxis.Kind);
         // values extraction - fork on boolean, if not boolean it's just a comma split
