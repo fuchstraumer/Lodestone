@@ -3,6 +3,7 @@
 #include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
+#include "compile/SymbolTable.hpp"
 #include "driver/CookerOptions.hpp"
 #include "emit/DedupeReport.hpp"
 #include "emit/OutputSink.hpp"
@@ -358,14 +359,11 @@ namespace
         return sink.WriteArtifact(MakeStageDumpFileName(module_name, kind), build_dump());
     }
 
-    /** Builds the compiler for one module, and checks everything that must hold before the first
-     * variant compiles. */
-    CookError PrepareModuleCompiler(const CookerOptions& options,
-                                    const std::filesystem::path& module_path,
-                                    const TargetProfile& target_profile,
-                                    DiagnosticSink& diagnostics,
-                                    SlangCompiler& compiler,
-                                    std::unique_ptr<PermutationSpace>& out_space)
+    CookError BootstrapCompiler(const CookerOptions& options,
+                                const std::filesystem::path& module_path,
+                                const TargetProfile& target_profile,
+                                SlangCompiler& compiler,
+                                DiagnosticSink& diagnostics)
     {
         SlangCompilerCreateInfo createInfo;
         createInfo.ModulePath = module_path;
@@ -384,24 +382,6 @@ namespace
         const std::string infoStr =
             std::format("module {} declares {} entrypoints", moduleName, compiler.EntryPointCount());
         ReportInfo(diagnostics, infoStr);
-
-        const std::vector<std::string_view> sourceViews{ compiler.ModuleSourceStringViews() };
-
-        if (const CookError axisResult =
-                out_space->VerifyAxisNamesAreDeclared(sourceViews, moduleName, diagnostics);
-            !axisResult)
-        {
-            return axisResult;
-        }
-
-        // verify constraints on space are valid
-        if (const CookError constraintResult = out_space->ValidateConstraints(diagnostics); !constraintResult)
-        {
-            return constraintResult;
-        }
-
-        // No error checking needed as ReportUndrivenExternConstants now returns void
-        out_space->ReportUndrivenExternConstants(sourceViews, moduleName, diagnostics);
 
         return CookError::Success;
     }
@@ -574,13 +554,45 @@ namespace
             return CookError::UnknownTargetProfile;
         }
 
+        // This function *just* initializes the compiler: permutation space is built *after* this step
+        // since it relies on an initial parse/build of the slang backend module data
         SlangCompiler compiler;
-        std::unique_ptr<PermutationSpace> permutationSpace{ nullptr };
         const CookError prepareResult =
-            PrepareModuleCompiler(options, module_path, *target, diagnostics, compiler, space);
+            BootstrapCompiler(options, module_path, *target, compiler, diagnostics);
         if (!prepareResult)
         {
             return prepareResult;
+        }
+
+        // todo-ship: To support multi-module builds, we'll need to build this symbol table at a higher level
+        // It supports multiple modules by partioning on module names, which for now is just unused
+        SymbolTable identifierTable;
+        const std::vector<std::string>& moduleSources = compiler.ModuleSourceStrings();
+        for (const std::string& source : moduleSources)
+        {
+            identifierTable.AddSource(compiler.ModuleName(), source);
+        }
+
+        // now we can build the permutation space
+        // todo-ship: this only contains one module name, bc as per comment above we're waiting to expand
+        // this to multi-modules
+        std::string_view localModuleNmae = compiler.ModuleName();
+        std::span<std::string_view> moduleNameSpan{ &localModuleNmae, 1 };
+        CookResult<PermutationSpace> spaceResult = BuildPermutationSpace(identifierTable,
+                                                                         moduleNameSpan,
+                                                                         compiler.AxisDeclarations(),
+                                                                         diagnostics);
+        if (!spaceResult)
+        {
+            return spaceResult.error();
+        }
+
+        PermutationSpace space(std::move(*spaceResult));
+        
+        // verify constraints on space are valid
+        if (const CookError constraintResult = space.ValidateConstraints(diagnostics); !constraintResult)
+        {
+            return constraintResult;
         }
 
         // print check state because it makes sure unchecked cooks don't look like checked ones
@@ -596,14 +608,14 @@ namespace
             policy_document.FindTargetPolicy(moduleName, options.TargetName);
 
         // validate policy against active permutation space
-        const CookError policyValidationResult = policy_document.ValidateAgainstSpace(moduleName, *space, diagnostics);
+        const CookError policyValidationResult = policy_document.ValidateAgainstSpace(moduleName, space, diagnostics);
         if (!policyValidationResult)
         {
             return policyValidationResult;
         }
         
         // expand permutation space into the final set of variants this build will be constructing
-        const CookResult<VariantSet> variantSet = space->EnumerateVariants(currTargetPolicy, diagnostics);
+        const CookResult<VariantSet> variantSet = space.EnumerateVariants(currTargetPolicy, diagnostics);
         if (!variantSet)
         {
             return variantSet.error();
@@ -618,7 +630,7 @@ namespace
 
         auto dumpPermutationSpace = [&moduleName, &space]()
         {
-            return DumpPermutationSpace(moduleName, *space);
+            return DumpPermutationSpace(moduleName, space);
         };
 
         const CookError spaceDumpResult =
@@ -646,7 +658,7 @@ namespace
             DisableDedupe(internedModule);
         }
         internedModule.Name = moduleName;
-        internedModule.Space = space;
+        internedModule.Space = &space;
         internedModule.SpaceSize = variantSet->SpaceSize;
         internedModule.VariantKeys = variantSet->Variants |
                                      std::views::transform(&VariantDescriptor::Key) |
@@ -655,7 +667,7 @@ namespace
         std::vector<CompiledVariant> moduleVariants;
         moduleVariants.reserve(variantSet.value().Variants.size());
 
-        CookResult<RawModule> rawModuleResult = compiler.PrepareRawModule(*space);
+        CookResult<RawModule> rawModuleResult = compiler.PrepareRawModule(space);
         if (!rawModuleResult)
         {
             return rawModuleResult.error();

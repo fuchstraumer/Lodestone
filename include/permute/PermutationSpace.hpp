@@ -2,6 +2,7 @@
 #ifndef LODESTONE_PERMUTATION_SPACE_HPP
 #define LODESTONE_PERMUTATION_SPACE_HPP
 #include "CookerErrors.hpp"
+#include "compile/SymbolTable.hpp"
 #include "permute/AttributeExpression.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
@@ -72,13 +73,7 @@ struct VariantSet
 class PermutationSpace
 {
 public:
-    PermutationSpace(std::string _name,
-                     std::span<const PermutationAxis> _axes,
-                     std::vector<std::string> require_expressions = {}) noexcept;
-    // same as permutation axis: this is just to keep our nasty gross internal constructors
-    // alive until we complete the next round of work to get data-driven permutations
-    PermutationSpace(std::string _name,
-                     std::initializer_list<PermutationAxis> _axes,
+    PermutationSpace(std::vector<PermutationAxis> _axes,
                      std::vector<std::string> require_expressions = {}) noexcept;
     ~PermutationSpace() noexcept = default;
 
@@ -131,15 +126,13 @@ private:
                          const AxisValueOverrideMap& axis_value_overrides,
                          std::vector<VariantDescriptor>& expanded,
                          DiagnosticSink& sink) const;
-    
-    std::string name;
     std::vector<PermutationAxis> axes;
     std::vector<std::string> requireExpressions;
 };
 
-CookResult<PermutationSpace> BuildPermutationSpace(std::string name, 
+CookResult<PermutationSpace> BuildPermutationSpace(const SymbolTable& symbol_table,
+                                                   std::span<std::string_view> module_names,
                                                    std::span<const struct RawAxisDeclaration> raw_axes,
-                                                   std::span<const std::string_view> reachable_sources,
                                                    DiagnosticSink& sink);
 
 } // namespace lodestone

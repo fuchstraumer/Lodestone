@@ -6,7 +6,6 @@
 #include "Diagnostics.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
-#include "permute/PermutationRegistry.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "permute/PolicyDocument.hpp"
 

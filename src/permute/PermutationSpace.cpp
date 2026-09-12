@@ -51,31 +51,16 @@ namespace
                                                  const RequireReadyMap& require_ready_at,
                                                  DiagnosticSink& sink);
     [[nodiscard]] AxisKind AxisKindFromString(std::string_view str);
-    [[nodiscard]] CookResult<std::vector<PermutationValue>> ValuesFromStr(const std::string_view str);
+    [[nodiscard]] CookResult<std::vector<PermutationValue>> ValuesFromStr(const std::string_view str,
+                                                                          DiagnosticSink& sink);  
 
 } // namespace
 
-PermutationSpace::PermutationSpace(std::string _name,
-                                   std::span<const PermutationAxis> _axes,
+PermutationSpace::PermutationSpace(std::vector<PermutationAxis> _axes,
                                    std::vector<std::string> require_expressions) noexcept
-    : name{ std::move(_name) },
-      axes{ _axes.begin(), _axes.end() },
+    : axes{ std::move(_axes) },
       requireExpressions{ std::move(require_expressions) }
 {
-}
-
-PermutationSpace::PermutationSpace(std::string _name,
-                                   std::initializer_list<PermutationAxis> _axes,
-                                   std::vector<std::string> require_expressions) noexcept
-    : name{ std::move(_name) },
-      axes{ _axes },
-      requireExpressions{ std::move(require_expressions) }
-{
-}
-
-std::string_view PermutationSpace::Name() const noexcept
-{
-    return name;
 }
 
 std::span<const PermutationAxis> PermutationSpace::Axes() const noexcept
@@ -621,12 +606,14 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
 }
 //NOLINTEND(misc-no-recursion)
 
-CookResult<PermutationSpace> BuildPermutationSpace(std::string name, 
+CookResult<PermutationSpace> BuildPermutationSpace(const SymbolTable& symbol_table,
+                                                   std::span<std::string_view> module_names,
                                                    std::span<const RawAxisDeclaration> raw_axes,
-                                                   std::span<const std::string_view> reachable_sources,
                                                    DiagnosticSink& sink)
 {
-    // First step: build the axes.
+    // First step: 
+
+    // Second step: build the axes.
     std::vector<PermutationAxis> axes;
     for (const RawAxisDeclaration& rawAxis : raw_axes)
     {
@@ -645,7 +632,7 @@ CookResult<PermutationSpace> BuildPermutationSpace(std::string name,
         }
         else
         {
-            CookResult<std::vector<PermutationValue>> splitValues = SplitCommaSeparatedValues(rawAxis.Values);
+            CookResult<std::vector<PermutationValue>> splitValues = ValuesFromStr(rawAxis.AxisValues, sink);
             if (!splitValues)
             {
                 return std::unexpected(splitValues.error());
@@ -661,6 +648,8 @@ CookResult<PermutationSpace> BuildPermutationSpace(std::string name,
                           valueDomain,
                           rawAxis.ActiveWhen);
     }
+
+    return PermutationSpace{ axes };
 }
 
 namespace
@@ -789,13 +778,11 @@ namespace
         std::vector<PermutationValue> values;
 
         auto csvView = str |
-                       std::views::split(',') |
-                       std::ranges::to<std::vector<std::string_view>>();
-
-        values.reserve(std::size(csvView));
+                       std::views::split(',');
         
-        for (std::string_view valueStr : csvView)
+        for (auto chunk : csvView)
         {
+            std::string_view valueStr = std::string_view(std::ranges::data(chunk), std::ranges::size(chunk));
             uint32_t value{ 0u };
             std::from_chars_result result = std::from_chars(valueStr.data(),
                                                             valueStr.data() + valueStr.size(),
