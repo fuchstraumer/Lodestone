@@ -1,5 +1,6 @@
 #include "compile/SymbolTable.hpp"
 #include <algorithm>
+#include <cassert>
 #include <cctype>
 #include <cstddef>
 #include <ranges>
@@ -10,6 +11,96 @@
 
 namespace lodestone
 {
+    namespace
+    {
+
+        constexpr bool IsIdentifierStartCharacter(char character) noexcept
+        {
+            return (character >= 'A' && character <= 'Z') ||
+                   (character >= 'a' && character <= 'z') ||
+                   character == '_';
+        }
+
+        constexpr bool IsIdentifierCharacter(char character) noexcept
+        {
+            return (character >= '0' && character <= '9') ||
+                   (character >= 'A' && character <= 'Z') ||
+                   (character >= 'a' && character <= 'z') ||
+                   character == '_';
+        }
+
+        constexpr bool IsValidIdentifier(std::string_view identifier) noexcept
+        {
+            if (identifier.empty() || !IsIdentifierStartCharacter(identifier.front()))
+            {
+                return false;
+            }
+
+            return std::ranges::all_of(identifier.substr(1), IsIdentifierCharacter);
+        }
+
+        constexpr std::string_view TrimWhitespace(std::string_view str) noexcept
+        {
+            constexpr std::string_view k_WhiteSpaceChars = " \t\n\r\f";
+            const size_t start = str.find_first_not_of(k_WhiteSpaceChars);
+            if (start == std::string_view::npos)
+            {
+                return {};
+            }
+            const size_t end = str.find_last_not_of(k_WhiteSpaceChars);
+            return str.substr(start, end - start + 1);
+        }
+
+        constexpr bool ChunkSeparator(char lhs, char rhs) noexcept
+        {
+            return IsIdentifierCharacter(lhs) == IsIdentifierCharacter(rhs);
+        }
+
+        /**@brief Pulls out a variable identifier from 'line', by using 'end_index' - which should be the
+         * location of an `=` character. */
+        constexpr std::string_view ExtractIdentifier(std::string_view line, size_t end_index) noexcept
+        {
+            constexpr std::string_view k_ValidIdChars =
+                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
+            // time to admit I just realized find_last_of runs in reverse (from the end_index backwards)
+            const size_t idEndIdx = line.find_last_of(k_ValidIdChars, end_index - 1);
+            if (idEndIdx == std::string_view::npos)
+            {
+                return {};
+            }
+            // run backwards to find id_start now
+            size_t idStartIdx = line.find_last_not_of(k_ValidIdChars, idEndIdx);
+            // asserting on npos because it should be nearly impossible for that to happen: we only enter
+            // this code if the line has `extern const static` etc in it, and that precedes the identifier
+            assert(idStartIdx != std::string_view::npos);
+            // increment idStartIdx to point to the actual start of the identifier
+            ++idStartIdx;
+            return line.substr(idStartIdx, idEndIdx - idStartIdx + 1);
+        }
+
+        /**@brief Pulls out a value assignment from line, by starting *after* the `=` character we find for
+         * the identifier extraction above. Much wider space of permissible characters though, so we just
+         * trim whitespace and pull out the whole chunk between `=` and `;`. */
+        constexpr std::string_view ExtractValueAssignment(std::string_view line, size_t assignment_index) noexcept
+        {
+            const size_t valueStartIdx = assignment_index + 1;
+            const size_t valueEndIdx = line.find(';', valueStartIdx);
+            // if no semicolon, just take the rest of the line
+            std::string_view valueStr = valueEndIdx == std::string_view::npos ?
+                                        line.substr(valueStartIdx) :
+                                        line.substr(valueStartIdx, valueEndIdx - valueStartIdx);
+            return TrimWhitespace(valueStr);
+        }
+
+        ExternConstantDeclaration ExtractExternConst(std::string_view line)
+        {
+            const size_t assignmentIndex = line.find('=');
+            const std::string_view identifier = ExtractIdentifier(line, assignmentIndex);
+            const std::string_view value = ExtractValueAssignment(line, assignmentIndex);
+            return ExternConstantDeclaration{ .Name=identifier, .Value=value };
+        }
+    }
+
     // Reserved words and built-in type names, so a token that can never be a user identifier does not
     // enter the symbol table. Sorted by byte value, which is the order `string_view::operator<` uses,
     // so `binary_search` below is correct. The list holds only genuinely reserved words and built-in
@@ -49,14 +140,10 @@ namespace lodestone
 
     void SymbolTable::AddSource(std::string_view module_name, std::string_view source_code) noexcept
     {
-        auto isIdentifierChar = [](char c) -> bool
-        {
-            return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
-        };
-
         // Accumulate tokens for this module - one module may receive tokens from
         // several sources, due to how slang handles `__include` directives.
         TokenSet& tokens = tokenMap[module_name];
+        ExternConstSet& externConsts = externConstMap[module_name];
         size_t lineStart = 0u;
 
         while (std::cmp_less(lineStart, source_code.size()))
@@ -76,26 +163,18 @@ namespace lodestone
                 line.contains("static") &&
                 line.contains("const"))
             {
-                continue;
+                ExternConstantDeclaration decl = ExtractExternConst(line);
+                externConsts.emplace(decl);
             }
 
-            auto chunkOperator = [&](char lhs, char rhs) -> bool
-            {
-                return isIdentifierChar(lhs) == isIdentifierChar(rhs);
-            };
-
-            auto chunkedLineView = line | std::views::chunk_by(chunkOperator);
+            // chunk_by works great here, since this is single pass: it's just a subview,
+            // not even doing any copying (and it's lazily evaluated)
+            auto chunkedLineView = line | std::views::chunk_by(ChunkSeparator);
 
             for (auto chunk : chunkedLineView)
             {
-                if ((std::isalpha(static_cast<unsigned char>(chunk.front())) == 0) &&
-                    (chunk.front() != '_'))
-                {
-                    continue;
-                }
-
                 std::string_view token(std::ranges::data(chunk), std::ranges::size(chunk));
-                if (IsReservedKeyword(token))
+                if (!IsValidIdentifier(token) || IsReservedKeyword(token))
                 {
                     continue;
                 }

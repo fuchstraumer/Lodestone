@@ -11,6 +11,29 @@
 
 namespace lodestone
 {
+    /**@brief For each `extern static const <Var> = <Value>;` decl in the shader source, we capture
+     * the variable name and its value. during the symbol table build. This was originally done in it's
+     * own pass over the source line-by-line, but with symbol table construction we can now share that
+     * traversal work to get two datasets (tokens and extern constant declarations) simultaneously.
+     * @note Like the original, it uses string_views since source strings are in memory all-session. */
+    struct ExternConstantDeclaration
+    {
+        std::string_view Name;
+        std::string_view Value;
+    };
+
+    struct ExternConstHash
+    {
+        std::size_t operator()(const ExternConstantDeclaration& decl) const noexcept
+        {
+            // use boost hash-combine method since it's more succinct than full fnv-1a
+            // but not nearly as collision-prone as a simple xor of the two hashes
+            std::size_t hash1 = std::hash<std::string_view>{}(decl.Name);
+            std::size_t hash2 = std::hash<std::string_view>{}(decl.Value);
+            constexpr static std::size_t goldenRatioFract = 0x9e3779b9;
+            return hash1 ^ (hash2 + goldenRatioFract + (hash1 << 6) + (hash1 >> 2));
+        }
+    };
 
     /**@brief Given an input shader source string, constructs a symbol table of unique variable tokens.
       *Skips parsing `extern static const`, and removes reserved keywords to reduce the size of the search. Returns
@@ -29,6 +52,8 @@ namespace lodestone
     private:
         using TokenSet = std::unordered_set<std::string_view>;
         std::unordered_map<std::string_view, TokenSet, TransparentStringHash, std::equal_to<>> tokenMap;
+        using ExternConstSet = std::unordered_set<ExternConstantDeclaration, ExternConstHash>;
+        std::unordered_map<std::string_view, ExternConstSet> externConstMap;
     };
 }
 
