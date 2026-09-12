@@ -54,16 +54,24 @@ struct RawSizeAttribute
     std::vector<std::string> Arguments;
 };
 
+struct RawInterfaceImpl
+{
+    std::string Module;
+    std::string TypeName; // namespace-qualified, not module-qualified
+};
+
 struct RawAxisDeclaration
 {
     std::string Name;
     bool IsBooleanAxis{ false }; // axis with ls_boolean_axis attribute
+    bool IsInterfaceAxis{ false }; // axis with ls_axis_interface attribute
     std::string AxisValues; // unparsed ls_axis_values arg
     std::string ActiveWhen; // unparsed ls_axis_active_when
     std::string Kind; // unparsed ls_axis_kind arg
     std::string SourceFile;
     int32_t SourceLine;
     int32_t SourceColumn;
+    std::vector<RawInterfaceImpl> InterfaceImpls; // structs tagged with ls_axis_interface_impl attribute
 };
 
 

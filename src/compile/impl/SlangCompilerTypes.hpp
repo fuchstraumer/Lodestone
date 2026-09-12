@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #ifndef LODESTONE_SHADER_COMPILER_SLANG_COMPILER_TYPES_HPP
 #define LODESTONE_SHADER_COMPILER_SLANG_COMPILER_TYPES_HPP
 #include "compile/RawLibrary.hpp"
@@ -220,6 +221,24 @@ constexpr TextureFormat FromSlangImageFormat(SlangImageFormat format) noexcept
     }
 }
 
+constexpr bool IsResourceTypeKind(slang::TypeReflection::Kind kind) noexcept
+{
+    constexpr static slang::TypeReflection::Kind k_ResourceKinds[]
+    {
+        slang::TypeReflection::Kind::ConstantBuffer,
+        slang::TypeReflection::Kind::Resource,
+        slang::TypeReflection::Kind::SamplerState,
+        slang::TypeReflection::Kind::TextureBuffer,
+        slang::TypeReflection::Kind::ShaderStorageBuffer,
+        slang::TypeReflection::Kind::ParameterBlock,
+        slang::TypeReflection::Kind::Feedback,
+        slang::TypeReflection::Kind::Pointer,
+        slang::TypeReflection::Kind::DynamicResource
+    };
+    // im doing this just because i think it's funny that it's constexpr
+    return std::ranges::binary_search(k_ResourceKinds, kind);
+}
+
 constexpr StorageTextureAccess FromSlangBindingTypeAccess(slang::BindingType binding_type) noexcept
 {
     switch (binding_type)
@@ -291,13 +310,27 @@ struct ParameterBlockInfo
     uint32_t UniformSize{ 0u };
 };
 
-
-
 struct SerializedModule
 {
     std::string Name;
     std::string Path;
     Slang::ComPtr<slang::IBlob> Blob;
+};
+
+struct InterfaceAxisStub
+{
+    std::string Name;
+    slang::TypeReflection* Type{ nullptr };
+    std::string SourceFile;
+    int32_t SourceLine;
+    int32_t SourceColumn;
+};
+
+struct InterfaceAxisImplStub
+{
+    std::string InterfaceName; // name of interface this binds to
+    slang::TypeReflection* Type{ nullptr };
+    RawInterfaceImpl Impl;
 };
 
 /** One compiler option as a row. A row of `Int` kind reads `IntValue`, and a row of `String`

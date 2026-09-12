@@ -35,7 +35,8 @@ enum class AxisValueDomain : uint8_t
     None,
     Boolean,
     Integral,
-    Enum
+    Enum,
+    Type
 };
 
 struct PermutationAxis
@@ -71,6 +72,7 @@ struct PermutationAxis
 private:
     uint64_t numValues{ 0 };
     std::array<PermutationValue, k_MaxValues> values;
+    std::string InterfaceName; // e.g, IBrdfImpl: the root interface that a Type axis instantiates
 };
 
 }

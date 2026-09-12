@@ -72,3 +72,13 @@ public struct ls_axis_kindAttribute
     public string kind;
 };
 
+[__AttributeUsage(_AttributeTargets.Struct)]
+public struct ls_axis_interfaceAttribute
+{
+};
+
+[__AttributeUsage(_AttributeTargets.Struct)]
+public struct ls_axis_interface_implAttribute
+{
+    public string interfaceName;
+};

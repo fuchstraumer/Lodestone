@@ -72,7 +72,6 @@ enum class CookError : uint16_t
     ManifestShaderLayoutVisiblityIndexInvalid = 111,
     ManifestShaderLayoutResourceListIndexInvalid = 112,
 
-
     // output and diagnostic sink operation errors
     OutputPathInvalid = 120,
     OutputFileOpenFailed = 121,
@@ -100,6 +99,11 @@ enum class CookError : uint16_t
     SlangGetAttributeValueStrFailed = 223,
     SlangGetSourceLocationFailed = 224,
     SlangGetVariableNameFailed = 225,
+    SlangInvalidAttributesOnDecl = 226,
+    SlangProgramLayoutNotFound = 227,
+    SlangMultipleConformingInterfaces = 228,
+    SlangNoConformingInterfaces = 229,
+    SlangInterfaceHasResourceMember = 230
 };
 
 constexpr bool operator!(CookError error) noexcept

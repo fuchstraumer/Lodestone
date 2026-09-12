@@ -1,4 +1,5 @@
 #include "SlangModuleContext.hpp"
+#include "ShaderLibraryTypes.hpp"
 #include "SlangCompilerTypes.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
@@ -7,7 +8,9 @@
 #include "slang-com-ptr.h"
 #include "slang.h"
 
+#include <algorithm>
 #include <array>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -21,6 +24,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -169,7 +173,10 @@ CookResult<std::span<const RawAxisDeclaration>> SlangModuleContext::ReadDeclared
         slang::DeclReflection* moduleReflection = module->getModuleReflection();
         if (moduleReflection != nullptr)
         {
-            const CookError collected = collectAxesFromDecl(moduleReflection);
+            const char* moduleNamePtr = moduleReflection->getName();
+            const std::string_view moduleNameSv =
+                moduleNamePtr != nullptr ? std::string_view(moduleNamePtr) : std::string_view();
+            const CookError collected = collectAxesFromDecl(moduleReflection, moduleNameSv);
             if (!collected)
             {
                 return std::unexpected(collected);
@@ -177,11 +184,17 @@ CookResult<std::span<const RawAxisDeclaration>> SlangModuleContext::ReadDeclared
         }
     }
 
+    const CookError interfacesBuilt = buildInterfaceAxes();
+    if (!interfacesBuilt)
+    {
+        return std::unexpected(interfacesBuilt);
+    }
+
     return axisDeclarations;
 }
 
 //NOLINTBEGIN(misc-no-recursion)
-CookError SlangModuleContext::collectAxesFromDecl(slang::DeclReflection* reflection)
+CookError SlangModuleContext::collectAxesFromDecl(slang::DeclReflection* reflection, std::string_view module_name)
 {
     const unsigned int childCount = reflection->getChildrenCount();
     for (unsigned int j = 0u; j < childCount; ++j)
@@ -207,11 +220,20 @@ CookError SlangModuleContext::collectAxesFromDecl(slang::DeclReflection* reflect
                 axisDeclarations.emplace_back(std::move(**axisDeclResult));
             }
         }
+        else if (child->getKind() == slang::DeclReflection::Kind::Struct)
+        {   
+            // ls_axis_interface or ls_axis_interface_impl values
+            const CookError axisDataStaged = stageInterfaceStruct(reflection, module_name);
+            if (!axisDataStaged)
+            {
+                return axisDataStaged;
+            }
+        }
         else if (child->getChildrenCount() > 0u)
         {
             // A `__include`/`implementing` fragment reflects as an Unsupported node whose children are
             // the real declarations. `getChild`/`getChildrenCount` are safe on such a node, so descend.
-            const CookError nested = collectAxesFromDecl(child);
+            const CookError nested = collectAxesFromDecl(child, module_name);
             if (!nested)
             {
                 return nested;
@@ -554,6 +576,229 @@ CookResult<std::string> SlangModuleContext::extractSingleAttribute(slang::DeclRe
     }
 
     return std::string(text, length);
+}
+
+CookError SlangModuleContext::stageInterfaceStruct(slang::DeclReflection* reflection, std::string_view module_name)
+{
+    // this is gonna be a doozy
+    slang::TypeReflection* type = reflection->getType();
+    if (type == nullptr)
+    {
+        return CookError::Success;
+    }
+
+    slang::UserAttribute* axisAttr = type->findUserAttributeByName("ls_axis_interface");
+    slang::UserAttribute* axisImplAttr = type->findUserAttributeByName("ls_axis_interface_impl");
+    if ((axisAttr == nullptr) && (axisImplAttr == nullptr))
+    {
+        // just an ordinary struct, not one of our decorated ones
+        return CookError::Success;
+    }
+
+    const char* declNamePtr = reflection->getName();
+    const std::string declName = declNamePtr != nullptr ? std::string{ declNamePtr } : "<unknown>";
+    if ((axisAttr != nullptr) && (axisImplAttr != nullptr))
+    {
+        // can't have *both* of these attributes on a struct
+        const std::string errStr =
+            std::format("Struct {} cannot have both ls_axis_interface and ls_axis_interface_impl attributes",
+                        declName);
+        return ReportError(*diagnosticSink,
+                           CookError::SlangInvalidAttributesOnDecl,
+                           errStr);
+    }
+
+    if (axisAttr != nullptr)
+    {
+        InterfaceAxisStub stub;
+        stub.Name = declName;
+        stub.Type = type;
+        slang::SourceLocation sourceLoc;
+        if (SLANG_SUCCEEDED(session->getDeclSourceLocation(reflection, &sourceLoc)) &&
+            (sourceLoc.filePath != nullptr))
+        {
+            stub.SourceFile = sourceLoc.filePath;
+            stub.SourceLine = static_cast<int32_t>(sourceLoc.line);
+            stub.SourceColumn = static_cast<int32_t>(sourceLoc.column);
+        }
+        interfaceAxisStubs.emplace_back(std::move(stub));
+        return CookError::Success;
+    }
+
+    // we'll need to use a blob to get the full name
+    Slang::ComPtr<slang::IBlob> fullNameBlob;
+    type->getFullName(fullNameBlob.writeRef());
+    std::string typeName;
+    if (fullNameBlob != nullptr)
+    {
+        typeName = std::string{ static_cast<const char*>(fullNameBlob->getBufferPointer()),
+                                fullNameBlob->getBufferSize() };
+    }
+    else
+    {
+        typeName = declName; // fallback to the declaration name if full name is not available
+    }
+
+    size_t interfaceNameLength = 0u;
+    const char* interfaceName = axisImplAttr->getArgumentValueString(0u, &interfaceNameLength);
+    if (interfaceName == nullptr)
+    {
+        const std::string errStr =
+            std::format("ls_axis_interface_impl on '{}' has no interface name", typeName);
+        return ReportError(*diagnosticSink,
+                           CookError::SlangInvalidAttributesOnDecl,
+                           errStr);
+    }
+
+    const CookError resourceCheck = rejectResourceMembers(type, typeName);
+    if (!resourceCheck)
+    {
+        return resourceCheck;
+    }
+
+    InterfaceAxisImplStub stub;
+    stub.InterfaceName.assign(interfaceName, interfaceNameLength);
+    stub.Type = type;
+    stub.Impl.Module = std::string(module_name);
+    stub.Impl.TypeName = std::move(typeName);
+    interfaceAxisImplStubs.emplace_back(std::move(stub));
+    return CookError::Success;
+}
+
+CookError SlangModuleContext::buildInterfaceAxes()
+{
+    if (interfaceAxisStubs.empty())
+    {
+        return CookError::Success;
+    }
+
+    Slang::ComPtr<slang::IBlob> diagBlob;
+    slang::ProgramLayout* programLayout = rootModule->getLayout(0, diagBlob.writeRef());
+    if (programLayout == nullptr)
+    {
+        const std::string errStr =
+            std::format("Failed to get program layout from rootModule for interface axis resolution");
+        return ReportError(*diagnosticSink,
+                           CookError::SlangProgramLayoutNotFound,
+                           errStr);
+    }
+
+    for (const InterfaceAxisStub& stub : interfaceAxisStubs)
+    {
+        // match each extern to the one exact interface it actaully conforms to
+        std::string matchedInterfaceName;
+
+        // validate there is at least one matching interface, and that there's not multiple conformity
+        // we'll have to traverse this list again later, but that shouldn't be too costly
+        for (const InterfaceAxisImplStub& implStub : interfaceAxisImplStubs)
+        {
+            slang::TypeReflection* interfaceType = programLayout->findTypeByName(implStub.InterfaceName.c_str());
+            // now check to see if implStub is a subtype of the outer type
+            if (interfaceType != nullptr && programLayout->isSubType(stub.Type, interfaceType))
+            {
+                if (matchedInterfaceName.empty())
+                {
+                    matchedInterfaceName = implStub.InterfaceName;
+                }
+                else if (matchedInterfaceName != implStub.InterfaceName)
+                {
+                    // can't conform to more than one interface
+                    const std::string errStr = std::format("Type '{}' conforms to multiple interfaces: '{}' and '{}'",
+                                                           stub.Name,
+                                                           matchedInterfaceName,
+                                                           implStub.InterfaceName);
+                    return ReportError(*diagnosticSink,
+                                       CookError::SlangMultipleConformingInterfaces,
+                                       errStr);
+                }
+            }
+        }
+
+        if (matchedInterfaceName.empty())
+        {
+            const std::string errStr = std::format("Interface Axis {} has no tagged and conforming impls", stub.Name);
+            return ReportError(*diagnosticSink,
+                               CookError::SlangNoConformingInterfaces,
+                               errStr);
+        }
+
+        RawAxisDeclaration axisDecl
+        {
+            .Name = stub.Name,
+            .IsBooleanAxis = false,
+            .IsInterfaceAxis = true,
+            .AxisValues = {},
+            .ActiveWhen = {}, // todo: fill this in if present
+            .Kind = {}, // todo: also fill this in if present
+            .SourceFile = stub.SourceFile.empty() ? "<unknown>" : stub.SourceFile,
+            .SourceLine = stub.SourceLine,
+            .SourceColumn = stub.SourceColumn
+        };
+
+        slang::TypeReflection* interfaceType = programLayout->findTypeByName(matchedInterfaceName.c_str());
+        for (const InterfaceAxisImplStub& implStub : interfaceAxisImplStubs)
+        {
+            // now add the conforming implementations to the axis declaration, since we've confirmed this 
+            // interface axis has at least one conforming implementation and is otherwise valid
+            if (implStub.InterfaceName != matchedInterfaceName)
+            {
+                continue;
+            }
+
+            if (!programLayout->isSubType(implStub.Type, interfaceType))
+            {
+                const std::string warningStr = std::format("Type '{}' does not conform to interface '{}'",
+                                                           implStub.Type->getName(),
+                                                           matchedInterfaceName);
+                ReportWarning(*diagnosticSink, warningStr);
+                continue;
+            }
+
+            axisDecl.InterfaceImpls.emplace_back(implStub.Impl);
+        }
+
+        assert(!axisDecl.InterfaceImpls.empty());
+
+        auto sortRawInterfaceImpl = [](const RawInterfaceImpl& lhs, const RawInterfaceImpl& rhs)
+        {
+            return std::tie(lhs.Module, lhs.TypeName) < std::tie(rhs.Module, rhs.TypeName);
+        };
+
+        std::ranges::sort(axisDecl.InterfaceImpls, sortRawInterfaceImpl);
+    }
+
+    interfaceAxisStubs.clear();
+    interfaceAxisStubs.shrink_to_fit();
+    interfaceAxisImplStubs.clear();
+    interfaceAxisImplStubs.shrink_to_fit();
+    return CookError::Success;
+}
+
+CookError SlangModuleContext::rejectResourceMembers(slang::TypeReflection* type, std::string_view type_name)
+{
+    // we have to reject interface types that declare resource members, as that's not valid with this 
+    // model for link-time specialization (resource binding layout is made concrete before link-time)
+    const uint32_t memberCount = static_cast<uint32_t>(type->getFieldCount());
+    for (uint32_t i = 0; i < memberCount; ++i)
+    {
+        slang::VariableReflection* field = type->getFieldByIndex(i);
+        slang::TypeReflection* fieldType = field != nullptr ? field->getType() : nullptr;
+        if (fieldType == nullptr)
+        {
+            continue;
+        }
+
+        if (IsResourceTypeKind(fieldType->getKind()))
+        {
+            const char* fieldName = field->getName();
+            const std::string_view fieldNameView = fieldName != nullptr ? fieldName : "<field>";
+            const std::string errStr = std::format("Interface type '{}' declares a resource member '{}', which is not allowed",
+                                                   type_name,
+                                                   fieldNameView);
+            return ReportError(*diagnosticSink, CookError::SlangInterfaceHasResourceMember, errStr);
+        }
+    }
+    return CookError::Success;
 }
 
 } // namespace lodestone

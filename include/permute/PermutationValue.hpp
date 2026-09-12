@@ -16,17 +16,22 @@ struct PermutationValue
     {
         Invalid = 0,
         Bool,
-        UInt
+        UInt,
+        Type // Interface type
     };
 
     constexpr PermutationValue() noexcept : type(Type::Invalid), uintValue(static_cast<uint32_t>(0)) {}
     constexpr explicit PermutationValue(bool value) noexcept : type(Type::Bool), boolValue(value) {}
     constexpr explicit PermutationValue(uint32_t value) noexcept : type(Type::UInt), uintValue(value) {}
 
+    // Interface types store their values as the ordinal/index within the Axis' type list
+    static PermutationValue MakeType(uint32_t ordinal) noexcept;
+
     [[nodiscard]] bool IsValid() const noexcept;
     [[nodiscard]] Type GetType() const noexcept;
     [[nodiscard]] bool AsBool() const noexcept;
     [[nodiscard]] uint32_t AsUInt() const noexcept;
+    [[nodiscard]] uint32_t AsType() const noexcept;
 
     [[nodiscard]] bool operator==(const PermutationValue& other) const noexcept;
     [[nodiscard]] bool operator!=(const PermutationValue& other) const noexcept;
