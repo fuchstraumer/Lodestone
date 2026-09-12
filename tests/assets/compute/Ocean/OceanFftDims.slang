@@ -6,7 +6,7 @@ extern static const uint IFFT_SIZE = 512u;
 [ls_boolean_axis][ls_axis_kind("capability")]
 extern static const bool IFFT_USE_WAVE_OPS = true;
 
-[ls_axis_values("32, 64, 128")][ls_axis_kind("tuning")][ls_axis_active_when("IFFT_USE_WAVE_OPS==1")]
+[ls_axis_values("16, 32, 64, 128")][ls_axis_kind("tuning")][ls_axis_active_when("IFFT_USE_WAVE_OPS==1")]
 extern static const uint IFFT_WAVE_SIZE = 32u;
 
 // unlikely we define this one differently

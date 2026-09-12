@@ -169,37 +169,59 @@ CookResult<std::span<const RawAxisDeclaration>> SlangModuleContext::ReadDeclared
         slang::DeclReflection* moduleReflection = module->getModuleReflection();
         if (moduleReflection != nullptr)
         {
-            const int64_t childCount = static_cast<int64_t>(moduleReflection->getChildrenCount());
-            for (int64_t j = 0; j < childCount; ++j)
+            const CookError collected = collectAxesFromDecl(moduleReflection);
+            if (!collected)
             {
-                slang::DeclReflection* child = moduleReflection->getChild(static_cast<unsigned int>(j));
-                if ((child != nullptr) && child->getKind() == slang::DeclReflection::Kind::Variable)
-                {
-                    // this is ugly, because we need to both bubble up errors from source code (so CookResult<T>),
-                    // but also there are going to be variables that just aren't axes... so we need std::optional<>
-                    // to succinctly return values that aren't invalid, but aren't an axis either. sorry its ugly :(
-                    //NOLINTBEGIN(readability-else-after-return)
-                    auto axisDeclResult = buildAxisDecl(child);
-                    if (!axisDeclResult)
-                    {
-                        return std::unexpected(axisDeclResult.error());
-                    }
-                    else if (axisDeclResult->has_value() && (*axisDeclResult == std::nullopt))
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        axisDeclarations.emplace_back(std::move(*axisDeclResult.value()));
-                    }
-                    //NOLINTEND(readability-else-after-return)
-                }
+                return std::unexpected(collected);
             }
         }
     }
-    
+
     return axisDeclarations;
 }
+
+//NOLINTBEGIN(misc-no-recursion)
+CookError SlangModuleContext::collectAxesFromDecl(slang::DeclReflection* reflection)
+{
+    const unsigned int childCount = reflection->getChildrenCount();
+    for (unsigned int j = 0u; j < childCount; ++j)
+    {
+        slang::DeclReflection* child = reflection->getChild(j);
+        if (child == nullptr)
+        {
+            continue;
+        }
+
+        if (child->getKind() == slang::DeclReflection::Kind::Variable)
+        {
+            // A variable is an axis candidate. buildAxisDecl returns nullopt for a variable that
+            // carries no axis attribute, which is the common case, so a nullopt is skipped and never
+            // an error.
+            CookResult<std::optional<RawAxisDeclaration>> axisDeclResult = buildAxisDecl(child);
+            if (!axisDeclResult)
+            {
+                return axisDeclResult.error();
+            }
+            if (axisDeclResult->has_value())
+            {
+                axisDeclarations.emplace_back(std::move(**axisDeclResult));
+            }
+        }
+        else if (child->getChildrenCount() > 0u)
+        {
+            // A `__include`/`implementing` fragment reflects as an Unsupported node whose children are
+            // the real declarations. `getChild`/`getChildrenCount` are safe on such a node, so descend.
+            const CookError nested = collectAxesFromDecl(child);
+            if (!nested)
+            {
+                return nested;
+            }
+        }
+    }
+
+    return CookError::Success;
+}
+//NOLINTEND(misc-no-recursion)
 
 slang::IGlobalSession* SlangModuleContext::GlobalSession() const noexcept
 {
@@ -461,11 +483,11 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
     }
 
     // ActiveWhen, totally optional
-    slang::Attribute* activeWhenAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_active_when");
+    slang::Attribute* activeWhenAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_axis_active_when");
     if (activeWhenAttr != nullptr)
     {
         CookResult<std::string> activeWhenResult =
-            extractSingleAttribute(reflection, activeWhenAttr, "ls_active_when");
+            extractSingleAttribute(reflection, activeWhenAttr, "ls_axis_active_when");
         if (!activeWhenResult.has_value())
         {
             return std::unexpected(activeWhenResult.error());
@@ -488,9 +510,12 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
         result.Kind = std::move(*kindResult);
     }
 
-    // even in case of success, get source location to have around for validation and reporting later 
-    // (in case we have later failures in parsing the expression strings, which happens at a layer
-    // intentionally without any visibility into slang types!)
+    // Get the source location to carry along for later validation and reporting (a later failure to
+    // parse one of the expression strings happens in a layer with no visibility into Slang types, so
+    // it needs this to point at the line). This is best-effort, not required: a declaration reached
+    // through an `__include`d fragment reflects without a usable source location, and Slang returns a
+    // failure here. That must not sink the axis -- an axis with no location is still a valid axis, it
+    // just cannot name its own line in a later diagnostic. Leave the location unset and continue.
     slang::SourceLocation sourceLoc;
     if (SLANG_SUCCEEDED(session->getDeclSourceLocation(reflection, &sourceLoc)))
     {
@@ -500,10 +525,7 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
     }
     else
     {
-        const std::string errStr = std::format("Failed to get source location for axis declaration {}", result.Name);
-        return std::unexpected(ReportError(*diagnosticSink,
-                                           CookError::SlangGetSourceLocationFailed,
-                                           errStr));
+        result.SourceFile = "<unknown>";
     }
 
     return result;

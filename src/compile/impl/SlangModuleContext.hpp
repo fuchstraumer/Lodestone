@@ -64,6 +64,11 @@ private:
     // when multiple sources can invoke this code. this makes things more consistent and repeatable.
     [[nodiscard]] CookError buildSlangComponents();
 
+    // Walks one reflection node and every node beneath it, collecting each axis-carrying variable into
+    // `axisDeclarations`. A `__include`d file declared with `implementing` reflects as an Unsupported
+    // node that holds the real declarations as its children, so the walk must descend, not stop at the
+    // module's top level.
+    [[nodiscard]] CookError collectAxesFromDecl(slang::DeclReflection* reflection);
     [[nodiscard]] CookResult<std::optional<RawAxisDeclaration>> buildAxisDecl(slang::DeclReflection* reflection);
     [[nodiscard]] CookResult<std::string> extractSingleAttribute(slang::DeclReflection* decl_reflection,
                                                                  slang::Attribute* attribute,

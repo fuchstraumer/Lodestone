@@ -49,17 +49,14 @@ namespace lodestone
 
     void SymbolTable::AddSource(std::string_view module_name, std::string_view source_code) noexcept
     {
-        if (tokenMap.contains(module_name))
-        {
-            return;
-        }
-
         auto isIdentifierChar = [](char c) -> bool
         {
             return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
         };
 
-        TokenSet tokens;
+        // Accumulate tokens for this module - one module may receive tokens from
+        // several sources, due to how slang handles `__include` directives.
+        TokenSet& tokens = tokenMap[module_name];
         size_t lineStart = 0u;
 
         while (std::cmp_less(lineStart, source_code.size()))
@@ -106,9 +103,6 @@ namespace lodestone
                 tokens.emplace(token);
             }
         }
-
-        tokenMap.emplace(module_name, std::move(tokens));
-  
     }
 
     std::vector<std::string_view> SymbolTable::MissingTokens(std::span<std::string_view> module_names,

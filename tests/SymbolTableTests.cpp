@@ -112,19 +112,18 @@ void csMain(uint3 tid : SV_DispatchThreadID)
                  "a declaration alone does not count as a use in the declaring module");
 }
 
-// A module is read once. A second AddSource with the same name is ignored. An unknown module holds no
-// tokens, so every queried token is missing.
-void TestIdempotencyAndUnknownModule(TestRunner& runner)
+// A module can be fed several sources, which pool under its name (a root plus its __include'd
+// fragments). An unknown module holds no tokens, so every queried token is missing.
+void TestAccumulationAndUnknownModule(TestRunner& runner)
 {
-    runner.BeginSection("idempotency and unknown module");
+    runner.BeginSection("accumulation and unknown module");
 
     SymbolTable table;
     table.AddSource("mod", "alpha beta");
-    table.AddSource("mod", "gamma delta"); // ignored: mod is already present
+    table.AddSource("mod", "gamma delta"); // pools into "mod" alongside the first source
 
-    const std::vector<std::string_view> missing = Missing(table, { "mod" }, { "alpha", "gamma" });
-    runner.Check(missing.size() == 1u && missing[0] == "gamma",
-                 "a second AddSource for the same module is ignored");
+    runner.Check(Missing(table, { "mod" }, { "alpha", "gamma" }).empty(),
+                 "a second AddSource for the same module pools its tokens in");
 
     runner.Check(Missing(table, { "nonexistent" }, { "alpha" }).size() == 1u,
                  "an unknown module holds no tokens, so the token is missing");
@@ -138,6 +137,6 @@ int main()
     TestExternStaticConstStripping(runner);
     TestKeywordStripping(runner);
     TestAxisReachability(runner);
-    TestIdempotencyAndUnknownModule(runner);
+    TestAccumulationAndUnknownModule(runner);
     return runner.Report();
 }

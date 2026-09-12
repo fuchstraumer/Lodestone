@@ -758,7 +758,8 @@ namespace
         }
         else
         {
-            std::optional<AxisKind> kind = magic_enum::enum_cast<AxisKind>(str);
+            // make sure to use case-insensitive, otherwise "tuning" would not match AxisKind::Tuning
+            std::optional<AxisKind> kind = magic_enum::enum_cast<AxisKind>(str, magic_enum::case_insensitive);
             if (kind.has_value())
             {
                 return kind.value();
@@ -781,6 +782,16 @@ namespace
         for (auto chunk : csvView)
         {
             std::string_view valueStr = std::string_view(std::ranges::data(chunk), std::ranges::size(chunk));
+            // we have to trim leading and trailing whitespace, if it's present, as from_chars will fail 
+            // if we don't make sure to trim it out
+            const size_t firstNonSpace = valueStr.find_first_not_of(" \t\r\n");
+            if (firstNonSpace == std::string_view::npos)
+            {
+                continue;
+            }
+            const size_t lastNonSpace = valueStr.find_last_not_of(" \t\r\n");
+            valueStr = valueStr.substr(firstNonSpace, lastNonSpace - firstNonSpace + 1);
+
             uint32_t value{ 0u };
             std::from_chars_result result = std::from_chars(valueStr.data(),
                                                             valueStr.data() + valueStr.size(),
