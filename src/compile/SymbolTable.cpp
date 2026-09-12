@@ -161,7 +161,8 @@ namespace lodestone
             // `extern static const` passes and so does `static extern const` etc
             if (line.contains("extern") &&
                 line.contains("static") &&
-                line.contains("const"))
+                line.contains("const") &&
+                line.contains("="))
             {
                 ExternConstantDeclaration decl = ExtractExternConst(line);
                 externConsts.emplace(decl);
