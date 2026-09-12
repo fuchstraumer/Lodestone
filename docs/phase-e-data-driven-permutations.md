@@ -686,11 +686,11 @@ change **what**. Each one adds capability that no golden file covers.
 | E3 | Depth-first enumeration with constraint propagation. **Done 2026-09-06**: one `expandFrom` walk, `Require` bucketed by ready-depth in a `RequireReadyMap`, `MaxVariants` enforced in the walk | **The variants dump is byte identical** (it stayed so) | medium |
 | E4 | Sorted key table and binary search, in place of the storage index. **Done 2026-09-07**: `ComputeVariantKey` returns a `uint64` key, `EnumerateVariants` ranks the sorted keys, the manifest carries a `VariantKeys` table, and `FindSlot` uses a `lower_bound`. The per-variant capability requirement stays open | Round trips pass, and five stage dumps were re-accepted because the indices compacted | **high** |
 | E5 | The toml++ reader behind a facade, the policy file, per-target sections, `CookValues`, `CookIf` (was `CookWhen`), `InertAxesForEntryPoints` (was `ExpectedInfluence`). **Done 2026-09-11** | `PolicyDocumentTest`; the six dumps unchanged, because the cook reads no policy yet | medium |
-| E6 | Axis attributes and the bootstrap compile. Delete `VerifyAxisNamesAreDeclared` | A cook of `OceanFft` with no registry entry | **high** |
+| E6 | Axis attributes read at the bootstrap compile, and `k_ModuleSpaces` deleted whole. **Done 2026-09-11**: `ReadDeclaredAxes` recurses through `__include` fragment nodes, `BuildPermutationSpace` builds the space, the `SymbolTable` prunes unused axes | `OceanFft` cooks 35 variants with no registry, the six dumps match, and `SymbolTableTest` | **high** |
 | E7 | Interface axes. E0 removed the enum fallback | A new test shader | medium |
 | E8 | Documents, and the measured numbers again | — | none |
 
-**E0c, E0, E1, E2, E3, E4, and E5 are complete.** A diversion after E4, call it E4a, hardened the
+**E0c, E0, E1, E2, E3, E4, E5, and E6 are complete.** A diversion after E4, call it E4a, hardened the
 client trust boundary. `ShaderManifestView::Open` now validates the whole manifest graph once. The
 error type is a `ShaderManifestError` struct that names the table and the record, and
 `DescribeShaderManifestError` prints it. The manifest format version is now 2.
@@ -705,18 +705,25 @@ enumeration. `PermutationValue` lost its signed alternative. The registry lost i
 renumber the E4 ranks and change five dumps, so `CookTest` passes no `--policy-file` and the dumps stay
 stable. **E6 is next.**
 
-**E6 moves the axis declaration into the shader.** It puts the axis on the `extern static const` line as
-an attribute, adds the bootstrap compile that reads it, then deletes `k_ModuleSpaces` and
-`VerifyAxisNamesAreDeclared`. After it, an axis name cannot drift from its declaration, because only one
-name exists.
+**E6 moved the axis declaration into the shader, on 2026-09-11.** The axis lives on the
+`extern static const` line as an `ls_axis_*` attribute. `SlangCompiler::PrepareRawModule` reads the
+attributes at the bootstrap compile through `SlangModuleContext::ReadDeclaredAxes`, and
+`BuildPermutationSpace` turns them into a space. `src/permute/PermutationRegistry.cpp`, `k_ModuleSpaces`,
+and `FindPermutationSpaceForModule` are deleted whole, so no module data is compiled in, and an axis
+name cannot drift from its declaration, because only one name exists. Two Slang facts about `__include`
+shaped `ReadDeclaredAxes`, and `docs/phase-e-attribute-spike.md` records them: an `__include`d fragment
+reflects as an Unsupported node with the declarations one level down, so the read recurses; and
+`getDeclSourceLocation` fails for such a decl, so a missing location is soft, not fatal. The
+`SymbolTable` prunes an imported-but-unused axis from a shader's space, and `SymbolTableTest` proves it.
+Two loose ends stay: the dead `VerifyAxisNamesAreDeclared` declaration, and the `ExternConstantScanner`
+read that a later step folds into the `SymbolTable`. **E7 is next.**
 
-**Run E6's acceptance test once before E6 starts.** A module with no registered space reached
-`space.front()` on an empty vector and aborted the cook until 2026-08-20. The walk (`expandFrom`, since
-E3) handles the empty space by hitting its base case at depth 0, and `PermutationIndexTest` covers it.
-Run the cook anyway, so a failure during
-E6 belongs to E6.
+**The empty space holds.** A module with no declared axis once reached `space.front()` on an empty
+vector and aborted the cook, until 2026-08-20. The walk (`expandFrom`, since E3) handles the empty space
+by hitting its base case at depth 0, so such a module cooks one variant. `PermutationIndexTest` covers
+it.
 
-E6 is the step that justifies the phase. After it, an axis name cannot drift from its declaration,
+E6 was the step that justified the phase. After it, an axis name cannot drift from its declaration,
 because only one name exists.
 
 ---

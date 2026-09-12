@@ -179,3 +179,35 @@ State these plainly, because a later reader must not think they were answered.
 - **A conditional or nested declaration.** §5 requires an axis at module scope, and not inside a struct
   or a function. The probe declared every axis at module scope. Reject a conditional declaration, and
   name the file and the line.
+
+---
+
+## Addendum: `__include` and `implementing`, measured during E6 (2026-09-11)
+
+Both probes used `import`. `OceanFft` does not. It builds one module from several files with
+`__include OceanFftDims;` and `implementing OceanFft;`, which the Slang docs recommend for splitting a
+module into discrete files. E6 found that `__include` reflects differently from `import` in two ways,
+and each one changed `ReadDeclaredAxes`. State them plainly, because the probes above imply `import` and
+a reader must not assume the `import` behavior holds for `__include`.
+
+1. **An `__include`d fragment reflects as an Unsupported node, and its declarations are its children.**
+   With `import`, the imported module is a separate loaded module, and its `extern static const`s are
+   top-level `Variable` decls in that module's reflection. With `__include`, there is one loaded module
+   (`OceanFft`), and each fragment appears as a **kind 0 (Unsupported) child node named for the file**
+   (`OceanFftDims`, `OceanFftBindings`, ...). The axes are `Variable` **grandchildren** inside those
+   nodes, one level down. A read that scans only the module's top level finds nothing.
+
+   **So `ReadDeclaredAxes` recurses.** It descends into any child that has children, and collects the
+   `Variable` decls at any depth. `getChild` and `getChildrenCount` are safe on an Unsupported node; the
+   E0 rule that `getType` crashes on one still holds, and the read does not call it.
+
+2. **`getDeclSourceLocation` fails for a decl reached through an `__include`d fragment.** The probe read
+   a top-level decl and got a file, a line, and a column. A decl inside a fragment node returns a
+   failure instead. So `buildAxisDecl` treats a missing source location as **soft**: it records
+   `<unknown>` and keeps the axis, rather than rejecting it. An axis with no location is still a valid
+   axis. It only loses the line number in a later diagnostic.
+
+Two smaller facts from the same work, for completeness. The values string arrives with the author's
+spacing, so `"128, 256"` splits into `" 256"`, and the values parser trims each token before
+`from_chars`. And `ls_axis_kind("tuning")` is lowercase while `AxisKind::Tuning` is not, so the kind
+parse is case-insensitive.

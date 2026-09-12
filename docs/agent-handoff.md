@@ -12,20 +12,22 @@ Text in this file follows ASD-STE100.
 
 ## 1. State on 2026-09-11
 
-**The compiler split is complete and the pipeline works. Phase E steps E1, E2, E3, E4, and E5 have
+**The compiler split is complete and the pipeline works. Phase E steps E1, E2, E3, E4, E5, and E6 have
 landed, and the client-side manifest validation work (E4a) has landed with them.** E3 made enumeration
 one depth-first walk with propagated `Require` pruning and an in-walk `MaxVariants` guard. E4 replaced
 the mixed-radix storage index with a sorted key table, so a variant's dense index is now its rank. E4a
 made `ShaderManifestView::Open` validate the whole manifest graph once, so the runtime accessors trust
 the data. E5 moved the cook policy out of the compiled-in registry and into a TOML file that a
-`PolicyDocument` reads. `PolicyDocumentTest` proves the reader, so the suite is sixteen test targets.
-Phase E step E0c added `AccessModelRejectTest`.
+`PolicyDocument` reads. **E6 moved the axis declarations into the shader and deleted the compiled-in
+registry whole**: the cooker reads each axis off its `extern static const` through reflection, so no
+module data is compiled in. `PolicyDocumentTest` and `SymbolTableTest` bring the suite to seventeen
+test targets. Phase E step E0c added `AccessModelRejectTest`.
 
 | Configuration | Build | Tests |
 |---|---|---|
-| RelWithDebInfo, `ninja-clang-cl` | green | 16 of 16 |
+| RelWithDebInfo, `ninja-clang-cl` | green | 17 of 17 |
 
-Thirteen targets are unit tests, and three are cooks. `scripts\run-tests.bat` reports
+Fourteen targets are unit tests, and three are cooks. `scripts\run-tests.bat` reports
 `all targets passed`, and `python scripts/check-known-good.py` reports all six stage dumps match.
 
 **Only the clang tree was rebuilt on 2026-09-01.** `build/ninja-msvc` went with the rest of `build/`
@@ -38,8 +40,12 @@ A green cook of `OceanFft` reports 35 variants over an index space of 56, 105 en
 emits 663 KiB of WGSL. Those numbers are the regression check. The whole cook took 1080 ms in
 RelWithDebInfo on 2026-09-01, and `CookTest` was still green on 2026-09-04.
 
+A cook now builds this space from the shader, not from a compiled-in table. The count matches the old
+registry because `OceanFftDims.slang` declares `IFFT_WAVE_SIZE` with all four values, 16 included. The
+16 value stays for testing only. A shipped shader would not cook it.
+
 **`python scripts/check-known-good.py` is the finer check.** It cooks a module and compares each of
-the six stage dumps against `tests/known_good/`. Those files are current as of 2026-09-04, when all
+the six stage dumps against `tests/known_good/`. Those files are current as of 2026-09-11, when all
 six matched a fresh RelWithDebInfo cook. Run it
 after a change to reflection, to a stage, or to a dump. It found a reflection regression on the day
 it was written, and section 13 records that.
@@ -241,10 +247,10 @@ module instead of reading the file. Fact 10 in §4 states which modules belong i
 
 ---
 
-## 8. The next task: phase E step E6
+## 8. The next task: phase E step E7
 
 `docs/phase-e-data-driven-permutations.md` holds the plan. **Steps E0a, E0b, E0c, E0, E1, E2, E3, E4,
-and E5 are complete, and item D2 of §10 is settled.** Nothing in that document is open for a decision.
+E5, and E6 are complete, and item D2 of §10 is settled.** Nothing in that document is open for a decision.
 
 **E1 is done, on 2026-09-01.** The attribute expression evaluator gained a comparison level, a
 logical level, and unary `!`. The file `SizeExpression.{hpp,cpp}` became `AttributeExpression.{hpp,cpp}`,
@@ -327,20 +333,29 @@ variant set, renumber the E4 ranks, and change five stage dumps. So the driver l
 `PolicyDocumentTest` covers the reader on its own. Wire the file into the cook only with a non-pruning
 policy, or accept the new dumps on purpose.
 
-**E6 is next.** It moves the axis declaration onto the `extern static const` line in the shader, as an
-attribute, and it adds the bootstrap compile that reads the attributes. `src/permute/PermutationRegistry.cpp`
-and its `k_ModuleSpaces` table are then deleted whole, and `VerifyAxisNamesAreDeclared` goes with them,
-because the axis becomes the declaration and no second name exists. §11 of
-`docs/phase-e-data-driven-permutations.md` holds the step, and §5 holds the reasoning.
+**E6 is done, on 2026-09-11. The registry is gone.** The axis declaration now lives on the
+`extern static const` line in the shader, as an `ls_axis_*` attribute. `SlangCompiler::PrepareRawModule`
+reads the attributes at the bootstrap compile, through `SlangModuleContext::ReadDeclaredAxes`, and the
+driver builds the `PermutationSpace` from what it reads with `BuildPermutationSpace`.
+`src/permute/PermutationRegistry.cpp`, the `k_ModuleSpaces` table, and `FindPermutationSpaceForModule`
+are deleted whole. No module data is compiled in. `SymbolTableTest` is the seventeenth target, and it
+proves the reachability prune that keeps an imported-but-unused axis out of a shader's space.
 
-**`docs/phase-e-attribute-spike.md` holds the E6 probe results. Read it before E6.** Two probes on
-2026-09-11 resolved the high-risk Slang unknown. First, an axis attribute reads back through reflection
-with a real source location: an `extern static const` is a `Variable` decl, `findAttributeByName` reads
-each `vx_axis_*` string, and `getDeclSourceLocation` gives file, line, and column. Second, and it
-changes the walk: an imported axis does **not** appear in the importing module's own reflection. The
-reader must iterate the session's loaded modules (`getLoadedModuleCount`/`getLoadedModule`), because
-each module holds only its own decls. Heritability still holds, because loading a shader loads its
-import closure, so the symbol-reachability prune of §5 becomes required, not optional.
+**Two Slang facts about `__include` decided the shape of `ReadDeclaredAxes`, and neither matched the E0
+probe.** `OceanFft` pulls its axes in with `__include OceanFftDims;` and `implementing OceanFft;`, not
+with `import`. First, an `__include`d fragment reflects as an Unsupported (kind 0) child node, and the
+axis `extern static const`s sit inside it, one level down. So `ReadDeclaredAxes` recurses through the
+child nodes, rather than reading the module's top level alone. Second, `getDeclSourceLocation` fails for
+a decl reached this way, so `buildAxisDecl` treats a missing location as soft, not fatal.
+`docs/phase-e-attribute-spike.md` records both, with the probe results and this addendum.
+
+**Two E6 loose ends stay open.** `VerifyAxisNamesAreDeclared` is now dead: it is declared in
+`permute/PermutationSpace.hpp` with no caller and no definition. Delete the declaration. And
+`ExternConstantScanner` still reads the undriven `extern static const` defaults for size expressions.
+The `SymbolTable` already tokenizes every source, so a later step folds that read into the tokenizer and
+deletes the scanner. `todo.md` records it.
+
+**E7 is next.** It adds interface axes, and `docs/phase-e-interface-spike.md` holds the answers.
 
 **`docs/phase-e-interface-spike.md` holds the E0 answers.** Read it before E7. Three results matter
 early: a link-time `extern` type works and uses the mechanism the constant axis already uses, an
@@ -349,12 +364,12 @@ interface axis can never carry a resource, and `getFullName` is not module quali
 The rest of the phase E order is the one §11 of that document gives. The parts worth knowing before
 you read it:
 
-- The axis declaration moves onto the `extern static const` in the shader, as an attribute. That is
-  what removes the drift rule 6 of `CLAUDE.md` guards against, by making the name impossible to state
-  twice. E6 does this.
-- `src/permute/PermutationRegistry.cpp` and its `k_ModuleSpaces` table are deleted whole by step E6.
-  Only `OceanFft` has a row today, and E5 already stripped that row's policy pointer.
-- E7 adds interface axes. §8 of that document holds the spike answers.
+- The axis declaration now lives on the `extern static const` in the shader, as an attribute. This
+  removed the drift that rule 6 of `CLAUDE.md` guards against, because the name cannot be stated twice.
+  E6 did this, and it deleted `src/permute/PermutationRegistry.cpp` and `k_ModuleSpaces` whole.
+- E7 adds interface axes. §8 of `docs/phase-e-data-driven-permutations.md` holds the spike answers, and
+  `docs/phase-e-interface-spike.md` holds the detail.
+- E8 is the documentation pass and a fresh measurement of the numbers.
 
 ---
 
