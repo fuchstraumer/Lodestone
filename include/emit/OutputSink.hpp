@@ -15,8 +15,8 @@ namespace lodestone
 class OutputSink
 {
 public:
-    OutputSink() noexcept;
-    virtual ~OutputSink();
+    explicit OutputSink(std::string _name) noexcept;
+    virtual ~OutputSink() noexcept;
     OutputSink(const OutputSink&) = delete;
     OutputSink& operator=(const OutputSink&) = delete;
     OutputSink(OutputSink&&) noexcept = default;
@@ -26,19 +26,20 @@ public:
      * multiple named artifacts. */
     virtual CookError WriteArtifact(std::string_view artifact_name,
                                     std::string_view content) = 0;
-    [[nodiscard]] virtual std::string_view Describe() const noexcept = 0;
+    std::string_view Describe() const noexcept;
+protected:
+    std::string name;
 };
 
 class FileOutputSink final : public OutputSink
 {
 public:
-    explicit FileOutputSink(std::filesystem::path path);
+    explicit FileOutputSink(std::filesystem::path path) noexcept;
     ~FileOutputSink() override;
     FileOutputSink(FileOutputSink&&) noexcept = default;
     FileOutputSink& operator=(FileOutputSink&&) noexcept = default;
 
     [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::string_view content) override;
-    [[nodiscard]] std::string_view Describe() const noexcept override;
 
 private:
     std::filesystem::path path;
@@ -48,16 +49,14 @@ class MemoryOutputSink final : public OutputSink
 {
 public:
     MemoryOutputSink();
-    explicit MemoryOutputSink(std::string_view _name);
+    explicit MemoryOutputSink(std::string _name) noexcept;
     ~MemoryOutputSink() override;
 
     [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::string_view content) override;
-    [[nodiscard]] std::string_view Describe() const noexcept override;
     /** Every companion artifact, keyed by name. The determinism check compares two cooks with it. */
     [[nodiscard]] const std::map<std::string, std::string>& GetArtifacts() const noexcept;
 
 private:
-    std::string name;
     std::map<std::string, std::string> artifacts;
 };
 

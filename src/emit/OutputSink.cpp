@@ -11,10 +11,16 @@
 namespace lodestone
 {
 
-OutputSink::OutputSink() noexcept = default;
-OutputSink::~OutputSink() = default;
+OutputSink::OutputSink(std::string _name) noexcept : name{ std::move(_name) } {}
+OutputSink::~OutputSink() noexcept = default;
 
-FileOutputSink::FileOutputSink(std::filesystem::path _path) :
+std::string_view OutputSink::Describe() const noexcept
+{
+    return name;
+}
+
+FileOutputSink::FileOutputSink(std::filesystem::path _path) noexcept :
+    OutputSink{ _path.string() },
     path{ std::move(_path) }
 {
     if (!path.empty() && !std::filesystem::exists(path))
@@ -48,7 +54,7 @@ MemoryOutputSink::MemoryOutputSink() : MemoryOutputSink{ "memory_output_sink" }
 {
 }
 
-MemoryOutputSink::MemoryOutputSink(std::string_view _name) : name{ _name }
+MemoryOutputSink::MemoryOutputSink(std::string _name) noexcept : OutputSink{ std::move(_name) }
 {
 }
 
@@ -58,11 +64,6 @@ CookError MemoryOutputSink::WriteArtifact(std::string_view artifact_name, std::s
 {
     auto [iter, inserted] = artifacts.try_emplace(std::string{ artifact_name }, std::string{ _content });
     return inserted ? CookError::Success : CookError::ArtifactAlreadyWritten;
-}
-
-std::string_view MemoryOutputSink::Describe() const noexcept
-{
-    return name;
 }
 
 const std::map<std::string, std::string>& MemoryOutputSink::GetArtifacts() const noexcept
