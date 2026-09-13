@@ -699,6 +699,7 @@ CookError SlangModuleContext::buildInterfaceAxes()
                 if (matchedInterfaceName.empty())
                 {
                     matchedInterfaceName = implStub.InterfaceName;
+                    // could we break here, if we know there's at least one matching interface?
                 }
                 else if (matchedInterfaceName != implStub.InterfaceName)
                 {
@@ -732,7 +733,9 @@ CookError SlangModuleContext::buildInterfaceAxes()
             .Kind = {}, // todo: also fill this in if present
             .SourceFile = stub.SourceFile.empty() ? "<unknown>" : stub.SourceFile,
             .SourceLine = stub.SourceLine,
-            .SourceColumn = stub.SourceColumn
+            .SourceColumn = stub.SourceColumn,
+            .InterfaceName = matchedInterfaceName,
+            .InterfaceImpls = {}
         };
 
         slang::TypeReflection* interfaceType = programLayout->findTypeByName(matchedInterfaceName.c_str());

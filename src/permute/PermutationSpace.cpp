@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
@@ -623,6 +624,17 @@ CookResult<PermutationSpace> BuildPermutationSpace(const SymbolTable& symbol_tab
             values.append_range(k_BoolValues);
             valueDomain = AxisValueDomain::Boolean;
         }
+        else if (rawAxis.IsInterfaceAxis)
+        {
+            // build the expanded list of permutation values for the interface axis.
+            // each value is just the index of that interface implementation in the list of all implementations
+            assert(rawAxis.InterfaceImpls.size() < PermutationAxis::k_MaxValues)
+            for (uint32_t i = 0; std::cmp_less(i, rawAxis.InterfaceImpls.size()); ++i)
+            {
+                values.emplace_back(PermutationValue::MakeType(i));
+            }
+            valueDomain = AxisValueDomain::Type;
+        }
         else
         {
             CookResult<std::vector<PermutationValue>> splitValues = ValuesFromStr(rawAxis.AxisValues, sink);
@@ -640,6 +652,13 @@ CookResult<PermutationSpace> BuildPermutationSpace(const SymbolTable& symbol_tab
                           EarliestBindingTime::Cook,
                           valueDomain,
                           rawAxis.ActiveWhen);
+
+        // awkward format to do this in currently, might be better 
+        if (rawAxis.IsInterfaceAxis)
+        {
+            auto& interfaceAxis = axes.back();
+            interfaceAxis.SetInterfaceAxisParams(rawAxis.InterfaceName, rawAxis.InterfaceImpls);
+        }
     }
 
     return PermutationSpace{ axes };

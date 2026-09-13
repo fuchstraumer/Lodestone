@@ -236,7 +236,7 @@ constexpr bool IsResourceTypeKind(slang::TypeReflection::Kind kind) noexcept
         slang::TypeReflection::Kind::DynamicResource
     };
     // im doing this just because i think it's funny that it's constexpr
-    return std::ranges::binary_search(k_ResourceKinds, kind);
+    return std::ranges::contains(k_ResourceKinds, kind);
 }
 
 constexpr StorageTextureAccess FromSlangBindingTypeAccess(slang::BindingType binding_type) noexcept
