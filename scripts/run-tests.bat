@@ -25,7 +25,7 @@ if not exist "%BIN%" (
 set "FAILED=0"
 
 for %%T in ("%BIN%\*Test.exe") do (
-    if /I not "%%~nT"=="CookTest" if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" (
+    if /I not "%%~nT"=="CookTest" if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" (
         "%%~fT" >nul 2>&1
         if errorlevel 1 (
             echo [FAIL] %%~nT
@@ -40,7 +40,7 @@ for %%T in ("%BIN%\*Test.exe") do (
 REM The end-to-end cook. Exit code 0 states that every variant compiled, every reflection agreed
 REM with the emitted WGSL, both round trips read back the same bytes, and two cooks agreed byte for
 REM byte. It takes about 15 seconds.
-"%BIN%\CookTest.exe" -o "%REPO%\build\%PRESET%\tests\cook_test_output\ShaderLibrary.hpp" --verify-deterministic "%REPO%\tests\assets\compute\Ocean\OceanFft.slang" >nul 2>&1
+"%BIN%\CookTest.exe" -o "%REPO%\build\%PRESET%\tests\cook_test_output" --verify-deterministic "%REPO%\tests\assets\compute\Ocean\OceanFft.slang" >nul 2>&1
 if errorlevel 1 (
     echo [FAIL] CookTest
     set "FAILED=1"
@@ -48,8 +48,18 @@ if errorlevel 1 (
     echo [ ok ] CookTest
 )
 
+REM The interface-axis end-to-end cook (phase E step E7). It cooks six variants over a Type axis
+REM crossed with a boolean axis.
+"%BIN%\InterfaceAxisCookTest.exe" -o "%REPO%\build\%PRESET%\tests\interface_axis_output" --verify-deterministic "%REPO%\tests\assets\InterfaceAxis\InterfaceAxisTest.slang" >nul 2>&1
+if errorlevel 1 (
+    echo [FAIL] InterfaceAxisCookTest
+    set "FAILED=1"
+) else (
+    echo [ ok ] InterfaceAxisCookTest
+)
+
 REM The same driver, on the probe module for the entry point parameter scope. It cooks one variant.
-"%BIN%\EntryPointParamsCookTest.exe" -o "%REPO%\build\%PRESET%\tests\entry_point_params_output\ShaderLibrary.hpp" --verify-deterministic "%REPO%\tests\assets\EntryPointParams.slang" >nul 2>&1
+"%BIN%\EntryPointParamsCookTest.exe" -o "%REPO%\build\%PRESET%\tests\entry_point_params_output" --verify-deterministic "%REPO%\tests\assets\EntryPointParams.slang" >nul 2>&1
 if errorlevel 1 (
     echo [FAIL] EntryPointParamsCookTest
     set "FAILED=1"
@@ -58,7 +68,7 @@ if errorlevel 1 (
 )
 
 REM The same driver, on the probe module for the parameter block walk. It cooks one variant.
-"%BIN%\ParameterBlocksCookTest.exe" -o "%REPO%\build\%PRESET%\tests\parameter_blocks_output\ShaderLibrary.hpp" --verify-deterministic "%REPO%\tests\assets\ParameterBlocks.slang" >nul 2>&1
+"%BIN%\ParameterBlocksCookTest.exe" -o "%REPO%\build\%PRESET%\tests\parameter_blocks_output" --verify-deterministic "%REPO%\tests\assets\ParameterBlocks.slang" >nul 2>&1
 if errorlevel 1 (
     echo [FAIL] ParameterBlocksCookTest
     set "FAILED=1"

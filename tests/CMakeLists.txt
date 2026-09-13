@@ -29,7 +29,7 @@ endfunction()
 # cook fails on a reflection mismatch, on a failed round trip, and on a non-deterministic result, so
 # exit code 0 is a real statement about the output.
 add_lodestone_unit_test(CookTest CookTest.cpp
-    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/cook_test_output/ShaderLibrary.hpp"
+    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/cook_test_output"
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/compute/Ocean/OceanFft.slang")
 # The same driver, on the probe module that phase E step E0a needed. `EntryPointParams.slang`
@@ -39,7 +39,7 @@ add_lodestone_unit_test(CookTest CookTest.cpp
 # The probe cooks on its own, and not beside OceanFft. One cook of two modules writes one shared
 # header and one shared dedupe report, so every OceanFft artifact would stop being byte identical.
 add_lodestone_unit_test(EntryPointParamsCookTest CookTest.cpp
-    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/entry_point_params_output/ShaderLibrary.hpp"
+    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/entry_point_params_output"
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/EntryPointParams.slang")
 # The same driver, on the probe module that phase E step E0b needed. `ParameterBlocks.slang` declares
@@ -47,7 +47,7 @@ add_lodestone_unit_test(EntryPointParamsCookTest CookTest.cpp
 # entry points. Slang describes a block with descriptor ranges alone, so a cooker that walks the
 # binding ranges gives every content of every block no binding at all.
 add_lodestone_unit_test(ParameterBlocksCookTest CookTest.cpp
-    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/parameter_blocks_output/ShaderLibrary.hpp"
+    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/parameter_blocks_output"
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/ParameterBlocks.slang")
 # The same driver, on the module that phase E step E7 needed. `InterfaceAxisTest.slang` declares an
@@ -57,7 +57,7 @@ add_lodestone_unit_test(ParameterBlocksCookTest CookTest.cpp
 # conformance. Crossed with the boolean axis it is a real product of six variants. Exit code 0 states
 # that every variant linked, the cross-check agreed, both round trips read back, and two cooks matched.
 add_lodestone_unit_test(InterfaceAxisCookTest CookTest.cpp
-    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/interface_axis_output/ShaderLibrary.hpp"
+    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/interface_axis_output"
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/InterfaceAxis/InterfaceAxisTest.slang")
 # The one test in this suite that asserts a cook FAILS. Phase E step E0c needed it.

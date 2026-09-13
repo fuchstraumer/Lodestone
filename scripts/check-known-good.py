@@ -75,7 +75,7 @@ def cook(cooker: pathlib.Path, module: pathlib.Path, out_directory: pathlib.Path
         [
             str(cooker),
             "-o",
-            str(out_directory / "dump"),
+            str(out_directory),
             "--dump-stage=all",
             str(module),
         ],
