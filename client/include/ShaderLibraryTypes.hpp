@@ -2,6 +2,7 @@
 #ifndef LODESTONE_SHADER_LIBRARY_TYPES_HPP
 #define LODESTONE_SHADER_LIBRARY_TYPES_HPP
 #include "ResourceFlags.hpp"
+#include "VariantKey.hpp"
 #include <cstdint>
 #include <span>
 #include <string_view>
@@ -245,11 +246,11 @@ public:
 
     /** @brief WGSL for one entry point of one variant. An unknown pair returns an empty view. */
     [[nodiscard]] virtual std::string_view Source(uint32_t entry_point,
-                                                  uint32_t variant_index) const noexcept = 0;
+                                                  VariantKey variant) const noexcept = 0;
     [[nodiscard]] virtual std::span<const BindingInfo> Bindings(uint32_t entry_point,
-                                                                uint32_t variant_index) const noexcept = 0;
+                                                                VariantKey variant) const noexcept = 0;
     [[nodiscard]] virtual WorkgroupSize Workgroup(uint32_t entry_point,
-                                                  uint32_t variant_index) const noexcept = 0;
+                                                  VariantKey variant) const noexcept = 0;
     /** @brief Increments when any source above changes. A constant means sources never change. */
     [[nodiscard]] virtual uint64_t Generation() const noexcept = 0;
 };

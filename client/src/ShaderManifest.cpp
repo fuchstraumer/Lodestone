@@ -1,6 +1,7 @@
 #include "ShaderManifest.hpp"
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "VariantKey.hpp"
 
 #include <algorithm>
 #include <array>
@@ -719,7 +720,7 @@ ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std:
     view.entryPoints = entryPointSpan;
     view.slots = MakeTable<ManifestSlot>(bytes, parsed.SlotTableOffset, parsed.SlotCount);
     view.variants = MakeTable<ManifestVariant>(bytes, parsed.VariantTableOffset, parsed.VariantCount);
-    view.variantKeys = MakeTable<uint64_t>(bytes, parsed.VariantKeyTableOffset, parsed.VariantKeyCount);
+    view.variantKeys = MakeTable<VariantKey>(bytes, parsed.VariantKeyTableOffset, parsed.VariantKeyCount);
     view.axes = MakeTable<ManifestAxis>(bytes, parsed.AxisTableOffset, parsed.AxisCount);
     view.axisValues = MakeTable<int64_t>(bytes, parsed.AxisValueTableOffset, parsed.AxisValueCount);
     view.rasterStates = MakeTable<ManifestRaster>(bytes, parsed.RasterTableOffset, parsed.RasterCount);
@@ -843,7 +844,7 @@ std::span<const ManifestUniformMember> ShaderManifestView::UniformMembers(
     return uniformMembers.subspan(binding.FirstUniformMember, binding.UniformMemberCount);
 }
 
-const ManifestSlot* ShaderManifestView::FindSlot(uint32_t entry_point, uint64_t variant_key) const noexcept
+const ManifestSlot* ShaderManifestView::FindSlot(uint32_t entry_point, VariantKey variant_key) const noexcept
 {
     const auto keyIter = std::ranges::lower_bound(variantKeys, variant_key);
     if (keyIter == variantKeys.end() || *keyIter != variant_key) [[unlikely]]
@@ -969,9 +970,9 @@ BindingInfo ManifestShaderSourceProvider::MakeBindingInfo(const ManifestBinding&
 ManifestShaderSourceProvider::~ManifestShaderSourceProvider() = default;
 
 std::string_view ManifestShaderSourceProvider::Source(uint32_t entry_point,
-                                                      uint32_t variant_index) const noexcept
+                                                      VariantKey variant) const noexcept
 {
-    const ManifestSlot* slot = view.FindSlot(entry_point, variant_index);
+    const ManifestSlot* slot = view.FindSlot(entry_point, variant);
     if (slot == nullptr)
     {
         return {};
@@ -981,9 +982,9 @@ std::string_view ManifestShaderSourceProvider::Source(uint32_t entry_point,
 }
 
 std::span<const BindingInfo> ManifestShaderSourceProvider::Bindings(uint32_t entry_point,
-                                                                    uint32_t variant_index) const noexcept
+                                                                    VariantKey variant) const noexcept
 {
-    const ManifestSlot* slot = view.FindSlot(entry_point, variant_index);
+    const ManifestSlot* slot = view.FindSlot(entry_point, variant);
     if (slot == nullptr)
     {
         return {};
@@ -1000,9 +1001,9 @@ std::span<const BindingInfo> ManifestShaderSourceProvider::Bindings(uint32_t ent
 }
 
 WorkgroupSize ManifestShaderSourceProvider::Workgroup(uint32_t entry_point,
-                                                      uint32_t variant_index) const noexcept
+                                                      VariantKey variant) const noexcept
 {
-    const ManifestSlot* slot = view.FindSlot(entry_point, variant_index);
+    const ManifestSlot* slot = view.FindSlot(entry_point, variant);
     if (slot == nullptr)
     {
         return WorkgroupSize{ .X = 0, .Y = 0, .Z = 0 };

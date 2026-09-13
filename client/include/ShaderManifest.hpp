@@ -2,6 +2,7 @@
 #ifndef LODESTONE_SHADER_MANIFEST_HPP
 #define LODESTONE_SHADER_MANIFEST_HPP
 #include "ShaderLibraryTypes.hpp"
+#include "VariantKey.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -359,7 +360,7 @@ public:
     [[nodiscard]] std::span<const uint32_t> VisibilityList(uint32_t list_index) const noexcept;
     [[nodiscard]] std::span<const ManifestEntryPoint> EntryPoints() const noexcept;
     [[nodiscard]] std::span<const ManifestVariant> Variants() const noexcept;
-    [[nodiscard]] std::span<const uint64_t> VariantKeys() const noexcept;
+    [[nodiscard]] std::span<const VariantKey> VariantKeys() const noexcept;
     [[nodiscard]] std::span<const ManifestAxis> Axes() const noexcept;
     [[nodiscard]] std::span<const int64_t> AxisValues(uint32_t axis_index) const noexcept;
 
@@ -374,7 +375,7 @@ public:
      *
      * `entry_point` is the `EntryPointId` value, so it counts from one and zero is Invalid.
      * `variant_index` is the dense index, the same number the generated library uses. */
-    [[nodiscard]] const ManifestSlot* FindSlot(uint32_t entry_point, uint64_t variant_key) const noexcept;
+    [[nodiscard]] const ManifestSlot* FindSlot(uint32_t entry_point, VariantKey variant) const noexcept;
     /** @brief One slot for each entry point of this variant, in entry point order. */
     [[nodiscard]] std::span<const ManifestSlot> Slots(const ManifestVariant& variant) const noexcept;
     /** @brief Every slot, in file order. */
@@ -395,7 +396,7 @@ private:
     std::span<const ManifestEntryPoint> entryPoints;
     std::span<const ManifestSlot> slots;
     std::span<const ManifestVariant> variants;
-    std::span<const uint64_t> variantKeys;
+    std::span<const VariantKey> variantKeys;
     std::span<const ManifestAxis> axes;
     std::span<const int64_t> axisValues;
     std::span<const ManifestRaster> rasterStates;
@@ -421,11 +422,11 @@ public:
     ~ManifestShaderSourceProvider() override;
 
     [[nodiscard]] std::string_view Source(uint32_t entry_point,
-                                          uint32_t variant_index) const noexcept override;
+                                          VariantKey variant) const noexcept override;
     [[nodiscard]] std::span<const BindingInfo> Bindings(uint32_t entry_point,
-                                                        uint32_t variant_index) const noexcept override;
+                                                        VariantKey variant) const noexcept override;
     [[nodiscard]] WorkgroupSize Workgroup(uint32_t entry_point,
-                                          uint32_t variant_index) const noexcept override;
+                                          VariantKey variant) const noexcept override;
     [[nodiscard]] uint64_t Generation() const noexcept override;
 
     [[nodiscard]] const ShaderManifestView& View() const noexcept;
