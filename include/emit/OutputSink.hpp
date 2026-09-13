@@ -22,14 +22,11 @@ public:
     OutputSink(OutputSink&&) noexcept = default;
     OutputSink& operator=(OutputSink&&) noexcept = default;
 
-    /** Writes the primary artifact, which is the generated header. */
-    virtual CookError Write(std::string_view content) = 0;
-    /** Writes a companion artifact beside the primary one. The name is a file name, not a path. */
+    /** Writes an artifact to the output sink: this never outputs just one item, it outputs
+     * multiple named artifacts. */
     virtual CookError WriteArtifact(std::string_view artifact_name,
                                     std::string_view content) = 0;
     [[nodiscard]] virtual std::string_view Describe() const noexcept = 0;
-    /** File name of the primary artifact, so a companion can include it. */
-    [[nodiscard]] virtual std::string_view PrimaryName() const noexcept = 0;
 };
 
 class FileOutputSink final : public OutputSink
@@ -40,35 +37,27 @@ public:
     FileOutputSink(FileOutputSink&&) noexcept = default;
     FileOutputSink& operator=(FileOutputSink&&) noexcept = default;
 
-    [[nodiscard]] CookError Write(std::string_view content) override;
     [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::string_view content) override;
     [[nodiscard]] std::string_view Describe() const noexcept override;
-    [[nodiscard]] std::string_view PrimaryName() const noexcept override;
 
 private:
     std::filesystem::path path;
-    std::string description;
-    std::string primaryName;
 };
 
 class MemoryOutputSink final : public OutputSink
 {
 public:
     MemoryOutputSink();
-    explicit MemoryOutputSink(std::string_view primary_name);
+    explicit MemoryOutputSink(std::string_view _name);
     ~MemoryOutputSink() override;
 
-    [[nodiscard]] CookError Write(std::string_view content) override;
     [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::string_view content) override;
     [[nodiscard]] std::string_view Describe() const noexcept override;
-    [[nodiscard]] std::string_view PrimaryName() const noexcept override;
-    [[nodiscard]] std::string_view GetContent() const noexcept;
     /** Every companion artifact, keyed by name. The determinism check compares two cooks with it. */
     [[nodiscard]] const std::map<std::string, std::string>& GetArtifacts() const noexcept;
 
 private:
-    std::string content;
-    std::string primaryName;
+    std::string name;
     std::map<std::string, std::string> artifacts;
 };
 
