@@ -1,7 +1,7 @@
 #pragma once
 #ifndef LODESTONE_RAW_LIBRARY_HPP
 #define LODESTONE_RAW_LIBRARY_HPP
-#include "permute/PermutationSpace.hpp"
+#include "permute/PermutationValue.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
@@ -71,6 +71,7 @@ struct RawAxisDeclaration
     std::string SourceFile;
     int32_t SourceLine;
     int32_t SourceColumn;
+    std::string InterfaceName;
     std::vector<RawInterfaceImpl> InterfaceImpls; // structs tagged with ls_axis_interface_impl attribute
 };
 

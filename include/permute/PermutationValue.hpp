@@ -58,6 +58,15 @@ std::string MakeExportedConstantSource(std::string_view axis_name, const Permuta
 std::string MakeVariantModuleName(std::string_view axis_name, const PermutationValue& value);
 std::string MakeVariantModulePath(std::string_view axis_name, const PermutationValue& value);
 
+// Until I think of a better location, this is going here: It's most related to PermutationValues,
+// and breaks an include loop that would be a real pain to break any other way
+struct ExternConstantDefault
+{
+    std::string Name;
+    int64_t Value{ 0 };
+};
+
+
 }
 
 #endif // !LODESTONE_PERMUTATION_VALUE_HPP

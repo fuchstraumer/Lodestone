@@ -26,12 +26,6 @@ using RequireReadyMap = std::unordered_map<std::ptrdiff_t, std::vector<std::stri
 using AxisValueOverrideMap = std::unordered_map<std::ptrdiff_t, std::vector<PermutationValue>>;
 using VariantKey = uint64_t;
 
-struct ExternConstantDefault
-{
-    std::string Name;
-    int64_t Value{ 0 };
-};
-
 /**
  * One variant's identity.
  *
