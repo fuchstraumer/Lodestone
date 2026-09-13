@@ -3,7 +3,7 @@ implementing OceanFft;
 [ls_axis_values("128, 256, 512, 1024, 2048, 4096, 8192")][ls_axis_kind("tuning")]
 extern static const uint IFFT_SIZE = 512u;
 
-[ls_boolean_axis][ls_axis_kind("capability")]
+[ls_axis_boolean][ls_axis_kind("capability")]
 extern static const bool IFFT_USE_WAVE_OPS = true;
 
 [ls_axis_values("16, 32, 64, 128")][ls_axis_kind("tuning")][ls_axis_active_when("IFFT_USE_WAVE_OPS==1")]
