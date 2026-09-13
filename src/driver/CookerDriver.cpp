@@ -326,18 +326,20 @@ namespace
         return CookError::Success;
     }
 
-    /** Writes the header and one source file for each module. The header name comes from the sink, so
-     * the generated source includes exactly the file the user asked for.
-     * todo: For writing files, we can accumulate output we want to write into a buffer, and only validate
-     * things once. Validate directory when opening the stream, validate write success of coalesced writes
-     * (cleans up control flow)*/
+    /** Writes the header and manifest files for one cooked library */
     CookError EmitLibraryArtifacts(const CookedLibrary& library, OutputSink& sink)
     {
-        const std::string report = GenerateDedupeReport(library);
-        const CookError result = sink.WriteArtifact("ShaderLibrary.dedupe.txt", report);
-        if (result != CookError::Success)
+        const CookError manifestResult = EmitLibraryModules(library.Modules, sink);
+        if (!manifestResult)
         {
-            return result;
+            return manifestResult;
+        }
+
+        const std::string report = GenerateDedupeReport(library);
+        const CookError dedupeResult = sink.WriteArtifact("ShaderLibrary.dedupe.txt", report);
+        if (!dedupeResult)
+        {
+            return dedupeResult;
         }
 
         return CookError::Success;
