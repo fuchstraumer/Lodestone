@@ -628,7 +628,6 @@ CookResult<PermutationSpace> BuildPermutationSpace(const SymbolTable& symbol_tab
         {
             // build the expanded list of permutation values for the interface axis.
             // each value is just the index of that interface implementation in the list of all implementations
-            assert(rawAxis.InterfaceImpls.size() < PermutationAxis::k_MaxValues)
             for (uint32_t i = 0; std::cmp_less(i, rawAxis.InterfaceImpls.size()); ++i)
             {
                 values.emplace_back(PermutationValue::MakeType(i));

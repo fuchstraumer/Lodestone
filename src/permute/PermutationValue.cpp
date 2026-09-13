@@ -8,6 +8,14 @@
 namespace lodestone
 {
 
+PermutationValue PermutationValue::MakeType(uint32_t ordinal) noexcept
+{
+    PermutationValue value{};
+    value.type = Type::Type;
+    value.uintValue = ordinal;
+    return value;
+}
+
 bool PermutationValue::IsValid() const noexcept
 {
     return type != Type::Invalid;
@@ -41,6 +49,8 @@ bool PermutationValue::operator==(const PermutationValue& other) const noexcept
     case Type::Bool:
         return boolValue == other.boolValue;
     case Type::UInt:
+        [[fallthrough]];
+    case Type::Type:
         return uintValue == other.uintValue;
     case Type::Invalid:
         return true;
@@ -66,6 +76,8 @@ bool PermutationValue::operator<(const PermutationValue& other) const noexcept
     case Type::Bool:
         return static_cast<int>(boolValue) < static_cast<int>(other.boolValue);
     case Type::UInt:
+        [[fallthrough]];
+    case Type::Type:
         return uintValue < other.uintValue;
     case Type::Invalid:
         return false;
@@ -82,6 +94,8 @@ int64_t PermutationValueToInt64(const PermutationValue& value) noexcept
     case PermutationValue::Type::Bool:
         return value.AsBool() ? 1 : 0;
     case PermutationValue::Type::UInt:
+        [[fallthrough]];
+    case PermutationValue::Type::Type:
         return static_cast<int64_t>(value.AsUInt());
     case PermutationValue::Type::Invalid:
         return -1;
@@ -96,6 +110,8 @@ std::string ValueToSlangLiteral(const PermutationValue& value)
     case PermutationValue::Type::Bool:
         return value.AsBool() ? "true" : "false";
     case PermutationValue::Type::UInt:
+        [[fallthrough]];
+    case PermutationValue::Type::Type:
         return std::to_string(value.AsUInt());
     case PermutationValue::Type::Invalid:
         return "invalid";
@@ -110,6 +126,8 @@ std::string ValueToPrintableString(const PermutationValue& value) noexcept
     case PermutationValue::Type::Bool:
         return value.AsBool() ? "true" : "false";
     case PermutationValue::Type::UInt:
+        [[fallthrough]];
+    case PermutationValue::Type::Type:
         return std::format("{}", value.AsUInt());
     case PermutationValue::Type::Invalid:
         return "invalid";
@@ -125,6 +143,8 @@ std::string ValueToSlangTypeName(const PermutationValue& value)
         return "bool";
     case PermutationValue::Type::UInt:
         return "uint";
+    case PermutationValue::Type::Type:
+        return "type";
     default:
         std::unreachable();
     }
