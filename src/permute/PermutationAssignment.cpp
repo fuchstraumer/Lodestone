@@ -55,7 +55,7 @@ std::string MakeAssignmentSuffix(const PermutationAssignment& assignment)
 
     for (const PermutationBinding& binding : assignment)
     {
-        suffix += std::format("_{}", ValueToSlangLiteral(binding.Value));
+        suffix += std::format("_{}", ValueToSlangLiteral(*binding.Axis, binding.Value));
     }
 
     return suffix;
@@ -72,7 +72,7 @@ std::string DescribeAssignment(const PermutationAssignment& assignment)
         {
             description += ", ";
         }
-        description += std::format("{}={}", binding.Axis->Name, ValueToSlangLiteral(binding.Value));
+        description += std::format("{}={}", binding.Axis->Name, ValueToSlangLiteral(*binding.Axis, binding.Value));
     }
 
     return description;

@@ -158,10 +158,20 @@ std::string ValueToSlangTypeName(const PermutationValue& value)
 
 std::string MakeExportedConstantSource(const PermutationAxis& axis, const PermutationValue& value)
 {
-    return std::format("export static const {} {} = {};\n",
-                       ValueToSlangTypeName(value),
-                       axis.Name,
-                       ValueToSlangLiteral(axis, value));
+    if (value.GetType() == PermutationValue::Type::Type)
+    {
+        return std::format("export struct {} : {} = {};\n",
+                           axis.Name,
+                           axis.InterfaceName(),
+                           ValueToSlangLiteral(axis, value));
+    }
+    else
+    {
+        return std::format("export static const {} {} = {};\n",
+                           ValueToSlangTypeName(value),
+                           axis.Name,
+                           ValueToSlangLiteral(axis, value));
+    }
 }
 
 std::string MakeVariantModuleName(const PermutationAxis& axis, const PermutationValue& value)

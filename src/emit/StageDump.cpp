@@ -40,9 +40,9 @@ namespace
         return document.value();
     }
 
-    void WriteAxisValue(JsonWriter& writer, const PermutationValue& value)
+    void WriteAxisValue(JsonWriter& writer, const PermutationBinding& binding)
     {
-        writer.String(ValueToSlangLiteral(value));
+        writer.String(ValueToSlangLiteral(*binding.Axis, binding.Value));
     }
 
     void WriteAssignment(JsonWriter& writer, const PermutationAssignment& assignment)
@@ -53,7 +53,7 @@ namespace
             writer.BeginObject();
             writer.KeyString("axis", binding.Axis != nullptr ? binding.Axis->Name : std::string{});
             writer.Key("value");
-            WriteAxisValue(writer, binding.Value);
+            WriteAxisValue(writer, binding);
             writer.EndObject();
         }
         writer.EndArray();
@@ -73,7 +73,7 @@ namespace
         writer.BeginArray();
         for (const PermutationValue& value : axis.GetValues())
         {
-            WriteAxisValue(writer, value);
+            WriteAxisValue(writer, PermutationBinding{ &axis, value });
         }
         writer.EndArray();
 

@@ -6,6 +6,7 @@
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangDiagnosticParser.hpp"
 #include "permute/PermutationAssignment.hpp"
+#include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "permute/PermutationValue.hpp"
 #include "slang-com-ptr.h"
@@ -16,6 +17,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <expected>
+#include <format>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -77,9 +79,9 @@ CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext&
 
     for (const PermutationBinding& binding : descriptor.Active)
     {
-        const std::string variantModuleName = MakeVariantModuleName(binding.Axis->Name, binding.Value);
-        const std::string variantModulePath = MakeVariantModulePath(binding.Axis->Name, binding.Value);
-        const std::string variantSource = MakeExportedConstantSource(binding.Axis->Name, binding.Value);
+        const std::string variantModuleName = MakeVariantModuleName(*binding.Axis, binding.Value);
+        const std::string variantModulePath = MakeVariantModulePath(*binding.Axis, binding.Value);
+        const std::string variantSource = MakeExportedConstantSource(*binding.Axis, binding.Value);
 
         Slang::ComPtr<slang::IBlob> diagnostics;
         slang::IModule* variantModule =
