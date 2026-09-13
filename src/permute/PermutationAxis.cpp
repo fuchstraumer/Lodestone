@@ -1,12 +1,13 @@
 #include "permute/PermutationAxis.hpp"
+#include "compile/RawLibrary.hpp"
 #include "permute/PermutationValue.hpp"
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <initializer_list>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -50,6 +51,21 @@ void PermutationAxis::SetInterfaceAxisParams(std::string interface_name, std::ve
 {
     interfaceName = std::move(interface_name);
     interfaceImpls = std::move(interface_impls);
+}
+
+std::string_view PermutationAxis::InterfaceName() const noexcept
+{
+    return interfaceName;
+}
+
+const RawInterfaceImpl& PermutationAxis::InterfaceImpl(uint32_t idx) const noexcept
+{
+    return interfaceImpls[static_cast<size_t>(idx)];
+}
+
+std::string_view PermutationAxis::InterfaceAxisName(uint32_t idx) const noexcept
+{
+    return interfaceImpls[static_cast<size_t>(idx)].TypeName;
 }
 
 } // namespace lodestone
