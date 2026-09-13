@@ -160,10 +160,14 @@ std::string MakeExportedConstantSource(const PermutationAxis& axis, const Permut
 {
     if (value.GetType() == PermutationValue::Type::Type)
     {
-        return std::format("export struct {} : {} = {};\n",
+        // since the synthetic module loads as it's own independent "TU", it must import the module
+        // that declares the concrete type and the interface it implements
+        const RawInterfaceImpl& impl = axis.InterfaceImpl(value.AsUInt());
+        return std::format("import {};\nexport struct {} : {} = {};\n",
+                           impl.Module,
                            axis.Name,
                            axis.InterfaceName(),
-                           ValueToSlangLiteral(axis, value));
+                           impl.TypeName);
     }
     else
     {
