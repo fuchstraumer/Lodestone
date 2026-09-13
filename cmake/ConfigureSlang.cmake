@@ -16,8 +16,8 @@ set(SLANG_EXCLUDE_DAWN ON CACHE BOOL "Optionally exclude webgpu_dawn from the bu
 set(SLANG_EXCLUDE_TINT ON CACHE BOOL "Optionally exclude slang-tint from the build")
 set(SLANG_ENABLE_RELEASE_LTO OFF CACHE BOOL "Enable LTO for release builds")
 set(SLANG_USE_SYSTEM_VULKAN_HEADERS ON)
-set(SLANG_ENABLE_MIMALLOC OFF)
-set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC OFF)
+set(SLANG_ENABLE_MIMALLOC ON)
+set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC ON)
 
 # Wraps add_subdirectory for Slang with warning suppression
 # This applies flags to ALL targets created within the Slang directory
