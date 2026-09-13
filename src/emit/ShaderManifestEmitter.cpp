@@ -222,7 +222,8 @@ namespace
     {
         const std::string_view expectedSource = ResolveSource(module, variant, entry_point_index);
         const VariantKey variantKey = module.VariantKeys[variant.Index];
-        if (provider.Source(entry_point_id, variantKey) == expectedSource)
+        const auto& providerSource = provider.Source(entry_point_id, variantKey);
+        if (providerSource == expectedSource)
         {
             return CookError::Success;
         }
@@ -461,8 +462,9 @@ namespace
                                        const LibraryVariant& variant,
                                        size_t entry_point_index)
     {
-        // The provider takes the EntryPointId value, which counts from one.
-        const auto entryPointId = static_cast<uint16_t>(entry_point_index + 1u);
+        // EntryPointId is zero-based (E4a): it is a direct offset into a variant's slots, matching the
+        // order MakeSlotRecord writes them and the `FirstSlot + entry_point` lookup in FindSlot.
+        const auto entryPointId = static_cast<uint16_t>(entry_point_index);
 
         const CookError sourceError = CheckManifestSource(module, provider, variant, entry_point_index, entryPointId);
         if (sourceError != CookError::Success)
