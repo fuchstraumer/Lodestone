@@ -1,7 +1,8 @@
 #pragma once
 #ifndef LODESTONE_PERMUTATION_AXIS_HPP
 #define LODESTONE_PERMUTATION_AXIS_HPP
-#include "PermutationValue.hpp"
+#include "permute/PermutationTypes.hpp"
+#include "permute/PermutationValue.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <span>

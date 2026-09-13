@@ -1,7 +1,7 @@
 #pragma once
 #ifndef LODESTONE_RAW_LIBRARY_HPP
 #define LODESTONE_RAW_LIBRARY_HPP
-#include "permute/PermutationValue.hpp"
+#include "permute/PermutationTypes.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"

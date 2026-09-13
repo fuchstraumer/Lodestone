@@ -1,4 +1,5 @@
 #include "emit/ShaderManifestEmitter.hpp"
+#include "VariantKey.hpp"
 #include "model/CookedLibrary.hpp"
 #include "CookerErrors.hpp"
 #include "permute/PermutationAxis.hpp"
@@ -214,13 +215,14 @@ namespace
     }
 
     CookError CheckManifestSource(const CookedModule& module,
-                                         const ManifestShaderSourceProvider& provider,
-                                         const LibraryVariant& variant,
-                                         size_t entry_point_index,
-                                         uint16_t entry_point_id)
+                                  const ManifestShaderSourceProvider& provider,
+                                  const LibraryVariant& variant,
+                                  size_t entry_point_index,
+                                  uint16_t entry_point_id)
     {
         const std::string_view expectedSource = ResolveSource(module, variant, entry_point_index);
-        if (provider.Source(entry_point_id, variant.Index) == expectedSource)
+        const VariantKey variantKey = module.VariantKeys[variant.Index];
+        if (provider.Source(entry_point_id, variantKey) == expectedSource)
         {
             return CookError::Success;
         }
@@ -240,7 +242,8 @@ namespace
                                             uint16_t entry_point_id)
     {
         const WorkgroupSize expected = variant.Workgroups[entry_point_index];
-        const WorkgroupSize read = provider.Workgroup(entry_point_id, variant.Index);
+        const VariantKey variantKey = module.VariantKeys[variant.Index];
+        const WorkgroupSize read = provider.Workgroup(entry_point_id, variantKey);
 
         if (read.X == expected.X && read.Y == expected.Y && read.Z == expected.Z)
         {

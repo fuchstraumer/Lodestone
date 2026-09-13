@@ -62,37 +62,6 @@ std::string MakeExportedConstantSource(const PermutationAxis& axis, const Permut
 std::string MakeVariantModuleName(const PermutationAxis& axis, const PermutationValue& value);
 std::string MakeVariantModulePath(const PermutationAxis& axis, const PermutationValue& value);
 
-// Until I think of a better location, this is going here: It's most related to PermutationValues,
-// and breaks an include loop that would be a real pain to break any other way
-struct ExternConstantDefault
-{
-    std::string Name;
-    int64_t Value{ 0 };
-};
-
-// Same deal as above: compile and permute need access to this, so it lives here rather than in
-// RawLibrary.hpp. Cleaner include graph.
-struct RawInterfaceImpl
-{
-    std::string Module;
-    std::string TypeName; // namespace-qualified, not module-qualified
-    constexpr bool operator==(const RawInterfaceImpl& other) const noexcept
-    {
-        return Module == other.Module && TypeName == other.TypeName;
-    }
-
-    constexpr bool operator<(const RawInterfaceImpl& other) const noexcept
-    {
-        if (Module < other.Module)
-        {
-            return true;
-        }
-        else
-        {
-            return TypeName < other.TypeName;
-        }
-    }
-};
 
 } // namespace lodestone
 

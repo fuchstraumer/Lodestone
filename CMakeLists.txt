@@ -129,6 +129,7 @@ set(LODESTONE_PERMUTE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationAssignment.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationAxis.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationSpace.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationTypes.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationValue.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PolicyDocument.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/AttributeExpression.cpp"
