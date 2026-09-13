@@ -24,7 +24,11 @@ class DiagnosticSink;
 struct TargetPolicy;
 using RequireReadyMap = std::unordered_map<std::ptrdiff_t, std::vector<std::string_view>>;
 using AxisValueOverrideMap = std::unordered_map<std::ptrdiff_t, std::vector<PermutationValue>>;
-using VariantKey = uint64_t;
+
+// This is defined as an enum class since it provides strong typing and prevents accidental misuse of
+// raw integers where a callsite expects a key: we'll have to cast to underlying type for packed output
+// or storage, but that's fine and clear as a boundary between strong typing and low-level representation.
+enum class VariantKey : uint64_t {};
 
 /**
  * One variant's identity.

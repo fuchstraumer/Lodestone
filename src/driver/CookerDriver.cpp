@@ -660,7 +660,7 @@ namespace
         internedModule.SpaceSize = variantSet->SpaceSize;
         internedModule.VariantKeys = variantSet->Variants |
                                      std::views::transform(&VariantDescriptor::Key) |
-                                     std::ranges::to<std::vector<uint64_t>>();
+                                     std::ranges::to<std::vector<VariantKey>>();
 
         std::vector<CompiledVariant> moduleVariants;
         moduleVariants.reserve(variantSet.value().Variants.size());

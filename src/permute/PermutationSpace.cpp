@@ -28,6 +28,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -146,7 +147,7 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetPolicy& p
     // check if the computed space size exceeds the maximum representable variant key
     // we'll need to change this eventually, but for now we're just using a simple uncompressed
     // key based on the canonical assignment of the axes.
-    if (variantSet.SpaceSize == std::numeric_limits<VariantKey>::max())
+    if (variantSet.SpaceSize == std::numeric_limits<std::underlying_type_t<VariantKey>>::max())
     {
         return std::unexpected(CookError::PermutationKeySpaceTooLarge);
     }
@@ -188,7 +189,11 @@ CanonicalAssignment PermutationSpace::CanonicalizeAssignment(const PermutationAs
 
 VariantKey PermutationSpace::ComputeVariantKey(const CanonicalAssignment& canonical) const
 {
-    VariantKey result = 0;
+    // this is the only place where we are allowed to treat the variant key as just a uint64_t
+    // we construct the strongly typed key at the very end: everyone else should treat it as opaque
+    // (though sorting and equality will still just work implicitly, thankfully)
+    uint64_t result{ 0 };
+    using UnderlyingType = std::underlying_type_t<VariantKey>;
 
     for (size_t i = 0; i < axes.size(); ++i)
     {
@@ -202,10 +207,10 @@ VariantKey PermutationSpace::ComputeVariantKey(const CanonicalAssignment& canoni
         // so result accumulates the mixed-radix number representing this assignment iteratively
         const auto found = std::ranges::find(values, value);
         const std::ptrdiff_t valueIndex = std::distance(values.begin(), found);
-        result = (result * values.size()) + static_cast<VariantKey>(valueIndex);
+        result = (result * values.size()) + static_cast<UnderlyingType>(valueIndex);
     }
 
-    return result;
+    return static_cast<VariantKey>(result);
 }
 
 uint64_t PermutationSpace::ComputeVariantSpaceSize() const noexcept
@@ -694,7 +699,7 @@ namespace
             std::println(stderr,
                          "[shader_cooker] two variants share key {}: [{}] collides. The mixed-radix "
                          "encoding and the enumerated set disagree.",
-                         duplicate.Key,
+                         static_cast<uint64_t>(duplicate.Key),
                          DescribeAssignment(duplicate.Canonical));
             return CookError::PermutationVariantIndexCollision;
         }
