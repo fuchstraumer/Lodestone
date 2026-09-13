@@ -38,6 +38,8 @@
 namespace lodestone
 {
 
+static std::unique_ptr<PermutationSpace> cookPermutationSpace;
+
 namespace
 {
 
@@ -578,10 +580,10 @@ namespace
             return spaceResult.error();
         }
 
-        PermutationSpace space(std::move(*spaceResult));
+        cookPermutationSpace = std::make_unique<PermutationSpace>(std::move(*spaceResult));
         
         // verify constraints on space are valid
-        if (const CookError constraintResult = space.ValidateConstraints(diagnostics); !constraintResult)
+        if (const CookError constraintResult = cookPermutationSpace->ValidateConstraints(diagnostics); !constraintResult)
         {
             return constraintResult;
         }
@@ -599,14 +601,14 @@ namespace
             policy_document.FindTargetPolicy(moduleName, options.TargetName);
 
         // validate policy against active permutation space
-        const CookError policyValidationResult = policy_document.ValidateAgainstSpace(moduleName, space, diagnostics);
+        const CookError policyValidationResult = policy_document.ValidateAgainstSpace(moduleName, *cookPermutationSpace, diagnostics);
         if (!policyValidationResult)
         {
             return policyValidationResult;
         }
         
         // expand permutation space into the final set of variants this build will be constructing
-        const CookResult<VariantSet> variantSet = space.EnumerateVariants(currTargetPolicy, diagnostics);
+        const CookResult<VariantSet> variantSet = cookPermutationSpace->EnumerateVariants(currTargetPolicy, diagnostics);
         if (!variantSet)
         {
             return variantSet.error();
@@ -619,6 +621,7 @@ namespace
                         variantSet.value().SpaceSize);
         ReportInfo(diagnostics, variantStatsStr);
 
+        PermutationSpace& space = *cookPermutationSpace;
         auto dumpPermutationSpace = [&moduleName, &space]()
         {
             return DumpPermutationSpace(moduleName, space);
@@ -649,7 +652,9 @@ namespace
             DisableDedupe(internedModule);
         }
         internedModule.Name = moduleName;
-        internedModule.Space = &space;
+        // todo-ship: this is a quick fix to fix permutation space lifespan issues. it is likely
+        // we'll need a cook context class to persist other state across cooks, and soon
+        internedModule.Space = cookPermutationSpace.get();
         internedModule.SpaceSize = variantSet->SpaceSize;
         internedModule.VariantKeys = variantSet->Variants |
                                      std::views::transform(&VariantDescriptor::Key) |
@@ -658,7 +663,7 @@ namespace
         std::vector<CompiledVariant> moduleVariants;
         moduleVariants.reserve(variantSet.value().Variants.size());
 
-        CookResult<RawModule> rawModuleResult = compiler.PrepareRawModule(space);
+        CookResult<RawModule> rawModuleResult = compiler.PrepareRawModule(*cookPermutationSpace);
         if (!rawModuleResult)
         {
             return rawModuleResult.error();
@@ -843,6 +848,9 @@ namespace
         {
             return firstResult;
         }
+
+        // reset the permutation space: remember to remove this once we fix this 
+        cookPermutationSpace.reset();
 
         MemoryOutputSink second{ sink.PrimaryName() };
         const CookResult<CookStatistics> secondResult = RunCookOnce(options, second, diagnostics);
