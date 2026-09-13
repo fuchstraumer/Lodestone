@@ -1,4 +1,5 @@
 #include "permute/PermutationValue.hpp"
+#include "permute/PermutationAxis.hpp"
 #include <cstdint>
 #include <format>
 #include <string>
@@ -35,6 +36,11 @@ bool PermutationValue::AsBool() const noexcept
 uint32_t PermutationValue::AsUInt() const noexcept
 {
     return uintValue;
+}
+
+std::string_view PermutationValue::AsType(const PermutationAxis& axis) const noexcept
+{
+    return axis.InterfaceAxisName(uintValue);
 }
 
 bool PermutationValue::operator==(const PermutationValue& other) const noexcept
@@ -103,16 +109,16 @@ int64_t PermutationValueToInt64(const PermutationValue& value) noexcept
     return -1;
 }
 
-std::string ValueToSlangLiteral(const PermutationValue& value)
+std::string ValueToSlangLiteral(const PermutationAxis& axis, const PermutationValue& value)
 {
     switch (value.GetType())
     {
     case PermutationValue::Type::Bool:
         return value.AsBool() ? "true" : "false";
     case PermutationValue::Type::UInt:
-        [[fallthrough]];
-    case PermutationValue::Type::Type:
         return std::to_string(value.AsUInt());
+    case PermutationValue::Type::Type:
+        return std::string{ value.AsType(axis) };
     case PermutationValue::Type::Invalid:
         return "invalid";
     }
@@ -150,22 +156,22 @@ std::string ValueToSlangTypeName(const PermutationValue& value)
     }
 }
 
-std::string MakeExportedConstantSource(std::string_view axis_name, const PermutationValue& value)
+std::string MakeExportedConstantSource(const PermutationAxis& axis, const PermutationValue& value)
 {
     return std::format("export static const {} {} = {};\n",
                        ValueToSlangTypeName(value),
-                       axis_name,
-                       ValueToSlangLiteral(value));
+                       axis.Name,
+                       ValueToSlangLiteral(axis, value));
 }
 
-std::string MakeVariantModuleName(std::string_view axis_name, const PermutationValue& value)
+std::string MakeVariantModuleName(const PermutationAxis& axis, const PermutationValue& value)
 {
-    return std::format("{}_{}", axis_name, ValueToSlangLiteral(value));
+    return std::format("{}_{}", axis.Name, ValueToSlangLiteral(axis, value));
 }
 
-std::string MakeVariantModulePath(std::string_view axis_name, const PermutationValue& value)
+std::string MakeVariantModulePath(const PermutationAxis& axis, const PermutationValue& value)
 {
-    return std::format("{}_{}.slang", axis_name, ValueToSlangLiteral(value));
+    return std::format("{}_{}.slang", axis.Name, ValueToSlangLiteral(axis, value));
 }
 
 } // namespace lodestone

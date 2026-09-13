@@ -8,6 +8,8 @@
 namespace lodestone
 {
 
+class PermutationAxis;
+
 // We used to use std::variant, but we know that our permutation values have a fixed set of types, so we can
 // represent them more efficiently than a variant. mostly, less templates and stdlib includes
 struct PermutationValue
@@ -31,7 +33,8 @@ struct PermutationValue
     [[nodiscard]] Type GetType() const noexcept;
     [[nodiscard]] bool AsBool() const noexcept;
     [[nodiscard]] uint32_t AsUInt() const noexcept;
-    [[nodiscard]] uint32_t AsType() const noexcept;
+    /** @brief Returns the type name of this type, as it is stored by the parent axis for this value */
+    [[nodiscard]] std::string_view AsType(const PermutationAxis& axis) const noexcept;
 
     [[nodiscard]] bool operator==(const PermutationValue& other) const noexcept;
     [[nodiscard]] bool operator!=(const PermutationValue& other) const noexcept;
@@ -52,11 +55,12 @@ private:
  * becomes 0 or 1, which is what a shader comparing it against a constant would see. */
 int64_t PermutationValueToInt64(const PermutationValue& value) noexcept;
 std::string ValueToPrintableString(const PermutationValue& value) noexcept;
-std::string ValueToSlangLiteral(const PermutationValue& value);
+// needs axis as of interface axis changes: have to get from ordinal to axis for type name
+std::string ValueToSlangLiteral(const PermutationAxis& axis, const PermutationValue& value);
 std::string ValueToSlangTypeName(const PermutationValue& value);
-std::string MakeExportedConstantSource(std::string_view axis_name, const PermutationValue& value);
-std::string MakeVariantModuleName(std::string_view axis_name, const PermutationValue& value);
-std::string MakeVariantModulePath(std::string_view axis_name, const PermutationValue& value);
+std::string MakeExportedConstantSource(const PermutationAxis& axis, const PermutationValue& value);
+std::string MakeVariantModuleName(const PermutationAxis& axis, const PermutationValue& value);
+std::string MakeVariantModulePath(const PermutationAxis& axis, const PermutationValue& value);
 
 // Until I think of a better location, this is going here: It's most related to PermutationValues,
 // and breaks an include loop that would be a real pain to break any other way
@@ -66,7 +70,6 @@ struct ExternConstantDefault
     int64_t Value{ 0 };
 };
 
-
-}
+} // namespace lodestone
 
 #endif // !LODESTONE_PERMUTATION_VALUE_HPP
