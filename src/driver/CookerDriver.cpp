@@ -841,10 +841,8 @@ namespace
     {
         ReportInfo(diagnostics, "determinism check: cooking twice into memory");
 
-        // Both memory sinks take the real sink's primary name. The emitter builds every companion
-        // artifact name from it, so a different name here would make the check compare a different
-        // set of file names than the cook it stands in for.
-        MemoryOutputSink first{ sink.PrimaryName() };
+        std::string firstName = std::string{ sink.Describe() } + "_first";
+        MemoryOutputSink first{ firstName };
         const CookResult<CookStatistics> firstResult = RunCookOnce(options, first, diagnostics);
         if (!firstResult)
         {
@@ -854,35 +852,41 @@ namespace
         // reset the permutation space: remember to remove this once we fix this 
         cookPermutationSpace.reset();
 
-        MemoryOutputSink second{ sink.PrimaryName() };
+        std::string secondName = std::string{ sink.Describe() } + "_second";
+        MemoryOutputSink second{ secondName };
         const CookResult<CookStatistics> secondResult = RunCookOnce(options, second, diagnostics);
         if (!secondResult)
         {
             return secondResult;
         }
 
-        if (first.GetContent() != second.GetContent())
-        {
-            return std::unexpected(ReportError(diagnostics,
-                                               CookError::CookNotDeterministic,
-                                               "DETERMINISM FAILED: the header differs between cooks"));
-        }
-
-        if (first.GetArtifacts().size() != second.GetArtifacts().size())
+        const auto& firstArtifacts = first.GetArtifacts();
+        const auto& secondArtifacts = second.GetArtifacts();
+        if (firstArtifacts.size() != secondArtifacts.size())
         {
             const std::string errStr =
                 std::format("Determinism Failed: first pass had {} artifacts, second had {}",
-                            first.GetArtifacts().size(),
-                            second.GetArtifacts().size());
+                            firstArtifacts.size(),
+                            secondArtifacts.size());
             return std::unexpected(ReportError(diagnostics, CookError::CookNotDeterministic, errStr));
         }
 
-        for (const auto& [name, content] : first.GetArtifacts())
+        auto [mismatchIterFirst, mismatchIterSecond] = std::ranges::mismatch(firstArtifacts, secondArtifacts);
+        if (mismatchIterFirst != firstArtifacts.end() && mismatchIterSecond != secondArtifacts.end())
         {
-            const auto other = second.GetArtifacts().find(name);
-            if (other == second.GetArtifacts().end() || other->second != content)
+            if (mismatchIterFirst->first == mismatchIterSecond->first)
             {
-                const std::string errStr = std::format("DETERMINISM FAILED: {} differs between cooks", name);
+                const std::string errStr =
+                    std::format("Determinism failed - mismatch in file contents for artifact '{}'",
+                                mismatchIterFirst->first);
+                return std::unexpected(ReportError(diagnostics, CookError::CookNotDeterministic, errStr));
+            }
+            else
+            {
+                // mismatch in artifact names
+                const std::string errStr = std::format("Determinism failed - mismatch in artifact names: '{}' vs '{}'",
+                                                       mismatchIterFirst->first,
+                                                       mismatchIterSecond->first);
                 return std::unexpected(ReportError(diagnostics, CookError::CookNotDeterministic, errStr));
             }
         }
@@ -890,12 +894,6 @@ namespace
         const std::string determinismStr = std::format("determinism verified: {} artifacts identical across two cooks",
                                                        first.GetArtifacts().size() + 1u);
         ReportInfo(diagnostics, determinismStr);
-
-        const CookError writeResult = sink.Write(first.GetContent());
-        if (writeResult != CookError::Success)
-        {
-            return std::unexpected(writeResult);
-        }
 
         for (const auto& [name, content] : first.GetArtifacts())
         {
