@@ -731,7 +731,8 @@ CookError SlangModuleContext::buildInterfaceAxes()
             .IsInterfaceAxis = true,
             .AxisValues = {},
             .ActiveWhen = {}, // todo: fill this in if present
-            .Kind = {}, // todo: also fill this in if present
+            .Kind = "technique", // an interface axis selects behaviour; ls_axis_kind cannot sit on a struct, so default it here
+
             .SourceFile = stub.SourceFile.empty() ? "<unknown>" : stub.SourceFile,
             .SourceLine = stub.SourceLine,
             .SourceColumn = stub.SourceColumn,
