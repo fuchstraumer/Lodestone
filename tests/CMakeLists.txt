@@ -6,6 +6,11 @@ function(add_lodestone_unit_test NAME)
     set_target_properties(${NAME} PROPERTIES FOLDER "Tests")
     set_target_properties(${NAME} PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED YES)
 
+    if (CMAKE_GENERATOR MATCHES "Visual Studio")
+        set_target_properties(${NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+        set_target_properties(${NAME} PROPERTIES VS_DEBUGGER_COMMAND_ARGUMENTS "${UNIT_TEST_TEST_ARGS}")
+    endif()
+
     # Both paths are here because a test includes a cooker header and a client header by name only,
     # the way the library's own sources do.
     target_include_directories(${NAME} PRIVATE
@@ -45,6 +50,16 @@ add_lodestone_unit_test(ParameterBlocksCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/parameter_blocks_output/ShaderLibrary.hpp"
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/ParameterBlocks.slang")
+# The same driver, on the module that phase E step E7 needed. `InterfaceAxisTest.slang` declares an
+# interface axis: an `extern struct SHADE_MODE : IShadeMode` that a per-variant `export struct` makes
+# concrete. Its three implementations are tagged `ls_axis_interface_impl` and reach the module through
+# an `__include`d fragment, so the axis read must recurse and match the extern to the impls by
+# conformance. Crossed with the boolean axis it is a real product of six variants. Exit code 0 states
+# that every variant linked, the cross-check agreed, both round trips read back, and two cooks matched.
+add_lodestone_unit_test(InterfaceAxisCookTest CookTest.cpp
+    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/interface_axis_output/ShaderLibrary.hpp"
+              --verify-deterministic
+              "${CMAKE_SOURCE_DIR}/tests/assets/InterfaceAxis/InterfaceAxisTest.slang")
 # The one test in this suite that asserts a cook FAILS. Phase E step E0c needed it.
 #
 # Every other cook test states that a good module cooks. A check that never fires and a check that
