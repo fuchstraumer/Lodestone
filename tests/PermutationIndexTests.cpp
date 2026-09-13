@@ -1,5 +1,6 @@
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
+#include "VariantKey.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
@@ -36,6 +37,7 @@ using lodestone::PermutationValue;
 using lodestone::StderrDiagnosticSink;
 using lodestone::TargetPolicy;
 using lodestone::VariantDescriptor;
+using lodestone::VariantKey;
 using lodestone::VariantSet;
 
 namespace
@@ -185,7 +187,7 @@ int main()
     runner.Check(filled.size() == k_TestSpace.AxisCount(),
                  "a partial assignment canonicalizes to every axis");
 
-    const uint64_t partialKey = k_TestSpace.ComputeVariantKey(filled);
+    const VariantKey partialKey = k_TestSpace.ComputeVariantKey(filled);
 
     bool matchesRealVariant = false;
     for (const VariantDescriptor& descriptor : variants.Variants)

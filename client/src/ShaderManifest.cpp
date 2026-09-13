@@ -797,6 +797,11 @@ std::span<const ManifestVariant> ShaderManifestView::Variants() const noexcept
     return variants;
 }
 
+std::span<const VariantKey> ShaderManifestView::VariantKeys() const noexcept
+{
+    return variantKeys;
+}
+
 std::span<const ManifestAxis> ShaderManifestView::Axes() const noexcept
 {
     return axes;

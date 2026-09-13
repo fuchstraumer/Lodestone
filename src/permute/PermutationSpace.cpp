@@ -1,11 +1,14 @@
 #include "permute/PermutationSpace.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
+#include "TransparentHash.hpp"
+#include "VariantKey.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SymbolTable.hpp"
 #include "permute/AttributeExpression.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
+#include "permute/PermutationTypes.hpp"
 #include "permute/PermutationValue.hpp"
 #include "permute/PolicyDocument.hpp"
 
@@ -22,6 +25,7 @@
 #include <iterator>
 #include <limits>
 #include <magic_enum/magic_enum.hpp>
+#include <optional>
 #include <print>
 #include <ranges>
 #include <span>
@@ -188,29 +192,21 @@ CanonicalAssignment PermutationSpace::CanonicalizeAssignment(const PermutationAs
 }
 
 VariantKey PermutationSpace::ComputeVariantKey(const CanonicalAssignment& canonical) const
-{
-    // this is the only place where we are allowed to treat the variant key as just a uint64_t
-    // we construct the strongly typed key at the very end: everyone else should treat it as opaque
-    // (though sorting and equality will still just work implicitly, thankfully)
-    uint64_t result{ 0 };
-    using UnderlyingType = std::underlying_type_t<VariantKey>;
+{  
+    std::vector<uint32_t> valueIndices(axes.size());
+    std::vector<uint32_t> radices(axes.size());
 
     for (size_t i = 0; i < axes.size(); ++i)
     {
-        // in canonical, the i-th element corresponds to the i-th axis in the space.
-        // so, the value at canonical[i] corresponds to the value of axes[i] in this assignment.
-        // (which could be the default value, or the actual concrete value)
-        const PermutationValue& value = canonical[i].Value;
-        const std::span<const PermutationValue> values = axes[i].GetValues();
-        // values.size() is the radix/base for this "digit" in the mixed-radix number system
-        // valueIndex is the digit itself, the coefficient in this mixed-radix number system
-        // so result accumulates the mixed-radix number representing this assignment iteratively
-        const auto found = std::ranges::find(values, value);
-        const std::ptrdiff_t valueIndex = std::distance(values.begin(), found);
-        result = (result * values.size()) + static_cast<UnderlyingType>(valueIndex);
+        const PermutationValue& actualValue = canonical[i].Value;
+        const auto& values = axes[i].GetValues();
+        
+        valueIndices[i] = static_cast<uint32_t>(std::distance(values.begin(),
+                                                              std::ranges::find(values, actualValue)));
+        radices[i] = static_cast<uint32_t>(axes[i].NumValues());
     }
 
-    return static_cast<VariantKey>(result);
+    return PackVariantKey(valueIndices, radices);
 }
 
 uint64_t PermutationSpace::ComputeVariantSpaceSize() const noexcept

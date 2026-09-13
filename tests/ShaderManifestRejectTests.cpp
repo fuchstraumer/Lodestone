@@ -3,6 +3,7 @@
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifest.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
+#include "VariantKey.hpp"
 #include "TestHarness.hpp"
 
 #include <cstddef>
@@ -30,6 +31,7 @@ using lodestone::CookedModule;
 using lodestone::EmitShaderManifest;
 using lodestone::ShaderManifestErrorCode;
 using lodestone::ShaderManifestView;
+using lodestone::VariantKey;
 
 namespace
 {
@@ -83,7 +85,7 @@ CookedModule MakeSmallModule()
 
     // A v2 manifest carries one variant key per variant, strictly ascending and parallel to the
     // variant table. This hand-built module predates that table, so give it keys the reader accepts.
-    module.VariantKeys = { 0u, 1u };
+    module.VariantKeys = { VariantKey{ 0u }, VariantKey{ 1u } };
 
     return module;
 }

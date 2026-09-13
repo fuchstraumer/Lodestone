@@ -320,6 +320,7 @@ void WriteVariants(lodestone::JsonWriter& writer,
                    const lodestone::ShaderManifestView& view,
                    bool with_sources) noexcept
 {
+    const std::span<const lodestone::VariantKey> keys = view.VariantKeys();
     writer.Key("variants");
     writer.BeginArray();
     for (const lodestone::ManifestVariant& variant : view.Variants())
@@ -334,7 +335,7 @@ void WriteVariants(lodestone::JsonWriter& writer,
         for (size_t entryPointIndex = 0u; entryPointIndex < entryPoints.size(); entryPointIndex++)
         {
             const uint16_t entryPointId = static_cast<uint16_t>(entryPointIndex + 1u);
-            const lodestone::ManifestSlot* slot = view.FindSlot(entryPointId, variant.Index);
+            const lodestone::ManifestSlot* slot = view.FindSlot(entryPointId, keys[variant.Index]);
             if (slot != nullptr)
             {
                 WriteSlot(writer, view, variant, entryPoints[entryPointIndex], *slot, with_sources);
