@@ -89,7 +89,7 @@ void TestAxisReachability(TestRunner& runner)
 
     constexpr std::string_view k_Common = R"(
 module common;
-[ls_boolean_axis] extern static const bool USE_WAVE_OPS = false;
+[ls_axis_boolean] extern static const bool USE_WAVE_OPS = false;
 [ls_axis_values("128, 256")] extern static const uint FFT_SIZE = 256;
 [ls_axis_values("16, 32")] extern static const uint UNUSED_TILE = 16;
 )";

@@ -458,7 +458,7 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
         return std::unexpected(CookError::AttributeExpressionParseFailed);
     }
 
-    slang::Attribute* booleanAxisAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_boolean_axis");
+    slang::Attribute* booleanAxisAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_axis_boolean");
     slang::Attribute* valuesAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_axis_values");
     // early out: if neither attribute is present, this is not an axis declaration
     if ((booleanAxisAttr == nullptr) && (valuesAttr == nullptr))

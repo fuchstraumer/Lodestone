@@ -44,7 +44,7 @@ public struct ls_extent_3dAttribute
 
 /** shortcut to declare a boolean axis, which will only produce true/false values in permutation space */
 [__AttributeUsage(_AttributeTargets.Var)]
-public struct ls_boolean_axisAttribute
+public struct ls_axis_booleanAttribute
 {
 };
 
