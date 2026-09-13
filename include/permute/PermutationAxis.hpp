@@ -2,12 +2,14 @@
 #ifndef LODESTONE_PERMUTATION_AXIS_HPP
 #define LODESTONE_PERMUTATION_AXIS_HPP
 #include "PermutationValue.hpp"
+#include "compile/RawLibrary.hpp"
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
 #include <span>
 #include <string>
+#include <vector>
 
 namespace lodestone
 {
@@ -41,19 +43,8 @@ enum class AxisValueDomain : uint8_t
 
 struct PermutationAxis
 {
-    /**This helps control permutation explosions, mostly. todo-ship: make it a cmake configure opt */
-    static constexpr std::size_t k_MaxValues = 8u;
-
     PermutationAxis(std::string name,
-                    std::span<const PermutationValue> values,
-                    AxisKind kind,
-                    EarliestBindingTime binding_time,
-                    AxisValueDomain value_domain,
-                    std::string active_when = {}) noexcept;
-    // initializer_list will be removed once we get to the data-driven permutation system
-    // this just keeps things compiling and running, for now
-    PermutationAxis(std::string name,
-                    std::initializer_list<PermutationValue> values,
+                    std::vector<PermutationValue> values,
                     AxisKind kind,
                     EarliestBindingTime binding_time,
                     AxisValueDomain value_domain,
@@ -63,16 +54,17 @@ struct PermutationAxis
     AxisKind Kind{ AxisKind::None };
     EarliestBindingTime BindingTime{ EarliestBindingTime::None };
     AxisValueDomain ValueDomain{ AxisValueDomain::None };
-    std::string ActiveWhen{};
+    std::string ActiveWhen;
 
-    [[nodiscard]] uint64_t NumValues() const noexcept;
+    [[nodiscard]] size_t NumValues() const noexcept;
     [[nodiscard]] std::span<const PermutationValue> GetValues() const noexcept;
     [[nodiscard]] const PermutationValue& GetDefault() const noexcept;
 
+    void SetInterfaceAxisParams(std::string interface_name, std::vector<RawInterfaceImpl> interface_impls) noexcept;
 private:
-    uint64_t numValues{ 0 };
-    std::array<PermutationValue, k_MaxValues> values;
-    std::string InterfaceName; // e.g, IBrdfImpl: the root interface that a Type axis instantiates
+    std::vector<PermutationValue> values;
+    std::string interfaceName; // e.g, IBrdfImpl: the root interface that a Type axis instantiates
+    std::vector<RawInterfaceImpl> interfaceImpls;
 };
 
 }
