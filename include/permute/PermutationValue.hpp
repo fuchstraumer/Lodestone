@@ -8,7 +8,7 @@
 namespace lodestone
 {
 
-class PermutationAxis;
+struct PermutationAxis;
 
 // We used to use std::variant, but we know that our permutation values have a fixed set of types, so we can
 // represent them more efficiently than a variant. mostly, less templates and stdlib includes
@@ -68,6 +68,30 @@ struct ExternConstantDefault
 {
     std::string Name;
     int64_t Value{ 0 };
+};
+
+// Same deal as above: compile and permute need access to this, so it lives here rather than in
+// RawLibrary.hpp. Cleaner include graph.
+struct RawInterfaceImpl
+{
+    std::string Module;
+    std::string TypeName; // namespace-qualified, not module-qualified
+    constexpr bool operator==(const RawInterfaceImpl& other) const noexcept
+    {
+        return Module == other.Module && TypeName == other.TypeName;
+    }
+
+    constexpr bool operator<(const RawInterfaceImpl& other) const noexcept
+    {
+        if (Module < other.Module)
+        {
+            return true;
+        }
+        else
+        {
+            return TypeName < other.TypeName;
+        }
+    }
 };
 
 } // namespace lodestone

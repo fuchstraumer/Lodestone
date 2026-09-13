@@ -40,7 +40,7 @@ uint32_t PermutationValue::AsUInt() const noexcept
 
 std::string_view PermutationValue::AsType(const PermutationAxis& axis) const noexcept
 {
-    return axis.InterfaceAxisName(uintValue);
+    return axis.InterfaceImplTypeName(uintValue);
 }
 
 bool PermutationValue::operator==(const PermutationValue& other) const noexcept

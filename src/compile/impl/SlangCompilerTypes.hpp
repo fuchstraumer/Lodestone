@@ -1,11 +1,12 @@
 #pragma once
-#include <algorithm>
 #ifndef LODESTONE_SHADER_COMPILER_SLANG_COMPILER_TYPES_HPP
 #define LODESTONE_SHADER_COMPILER_SLANG_COMPILER_TYPES_HPP
 #include "compile/RawLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
+#include "permute/PermutationValue.hpp"
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <string>
@@ -322,8 +323,8 @@ struct InterfaceAxisStub
     std::string Name;
     slang::TypeReflection* Type{ nullptr };
     std::string SourceFile;
-    int32_t SourceLine;
-    int32_t SourceColumn;
+    int32_t SourceLine{ 0 };
+    int32_t SourceColumn{ 0 };
 };
 
 struct InterfaceAxisImplStub

@@ -5,6 +5,7 @@
 #include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
+#include "permute/PermutationValue.hpp"
 #include "slang-com-ptr.h"
 #include "slang.h"
 
@@ -17,6 +18,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <functional>
 #include <ios>
 #include <iterator>
 #include <optional>
@@ -24,7 +26,6 @@
 #include <span>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -223,7 +224,7 @@ CookError SlangModuleContext::collectAxesFromDecl(slang::DeclReflection* reflect
         else if (child->getKind() == slang::DeclReflection::Kind::Struct)
         {   
             // ls_axis_interface or ls_axis_interface_impl values
-            const CookError axisDataStaged = stageInterfaceStruct(reflection, module_name);
+            const CookError axisDataStaged = stageInterfaceStruct(child, module_name);
             if (!axisDataStaged)
             {
                 return axisDataStaged;
@@ -750,8 +751,9 @@ CookError SlangModuleContext::buildInterfaceAxes()
 
             if (!programLayout->isSubType(implStub.Type, interfaceType))
             {
+                const char* implName = implStub.Type->getName();
                 const std::string warningStr = std::format("Type '{}' does not conform to interface '{}'",
-                                                           implStub.Type->getName(),
+                                                           implName != nullptr ? implName : "<unknown>",
                                                            matchedInterfaceName);
                 ReportWarning(*diagnosticSink, warningStr);
                 continue;
@@ -760,14 +762,16 @@ CookError SlangModuleContext::buildInterfaceAxes()
             axisDecl.InterfaceImpls.emplace_back(implStub.Impl);
         }
 
-        assert(!axisDecl.InterfaceImpls.empty());
-
-        auto sortRawInterfaceImpl = [](const RawInterfaceImpl& lhs, const RawInterfaceImpl& rhs)
+        if (axisDecl.InterfaceImpls.empty())
         {
-            return std::tie(lhs.Module, lhs.TypeName) < std::tie(rhs.Module, rhs.TypeName);
-        };
+            const std::string errorStr = std::format("Interface Axis '{}' has no conforming implementations", stub.Name);
+            return ReportError(*diagnosticSink,
+                               CookError::SlangNoConformingInterfaces,
+                               errorStr);
+        }
 
-        std::ranges::sort(axisDecl.InterfaceImpls, sortRawInterfaceImpl);
+        std::ranges::sort(axisDecl.InterfaceImpls, std::less{});
+        axisDeclarations.emplace_back(std::move(axisDecl));
     }
 
     interfaceAxisStubs.clear();

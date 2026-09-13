@@ -63,7 +63,7 @@ const RawInterfaceImpl& PermutationAxis::InterfaceImpl(uint32_t idx) const noexc
     return interfaceImpls[static_cast<size_t>(idx)];
 }
 
-std::string_view PermutationAxis::InterfaceAxisName(uint32_t idx) const noexcept
+std::string_view PermutationAxis::InterfaceImplTypeName(uint32_t idx) const noexcept
 {
     return interfaceImpls[static_cast<size_t>(idx)].TypeName;
 }

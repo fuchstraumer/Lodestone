@@ -2,7 +2,6 @@
 #ifndef LODESTONE_PERMUTATION_AXIS_HPP
 #define LODESTONE_PERMUTATION_AXIS_HPP
 #include "PermutationValue.hpp"
-#include "compile/RawLibrary.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -63,7 +62,7 @@ struct PermutationAxis
     [[nodiscard]] std::string_view InterfaceName() const noexcept;
     [[nodiscard]] const RawInterfaceImpl& InterfaceImpl(uint32_t idx) const noexcept;
     /** @brief Shortcut to get the name of the interface axis at `idx`, to avoid extra includes where this is used */
-    [[nodiscard]] std::string_view InterfaceAxisName(uint32_t idx) const noexcept;
+    [[nodiscard]] std::string_view InterfaceImplTypeName(uint32_t idx) const noexcept;
 private:
     std::vector<PermutationValue> values;
     std::string interfaceName; // e.g, IBrdfImpl: the root interface that a Type axis instantiates

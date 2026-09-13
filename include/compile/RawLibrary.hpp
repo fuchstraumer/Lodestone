@@ -54,12 +54,6 @@ struct RawSizeAttribute
     std::vector<std::string> Arguments;
 };
 
-struct RawInterfaceImpl
-{
-    std::string Module;
-    std::string TypeName; // namespace-qualified, not module-qualified
-};
-
 struct RawAxisDeclaration
 {
     std::string Name;

@@ -3,10 +3,8 @@
 #include "SlangCompilerTypes.hpp"
 #include "SlangModuleContext.hpp"
 #include "Diagnostics.hpp"
-#include "compile/RawLibrary.hpp"
 #include "compile/SlangDiagnosticParser.hpp"
 #include "permute/PermutationAssignment.hpp"
-#include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "permute/PermutationValue.hpp"
 #include "slang-com-ptr.h"
@@ -17,8 +15,6 @@
 #include <cstdint>
 #include <cstdio>
 #include <expected>
-#include <format>
-#include <ranges>
 #include <string>
 #include <string_view>
 #include <utility>
