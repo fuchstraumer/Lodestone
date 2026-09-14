@@ -24,6 +24,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -677,6 +678,27 @@ namespace
         std::vector<int64_t> Values;
     };
 
+    void AppendLiteralValues(AxisTables& tables, std::span<const PermutationValue> values)
+    {
+        for (const PermutationValue& value : values)
+        {
+            tables.Values.emplace_back(PermutationValueToInt64(value));
+        }
+    }
+
+    void AppendStringValues(StringTableBuilder& strings, 
+                            AxisTables& tables,
+                            const PermutationAxis& axis,
+                            std::span<const PermutationValue> values)
+    {
+        for (const PermutationValue& value : values)
+        {
+            std::string_view valName = value.AsType(axis);
+            uint32_t valNameIdx = strings.Add(valName);
+            tables.Values.emplace_back(static_cast<int64_t>(valNameIdx));
+        }
+    }
+
     AxisTables BuildAxisTables(const CookedModule& module, StringTableBuilder& strings)
     {
         AxisTables tables;
@@ -693,6 +715,28 @@ namespace
             record.NameString = strings.Add(axis.Name);
             record.FirstValue = static_cast<uint32_t>(tables.Values.size());
             record.ValueCount = static_cast<uint32_t>(axis.NumValues());
+            record.Kind = axis.Kind;
+            record.Domain = axis.ValueDomain;
+            record.BindingTime = axis.BindingTime;
+            std::span<const PermutationValue> axisValues = axis.GetValues();
+            switch (axis.ValueDomain)
+            {
+            case lodestone::AxisValueDomain::Boolean:
+                [[fallthrough]];
+            case lodestone::AxisValueDomain::Integral:
+                [[fallthrough]];
+            case lodestone::AxisValueDomain::Enum:
+                AppendLiteralValues(tables, axisValues);
+                break;
+            case lodestone::AxisValueDomain::Type:
+                // typename appending requires appending the strings, and
+                // then indices to those strings in the values table
+                AppendStringValues(strings, tables, axis, axisValues);
+                break;
+            case lodestone::AxisValueDomain::None:
+                std::unreachable();
+            }
+
             tables.Axes.push_back(record);
             for (const PermutationValue& value : axis.GetValues())
             {

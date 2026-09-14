@@ -67,6 +67,7 @@ enum class ShaderManifestErrorCode : uint32_t
     InvalidUniformMember = 29,
     InvalidAxisName = 30,
     InvalidAxisValueRange = 31,
+    InvalidAxisTypeStrIndex = 32,
     Count
 };
 
@@ -108,7 +109,6 @@ struct ShaderManifestError
     uint32_t RecordIndex{ 0u };
     // offending value, or bound, or version: varies based on error code and table
     uint32_t Detail{ 0u };
-    // implicit bool conversion operator: true if successful (i.e., Code is Success)
     constexpr explicit operator bool() const noexcept
     {
         return Code == ShaderManifestErrorCode::Success;
@@ -316,7 +316,10 @@ struct alignas(8) ManifestAxis
     uint32_t NameString{ 0u };
     uint32_t FirstValue{ 0u };
     uint32_t ValueCount{ 0u };
-    uint32_t Reserved{ 0u };
+    AxisKind Kind{ AxisKind::None };
+    AxisValueDomain Domain{ AxisValueDomain::None };
+    EarliestBindingTime BindingTime{ EarliestBindingTime::None };
+    uint8_t Pad{ 0u };
 };
 
 /** The reader reinterprets manifest bytes as records, so a record must be a bag of bytes.

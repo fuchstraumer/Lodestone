@@ -1160,6 +1160,26 @@ namespace
                                             .RecordIndex = i,
                                             .Detail = axis.ValueCount };
             }
+
+            if (axis.Domain == AxisValueDomain::Type)
+            {
+                // validate that all the values - which are actually indices into the string table - are in range
+                const std::span<const int64_t> allAxesValueSpan =
+                    MakeTable<int64_t>(bytes, parsed.AxisValueTableOffset, parsed.AxisValueCount);
+                const std::span<const int64_t> axisValueSpan =
+                    allAxesValueSpan.subspan(axis.FirstValue, axis.ValueCount);
+                for (const int64_t value : axisValueSpan)
+                {
+                    if (value < 0 || std::cmp_greater_equal(value, parsed.StringCount))
+                    {
+                        return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidAxisTypeStrIndex,
+                                                    .Table = ShaderManifestTable::Axes,
+                                                    .RecordIndex = i,
+                                                    .Detail = static_cast<uint32_t>(value) };
+                    }
+                }
+            }
+
         }
         
         return k_ManifestOk;
