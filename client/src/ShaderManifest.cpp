@@ -14,7 +14,6 @@
 #include <functional>
 #include <iterator>
 #include <magic_enum/magic_enum.hpp>
-#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
@@ -34,280 +33,12 @@ namespace
 
     constexpr ShaderManifestError k_ManifestOk{ .Code = ShaderManifestErrorCode::Success };
 
-    /** True when a table of `count` records of `record_size` bytes starts at `offset` and stays
-     * inside a file of `file_size` bytes. An empty table at any offset is in bounds. */
-    bool TableIsInBounds(uint32_t offset, uint32_t count, size_t record_size, size_t file_size) noexcept
+    // expanded descriptions for manifest error codes, since making these clear to users is important
+    // static_assert will break compile if new code is added without updating the descriptions array
+    // make sure ordering is respected, though
+    constexpr size_t k_ErrorDescriptionsCount = static_cast<size_t>(ShaderManifestErrorCode::Count);
+    constexpr std::array<std::string_view, k_ErrorDescriptionsCount> k_ErrorDescriptions
     {
-        if (count == 0u)
-        {
-            return true;
-        }
-
-        const size_t span = static_cast<size_t>(count) * record_size;
-        return offset <= file_size && span <= file_size - offset;
-    }
-
-    template<typename RecordType>
-    std::span<const RecordType> MakeTable(std::span<const std::byte> bytes,
-                                          uint32_t offset,
-                                          uint32_t count) noexcept
-    {
-        return std::span<const RecordType>{ reinterpret_cast<const RecordType*>(bytes.data() + offset),
-                                            count };
-    }
-
-    /**@brief In multiple locations, we store ranges of data in "runs". Each run specifies a contiguous block
-     * of payloads, which could be themselves simple indices or POD structs. This is just a more succinct
-     * accessor for those cases  */
-    template<typename PayloadType>
-    std::span<const PayloadType> RunOf(std::span<const ManifestRun> runs,
-                                       std::span<const PayloadType> payloads,
-                                       uint32_t run_index) noexcept
-    {
-        const ManifestRun& run = runs[static_cast<size_t>(run_index)];
-        return payloads.subspan(run.First, run.Count);
-    }
-
-    ShaderManifestError CheckManifestHeader(const ShaderManifestHeader& parsed,
-                                            const size_t file_size) noexcept
-    {
-        if (parsed.Magic != k_ShaderManifestMagic)
-        {
-            return { .Code = ShaderManifestErrorCode::BadMagic };
-        }
-
-        if (parsed.Version != k_ShaderManifestVersion)
-        {
-            return { .Code = ShaderManifestErrorCode::VersionMismatch, .Detail = parsed.Version };
-        }
-
-        if (parsed.FileSize != file_size)
-        {
-            return { .Code = ShaderManifestErrorCode::SizeMismatch, .Detail = parsed.FileSize };
-        }
-
-        return k_ManifestOk;
-    }
-
-    //NOLINTBEGIN(modernize-use-designated-initializers)
-    ShaderManifestError ValidateTablesInRange(const ShaderManifestHeader& parsed,
-                                              std::span<const std::byte> bytes) noexcept
-    {
-        const size_t fileSize = bytes.size();
-
-        // instead of a nasty chain of booleans and ifs on those booleans,
-        // just build a table of sections and then validate each one in a loop
-        struct Section
-        {
-            ShaderManifestTable Table;
-            uint32_t Offset;
-            uint32_t Count;
-            size_t RecordSize;
-        };
-
-        const std::array<Section, static_cast<size_t>(ShaderManifestTable::Count) + 1> sections
-        {
-            Section{ ShaderManifestTable::Strings,
-                     parsed.StringTableOffset,
-                     parsed.StringCount,
-                     sizeof(ManifestStringRef) },
-            Section{ ShaderManifestTable::Strings,
-                     parsed.StringBlobOffset,
-                     parsed.StringBlobSize,
-                     1u },
-            Section{ ShaderManifestTable::Sources,
-                     parsed.SourceTableOffset,
-                     parsed.SourceCount,
-                     sizeof(ManifestStringRef) },
-            Section{ ShaderManifestTable::Sources,
-                     parsed.SourceBlobOffset,
-                     parsed.SourceBlobSize,
-                     1u },
-            Section{ ShaderManifestTable::Bindings,
-                     parsed.BindingTableOffset,
-                     parsed.BindingCount,
-                     sizeof(ManifestBinding) },
-            Section{ ShaderManifestTable::ResourceLists,
-                     parsed.ResourceListTableOffset,
-                     parsed.ResourceListCount,
-                     sizeof(ManifestRun) },
-            Section{ ShaderManifestTable::ResourceIndices,
-                     parsed.ResourceIndexTableOffset,
-                     parsed.ResourceIndexCount,
-                     sizeof(uint32_t) },
-            Section{ ShaderManifestTable::Footprints,
-                     parsed.FootprintTableOffset,
-                     parsed.FootprintCount,
-                     sizeof(ManifestFootprint) },
-            Section{ ShaderManifestTable::FootprintLists,
-                     parsed.FootprintListTableOffset,
-                     parsed.FootprintListCount,
-                     sizeof(ManifestRun) },
-            Section{ ShaderManifestTable::VisibilityLists,
-                     parsed.VisibilityListTableOffset,
-                     parsed.VisibilityListCount,
-                     sizeof(ManifestRun) },
-            Section{ ShaderManifestTable::VisibilityIndices,
-                     parsed.VisibilityIndexTableOffset,
-                     parsed.VisibilityIndexCount,
-                     sizeof(uint32_t) },
-            Section{ ShaderManifestTable::EntryPoints,
-                     parsed.EntryPointTableOffset,
-                     parsed.EntryPointCount,
-                     sizeof(ManifestEntryPoint) },
-            Section{ ShaderManifestTable::Slots,
-                     parsed.SlotTableOffset,
-                     parsed.SlotCount,
-                     sizeof(ManifestSlot) },
-            Section{ ShaderManifestTable::Variants,
-                     parsed.VariantTableOffset,
-                     parsed.VariantCount,
-                     sizeof(ManifestVariant) },
-            Section{ ShaderManifestTable::VariantKeys,
-                     parsed.VariantKeyTableOffset,
-                     parsed.VariantKeyCount,
-                     sizeof(uint64_t) },
-            Section{ ShaderManifestTable::Axes,
-                     parsed.AxisTableOffset,
-                     parsed.AxisCount,
-                     sizeof(ManifestAxis) },
-            Section{ ShaderManifestTable::AxisValues,
-                     parsed.AxisValueTableOffset,
-                     parsed.AxisValueCount,
-                     sizeof(int64_t) },
-            Section{ ShaderManifestTable::Rasters,
-                     parsed.RasterTableOffset,
-                     parsed.RasterCount,
-                     sizeof(ManifestRaster) },
-            Section{ ShaderManifestTable::VertexInputs,
-                     parsed.VertexInputTableOffset,
-                     parsed.VertexInputCount,
-                     sizeof(ManifestVertexInput) },
-            Section{ ShaderManifestTable::ColorTargets,
-                     parsed.ColorTargetTableOffset,
-                     parsed.ColorTargetCount,
-                     sizeof(ManifestColorTarget) },
-            Section{ ShaderManifestTable::UniformMembers,
-                     parsed.UniformMemberTableOffset,
-                     parsed.UniformMemberCount,
-                     sizeof(ManifestUniformMember) },
-        };
-
-        for (const Section& section : sections)
-        {
-            if (!TableIsInBounds(section.Offset, section.Count, section.RecordSize, fileSize))
-            {
-                return { .Code = ShaderManifestErrorCode::SectionOutOfBounds, .Table = section.Table };
-            }
-        }
-
-        return k_ManifestOk;
-    }
-    //NOLINTEND(modernize-use-designated-initializers)
-
-    ShaderManifestError CheckManifestStringBlobs(const ShaderManifestHeader& parsed,
-                                                 std::span<const std::byte> bytes) noexcept
-    {
-        auto stringOutOfBounds = [](const ManifestStringRef& string_ref, const uint32_t blob_size)
-        {
-            return string_ref.Length > blob_size || string_ref.Offset > blob_size - string_ref.Length;
-        };
-
-        const std::span<const ManifestStringRef> stringSpan =
-            MakeTable<ManifestStringRef>(bytes, parsed.StringTableOffset, parsed.StringCount);
-        for (uint32_t i = 0u; i < stringSpan.size(); ++i)
-        {
-            if (stringOutOfBounds(stringSpan[i], parsed.StringBlobSize))
-            {
-                return { .Code = ShaderManifestErrorCode::StringOutOfBounds,
-                         .Table = ShaderManifestTable::Strings,
-                         .RecordIndex = i };
-            }
-        }
-
-        const std::span<const ManifestStringRef> sourceSpan =
-            MakeTable<ManifestStringRef>(bytes, parsed.SourceTableOffset, parsed.SourceCount);
-        for (uint32_t i = 0u; i < sourceSpan.size(); ++i)
-        {
-            if (stringOutOfBounds(sourceSpan[i], parsed.SourceBlobSize))
-            {
-                return { .Code = ShaderManifestErrorCode::SourceOutOfBounds,
-                         .Table = ShaderManifestTable::Sources,
-                         .RecordIndex = i };
-            }
-        }
-
-        return k_ManifestOk;
-    }
-
-    ShaderManifestError ValidateManifestRunTables(const ShaderManifestHeader& parsed,
-                                                  std::span<const std::byte> bytes) noexcept
-    {
-        auto validManifestRun = [](const ManifestRun& run, const size_t list_size)
-        {
-            // <= on first check for edge case: module with empty trailing list
-            return static_cast<size_t>(run.First) <= list_size &&
-                   (static_cast<size_t>(run.First) + static_cast<size_t>(run.Count)) <= list_size;
-        };
-
-        // all indices are valid: now validate the runs, as those are indices into the resource index list
-        // the visiblity lists then give indices into this list
-        const std::span<const ManifestRun> resourceListSpan =
-            MakeTable<ManifestRun>(bytes, parsed.ResourceListTableOffset, parsed.ResourceListCount);
-        for (uint32_t i = 0u; i < resourceListSpan.size(); ++i)
-        {
-            if (!validManifestRun(resourceListSpan[i], parsed.ResourceIndexCount))
-            {
-                return { .Code = ShaderManifestErrorCode::InvalidResourceListRun,
-                         .Table = ShaderManifestTable::ResourceLists,
-                         .RecordIndex = i };
-            }
-        }
-
-        // we can't really validate footprints, as they are mostly descriptive and don't have strict
-        // referential integrity requirements
-        const std::span<const ManifestRun> footprintListSpan =
-            MakeTable<ManifestRun>(bytes, parsed.FootprintListTableOffset, parsed.FootprintListCount);
-        for (uint32_t i = 0u; i < footprintListSpan.size(); ++i)
-        {
-            if (!validManifestRun(footprintListSpan[i], parsed.FootprintCount))
-            {
-                return { .Code = ShaderManifestErrorCode::InvalidFootprintListRun,
-                         .Table = ShaderManifestTable::FootprintLists,
-                         .RecordIndex = i };
-            }
-        }
-
-        // now visibility lists
-        const std::span<const ManifestRun> visibilityListSpan =
-            MakeTable<ManifestRun>(bytes, parsed.VisibilityListTableOffset, parsed.VisibilityListCount);
-        for (uint32_t i = 0u; i < visibilityListSpan.size(); ++i)
-        {
-            if (!validManifestRun(visibilityListSpan[i], parsed.VisibilityIndexCount))
-            {
-                return { .Code = ShaderManifestErrorCode::InvalidVisibilityListRun,
-                         .Table = ShaderManifestTable::VisibilityLists,
-                         .RecordIndex = i };
-            }
-        }
-
-        return k_ManifestOk;
-    }
-
-} // namespace
-
-std::string_view ToString(ShaderManifestErrorCode error) noexcept
-{
-    return magic_enum::enum_name(error);
-}
-
-namespace
-{
-    // One human sentence per error code, in enum order so the index is the code. The static_assert
-    // pins the length to the enum, so a new code that forgets a line fails to compile rather than
-    // reporting the wrong sentence.
-    constexpr std::array<std::string_view, static_cast<size_t>(ShaderManifestErrorCode::Count)>
-        k_ErrorDescriptions{
             "no error code was set",
             "no error",
             "the byte span is smaller than the manifest header",
@@ -344,7 +75,67 @@ namespace
 
     static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ShaderManifestErrorCode::Count),
                   "every ShaderManifestErrorCode needs a description; add a line when you add a code");
+
+    template<typename RecordType>
+    std::span<const RecordType> MakeTable(std::span<const std::byte> bytes,
+                                          uint32_t offset,
+                                          uint32_t count) noexcept
+    {
+        return std::span<const RecordType>{ reinterpret_cast<const RecordType*>(bytes.data() + offset),
+                                            count };
+    }
+
+    /**@brief In multiple locations, we store ranges of data in "runs". Each run specifies a contiguous block
+     * of payloads, which could be themselves simple indices or POD structs. This is just a more succinct
+     * accessor for those cases  */
+    template<typename PayloadType>
+    std::span<const PayloadType> RunOf(std::span<const ManifestRun> runs,
+                                       std::span<const PayloadType> payloads,
+                                       uint32_t run_index) noexcept
+    {
+        const ManifestRun& run = runs[static_cast<size_t>(run_index)];
+        return payloads.subspan(run.First, run.Count);
+    }
+
+    /** True when a table of `count` records of `record_size` bytes starts at `offset` and stays
+     * inside a file of `file_size` bytes. An empty table at any offset is in bounds. */
+    bool TableIsInBounds(uint32_t offset, uint32_t count, size_t record_size, size_t file_size) noexcept;
+
+    ShaderManifestError ValidateManifestHeader(const ShaderManifestHeader& parsed,
+                                               const size_t file_size) noexcept;
+    ShaderManifestError ValidateTablesInRange(const ShaderManifestHeader& parsed,
+                                              std::span<const std::byte> bytes) noexcept;
+    ShaderManifestError ValidateStringBlobs(const ShaderManifestHeader& parsed,
+                                            std::span<const std::byte> bytes) noexcept;
+    ShaderManifestError ValidateBindingTables(const ShaderManifestHeader& parsed,
+                                              std::span<const std::byte> bytes) noexcept;
+    ShaderManifestError ValidateResourceIndices(const ShaderManifestHeader& parsed,
+                                                std::span<const std::byte> bytes) noexcept;
+    ShaderManifestError ValidateRunTables(const ShaderManifestHeader& parsed,
+                                          std::span<const std::byte> bytes) noexcept;
+    ShaderManifestError ValidateEntryPoints(const ShaderManifestHeader& parsed,
+                                            std::span<const std::byte> bytes) noexcept;
+    ShaderManifestError ValidateManifestSlots(const ShaderManifestHeader& parsed,
+                                              std::span<const std::byte> bytes) noexcept;
+    ShaderManifestError ValidateVariantKeys(const ShaderManifestHeader& parsed,
+                                            std::span<const std::byte> bytes) noexcept;
+    ShaderManifestError ValidateCrossReferences(const ShaderManifestHeader& parsed,
+                                                std::span<const std::byte> bytes) noexcept;
+    ShaderManifestError ValidateRasterStates(const ShaderManifestHeader& parsed,
+                                             std::span<const std::byte> bytes) noexcept;
+    ShaderManifestError ValidateVertexLayouts(const ShaderManifestHeader& parsed,
+                                              std::span<const std::byte> bytes) noexcept;
+    ShaderManifestError ValidateUniformMembers(const ShaderManifestHeader& parsed,
+                                               std::span<const std::byte> bytes) noexcept;
+    ShaderManifestError ValidateAxes(const ShaderManifestHeader& parsed,
+                                     std::span<const std::byte> bytes) noexcept;
+
 } // namespace
+
+std::string_view ToString(ShaderManifestErrorCode error) noexcept
+{
+    return magic_enum::enum_name(error);
+}
 
 std::string DescribeShaderManifestError(const ShaderManifestError& error)
 {
@@ -360,7 +151,7 @@ std::string DescribeShaderManifestError(const ShaderManifestError& error)
         out += std::format(" [table {}, record {}]", magic_enum::enum_name(error.Table), error.RecordIndex);
     }
 
-    // `Detail` carries a different fact per code, so the ones worth spelling out get their own phrasing.
+    // `Detail` is only implemented for a few codes, so we only handle it for a few specific error codes
     switch (error.Code)
     {
     case ShaderManifestErrorCode::VersionMismatch:
@@ -404,302 +195,101 @@ ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std:
     ShaderManifestHeader parsed{};
     std::memcpy(&parsed, bytes.data(), sizeof(ShaderManifestHeader));
 
+    // Yes, I know how ugly this is. "It's so branchy and repeatable", you say: and you're right.
+    // But we pay this once when opening the manifest and then there's no branches during actual queries,
+    // and the error type here can hold rich information that makes debugging easier.
+    // This is mainly intended to catch errors in the manifest file itself, like corruption or truncation:
+    // a rare issue, but a huge pain to debug if no infrastructure exists for catching it.
+    // You should read this ugly code as "I once spent a weekend debugging corrupted shader variants 
+    // when trying to ship a game, and it messed me up so bad I'm willing to write this BS"
+
     const size_t fileSize = bytes.size();
-    const ShaderManifestError headerCheck = CheckManifestHeader(parsed, fileSize);
-    if (headerCheck.Code != ShaderManifestErrorCode::Success) [[unlikely]]
+    const ShaderManifestError manifestHeaderValid = ValidateManifestHeader(parsed, fileSize);
+    if (!manifestHeaderValid)
     {
-        return std::unexpected(headerCheck);
+        return std::unexpected(manifestHeaderValid);
     }
 
-    const ShaderManifestError tablesInRangeCheck = ValidateTablesInRange(parsed, bytes);
-    if (tablesInRangeCheck.Code != ShaderManifestErrorCode::Success) [[unlikely]]
+    const ShaderManifestError tablesInRange = ValidateTablesInRange(parsed, bytes);
+    if (!tablesInRange)
     {
-        return std::unexpected(tablesInRangeCheck);
+        return std::unexpected(tablesInRange);
     }
 
-    const ShaderManifestError stringBlobsCheck = CheckManifestStringBlobs(parsed, bytes);
-    if (stringBlobsCheck.Code != ShaderManifestErrorCode::Success) [[unlikely]]
+    const ShaderManifestError stringBlobsValid = ValidateStringBlobs(parsed, bytes);
+    if (!stringBlobsValid)
     {
-        return std::unexpected(stringBlobsCheck);
+        return std::unexpected(stringBlobsValid);
     }
 
-    const std::span<const ManifestBinding> bindingSpan =
-        MakeTable<ManifestBinding>(bytes, parsed.BindingTableOffset, parsed.BindingCount);
-    // validate integrity of binding data
-    for (uint32_t i = 0u; i < bindingSpan.size(); ++i)
-    {
-        const ManifestBinding& binding = bindingSpan[i];
-        if (binding.NameString >= parsed.StringCount)
-        {
-            return std::unexpected(
-                ShaderManifestError{ .Code = ShaderManifestErrorCode::ManifestBindingInvalidName,
-                                     .Table = ShaderManifestTable::Bindings,
-                                     .RecordIndex = i,
-                                     .Detail = binding.NameString });
-        }
+    // todo: in a future cleanup pass, we could make the manifest view here and then pass it down to
+    // each of the validation functions, which might make them a little cleaner (especially the cross ref)
 
-        if (binding.FirstUniformMember > parsed.UniformMemberCount ||
-            binding.UniformMemberCount > parsed.UniformMemberCount - binding.FirstUniformMember)
-        {
-            return std::unexpected(
-                ShaderManifestError{ .Code = ShaderManifestErrorCode::ManifestBindingInvalidUniforms,
-                                     .Table = ShaderManifestTable::Bindings,
-                                     .RecordIndex = i });
-        }
+    const ShaderManifestError bindingTablesValid = ValidateBindingTables(parsed, bytes);
+    if (!bindingTablesValid)
+    {
+        return std::unexpected(bindingTablesValid);
     }
 
-    // resource index list is also context-free: it's the (potentially repeated) runs of indices
-    // of resources used by the variants
-    const std::span<const uint32_t> resourceIndexList =
-        MakeTable<uint32_t>(bytes, parsed.ResourceIndexTableOffset, parsed.ResourceIndexCount);
-    // make sure all indices are within range
-    for (uint32_t i = 0u; i < resourceIndexList.size(); ++i)
+    const ShaderManifestError resourceIndicesValid = ValidateResourceIndices(parsed, bytes);
+    if (!resourceIndicesValid)
     {
-        if (resourceIndexList[i] >= parsed.BindingCount)
-        {
-            return std::unexpected(
-                ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidResourceBindingIndex,
-                                     .Table = ShaderManifestTable::ResourceIndices,
-                                     .RecordIndex = i,
-                                     .Detail = resourceIndexList[i] });
-        }
+        return std::unexpected(resourceIndicesValid);
     }
 
     // check all the tables of "runs", which are just ranges of indices into other lists
-    const ShaderManifestError runTablesCheck = ValidateManifestRunTables(parsed, bytes);
-    if (runTablesCheck.Code != ShaderManifestErrorCode::Success)
+    const ShaderManifestError runTablesValid = ValidateRunTables(parsed, bytes);
+    if (!runTablesValid)
     {
-        return std::unexpected(runTablesCheck);
+        return std::unexpected(runTablesValid);
     }
 
-    const std::span<const ManifestEntryPoint> entryPointSpan =
-        MakeTable<ManifestEntryPoint>(bytes, parsed.EntryPointTableOffset, parsed.EntryPointCount);
-    for (uint32_t i = 0u; i < entryPointSpan.size(); ++i)
+    const ShaderManifestError entryPointsValid = ValidateEntryPoints(parsed, bytes);
+    if (!entryPointsValid)
     {
-        const ManifestEntryPoint& entryPoint = entryPointSpan[i];
-        // check namestring validity and stage correctness
-        if (entryPoint.NameString >= parsed.StringCount)
-        {
-            return std::unexpected(
-                ShaderManifestError{ .Code = ShaderManifestErrorCode::EntryPointInvalidName,
-                                     .Table = ShaderManifestTable::EntryPoints,
-                                     .RecordIndex = i,
-                                     .Detail = entryPoint.NameString });
-        }
-
-        if (entryPoint.Stage >= static_cast<uint32_t>(ShaderStageKind::Count) ||
-            entryPoint.Stage == static_cast<uint32_t>(ShaderStageKind::Invalid))
-        {
-            return std::unexpected(
-                ShaderManifestError{ .Code = ShaderManifestErrorCode::EntryPointInvalidStage,
-                                     .Table = ShaderManifestTable::EntryPoints,
-                                     .RecordIndex = i,
-                                     .Detail = entryPoint.Stage });
-        }
+        return std::unexpected(entryPointsValid);
     }
 
-    const std::span<const ManifestSlot> slotSpan =
-        MakeTable<ManifestSlot>(bytes, parsed.SlotTableOffset, parsed.SlotCount);
-    for (uint32_t i = 0u; i < slotSpan.size(); ++i)
+    const ShaderManifestError slotTableValid = ValidateManifestSlots(parsed, bytes);
+    if (!slotTableValid)
     {
-        const ManifestSlot& slot = slotSpan[i];
-        if (slot.SourceIndex >= parsed.SourceCount)
-        {
-            return std::unexpected(
-                ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidSlotSourceIndex,
-                                     .Table = ShaderManifestTable::Slots,
-                                     .RecordIndex = i,
-                                     .Detail = slot.SourceIndex });
-        }
-
-        if (slot.VisibilityIndex >= parsed.VisibilityListCount)
-        {
-            return std::unexpected(
-                ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidSlotVisibilityIndex,
-                                     .Table = ShaderManifestTable::Slots,
-                                     .RecordIndex = i,
-                                     .Detail = slot.VisibilityIndex });
-        }
-
-        if (slot.RasterIndex >= parsed.RasterCount)
-        {
-            return std::unexpected(
-                ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidSlotRasterIndex,
-                                     .Table = ShaderManifestTable::Slots,
-                                     .RecordIndex = i,
-                                     .Detail = slot.RasterIndex });
-        }
+        return std::unexpected(slotTableValid);
     }
 
-    // variant validation is going to be a bit more complex: going to validate variant keys first
-    const std::span<const uint64_t> variantKeySpan =
-        MakeTable<uint64_t>(bytes, parsed.VariantKeyTableOffset, parsed.VariantKeyCount);
-    // validate all keys are sorted in ascending order and unique
-    const auto variantKeysSorted = std::ranges::adjacent_find(variantKeySpan, std::greater_equal<uint64_t>{});
-    if (variantKeysSorted != variantKeySpan.end())
+    const ShaderManifestError variantKeysValid = ValidateVariantKeys(parsed, bytes);
+    if (!variantKeysValid)
     {
-        return std::unexpected(ShaderManifestError{
-            .Code = ShaderManifestErrorCode::InvalidVariantKeyOrder,
-            .Table = ShaderManifestTable::VariantKeys,
-            .RecordIndex = static_cast<uint32_t>(std::distance(variantKeySpan.begin(), variantKeysSorted)) });
+        return std::unexpected(variantKeysValid);
     }
 
-    // this better be true...
-    if (variantKeySpan.size() != parsed.VariantCount)
+    const ShaderManifestError crossReferencesValid = ValidateCrossReferences(parsed, bytes);
+    if (!crossReferencesValid)
     {
-        return std::unexpected(
-            ShaderManifestError{ .Code = ShaderManifestErrorCode::VariantKeyVariantCountMismatch,
-                                 .Table = ShaderManifestTable::VariantKeys,
-                                 .Detail = parsed.VariantCount });
+        return std::unexpected(crossReferencesValid);
     }
 
-    // now do referential integrity pass, so that hotpath accessors can make more assumptions and use
-    // less branchy logic
-    const std::span<const ManifestVariant> variantSpan =
-        MakeTable<ManifestVariant>(bytes, parsed.VariantTableOffset, parsed.VariantCount);
-    const std::span<const ManifestRun> resourceLists =
-        MakeTable<ManifestRun>(bytes, parsed.ResourceListTableOffset, parsed.ResourceListCount);
-    const std::span<const uint32_t> visiblityIndices =
-        MakeTable<uint32_t>(bytes, parsed.VisibilityIndexTableOffset, parsed.VisibilityIndexCount);
-    const std::span<const ManifestRun> visibilityLists =
-        MakeTable<ManifestRun>(bytes, parsed.VisibilityListTableOffset, parsed.VisibilityListCount);
-    for (uint32_t vi = 0u; vi < variantSpan.size(); ++vi)
+    const ShaderManifestError rasterStatesValid = ValidateRasterStates(parsed, bytes);
+    if (!rasterStatesValid)
     {
-        const ManifestVariant& variant = variantSpan[vi];
-        if (static_cast<size_t>(variant.FirstSlot) + static_cast<size_t>(variant.SlotCount) >
-            parsed.SlotCount)
-        {
-            return std::unexpected(
-                ShaderManifestError{ .Code = ShaderManifestErrorCode::VariantSlotOutOfRange,
-                                     .Table = ShaderManifestTable::Variants,
-                                     .RecordIndex = vi });
-        }
-
-        // now check the resource lists
-        if (variant.ResourceListIndex >= parsed.ResourceListCount)
-        {
-            return std::unexpected(
-                ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidResourceListRun,
-                                     .Table = ShaderManifestTable::Variants,
-                                     .RecordIndex = vi,
-                                     .Detail = variant.ResourceListIndex });
-        }
-
-        const std::span<const uint32_t> variantResourceIndices =
-            RunOf<const uint32_t>(resourceLists, resourceIndexList, variant.ResourceListIndex);
-        for (uint32_t i = 0u; i < variant.SlotCount; ++i)
-        {
-            const uint32_t slotIndex = variant.FirstSlot + i;
-            const ManifestSlot& currSlot = slotSpan[slotIndex];
-            const std::span<const uint32_t> slotVisibilityIndices =
-                RunOf<uint32_t>(visibilityLists, visiblityIndices, currSlot.VisibilityIndex);
-            // absolute offset of this run into the visibility index table, so a bad entry names its row
-            const auto runOffset =
-                static_cast<uint32_t>(slotVisibilityIndices.data() - visiblityIndices.data());
-
-            for (uint32_t j = 0u; j < slotVisibilityIndices.size(); ++j)
-            {
-                // idx = index into the variant's resource list, which then indexes the *global* resource
-                // table (those values are the final values, a ManifestBinding entry)
-                const uint32_t idx = slotVisibilityIndices[j];
-                const bool valid =
-                    idx < variantResourceIndices.size() && variantResourceIndices[idx] < bindingSpan.size();
-                if (!valid)
-                {
-                    return std::unexpected(
-                        ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidSlotVisibilityIndex,
-                                             .Table = ShaderManifestTable::VisibilityIndices,
-                                             .RecordIndex = runOffset + j,
-                                             .Detail = idx });
-                }
-            }
-        }
-
-        // further open question for footprint lists: should we change it so that the null check
-        // is no longer needed? this is at L700 now, in `MakeBindingInfo`. We should have a sentinel
-        // value that indicates an empty or null footprint for a resource, since that is still a valid case
-        if (variant.FootprintListIndex >= parsed.FootprintListCount)
-        {
-            return std::unexpected(
-                ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidVariantFootprintListIndex,
-                                     .Table = ShaderManifestTable::Variants,
-                                     .RecordIndex = vi,
-                                     .Detail = variant.FootprintListIndex });
-        }
+        return std::unexpected(rasterStatesValid);
     }
 
-    const std::span<const ManifestRaster> rasterSpan =
-        MakeTable<ManifestRaster>(bytes, parsed.RasterTableOffset, parsed.RasterCount);
-    for (uint32_t i = 0u; i < rasterSpan.size(); ++i)
+    const ShaderManifestError vertexLayoutsValid = ValidateVertexLayouts(parsed, bytes);
+    if (!vertexLayoutsValid)
     {
-        const ManifestRaster& raster = rasterSpan[i];
-        if (static_cast<size_t>(raster.FirstVertexInput) + static_cast<size_t>(raster.VertexInputCount) >
-            parsed.VertexInputCount)
-        {
-            return std::unexpected(
-                ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidRasterVertexInputRange,
-                                     .Table = ShaderManifestTable::Rasters,
-                                     .RecordIndex = i });
-        }
-
-        if (static_cast<size_t>(raster.FirstColorTarget) + static_cast<size_t>(raster.ColorTargetCount) >
-            parsed.ColorTargetCount)
-        {
-            return std::unexpected(
-                ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidRasterColorTargetRange,
-                                     .Table = ShaderManifestTable::Rasters,
-                                     .RecordIndex = i });
-        }
+        return std::unexpected(vertexLayoutsValid);
     }
 
-    const std::span<const ManifestVertexInput> vertexInputSpan =
-        MakeTable<ManifestVertexInput>(bytes, parsed.VertexInputTableOffset, parsed.VertexInputCount);
-    for (uint32_t i = 0u; i < vertexInputSpan.size(); ++i)
+    const ShaderManifestError uniformMembersValid = ValidateUniformMembers(parsed, bytes);
+    if (!uniformMembersValid)
     {
-        if (vertexInputSpan[i].SemanticNameString >= parsed.StringCount)
-        {
-            return std::unexpected(ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidVertexInput,
-                                                        .Table = ShaderManifestTable::VertexInputs,
-                                                        .RecordIndex = i,
-                                                        .Detail = vertexInputSpan[i].SemanticNameString });
-        }
+        return std::unexpected(uniformMembersValid);
     }
 
-    const std::span<const ManifestUniformMember> uniformMemberSpan =
-        MakeTable<ManifestUniformMember>(bytes, parsed.UniformMemberTableOffset, parsed.UniformMemberCount);
-    for (uint32_t i = 0u; i < uniformMemberSpan.size(); ++i)
+    const ShaderManifestError axesValid = ValidateAxes(parsed, bytes);
+    if (!axesValid)
     {
-        if (uniformMemberSpan[i].NameString >= parsed.StringCount)
-        {
-            return std::unexpected(ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidUniformMember,
-                                                        .Table = ShaderManifestTable::UniformMembers,
-                                                        .RecordIndex = i,
-                                                        .Detail = uniformMemberSpan[i].NameString });
-        }
-    }
-
-    // Each axis names a string and owns a run of values in the axis value table. The values themselves
-    // are plain int64 data with nothing to reference, so only the name and the run need checking.
-    const std::span<const ManifestAxis> axisSpan =
-        MakeTable<ManifestAxis>(bytes, parsed.AxisTableOffset, parsed.AxisCount);
-    for (uint32_t i = 0u; i < axisSpan.size(); ++i)
-    {
-        const ManifestAxis& axis = axisSpan[i];
-        if (axis.NameString >= parsed.StringCount)
-        {
-            return std::unexpected(ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidAxisName,
-                                                        .Table = ShaderManifestTable::Axes,
-                                                        .RecordIndex = i,
-                                                        .Detail = axis.NameString });
-        }
-
-        if (static_cast<size_t>(axis.FirstValue) + static_cast<size_t>(axis.ValueCount) > parsed.AxisValueCount)
-        {
-            return std::unexpected(ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidAxisValueRange,
-                                                        .Table = ShaderManifestTable::Axes,
-                                                        .RecordIndex = i,
-                                                        .Detail = axis.ValueCount });
-        }
+        return std::unexpected(axesValid);
     }
 
     ShaderManifestView view;
@@ -707,17 +297,21 @@ ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std:
     view.header = reinterpret_cast<const ShaderManifestHeader*>(bytes.data());
     view.strings = MakeTable<ManifestStringRef>(bytes, parsed.StringTableOffset, parsed.StringCount);
     view.sources = MakeTable<ManifestStringRef>(bytes, parsed.SourceTableOffset, parsed.SourceCount);
-    view.bindings = bindingSpan;
-    view.resourceLists = resourceLists;
-    view.resourceIndices = resourceIndexList;
-    view.footprints = MakeTable<ManifestFootprint>(bytes, parsed.FootprintTableOffset, parsed.FootprintCount);
+    view.bindings = MakeTable<ManifestBinding>(bytes, parsed.BindingTableOffset, parsed.BindingCount);
+    view.resourceLists =
+        MakeTable<ManifestRun>(bytes, parsed.ResourceListTableOffset, parsed.ResourceListCount);
+    view.resourceIndices =
+        MakeTable<uint32_t>(bytes, parsed.ResourceIndexTableOffset, parsed.ResourceIndexCount);
+    view.footprints =
+        MakeTable<ManifestFootprint>(bytes, parsed.FootprintTableOffset, parsed.FootprintCount);
     view.footprintLists =
         MakeTable<ManifestRun>(bytes, parsed.FootprintListTableOffset, parsed.FootprintListCount);
     view.visibilityLists =
         MakeTable<ManifestRun>(bytes, parsed.VisibilityListTableOffset, parsed.VisibilityListCount);
     view.visibilityIndices =
         MakeTable<uint32_t>(bytes, parsed.VisibilityIndexTableOffset, parsed.VisibilityIndexCount);
-    view.entryPoints = entryPointSpan;
+    view.entryPoints =
+        MakeTable<ManifestEntryPoint>(bytes, parsed.EntryPointTableOffset, parsed.EntryPointCount);
     view.slots = MakeTable<ManifestSlot>(bytes, parsed.SlotTableOffset, parsed.SlotCount);
     view.variants = MakeTable<ManifestVariant>(bytes, parsed.VariantTableOffset, parsed.VariantCount);
     view.variantKeys = MakeTable<VariantKey>(bytes, parsed.VariantKeyTableOffset, parsed.VariantKeyCount);
@@ -978,11 +572,7 @@ std::string_view ManifestShaderSourceProvider::Source(uint32_t entry_point,
                                                       VariantKey variant) const noexcept
 {
     const ManifestSlot* slot = view.FindSlot(entry_point, variant);
-    if (slot == nullptr)
-    {
-        return {};
-    }
-
+    assert(slot != nullptr);
     return view.Source(slot->SourceIndex);
 }
 
@@ -990,17 +580,8 @@ std::span<const BindingInfo> ManifestShaderSourceProvider::Bindings(uint32_t ent
                                                                     VariantKey variant) const noexcept
 {
     const ManifestSlot* slot = view.FindSlot(entry_point, variant);
-    if (slot == nullptr)
-    {
-        return {};
-    }
-
+    assert(slot != nullptr);
     const size_t slotIndex = static_cast<size_t>(slot - view.SlotTable().data());
-    if (slotIndex >= slotBindingCount.size() || slotBindingCount[slotIndex] == 0u)
-    {
-        return {};
-    }
-
     return std::span<const BindingInfo>{ bindingInfos.data() + slotFirstBinding[slotIndex],
                                          slotBindingCount[slotIndex] };
 }
@@ -1009,11 +590,7 @@ WorkgroupSize ManifestShaderSourceProvider::Workgroup(uint32_t entry_point,
                                                       VariantKey variant) const noexcept
 {
     const ManifestSlot* slot = view.FindSlot(entry_point, variant);
-    if (slot == nullptr)
-    {
-        return WorkgroupSize{ .X = 0, .Y = 0, .Z = 0 };
-    }
-
+    assert(slot != nullptr);
     return WorkgroupSize{ .X = slot->WorkgroupX, .Y = slot->WorkgroupY, .Z = slot->WorkgroupZ };
 }
 
@@ -1025,6 +602,568 @@ uint64_t ManifestShaderSourceProvider::Generation() const noexcept
 const ShaderManifestView& ManifestShaderSourceProvider::View() const noexcept
 {
     return view;
+}
+
+namespace
+{
+    
+    /** True when a table of `count` records of `record_size` bytes starts at `offset` and stays
+     * inside a file of `file_size` bytes. An empty table at any offset is in bounds. */
+    bool TableIsInBounds(uint32_t offset, uint32_t count, size_t record_size, size_t file_size) noexcept
+    {
+        if (count == 0u)
+        {
+            return true;
+        }
+
+        const size_t span = static_cast<size_t>(count) * record_size;
+        return offset <= file_size && span <= file_size - offset;
+    }
+
+    ShaderManifestError ValidateManifestHeader(const ShaderManifestHeader& parsed,
+                                            const size_t file_size) noexcept
+    {
+        if (parsed.Magic != k_ShaderManifestMagic)
+        {
+            return { .Code = ShaderManifestErrorCode::BadMagic };
+        }
+
+        if (parsed.Version != k_ShaderManifestVersion)
+        {
+            return { .Code = ShaderManifestErrorCode::VersionMismatch, .Detail = parsed.Version };
+        }
+
+        if (parsed.FileSize != file_size)
+        {
+            return { .Code = ShaderManifestErrorCode::SizeMismatch, .Detail = parsed.FileSize };
+        }
+
+        return k_ManifestOk;
+    }
+
+    //NOLINTBEGIN(modernize-use-designated-initializers)
+    ShaderManifestError ValidateTablesInRange(const ShaderManifestHeader& parsed,
+                                              std::span<const std::byte> bytes) noexcept
+    {
+        const size_t fileSize = bytes.size();
+
+        // instead of a nasty chain of booleans and ifs on those booleans,
+        // just build a table of sections and then validate each one in a loop
+        struct Section
+        {
+            ShaderManifestTable Table;
+            uint32_t Offset;
+            uint32_t Count;
+            size_t RecordSize;
+        };
+
+        const std::array<Section, static_cast<size_t>(ShaderManifestTable::Count) + 1> sections
+        {
+            Section{ ShaderManifestTable::Strings,
+                     parsed.StringTableOffset,
+                     parsed.StringCount,
+                     sizeof(ManifestStringRef) },
+            Section{ ShaderManifestTable::Strings,
+                     parsed.StringBlobOffset,
+                     parsed.StringBlobSize,
+                     1u },
+            Section{ ShaderManifestTable::Sources,
+                     parsed.SourceTableOffset,
+                     parsed.SourceCount,
+                     sizeof(ManifestStringRef) },
+            Section{ ShaderManifestTable::Sources,
+                     parsed.SourceBlobOffset,
+                     parsed.SourceBlobSize,
+                     1u },
+            Section{ ShaderManifestTable::Bindings,
+                     parsed.BindingTableOffset,
+                     parsed.BindingCount,
+                     sizeof(ManifestBinding) },
+            Section{ ShaderManifestTable::ResourceLists,
+                     parsed.ResourceListTableOffset,
+                     parsed.ResourceListCount,
+                     sizeof(ManifestRun) },
+            Section{ ShaderManifestTable::ResourceIndices,
+                     parsed.ResourceIndexTableOffset,
+                     parsed.ResourceIndexCount,
+                     sizeof(uint32_t) },
+            Section{ ShaderManifestTable::Footprints,
+                     parsed.FootprintTableOffset,
+                     parsed.FootprintCount,
+                     sizeof(ManifestFootprint) },
+            Section{ ShaderManifestTable::FootprintLists,
+                     parsed.FootprintListTableOffset,
+                     parsed.FootprintListCount,
+                     sizeof(ManifestRun) },
+            Section{ ShaderManifestTable::VisibilityLists,
+                     parsed.VisibilityListTableOffset,
+                     parsed.VisibilityListCount,
+                     sizeof(ManifestRun) },
+            Section{ ShaderManifestTable::VisibilityIndices,
+                     parsed.VisibilityIndexTableOffset,
+                     parsed.VisibilityIndexCount,
+                     sizeof(uint32_t) },
+            Section{ ShaderManifestTable::EntryPoints,
+                     parsed.EntryPointTableOffset,
+                     parsed.EntryPointCount,
+                     sizeof(ManifestEntryPoint) },
+            Section{ ShaderManifestTable::Slots,
+                     parsed.SlotTableOffset,
+                     parsed.SlotCount,
+                     sizeof(ManifestSlot) },
+            Section{ ShaderManifestTable::Variants,
+                     parsed.VariantTableOffset,
+                     parsed.VariantCount,
+                     sizeof(ManifestVariant) },
+            Section{ ShaderManifestTable::VariantKeys,
+                     parsed.VariantKeyTableOffset,
+                     parsed.VariantKeyCount,
+                     sizeof(uint64_t) },
+            Section{ ShaderManifestTable::Axes,
+                     parsed.AxisTableOffset,
+                     parsed.AxisCount,
+                     sizeof(ManifestAxis) },
+            Section{ ShaderManifestTable::AxisValues,
+                     parsed.AxisValueTableOffset,
+                     parsed.AxisValueCount,
+                     sizeof(int64_t) },
+            Section{ ShaderManifestTable::Rasters,
+                     parsed.RasterTableOffset,
+                     parsed.RasterCount,
+                     sizeof(ManifestRaster) },
+            Section{ ShaderManifestTable::VertexInputs,
+                     parsed.VertexInputTableOffset,
+                     parsed.VertexInputCount,
+                     sizeof(ManifestVertexInput) },
+            Section{ ShaderManifestTable::ColorTargets,
+                     parsed.ColorTargetTableOffset,
+                     parsed.ColorTargetCount,
+                     sizeof(ManifestColorTarget) },
+            Section{ ShaderManifestTable::UniformMembers,
+                     parsed.UniformMemberTableOffset,
+                     parsed.UniformMemberCount,
+                     sizeof(ManifestUniformMember) },
+        };
+
+        for (const Section& section : sections)
+        {
+            if (!TableIsInBounds(section.Offset, section.Count, section.RecordSize, fileSize))
+            {
+                return { .Code = ShaderManifestErrorCode::SectionOutOfBounds, .Table = section.Table };
+            }
+        }
+
+        return k_ManifestOk;
+    }
+    //NOLINTEND(modernize-use-designated-initializers)
+
+    ShaderManifestError ValidateBindingTables(const ShaderManifestHeader& parsed,
+                                                       std::span<const std::byte> bytes) noexcept
+    {
+        const std::span<const ManifestBinding> bindingSpan =
+            MakeTable<ManifestBinding>(bytes, parsed.BindingTableOffset, parsed.BindingCount);
+        // validate integrity of binding data
+        for (uint32_t i = 0u; i < bindingSpan.size(); ++i)
+        {
+            const ManifestBinding& binding = bindingSpan[i];
+            if (binding.NameString >= parsed.StringCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::ManifestBindingInvalidName,
+                                            .Table = ShaderManifestTable::Bindings,
+                                            .RecordIndex = i,
+                                            .Detail = binding.NameString };
+            }
+
+            if (binding.FirstUniformMember > parsed.UniformMemberCount ||
+                binding.UniformMemberCount > parsed.UniformMemberCount - binding.FirstUniformMember)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::ManifestBindingInvalidUniforms,
+                                            .Table = ShaderManifestTable::Bindings,
+                                            .RecordIndex = i };
+            }
+        } 
+
+        return k_ManifestOk;
+    }
+
+    ShaderManifestError ValidateResourceIndices(const ShaderManifestHeader& parsed,
+                                                         std::span<const std::byte> bytes) noexcept
+    {
+        const std::span<const uint32_t> resourceIndexList =
+            MakeTable<uint32_t>(bytes, parsed.ResourceIndexTableOffset, parsed.ResourceIndexCount);
+        for (uint32_t i = 0u; i < resourceIndexList.size(); ++i)
+        {
+            if (resourceIndexList[i] >= parsed.BindingCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidResourceBindingIndex,
+                                            .Table = ShaderManifestTable::ResourceIndices,
+                                            .RecordIndex = i,
+                                            .Detail = resourceIndexList[i] };
+            }
+        }
+        return k_ManifestOk;
+    }
+
+    ShaderManifestError ValidateStringBlobs(const ShaderManifestHeader& parsed,
+                                                 std::span<const std::byte> bytes) noexcept
+    {
+        auto stringOutOfBounds = [](const ManifestStringRef& string_ref, const uint32_t blob_size)
+        {
+            return string_ref.Length > blob_size || string_ref.Offset > blob_size - string_ref.Length;
+        };
+
+        const std::span<const ManifestStringRef> stringSpan =
+            MakeTable<ManifestStringRef>(bytes, parsed.StringTableOffset, parsed.StringCount);
+        for (uint32_t i = 0u; i < stringSpan.size(); ++i)
+        {
+            if (stringOutOfBounds(stringSpan[i], parsed.StringBlobSize))
+            {
+                return { .Code = ShaderManifestErrorCode::StringOutOfBounds,
+                         .Table = ShaderManifestTable::Strings,
+                         .RecordIndex = i };
+            }
+        }
+
+        const std::span<const ManifestStringRef> sourceSpan =
+            MakeTable<ManifestStringRef>(bytes, parsed.SourceTableOffset, parsed.SourceCount);
+        for (uint32_t i = 0u; i < sourceSpan.size(); ++i)
+        {
+            if (stringOutOfBounds(sourceSpan[i], parsed.SourceBlobSize))
+            {
+                return { .Code = ShaderManifestErrorCode::SourceOutOfBounds,
+                         .Table = ShaderManifestTable::Sources,
+                         .RecordIndex = i };
+            }
+        }
+
+        return k_ManifestOk;
+    }
+
+    ShaderManifestError ValidateRunTables(const ShaderManifestHeader& parsed,
+                                                  std::span<const std::byte> bytes) noexcept
+    {
+        auto validManifestRun = [](const ManifestRun& run, const size_t list_size)
+        {
+            // <= on first check for edge case: module with empty trailing list
+            return static_cast<size_t>(run.First) <= list_size &&
+                   (static_cast<size_t>(run.First) + static_cast<size_t>(run.Count)) <= list_size;
+        };
+
+        // all indices are valid: now validate the runs, as those are indices into the resource index list
+        // the visiblity lists then give indices into this list
+        const std::span<const ManifestRun> resourceListSpan =
+            MakeTable<ManifestRun>(bytes, parsed.ResourceListTableOffset, parsed.ResourceListCount);
+        for (uint32_t i = 0u; i < resourceListSpan.size(); ++i)
+        {
+            if (!validManifestRun(resourceListSpan[i], parsed.ResourceIndexCount))
+            {
+                return { .Code = ShaderManifestErrorCode::InvalidResourceListRun,
+                         .Table = ShaderManifestTable::ResourceLists,
+                         .RecordIndex = i };
+            }
+        }
+
+        // we can't really validate footprints, as they are mostly descriptive and don't have strict
+        // referential integrity requirements
+        const std::span<const ManifestRun> footprintListSpan =
+            MakeTable<ManifestRun>(bytes, parsed.FootprintListTableOffset, parsed.FootprintListCount);
+        for (uint32_t i = 0u; i < footprintListSpan.size(); ++i)
+        {
+            if (!validManifestRun(footprintListSpan[i], parsed.FootprintCount))
+            {
+                return { .Code = ShaderManifestErrorCode::InvalidFootprintListRun,
+                         .Table = ShaderManifestTable::FootprintLists,
+                         .RecordIndex = i };
+            }
+        }
+
+        // now visibility lists
+        const std::span<const ManifestRun> visibilityListSpan =
+            MakeTable<ManifestRun>(bytes, parsed.VisibilityListTableOffset, parsed.VisibilityListCount);
+        for (uint32_t i = 0u; i < visibilityListSpan.size(); ++i)
+        {
+            if (!validManifestRun(visibilityListSpan[i], parsed.VisibilityIndexCount))
+            {
+                return { .Code = ShaderManifestErrorCode::InvalidVisibilityListRun,
+                         .Table = ShaderManifestTable::VisibilityLists,
+                         .RecordIndex = i };
+            }
+        }
+
+        return k_ManifestOk;
+    }
+
+    ShaderManifestError ValidateEntryPoints(const ShaderManifestHeader& parsed,
+                                            std::span<const std::byte> bytes) noexcept
+    {
+        const std::span<const ManifestEntryPoint> entryPointSpan =
+            MakeTable<ManifestEntryPoint>(bytes, parsed.EntryPointTableOffset, parsed.EntryPointCount);
+        for (uint32_t i = 0u; i < entryPointSpan.size(); ++i)
+        {
+            const ManifestEntryPoint& entryPoint = entryPointSpan[i];
+            // check namestring validity and stage correctness
+            if (entryPoint.NameString >= parsed.StringCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::EntryPointInvalidName,
+                                           .Table = ShaderManifestTable::EntryPoints,
+                                           .RecordIndex = i,
+                                           .Detail = entryPoint.NameString };
+            }
+
+            if (entryPoint.Stage >= static_cast<uint32_t>(ShaderStageKind::Count) ||
+                entryPoint.Stage == static_cast<uint32_t>(ShaderStageKind::Invalid))
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::EntryPointInvalidStage,
+                                           .Table = ShaderManifestTable::EntryPoints,
+                                           .RecordIndex = i,
+                                           .Detail = entryPoint.Stage };
+            }
+        }
+
+        return k_ManifestOk;
+    }
+
+    ShaderManifestError ValidateManifestSlots(const ShaderManifestHeader& parsed,
+                                              std::span<const std::byte> bytes) noexcept
+    {
+        const std::span<const ManifestSlot> slotSpan =
+            MakeTable<ManifestSlot>(bytes, parsed.SlotTableOffset, parsed.SlotCount);
+        for (uint32_t i = 0u; i < slotSpan.size(); ++i)
+        {
+            const ManifestSlot& slot = slotSpan[i];
+            if (slot.SourceIndex >= parsed.SourceCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidSlotSourceIndex,
+                                           .Table = ShaderManifestTable::Slots,
+                                           .RecordIndex = i,
+                                           .Detail = slot.SourceIndex };
+            }
+
+            if (slot.VisibilityIndex >= parsed.VisibilityListCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidSlotVisibilityIndex,
+                                           .Table = ShaderManifestTable::Slots,
+                                           .RecordIndex = i,
+                                           .Detail = slot.VisibilityIndex };
+            }
+
+            if (slot.RasterIndex >= parsed.RasterCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidSlotRasterIndex,
+                                           .Table = ShaderManifestTable::Slots,
+                                           .RecordIndex = i,
+                                           .Detail = slot.RasterIndex };
+            }
+        }
+
+        return k_ManifestOk;
+    }
+
+    ShaderManifestError ValidateVariantKeys(const ShaderManifestHeader& parsed,
+                                            std::span<const std::byte> bytes) noexcept
+    {
+        // variant validation is going to be a bit more complex: going to validate variant keys first
+        const std::span<const VariantKey> variantKeySpan =
+            MakeTable<VariantKey>(bytes, parsed.VariantKeyTableOffset, parsed.VariantKeyCount);
+        // validate all keys are sorted in ascending order and unique
+        // (adjacent_find lets us combine is_sorted and uniqueness check)
+        const auto variantKeysSorted = std::ranges::adjacent_find(variantKeySpan, std::greater_equal<VariantKey>{});
+        if (variantKeysSorted != variantKeySpan.end())
+        {
+            const uint32_t idx = static_cast<uint32_t>(std::distance(variantKeySpan.begin(), variantKeysSorted));
+            return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidVariantKeyOrder,
+                                        .Table = ShaderManifestTable::VariantKeys,
+                                        .RecordIndex = idx };
+        }
+
+        // this better be true...
+        if (variantKeySpan.size() != parsed.VariantCount)
+        {
+            return ShaderManifestError{ .Code = ShaderManifestErrorCode::VariantKeyVariantCountMismatch,
+                                        .Table = ShaderManifestTable::VariantKeys,
+                                        .Detail = parsed.VariantCount };
+        }
+
+        return k_ManifestOk;
+    }
+
+    ShaderManifestError ValidateCrossReferences(const ShaderManifestHeader& parsed,
+                                                std::span<const std::byte> bytes) noexcept
+    {
+        // the most complex and annoying pass to handle, but the most beneficial: after this, 
+        // all cross-references between variants, resource lists, and visibility lists are validated
+        // so that all accessors can run unchecked
+        const std::span<const ManifestBinding> bindingSpan =
+            MakeTable<ManifestBinding>(bytes, parsed.BindingTableOffset, parsed.BindingCount);
+        const std::span<const ManifestVariant> variantSpan =
+            MakeTable<ManifestVariant>(bytes, parsed.VariantTableOffset, parsed.VariantCount);
+        const std::span<const ManifestRun> resourceLists =
+            MakeTable<ManifestRun>(bytes, parsed.ResourceListTableOffset, parsed.ResourceListCount);
+        const std::span<const uint32_t> resourceIndexList =
+            MakeTable<uint32_t>(bytes, parsed.ResourceIndexTableOffset, parsed.ResourceIndexCount);
+        const std::span<const uint32_t> visiblityIndices =
+            MakeTable<uint32_t>(bytes, parsed.VisibilityIndexTableOffset, parsed.VisibilityIndexCount);
+        const std::span<const ManifestRun> visibilityLists =
+            MakeTable<ManifestRun>(bytes, parsed.VisibilityListTableOffset, parsed.VisibilityListCount);
+        const std::span<const ManifestSlot> slotSpan =
+            MakeTable<ManifestSlot>(bytes, parsed.SlotTableOffset, parsed.SlotCount);
+        
+        // after the annoying step of retrieving all of those tables, lets get to work
+        for (uint32_t vi = 0u; vi < variantSpan.size(); ++vi)
+        {
+            const ManifestVariant& variant = variantSpan[vi];
+            if (static_cast<size_t>(variant.FirstSlot) + static_cast<size_t>(variant.SlotCount) >
+                parsed.SlotCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::VariantSlotOutOfRange,
+                                            .Table = ShaderManifestTable::Variants,
+                                            .RecordIndex = vi };
+            }
+
+            // now check the resource lists
+            if (variant.ResourceListIndex >= parsed.ResourceListCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidResourceListRun,
+                                            .Table = ShaderManifestTable::Variants,
+                                            .RecordIndex = vi,
+                                            .Detail = variant.ResourceListIndex };
+            }
+
+            const std::span<const uint32_t> variantResourceIndices =
+                RunOf<const uint32_t>(resourceLists, resourceIndexList, variant.ResourceListIndex);
+            for (uint32_t i = 0u; i < variant.SlotCount; ++i)
+            {
+                const uint32_t slotIndex = variant.FirstSlot + i;
+                const ManifestSlot& currSlot = slotSpan[slotIndex];
+                const std::span<const uint32_t> slotVisibilityIndices =
+                    RunOf<uint32_t>(visibilityLists, visiblityIndices, currSlot.VisibilityIndex);
+                // absolute offset of this run into the visibility index table, so a bad entry names its row
+                const uint32_t runOffset =
+                    static_cast<uint32_t>(slotVisibilityIndices.data() - visiblityIndices.data());
+
+                for (uint32_t j = 0u; j < slotVisibilityIndices.size(); ++j)
+                {
+                    // idx = index into the variant's resource list, which then indexes the *global* resource
+                    // table (those values are the final values, a ManifestBinding entry)
+                    const uint32_t idx = slotVisibilityIndices[j];
+                    const bool valid =
+                        idx < variantResourceIndices.size() && variantResourceIndices[idx] < bindingSpan.size();
+                    if (!valid)
+                    {
+                        return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidSlotVisibilityIndex,
+                                                   .Table = ShaderManifestTable::VisibilityIndices,
+                                                   .RecordIndex = runOffset + j,
+                                                   .Detail = idx };
+                    }
+                }
+            }
+
+            // further open question for footprint lists: should we change it so that the null check
+            // is no longer needed? this is at L700 now, in `MakeBindingInfo`. We should have a sentinel
+            // value that indicates an empty or null footprint for a resource, since that is still a valid case
+            if (variant.FootprintListIndex >= parsed.FootprintListCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidVariantFootprintListIndex,
+                                            .Table = ShaderManifestTable::Variants,
+                                            .RecordIndex = vi,
+                                            .Detail = variant.FootprintListIndex };
+            }
+        }
+
+        return k_ManifestOk;
+    }
+
+    ShaderManifestError ValidateRasterStates(const ShaderManifestHeader& parsed, const std::span<const std::byte> bytes) noexcept
+    {
+        const std::span<const ManifestRaster> rasterSpan =
+            MakeTable<const ManifestRaster>(bytes, parsed.RasterTableOffset, parsed.RasterCount);
+        for (uint32_t i = 0u; i < rasterSpan.size(); ++i)
+        {
+            const ManifestRaster& raster = rasterSpan[i];
+            if (static_cast<size_t>(raster.FirstVertexInput) + static_cast<size_t>(raster.VertexInputCount) >
+                parsed.VertexInputCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidRasterVertexInputRange,
+                                            .Table = ShaderManifestTable::Rasters,
+                                            .RecordIndex = i };
+            }
+
+            if (static_cast<size_t>(raster.FirstColorTarget) + static_cast<size_t>(raster.ColorTargetCount) >
+                parsed.ColorTargetCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidRasterColorTargetRange,
+                                            .Table = ShaderManifestTable::Rasters,
+                                            .RecordIndex = i };
+            }
+        }
+
+        return k_ManifestOk;
+    }
+
+    ShaderManifestError ValidateVertexLayouts(const ShaderManifestHeader& parsed, const std::span<const std::byte> bytes) noexcept
+    {
+        const std::span<const ManifestVertexInput> vertexInputSpan =
+            MakeTable<ManifestVertexInput>(bytes, parsed.VertexInputTableOffset, parsed.VertexInputCount);
+        for (uint32_t i = 0u; i < vertexInputSpan.size(); ++i)
+        {
+            if (vertexInputSpan[i].SemanticNameString >= parsed.StringCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidVertexInput,
+                                            .Table = ShaderManifestTable::VertexInputs,
+                                            .RecordIndex = i,
+                                            .Detail = vertexInputSpan[i].SemanticNameString };
+            }
+        }
+
+        return k_ManifestOk;
+    }
+
+    ShaderManifestError ValidateUniformMembers(const ShaderManifestHeader& parsed, const std::span<const std::byte> bytes) noexcept
+    {
+        const std::span<const ManifestUniformMember> uniformMemberSpan =
+            MakeTable<ManifestUniformMember>(bytes, parsed.UniformMemberTableOffset, parsed.UniformMemberCount);
+        for (uint32_t i = 0u; i < uniformMemberSpan.size(); ++i)
+        {
+            if (uniformMemberSpan[i].NameString >= parsed.StringCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidUniformMember,
+                                            .Table = ShaderManifestTable::UniformMembers,
+                                            .RecordIndex = i,
+                                            .Detail = uniformMemberSpan[i].NameString };
+            }
+        }
+
+        return k_ManifestOk;
+    }
+
+    ShaderManifestError ValidateAxes(const ShaderManifestHeader& parsed, const std::span<const std::byte> bytes) noexcept
+    {
+        // Each axis names a string and owns a run of values in the axis value table. The values themselves
+        // are plain int64 data with nothing to reference, so only the name and the run need checking.
+        const std::span<const ManifestAxis> axisSpan =
+            MakeTable<ManifestAxis>(bytes, parsed.AxisTableOffset, parsed.AxisCount);
+        for (uint32_t i = 0u; i < axisSpan.size(); ++i)
+        {
+            const ManifestAxis& axis = axisSpan[i];
+            if (axis.NameString >= parsed.StringCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidAxisName,
+                                            .Table = ShaderManifestTable::Axes,
+                                            .RecordIndex = i,
+                                            .Detail = axis.NameString };
+            }
+
+            if (static_cast<size_t>(axis.FirstValue) + static_cast<size_t>(axis.ValueCount) > parsed.AxisValueCount)
+            {
+                return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidAxisValueRange,
+                                            .Table = ShaderManifestTable::Axes,
+                                            .RecordIndex = i,
+                                            .Detail = axis.ValueCount };
+            }
+        }
+        
+        return k_ManifestOk;
+    }
 }
 
 } // namespace lodestone

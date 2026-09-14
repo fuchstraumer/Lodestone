@@ -108,6 +108,16 @@ struct ShaderManifestError
     uint32_t RecordIndex{ 0u };
     // offending value, or bound, or version: varies based on error code and table
     uint32_t Detail{ 0u };
+    // implicit bool conversion operator: true if successful (i.e., Code is Success)
+    constexpr explicit operator bool() const noexcept
+    {
+        return Code == ShaderManifestErrorCode::Success;
+    }
+
+    constexpr bool operator!() const noexcept
+    {
+        return Code != ShaderManifestErrorCode::Success;
+    }
 };
 
 template<typename T>
@@ -345,6 +355,9 @@ class ShaderManifestView
 public:
     ShaderManifestView() noexcept;
 
+    // Performs deep validation of the manifest data: cross reference checks, consistency verification,
+    // effectively a full validation of the manifest. This means, however, that all the accessors
+    // can run totally unchecked after Open() has successfully returned.
     static ManifestResult<ShaderManifestView> Open(std::span<const std::byte> bytes) noexcept;
 
     [[nodiscard]] std::string_view ModuleName() const noexcept;

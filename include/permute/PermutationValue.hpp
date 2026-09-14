@@ -12,6 +12,8 @@ struct PermutationAxis;
 
 // We used to use std::variant, but we know that our permutation values have a fixed set of types, so we can
 // represent them more efficiently than a variant. mostly, less templates and stdlib includes
+// todo-ship: Just make this use a variant again, since we're getting more complex types involved
+// Typename string can be a string_view at least, since it will persist in the axis itself
 struct PermutationValue
 {
     enum class Type : uint8_t
