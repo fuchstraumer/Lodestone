@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <span>
 #include <string_view>
+
 /**
  * @brief The vocabulary the shader cooker writes and clients read. This header is the contract between
  * Lodestone and clients that want to use the data the cooker produces. Texture formats and view dimensions
@@ -209,6 +210,27 @@ struct UniformMemberInfo
     uint32_t ArrayCount{ 1u };
 };
 
+/** @brief One axis value: represents a single possible value for a permutation axis in the shader. */
+struct ManifestAxisValue
+{
+    AxisValueDomain Type{ AxisValueDomain::None };
+    union
+    {
+        bool BoolValue;
+        uint32_t IntegralValue{ 0u };
+    };
+    std::string_view TypeName;
+};
+
+/** @brief Used to build queries for variants: a span of these provides the complete set of parameters
+  * we need to find and return a specific variant. */
+// todo-ship: Use this API and these two structs more to identify how else we could shape or improve this query API
+struct ManifestAxisAssignment
+{
+    std::string_view AxisName;
+    ManifestAxisValue Value;
+};
+
 /** @brief One resource a shader binds, as the generated library states it. This is the optimized and
  * compact form of the cooker's `ReflectedBinding`. Strings are stored in the cooked data, so views
  * are used here instead of owning strings. It is critical to use the group and binding indices
@@ -259,35 +281,6 @@ struct BindingInfo
  * error: it means the CPU side names a field the shader does not have. */
 [[nodiscard]] const UniformMemberInfo* FindUniformMember(std::span<const UniformMemberInfo> members,
                                                          std::string_view name) noexcept;
-
-/**
- * @brief Where the rendergraph gets shader sources and layouts. This is a virtual base class
- * so that we can choose to use a provider reading from baked source - or a provider that reads
- * from memory and can provide live-edit functionality. Clients binding and using shaders
- * and their reflection data should not care where it comes from.
- *
- * `Generation()` is the future hot-reload hook. A provider for baked data will always return the same value,
- * but a live provider can increment the value when any source changes - allowing users to reload
- * shaders and reset state gracefully
- */
-class ShaderSourceProvider
-{
-public:
-    ShaderSourceProvider() noexcept;
-    virtual ~ShaderSourceProvider() noexcept;
-    ShaderSourceProvider(const ShaderSourceProvider&) = delete;
-    ShaderSourceProvider& operator=(const ShaderSourceProvider&) = delete;
-
-    /** @brief WGSL for one entry point of one variant. An unknown pair returns an empty view. */
-    [[nodiscard]] virtual std::string_view Source(uint32_t entry_point,
-                                                  VariantKey variant) const noexcept = 0;
-    [[nodiscard]] virtual std::span<const BindingInfo> Bindings(uint32_t entry_point,
-                                                                VariantKey variant) const noexcept = 0;
-    [[nodiscard]] virtual WorkgroupSize Workgroup(uint32_t entry_point,
-                                                  VariantKey variant) const noexcept = 0;
-    /** @brief Increments when any source above changes. A constant means sources never change. */
-    [[nodiscard]] virtual uint64_t Generation() const noexcept = 0;
-};
 
 /** @brief Finds one binding by the name the shader gave it.
  *

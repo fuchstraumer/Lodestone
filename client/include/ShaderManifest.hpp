@@ -15,9 +15,6 @@
 /**
  * @brief A read-only view over one cooked shader module, stored as a flat byte span.
  *
- * The generated C++ library and this manifest hold the same data. The library compiles into the
- * program. The manifest arrives as bytes, so a running program can accept a new one.
- *
  * Every cross-reference in the file is a uint32 index, never a pointer. The reader is therefore a set
  * of spans over one byte span. It allocates nothing to open a file, and it relocates nothing.
  *
@@ -379,18 +376,12 @@ public:
     [[nodiscard]] std::span<const VariantKey> VariantKeys() const noexcept;
     [[nodiscard]] std::span<const ManifestAxis> Axes() const noexcept;
     [[nodiscard]] std::span<const int64_t> AxisValues(uint32_t axis_index) const noexcept;
-
     [[nodiscard]] std::span<const ManifestVertexInput> VertexInputs(uint32_t raster_index) const noexcept;
     [[nodiscard]] std::span<const ManifestColorTarget> ColorTargets(uint32_t raster_index) const noexcept;
     [[nodiscard]] bool WritesFragDepth(uint32_t raster_index) const noexcept;
-
     [[nodiscard]] std::span<const ManifestUniformMember> UniformMembers(
         const ManifestBinding& binding) const noexcept;
-
-    /** @brief The slot for one entry point of one variant, or nullptr when the pair does not exist.
-     *
-     * `entry_point` is the `EntryPointId` value, so it counts from one and zero is Invalid.
-     * `variant_index` is the dense index, the same number the generated library uses. */
+    /** @brief The entry-point specific information for one entry point of one variant. */
     [[nodiscard]] const ManifestSlot* FindSlot(uint32_t entry_point, VariantKey variant) const noexcept;
     /** @brief One slot for each entry point of this variant, in entry point order. */
     [[nodiscard]] std::span<const ManifestSlot> Slots(const ManifestVariant& variant) const noexcept;
@@ -424,26 +415,26 @@ private:
 /**
  * @brief Serves shader sources out of a manifest instead of out of generated C++.
  *
- * This is the second implementation of ShaderSourceProvider, and the reason the interface exists. A
- * watch-and-serve cooker sends a new manifest, the caller builds a new provider, and Generation()
- * moves. Nothing in the rendergraph changes.
- *
+ * This is now the only implementation of ShaderSourceProvider, after removal of the old header path.
  * The constructor converts the manifest binding records into BindingInfo once. That is the only
  * allocation, and it is needed because BindingInfo holds string views while the file holds indices.
+ *
+ * `Generation()` is the future hot-reload hook. A provider for baked data will always return the same value,
+ * but a live provider can increment the value when any source changes - allowing users to reload
+ * shaders and reset state gracefully
  */
-class ManifestShaderSourceProvider final : public ShaderSourceProvider
+class ShaderSourceProvider
 {
 public:
-    ManifestShaderSourceProvider(ShaderManifestView view, uint64_t generation) noexcept;
-    ~ManifestShaderSourceProvider() override;
+    ShaderSourceProvider(ShaderManifestView view, uint64_t generation) noexcept;
 
     [[nodiscard]] std::string_view Source(uint32_t entry_point,
-                                          VariantKey variant) const noexcept override;
+                                          VariantKey variant) const noexcept;
     [[nodiscard]] std::span<const BindingInfo> Bindings(uint32_t entry_point,
-                                                        VariantKey variant) const noexcept override;
+                                                        VariantKey variant) const noexcept;
     [[nodiscard]] WorkgroupSize Workgroup(uint32_t entry_point,
-                                          VariantKey variant) const noexcept override;
-    [[nodiscard]] uint64_t Generation() const noexcept override;
+                                          VariantKey variant) const noexcept;
+    [[nodiscard]] uint64_t Generation() const noexcept;
 
     [[nodiscard]] const ShaderManifestView& View() const noexcept;
 

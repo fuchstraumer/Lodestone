@@ -687,7 +687,7 @@ change **what**. Each one adds capability that no golden file covers.
 | E4 | Sorted key table and binary search, in place of the storage index. **Done 2026-09-07**: `ComputeVariantKey` returns a `uint64` key, `EnumerateVariants` ranks the sorted keys, the manifest carries a `VariantKeys` table, and `FindSlot` uses a `lower_bound`. The per-variant capability requirement stays open | Round trips pass, and five stage dumps were re-accepted because the indices compacted | **high** |
 | E5 | The toml++ reader behind a facade, the policy file, per-target sections, `CookValues`, `CookIf` (was `CookWhen`), `InertAxesForEntryPoints` (was `ExpectedInfluence`). **Done 2026-09-11** | `PolicyDocumentTest`; the six dumps unchanged, because the cook reads no policy yet | medium |
 | E6 | Axis attributes read at the bootstrap compile, and `k_ModuleSpaces` deleted whole. **Done 2026-09-11**: `ReadDeclaredAxes` recurses through `__include` fragment nodes, `BuildPermutationSpace` builds the space, the `SymbolTable` prunes unused axes | `OceanFft` cooks 35 variants with no registry, the six dumps match, and `SymbolTableTest` | **high** |
-| E7 | Interface axes. E0 removed the enum fallback | A new test shader | medium |
+| E7 | Interface axes. E0 removed the enum fallback. **Done 2026-09-14**: `ls_axis_interface` on an `extern struct`, `ls_axis_interface_impl` on each conforming type, staged and matched by `isSubType`, cooked by a per-variant `export struct`, with a `Type` `PermutationValue` holding the impl ordinal | `InterfaceAxisCookTest` | medium |
 | E8 | Documents, and the measured numbers again | — | none |
 
 **E0c, E0, E1, E2, E3, E4, E5, and E6 are complete.** A diversion after E4, call it E4a, hardened the
@@ -715,8 +715,13 @@ shaped `ReadDeclaredAxes`, and `docs/phase-e-attribute-spike.md` records them: a
 reflects as an Unsupported node with the declarations one level down, so the read recurses; and
 `getDeclSourceLocation` fails for such a decl, so a missing location is soft, not fatal. The
 `SymbolTable` prunes an imported-but-unused axis from a shader's space, and `SymbolTableTest` proves it.
-Two loose ends stay: the dead `VerifyAxisNamesAreDeclared` declaration, and the `ExternConstantScanner`
-read that a later step folds into the `SymbolTable`. **E7 is next.**
+Both E6 loose ends are now closed: the dead `VerifyAxisNamesAreDeclared` declaration is deleted, and
+`ExternConstantScanner` is folded into the `SymbolTable` and removed.
+
+**E7 is done, on 2026-09-14. Interface axes work.** An `extern struct : IFoo` marked `ls_axis_interface`
+is the axis, each conforming type carries `ls_axis_interface_impl`, and a per-variant `export struct`
+makes the type concrete. Phase E is now complete through E7; only E8, the documentation pass, remains.
+The manifest variant-key retrieval path is the work in flight after it (see `docs/agent-handoff.md` §14).
 
 **The empty space holds.** A module with no declared axis once reached `space.front()` on an empty
 vector and aborted the cook, until 2026-08-20. The walk (`expandFrom`, since E3) handles the empty space

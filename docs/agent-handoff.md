@@ -3,32 +3,40 @@
 Written on 2026-08-22. Rewritten on 2026-08-28, after the compiler split finished. Updated on
 2026-09-01, after six build faults were fixed, the C++ emitter was removed, and phase E steps E0c and
 E0 completed. Updated again on 2026-09-04, after phase E steps E1 and E2 landed and
-`PermutationConstraintTest` was verified. This document records the state, the measured facts, and the
+`PermutationConstraintTest` was verified. Updated on 2026-09-14, after phase E finished through E7 and
+the manifest variant-key work began (§14). This document records the state, the measured facts, and the
 next task. Read it first.
 
 Text in this file follows ASD-STE100.
 
 ---
 
-## 1. State on 2026-09-11
+## 1. State on 2026-09-14
 
-**The compiler split is complete and the pipeline works. Phase E steps E1, E2, E3, E4, E5, and E6 have
-landed, and the client-side manifest validation work (E4a) has landed with them.** E3 made enumeration
-one depth-first walk with propagated `Require` pruning and an in-walk `MaxVariants` guard. E4 replaced
-the mixed-radix storage index with a sorted key table, so a variant's dense index is now its rank. E4a
-made `ShaderManifestView::Open` validate the whole manifest graph once, so the runtime accessors trust
-the data. E5 moved the cook policy out of the compiled-in registry and into a TOML file that a
-`PolicyDocument` reads. **E6 moved the axis declarations into the shader and deleted the compiled-in
-registry whole**: the cooker reads each axis off its `extern static const` through reflection, so no
-module data is compiled in. `PolicyDocumentTest` and `SymbolTableTest` bring the suite to seventeen
-test targets. Phase E step E0c added `AccessModelRejectTest`.
+**The compiler split is complete and the pipeline works. Phase E is done through E7; only E8, the
+documentation pass, remains.** E3 made enumeration one depth-first walk with propagated `Require`
+pruning and an in-walk `MaxVariants` guard. E4 replaced the mixed-radix storage index with a sorted key
+table, so a variant's dense index is now its rank. E4a made `ShaderManifestView::Open` validate the
+whole manifest graph once, so the runtime accessors trust the data. E5 moved the cook policy out of the
+compiled-in registry and into a TOML file that a `PolicyDocument` reads. **E6 moved the axis
+declarations into the shader and deleted the compiled-in registry whole**: the cooker reads each axis
+off its `extern static const` through reflection, so no module data is compiled in. **E7 added interface
+axes**: an `extern struct : IFoo` declared with `ls_axis_interface`, whose implementations carry
+`ls_axis_interface_impl`, cooked by a per-variant `export struct` (see §14). `PolicyDocumentTest`,
+`SymbolTableTest`, and `InterfaceAxisCookTest` bring the suite to seventeen test targets. Phase E step
+E0c added `AccessModelRejectTest`.
+
+**In progress, after E7: the manifest variant-key retrieval path (see §14).** The variant key is now a
+strong type, the cooker and client share one packing codec, and the manifest carries the axis schema.
+The client-side query surface (decode, enumerate, filter) is the open work.
 
 | Configuration | Build | Tests |
 |---|---|---|
-| RelWithDebInfo, `ninja-clang-cl` | green | 17 of 17 |
+| RelWithDebInfo, `ninja-clang-cl` | green (before the in-progress §14 edits) | 17 of 17 |
 
-Fourteen targets are unit tests, and three are cooks. `scripts\run-tests.bat` reports
-`all targets passed`, and `python scripts/check-known-good.py` reports all six stage dumps match.
+Thirteen targets are unit tests, and four are cooks. `scripts\run-tests.bat` reports
+`all targets passed`, and `python scripts/check-known-good.py` reports all six stage dumps match. The
+manifest-key edits in §14 are unverified; build and run both before you trust a green claim.
 
 **Only the clang tree was rebuilt on 2026-09-01.** `build/ninja-msvc` went with the rest of `build/`
 and has not been configured since. Build it before you trust a claim about MSVC.
@@ -247,10 +255,22 @@ module instead of reading the file. Fact 10 in §4 states which modules belong i
 
 ---
 
-## 8. The next task: phase E step E7
+## 8. Phase E is done through E7. The next task is the manifest key path (§14), then E8
 
-`docs/phase-e-data-driven-permutations.md` holds the plan. **Steps E0a, E0b, E0c, E0, E1, E2, E3, E4,
-E5, and E6 are complete, and item D2 of §10 is settled.** Nothing in that document is open for a decision.
+`docs/phase-e-data-driven-permutations.md` holds the plan. **Every step through E7 is complete, and item
+D2 of §10 is settled.** The per-step history below stays for the record. E8 is the documentation pass and
+a fresh measurement of the numbers.
+
+**E7 is done. Interface axes work.** An `extern struct SHADE_MODE : IShadeMode` marked
+`ls_axis_interface` is the axis; each implementation struct carries `ls_axis_interface_impl("IShadeMode")`;
+`SlangModuleContext` stages the extern and the impls while walking every loaded module, then matches them
+by `isSubType` against the interface from the program layout, and rejects a conformance that declares a
+resource member. `SlangVariantCompiler` cooks each value by loading a synthetic module
+`import <impl module>; export struct SHADE_MODE : IShadeMode = <impl>;`. A `Type` `PermutationValue`
+holds the ordinal into the axis's implementation list. `InterfaceAxisCookTest` cooks it end to end.
+`docs/phase-e-attribute-spike.md` records the reflection facts this needed.
+
+**The current work is the manifest variant-key retrieval path. §14 holds its state and plan.**
 
 **E1 is done, on 2026-09-01.** The attribute expression evaluator gained a comparison level, a
 logical level, and unary `!`. The file `SizeExpression.{hpp,cpp}` became `AttributeExpression.{hpp,cpp}`,
@@ -560,3 +580,48 @@ exists, and why a schema change must be accepted deliberately rather than in pas
 new dumps without reading them would have made the defect the baseline.
 
 ---
+
+## 14. The manifest variant-key retrieval path
+
+This is the current work, after E7. It lets a runtime consumer find a variant by its axis values. It is
+built in four phases. The text follows ASD-STE100.
+
+**Design decisions, settled:**
+
+- The output sink treats `-o` as a **directory**. Every artifact goes inside it. The C++ header emitter
+  is gone, so there is no primary file. `tests/CMakeLists.txt`, `scripts\run-tests.bat`, and
+  `scripts/check-known-good.py` all pass a directory now. `check-known-good.py` cooks into a temp
+  directory and reads the dumps from it.
+- The variant key is a strong type: `enum class VariantKey : uint64_t` in `client/include/VariantKey.hpp`.
+  `PackVariantKey`/`UnpackVariantKey` (a mixed-radix fold in declaration order, and its inverse) are in
+  `client/src/VariantKey.cpp`. `PermutationSpace::ComputeVariantKey` routes through `PackVariantKey`, so
+  the cooker and the client share one packing algorithm.
+- The client never constructs a key from raw axis values. The cooked variants are already
+  canonicalized, gated, and pruned, so the client decodes the keys that exist and matches against them.
+  No expression evaluator and no canonicalization on the client.
+- Radices are `ManifestAxis::ValueCount`, already serialized. Do not add a manifest radices field. Cache
+  the radices and the per-axis place-values on the view at `Open`. A single-axis constraint is one
+  div-and-mod on the raw key: `digit_j = (key / place_j) % radix_j`, no full decode. The filter type is a
+  value-set per axis (`ManifestAxisAssignmentRange`).
+
+**Phase state:**
+
+- **Phase 0 done.** Variant lookup is by key. The base `ShaderSourceProvider`, `FindSlot`, and the
+  `ManifestShaderSourceProvider` methods all take `VariantKey`. A fossil off-by-one is fixed: the verify
+  used `entry_point_index + 1`, but `EntryPointId` is zero-based (E4a) and a direct slot offset, so it is
+  the index. That bug hid because `VerifyManifestRoundTrip` was orphaned (`EmitLibraryModules` had no
+  caller, against rule 3 of `CLAUDE.md`); it is wired back in.
+- **Phase 1 done.** The strong key and the shared codec, described above.
+- **Phase 2 done, unverified.** The manifest carries the axis schema. `ManifestAxis` holds the name,
+  value count, and `Kind`/`Domain`/`BindingTime` bytes (the axis enums moved to
+  `client/include/ShaderLibraryTypes.hpp`, one source of truth for the cooker and the client). An
+  `AxisValues` table holds each value; for a `Type` axis the value names a string, the implementation
+  type name. `Open` validates the axis and value tables, string indices included.
+- **Phase 3 in progress.** The client query surface. `ManifestAxisValue` and `ManifestAxisAssignment`
+  are added. The open work: a `Decode(key, out-span)` that unpacks through the cached radices; a
+  whole-space enumeration that decodes every key for a rendergraph to walk and precache; and a
+  value-set filter that matches by digit tests on the raw key.
+
+**Verify with:** `scripts\build.bat RelWithDebInfo ninja-clang-cl`, then `scripts\run-tests.bat
+RelWithDebInfo ninja-clang-cl` (seventeen targets), then `python scripts\check-known-good.py` (six
+dumps). The Phase 2 and Phase 3 edits are unverified; run all three before you trust a green claim.

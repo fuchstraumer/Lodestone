@@ -7,9 +7,6 @@
 namespace lodestone
 {
 
-ShaderSourceProvider::ShaderSourceProvider() noexcept = default;
-ShaderSourceProvider::~ShaderSourceProvider() noexcept = default;
-
 const BindingInfo* FindBindingByName(std::span<const BindingInfo> bindings,
                                      std::string_view name) noexcept
 {

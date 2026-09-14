@@ -72,8 +72,9 @@ argument it exits 1 on `NoOutputSpecified`, which reads like a failure rather th
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
-Fifteen test targets exist. Twelve are unit tests, and each one proves a claim the repository makes.
-None of them needs Slang, a compiler, or an asset, and all twelve together run in under one second.
+Seventeen test targets exist. Thirteen are unit tests, and each one proves a claim the repository
+makes. None of them needs Slang, a compiler, or an asset, and all thirteen together run in under one
+second.
 
 | Target | Proves |
 |---|---|
@@ -82,8 +83,9 @@ None of them needs Slang, a compiler, or an asset, and all twelve together run i
 | `PermutationIndexTest` | A variant index is unique, dense, and stable, and a partial assignment resolves to one variant. |
 | `ShaderManifestRejectTest` | The manifest reader rejects a short, misaligned, or damaged file, and opens a real one. |
 | `WgslBindingScannerTest` | The cross-check reads the emitted WGSL correctly, and fails on a real mismatch. It also proves that a scoped binding states the name the emitted text must declare. |
-| `ExternConstantScannerTest` | The scanner reads an `extern static const` declaration out of shader text, and refuses a use of the name as a declaration. Nothing compares this answer against a second opinion, and it decides buffer sizes. |
 | `StageDumpTest` | A stage dump holds the model and no target text, it names itself the way `--dump-stage` names it, and two dumps of one input agree byte for byte. |
+| `SymbolTableTest` | The tokenizer that powers axis-reachability pruning: it strips `extern static const` declarations and reserved keywords, and reports the axis names no reachable source uses. |
+| `PolicyDocumentTest` | The TOML policy reader, its query surface, and its validation of every axis name and value against the declared space. |
 | `DedupeInfluenceTest` | Dedup changes what the tables cost and never what the cook measures. It builds one module in both arms and checks that the axis influence agrees, and that the measurement reads every group of variants. |
 | `DiagnosticParserTest` | The parser reads Slang's machine-readable diagnostic form into a record. It names no Slang type, so it needs no compiler. |
 | `ResolveStageTest` | Stage 4 resolves a hand-built `RawVariant` with no Slang present. This test is the proof that the stage 3 and stage 4 split worked, and before phase D step D5 it could not be written at all. |
@@ -92,10 +94,11 @@ None of them needs Slang, a compiler, or an asset, and all twelve together run i
 
 An error check prints a diagnostic to `stderr` on purpose. Read the last line for the result.
 
-The last three are different. Each one is the cooker driver, and not an assertion suite.
-`tests/CMakeLists.txt` gives each a command line through `TEST_ARGS`, and all three build from
+The last four are different. Each one is the cooker driver, and not an assertion suite.
+`tests/CMakeLists.txt` gives each a command line through `TEST_ARGS`, and all four build from
 `CookTest.cpp`. Exit code 0 there is a real statement: every variant compiled, every reflection agreed
-with the emitted WGSL, both round trips read back the same bytes, and two cooks agreed byte for byte.
+with the emitted WGSL, all three round trips read back the same bytes, and two cooks agreed byte for
+byte.
 
 - `CookTest` cooks `OceanFft.slang` with `--verify-deterministic`. It takes about 18 seconds, and it
   is the end-to-end coverage of the permutation path.
@@ -108,11 +111,18 @@ with the emitted WGSL, both round trips read back the same bytes, and two cooks 
   resources, a block of ordinary data, a block inside a block, and a block on each of two entry
   points. Phase E step E0b needed it. It cooks one variant in about one second.
 
-Each cook writes one shared header and one shared dedupe report, so each module cooks on its own.
-One cook of all three would leave no artifact of `OceanFft` byte identical.
+- `InterfaceAxisCookTest` cooks `tests/assets/InterfaceAxis/InterfaceAxisTest.slang`. It declares an
+  interface axis (`extern struct SHADE_MODE : IShadeMode`) whose three implementations reach the module
+  through an `__include`d fragment, crossed with a boolean axis for six variants. Phase E step E7 needed
+  it.
 
-Add a test with `add_ls_unit_test(<Name> <Name>.cpp)`. Add `TEST_ARGS <args>` after the sources
-when the test needs a command line.
+Each cook writes into its own output directory, so each module cooks on its own. One cook of several
+modules would leave no artifact of `OceanFft` byte identical.
+
+Add a test with `add_lodestone_unit_test(<Name> <Name>.cpp)`. Add `TEST_ARGS <args>` after the sources
+when the test needs a command line. A cook test also needs a line in `scripts\run-tests.bat`: the
+script skips the cook tests in its glob and re-runs each with explicit arguments, so add the new name to
+that skip list and give it its own explicit block.
 
 ## Running the cooker
 
@@ -150,7 +160,7 @@ is therefore a visible word in a diff: the day a file in `emit/` writes
 
 | Folder | Holds | Why it is one thing |
 |---|---|---|
-| `permute/` | `PermutationValue`, `PermutationAxis`, `PermutationAssignment`, `PermutationSpace`, `PermutationPolicy`, `PermutationRegistry`, `AttributeExpression`, `ExternConstantScanner` | The authoring parameter domain. Stages 1 and 2. Phase E fills this folder. |
+| `permute/` | `PermutationValue`, `PermutationAxis`, `PermutationAssignment`, `PermutationSpace`, `PolicyDocument`, `AttributeExpression` | The authoring parameter domain. Stages 1 and 2. Phase E filled this folder. |
 | `compile/` | `SlangCompiler`, `SlangDiagnosticParser`, `RawLibrary`, `Diagnostics`, and `src/compile/impl/` | **The Slang wall. No file outside this folder names a Slang type.** |
 | `model/` | `ResolveStage`, `ShaderDataSchema`, `ContentHash`, `ContentInterner`, `CookedLibrary` | The data that flows, interns, and freezes. Stages 4, 6, and 7. |
 | `target/` | `TargetProfile`, `WgslBindingScanner` | A target, its access model, and its validator. Phase F fills this folder. |
@@ -301,10 +311,13 @@ takes an input type and gives an output type. A validator reads the output of a 
 against a second opinion, and changes nothing. A validator gets a name and no number, because a
 number would state that every target must supply one. A target supplies a validator only when it can.
 
-1. **Declare.** `FindPermutationSpaceForModule(name)` finds the module's axes.
-   `space.VerifyAxisNamesAreDeclared` checks each axis name against the `extern static const`
-   declarations in the Slang source texts, through `ExternConstantScanner`. A module with no
-   registered space gets an empty space and one variant.
+1. **Declare.** The axes live in the shader, on `extern static const` (and `extern struct` for an
+   interface axis) declarations, as `ls_axis_*` attributes. `SlangCompiler::PrepareRawModule` reads
+   them at the bootstrap compile through `SlangModuleContext::ReadDeclaredAxes`, and
+   `BuildPermutationSpace` (in `permute/PermutationSpace.cpp`) turns them into a `PermutationSpace`. The
+   `SymbolTable` prunes an axis no reachable source uses, so an imported-but-unused axis leaves the
+   space. An axis name cannot drift from its declaration, because only one name exists. A module with
+   no declared axis gets an empty space and one variant.
 2. **Enumerate.** `space.EnumerateVariants()` expands the space into a `VariantSet` of
    `VariantDescriptor` values. Each descriptor holds `Active` and `Canonical` (see below) and a dense
    index.
@@ -321,11 +334,11 @@ number would state that every target must supply one. A target supplies a valida
    `SlangCompiler::Compile` then runs once for the whole variant set, and returns one
    `CookResult<RawVariant>` for each variant. A `ThreadPool` spreads the variants across workers.
    Each worker holds one `SlangModuleContext`, and each job runs a `SlangVariantCompiler` and then a
-   `SlangReflector`. Output is `RawVariant`. Every `[vx_*]` argument comes back as the string the
+   `SlangReflector`. Output is `RawVariant`. Every `[ls_*]` argument comes back as the string the
    author wrote, because evaluating one is stage 4's job.
-4. **Resolve.** `ResolveVariant` in `model/ResolveStage.cpp` reads the `[vx_*]` attributes and evaluates each
+4. **Resolve.** `ResolveVariant` in `model/ResolveStage.cpp` reads the `[ls_*]` attributes and evaluates each
    size expression against a `ResolveContext`. Output is `CompiledVariant`.
-   **No file under `src/compile/` names a size expression or evaluates a `[vx_*]` attribute, and
+   **No file under `src/compile/` names a size expression or evaluates a `[ls_*]` attribute, and
    `model/ResolveStage.cpp` names no Slang type.** Phase D step D5 made that true, and it is what lets a second target language
    exist. Do not undo it.
 5. **Normalize.** Empty on purpose. The dedup report says `normalization passes active: (none)`. A
@@ -357,7 +370,7 @@ Four validators run inside that loop. None of them is a stage.
   point) through the resource, footprint, and visibility tables and compares the result against
   `BuildEntryPointLayout`. Phase D step D8b built it, because the step that collapses the layout
   tables owes the repository a check that a collapse was correct. `EnforceModulePolicy` then checks
-  the measured axis influence against `ModulePolicy`.
+  the measured axis influence against the `ModulePolicyEntry` the driver read from the policy file.
 - **The manifest round trip**, inside stage 8. `VerifyManifestRoundTrip` reads each manifest back and
   compares it against the module it came from. `CheckManifestLayout` walks the manifest the way a
   consumer walks it, from variant to resource list to footprint list to visibility list.
@@ -372,17 +385,17 @@ unordered container reached the output.
 |---|---|---|
 | `CookerOptions` | `driver/CookerOptions.hpp` | Every knob one cook has. `ParseCommandLine` fills it. |
 | `OutputSink` | `emit/OutputSink.hpp` | Where artifacts go. `FileOutputSink` and `MemoryOutputSink`. The seam a live cooker will use. |
-| `PermutationValue` | `permute/PermutationValue.hpp` | One axis value: bool, uint32, or int32. A tagged union, and not a `std::variant`, so no header downstream carries the template. |
-| `PermutationAxis` | `permute/PermutationAxis.hpp` | One axis of variation. Values are stored in place, capped at `k_MaxValues`. `ParentIndex` names the parent axis inside the owning space. |
+| `PermutationValue` | `permute/PermutationValue.hpp` | One axis value: `Bool`, `UInt`, or `Type` (an interface-axis ordinal into the axis's implementation list). A tagged union, and not a `std::variant`, so no header downstream carries the template. |
+| `PermutationAxis` | `permute/PermutationAxis.hpp` | One axis of variation. It owns its values in a `std::vector`. `ActiveWhen` gates it on an earlier axis (it replaced the old parent link). An interface axis also carries the interface name and its implementation list. |
 | `PermutationSpace` | `permute/PermutationSpace.hpp` | A named, ordered set of axes, and every question you ask about them. It **owns** its axes, so it cannot be copied. |
 | `PermutationBinding`, `PermutationAssignment` | `permute/PermutationAssignment.hpp` | One axis bound to one value, and a list of them. |
 | `VariantDescriptor` | `permute/PermutationAssignment.hpp` | One variant identity. `Active` and `Canonical`. |
-| `CanonicalAssignment` | `permute/PermutationAssignment.hpp` | An assignment that holds every axis of one space. Only `PermutationSpace::CanonicalizeAssignment` builds one, so `ComputeVariantIndex` cannot be given a partial assignment. |
-| `ModulePolicy` | `permute/PermutationPolicy.hpp` | A variant budget, plus the axis influence the author expects. |
-| `ExternConstantDeclaration` | `permute/ExternConstantScanner.hpp` | One `extern static const` line read out of shader text. |
+| `CanonicalAssignment` | `permute/PermutationAssignment.hpp` | An assignment that holds every axis of one space. Only `PermutationSpace::CanonicalizeAssignment` builds one, so `ComputeVariantKey` cannot be given a partial assignment. |
+| `VariantKey` | `client/include/VariantKey.hpp` | A variant's identity: a strong `enum class : uint64_t`, a mixed-radix packing of the canonical assignment. `PackVariantKey`/`UnpackVariantKey` are the shared codec the cooker and the client both use. |
+| `PolicyDocument`, `TargetPolicy` | `permute/PolicyDocument.hpp` | The cook policy read from a TOML file: per target a variant budget, a `CookValues` allow-list, and a `CookIf` predicate. `ModulePolicyEntry` carries the per-module expectations to `EnforceModulePolicy`. |
 | `CompiledVariant`, `CompiledEntryPoint` | `model/ShaderDataSchema.hpp` | Compiler output: WGSL text plus reflection. Owns its strings. |
 | `ReflectedBinding` | `model/ShaderDataSchema.hpp` | What the shader states about one resource. The CPU side never writes any of it. `Name` and `ScopeName` together are the identity: two entry points can each declare `albedoMap`. |
-| `RawVariant`, `RawModule` | `compile/RawLibrary.hpp` | Stage 3 output. Everything Slang says, with no opinion about any of it. A `[vx_*]` argument is still the string the author wrote. |
+| `RawVariant`, `RawModule` | `compile/RawLibrary.hpp` | Stage 3 output. Everything Slang says, with no opinion about any of it. A `[ls_*]` argument is still the string the author wrote. |
 | `ResolveContext` | `model/ResolveStage.hpp` | Stage 4 input. The axis values of one variant, plus the extern constant defaults that stage 3 carried out. |
 | `TargetProfile` | `target/TargetProfile.hpp` | A target name, an access model, and an optional validator. `--target` names one. |
 | `DiagnosticRecord`, `DiagnosticSink` | `compile/Diagnostics.hpp` | One compiler message as a record, and where it goes. Compilation never formats a string. |
@@ -423,9 +436,11 @@ Break one of these and the cook can exit 0 with wrong content.
    recognise.
 5. **Every emitter reads one frozen model.** An emitter must not reach past `CookedLibrary` into
    `CompiledVariant` or into Slang.
-6. **An axis name must match the Slang `extern static const` name exactly.** A mismatch links a
-   symbol that nobody references, leaves the shader on its default, and fails nowhere.
-   `VerifyAxisNamesAreDeclared` exists for this reason.
+6. **An axis name cannot drift from the constant it drives, because only one name exists.** Phase E
+   step E6 moved the axis declaration onto the `extern static const` (or `extern struct`) itself, as an
+   `ls_axis_*` attribute the cooker reads through reflection. The old failure — an axis name that no
+   symbol references, which leaves the shader on its default and fails nowhere — cannot be written down
+   any more, so the check that guarded against it is gone.
 
 ### `Active` and `Canonical`
 
@@ -437,7 +452,7 @@ change shader output, and a caller can find a variant with a partial set of valu
 `Canonical` has its own type, `CanonicalAssignment`, and only `PermutationSpace::CanonicalizeAssignment`
 builds one.
 `PermutationAssignment` named four different things: an active assignment, a partial one, a canonical
-one, and the parameter of every function that takes any of them. `ComputeVariantIndex` needs the
+one, and the parameter of every function that takes any of them. `ComputeVariantKey` needs the
 canonical form, and it stated that in a parameter name alone. A partial assignment now fails to
 compile. The type holds the same vector and costs nothing at run time.
 
@@ -458,36 +473,46 @@ The attribute declarations are in `tests/assets/LodestoneAttributes.slang`: `ls_
 `ls_extent_2d`, `ls_extent_3d`. Slang has no optional attribute parameters, so each arity needs its
 own name. The README shows `ls_element_count`; the code says `ls_element_count`.
 
-## Where to register a module
+## Where axes and policy live
 
-`FindPermutationSpaceForModule` and `FindPolicyForModule` read a static table, `k_ModuleSpaces`, in
-`src/permute/PermutationRegistry.cpp`. Add an axis, a space, a policy, and a table row there. Only
-`OceanFft` has an entry today. That file holds nothing else, so phase E step E6 deletes it whole.
+No module data is compiled in. Phase E step E6 deleted the old registry
+(`src/permute/PermutationRegistry.cpp`, `k_ModuleSpaces`, `FindPermutationSpaceForModule`) whole.
 
-An axis names its parent by index into the space that owns it, and not by pointer. A
-`PermutationSpace` owns its axes by value, so a copy would leave every `PermutationBinding` of the
-original aimed at a different object, and a child axis would then read as absent and quietly reduce
-the variant count. Copying a space is deleted for that reason. Moving one is safe, because moving the
-vector keeps the axis addresses.
+An axis is declared in the shader, on its `extern static const` (or `extern struct`, for an interface
+axis) declaration, as an `ls_axis_*` attribute. `tests/assets/LodestoneAttributes.slang` defines the
+attributes: `ls_axis_values`, `ls_axis_boolean`, `ls_axis_active_when`, `ls_axis_kind`,
+`ls_axis_interface`, and `ls_axis_interface_impl`. `SlangCompiler::PrepareRawModule` reads them at the
+bootstrap compile through `SlangModuleContext::ReadDeclaredAxes`, and `BuildPermutationSpace` turns them
+into a `PermutationSpace`.
 
-This table is compiled in. Replacing it is phase E, and
-`docs/phase-e-data-driven-permutations.md` plans it: the axis moves onto the `extern static const`
-declaration as an attribute, and the policy moves into a data file a tech artist owns. Do not start
-that work as a side effect of another task.
+The cook policy is data, not code. A `PolicyDocument` reads a TOML file through toml++, behind a facade
+in `src/permute/PolicyDocument.cpp` (no toml++ type leaves that file). Each module names an
+`InertAxesForEntryPoints` table and one section for each target profile, and a target section carries
+`MaxVariants`, a `CookValues` allow-list, and a `CookIf` predicate. The `--policy-file` option names the
+file. `tests/assets/compute/Ocean/OceanFftPolicy.toml` is the reference.
 
-## Two output forms, one model
+A `PermutationSpace` owns its axes by value, so a copy would leave every `PermutationBinding` of the
+original aimed at a different object, and a gated axis would then read as absent and quietly reduce the
+variant count. Copying a space is deleted for that reason. Moving one is safe, because moving the vector
+keeps the axis addresses.
 
-The generated C++ and the binary manifest carry the same tables from the same `CookedModule`.
+## One output form: the binary manifest
 
-- The C++ form compiles into the program. The header holds identity and lookup only, never shader
-  text, so naming a shader does not rebuild when the text changes.
-- The manifest form arrives as bytes. Every cross-reference is a `uint32` index, never a pointer, so
-  the reader is a set of spans and it relocates nothing. Sections start on 8-byte boundaries. A record must be
-  trivially copyable, and `k_IsManifestRecord` holds that line. Record **sizes** are not pinned, and
-  `ShaderManifest.hpp` says so: the format has no version migration yet, so a record can still grow.
+The cook writes one output form now, the binary manifest, from the `CookedModule`. The C++ header/source
+emitter is gone. `-o` names an output **directory**, and every artifact goes inside it: one
+`<Module>.ldmanifest` for each module, one shared `ShaderLibrary.dedupe.txt`, and, when `--dump-stage`
+asks, the stage-dump JSON files.
 
-`todo.md` states the author's plan to delete the C++ emitter once the manifest path is complete. Do
-not start that removal without a request.
+The manifest arrives as bytes. Every cross-reference is an index, never a pointer, so the reader is a
+set of spans and it relocates nothing. Sections start on 8-byte boundaries. A record must be trivially
+copyable, and `k_IsManifestRecord` holds that line. Record **sizes** are not pinned, and
+`ShaderManifest.hpp` says so: the format has no version migration yet, so a record can still grow.
+
+A variant is found by its **key**, not by a dense index. `ShaderManifestView::FindSlot` takes a
+`VariantKey` and does a `lower_bound` on the sorted `VariantKeys` table; the position it finds is the
+dense index. The manifest also carries the axis schema (`ManifestAxis` records with name, value count,
+kind, and domain, plus an `AxisValues` table), so a consumer can enumerate the axes and decode a key
+back into its per-axis values with `UnpackVariantKey`.
 
 ## The velox rename
 

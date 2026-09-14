@@ -216,7 +216,7 @@ namespace
     }
 
     CookError CheckManifestSource(const CookedModule& module,
-                                  const ManifestShaderSourceProvider& provider,
+                                  const ShaderSourceProvider& provider,
                                   const LibraryVariant& variant,
                                   size_t entry_point_index,
                                   uint16_t entry_point_id)
@@ -238,7 +238,7 @@ namespace
     }
 
     CookError CheckManifestWorkgroup(const CookedModule& module,
-                                            const ManifestShaderSourceProvider& provider,
+                                            const ShaderSourceProvider& provider,
                                             const LibraryVariant& variant,
                                             size_t entry_point_index,
                                             uint16_t entry_point_id)
@@ -459,7 +459,7 @@ namespace
     /** Every fact the manifest states about one entry point of one variant. */
     CookError CheckManifestSlot(const CookedModule& module,
                                        const ShaderManifestView& view,
-                                       const ManifestShaderSourceProvider& provider,
+                                       const ShaderSourceProvider& provider,
                                        const LibraryVariant& variant,
                                        size_t entry_point_index)
     {
@@ -893,7 +893,7 @@ CookError VerifyManifestRoundTrip(const CookedModule& module, const std::string&
     }
 
     const ShaderManifestView& view = opened.value();
-    const ManifestShaderSourceProvider provider{ view, 0u };
+    const ShaderSourceProvider provider{ view, 0u };
     uint32_t checked = 0u;
 
     for (const LibraryVariant& variant : module.Variants)

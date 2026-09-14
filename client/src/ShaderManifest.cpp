@@ -17,6 +17,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace lodestone
@@ -457,8 +458,8 @@ const ManifestSlot* ShaderManifestView::FindSlot(uint32_t entry_point, VariantKe
     return &slots[variant.FirstSlot + entry_point];
 }
 
-ManifestShaderSourceProvider::ManifestShaderSourceProvider(ShaderManifestView _view,
-                                                           uint64_t _generation) noexcept
+ShaderSourceProvider::ShaderSourceProvider(ShaderManifestView _view,
+                                           uint64_t _generation) noexcept
     : view{ _view },
       generation{ _generation }
 {
@@ -505,7 +506,7 @@ ManifestShaderSourceProvider::ManifestShaderSourceProvider(ShaderManifestView _v
     }
 }
 
-void ManifestShaderSourceProvider::GatherVariantBindings(const ManifestVariant& variant,
+void ShaderSourceProvider::GatherVariantBindings(const ManifestVariant& variant,
                                                          const std::vector<uint32_t>& member_offsets)
 {
     const std::span<const ManifestBinding> records = view.Bindings();
@@ -530,7 +531,7 @@ void ManifestShaderSourceProvider::GatherVariantBindings(const ManifestVariant& 
     }
 }
 
-BindingInfo ManifestShaderSourceProvider::MakeBindingInfo(const ManifestBinding& record,
+BindingInfo ShaderSourceProvider::MakeBindingInfo(const ManifestBinding& record,
                                                           const ManifestFootprint* footprint,
                                                           uint32_t member_offset) const noexcept
 {
@@ -566,9 +567,7 @@ BindingInfo ManifestShaderSourceProvider::MakeBindingInfo(const ManifestBinding&
     return info;
 }
 
-ManifestShaderSourceProvider::~ManifestShaderSourceProvider() = default;
-
-std::string_view ManifestShaderSourceProvider::Source(uint32_t entry_point,
+std::string_view ShaderSourceProvider::Source(uint32_t entry_point,
                                                       VariantKey variant) const noexcept
 {
     const ManifestSlot* slot = view.FindSlot(entry_point, variant);
@@ -576,7 +575,7 @@ std::string_view ManifestShaderSourceProvider::Source(uint32_t entry_point,
     return view.Source(slot->SourceIndex);
 }
 
-std::span<const BindingInfo> ManifestShaderSourceProvider::Bindings(uint32_t entry_point,
+std::span<const BindingInfo> ShaderSourceProvider::Bindings(uint32_t entry_point,
                                                                     VariantKey variant) const noexcept
 {
     const ManifestSlot* slot = view.FindSlot(entry_point, variant);
@@ -586,7 +585,7 @@ std::span<const BindingInfo> ManifestShaderSourceProvider::Bindings(uint32_t ent
                                          slotBindingCount[slotIndex] };
 }
 
-WorkgroupSize ManifestShaderSourceProvider::Workgroup(uint32_t entry_point,
+WorkgroupSize ShaderSourceProvider::Workgroup(uint32_t entry_point,
                                                       VariantKey variant) const noexcept
 {
     const ManifestSlot* slot = view.FindSlot(entry_point, variant);
@@ -594,12 +593,12 @@ WorkgroupSize ManifestShaderSourceProvider::Workgroup(uint32_t entry_point,
     return WorkgroupSize{ .X = slot->WorkgroupX, .Y = slot->WorkgroupY, .Z = slot->WorkgroupZ };
 }
 
-uint64_t ManifestShaderSourceProvider::Generation() const noexcept
+uint64_t ShaderSourceProvider::Generation() const noexcept
 {
     return generation;
 }
 
-const ShaderManifestView& ManifestShaderSourceProvider::View() const noexcept
+const ShaderManifestView& ShaderSourceProvider::View() const noexcept
 {
     return view;
 }
