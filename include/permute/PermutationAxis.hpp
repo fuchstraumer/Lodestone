@@ -1,6 +1,7 @@
 #pragma once
 #ifndef LODESTONE_PERMUTATION_AXIS_HPP
 #define LODESTONE_PERMUTATION_AXIS_HPP
+#include "ShaderLibraryTypes.hpp"
 #include "permute/PermutationTypes.hpp"
 #include "permute/PermutationValue.hpp"
 #include <cstddef>
@@ -12,33 +13,6 @@
 
 namespace lodestone
 {
-
-enum class AxisKind : uint8_t
-{
-    None,
-    ResourcePresence, // Whether a resource is used (e.g, texture, buffer, etc.)
-    Capability, // Whether a specific capability is required, e.g Wave or Subgroup ops
-    Tuning, // Often uses a size expression: buffer sizes, wave dims, thread dims, etc
-    Technique // Which technique or algorithm is used: uniform branching
-};
-
-enum class EarliestBindingTime : uint8_t
-{
-    None = 0,
-    Cook, // Value is set during cook (shader uniform)
-    Bind, // Value is set during pipeline bind (pipeline uniform)
-    Invocation, // Value is set for a single invocation of a pipeline (draw/dispatch uniform)
-    Execution, // Value is set during shader execution (per-thread, divergent)
-};
-
-enum class AxisValueDomain : uint8_t
-{
-    None,
-    Boolean,
-    Integral,
-    Enum,
-    Type
-};
 
 struct PermutationAxis
 {

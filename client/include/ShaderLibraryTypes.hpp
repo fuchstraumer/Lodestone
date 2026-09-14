@@ -130,6 +130,40 @@ enum class VertexScalarType : uint32_t
     UnsignedInteger32,
 };
 
+/** @brief The kind of a permutation axis: stored in both Lodestone runtime 
+ * and reflected in the shader manifest. */
+enum class AxisKind : uint8_t
+{
+    None,
+    ResourcePresence, // Whether a resource is used (e.g, texture, buffer, etc.)
+    Capability, // Whether a specific capability is required, e.g Wave or Subgroup ops
+    Tuning, // Often uses a size expression: buffer sizes, wave dims, thread dims, etc
+    Technique // Which technique or algorithm is used: uniform branching
+};
+
+/** @brief When a permutation axis value is made concrete and discretely bound
+  * to an actual value, i.e. the granularity at which it is bound. */
+enum class EarliestBindingTime : uint8_t
+{
+    None = 0,
+    Cook, // Value is set during cook (shader uniform)
+    Bind, // Value is set during pipeline bind (pipeline uniform)
+    Invocation, // Value is set for a single invocation of a pipeline (draw/dispatch uniform)
+    Execution, // Value is set during shader execution (per-thread, divergent)
+};
+
+/** @brief The fundamental type/domain of a permutation axis' values, and how they
+  * should be interpreted or reflected. "Type" is for interface axes, but reflects
+  * as the name of that type to keep things succinct. */
+enum class AxisValueDomain : uint8_t
+{
+    None,
+    Boolean,
+    Integral,
+    Enum,
+    Type
+};
+
 /** @brief One vertex shader input.
  *
  * WGSL keeps only `@location`. The semantic name and index live in the Slang source and in no part of
