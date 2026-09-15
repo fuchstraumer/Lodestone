@@ -6,6 +6,7 @@
 #include "VariantKey.hpp"
 #include <cstdint>
 #include <cstddef>
+#include <expected>
 #include <span>
 #include <string_view>
 #include <unordered_map>
@@ -29,6 +30,9 @@ struct QueryError
     std::string_view AxisName; // reads into manifest, so should remain valid
     uint32_t Detail{}; // additional context-specific detail about the error
 };
+
+template<typename T>
+using QueryResult = std::expected<T, QueryError>;
 
 struct DecodedVariant
 {
@@ -96,10 +100,12 @@ private:
     struct ScanConstraint
     {
         uint32_t AxisIndex;
-        std::span<const uint32_t> AllowedValueIndices;
+        std::vector<uint32_t> AllowedValueIndices;
     };
 
     [[nodiscard]] ManifestAxisValue decodeAxis(uint32_t axis_index, uint32_t value_index) const noexcept;
+    [[nodiscard]] std::vector<uint32_t> integralValueIndices(const uint32_t axis_index, const ManifestAxisAssignmentRange& range) const;
+    [[nodiscard]] std::vector<uint32_t> stringValueIndices(const uint32_t axis_index, const ManifestAxisAssignmentRange& range) const;
     [[nodiscard]] std::vector<VariantKey> scan(std::span<const ScanConstraint> constraints) const;
 
     ShaderManifestView manifest;

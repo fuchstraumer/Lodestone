@@ -5,10 +5,12 @@
 #include <algorithm>
 #include <cassert>
 #include <functional>
+#include <iterator>
 #include <numeric>
 #include <cstdint>
 #include <ranges>
 #include <span>
+#include <stdexcept>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -100,42 +102,18 @@ std::vector<VariantKey> ManifestIndex::Select(std::span<const ManifestAxisAssign
     scanConstraints.reserve(constraints.size());
     for (const auto& range : constraints)
     {
-        // input constraints give actual *values*. we need to convert them into the indices in the values array
-        // (offset within the subspace that is the current radix space, though, not from the global array len)
         const uint32_t axisIndex = axisNameToIndex.at(range.AxisName);
         const ManifestAxis& axis = manifest.Axis(axisIndex);
-        std::span<const int64_t> axisValues = manifest.AxisValues(axisIndex);
-        // need to convert from the "described" values in the constraint, to the actual concrete manifest values
-        // when axisKind is not Integral or Enum, the constraint values may need special handling
-        std::vector<int64_t> constraintValues(range.Values.size());
-        if (axis.Domain != AxisValueDomain::Type)
-        {
-            // straightforward copy of values
-            auto copyValue = [](const ManifestAxisValue& v) -> int64_t
-            {
-                switch (v.Type)
-                {
-                case AxisValueDomain::Boolean:
-                    return static_cast<int64_t>(v.BoolValue);
-                case AxisValueDomain::Integral:
-                    [[fallthrough]];
-                case AxisValueDomain::Enum:
-                    return static_cast<int64_t>(v.IntegralValue);
-                default:
-                    std::unreachable();
-                }
-            };
-            std::ranges::transform(range.Values, constraintValues.begin(), copyValue);
-        }
-        else
-        {
-            
-        }
-
-
+        // don't like my syntax here? think this is ugly? then you hate women
+        // (each function maps concrete values to their corresponding indices in the axis values array)
+        // (this just constructs the result vector right in ScanConstraint succinctly thats all)
+        scanConstraints.emplace_back(axisIndex,
+                                     axis.Domain != AxisValueDomain::Type ? integralValueIndices(axisIndex, range) :
+                                                                            stringValueIndices(axisIndex, range));
     }
     // sorting scanConstraints makes matching from constraints to axes a little more efficient
     // less important than the keys being sorted, and the subspan construction that happens later
+    // range much not contain any duplicate axes, as this would violate the uniqueness assumption in the scan logic
     std::ranges::sort(scanConstraints, std::less<uint32_t>{}, &ScanConstraint::AxisIndex);
     return scan(scanConstraints);
 }
@@ -164,6 +142,56 @@ ManifestAxisValue ManifestIndex::decodeAxis(uint32_t axis_index, uint32_t value_
         std::unreachable();
     }
     return result;
+}
+
+std::vector<uint32_t> ManifestIndex::integralValueIndices(const uint32_t axis_index, const ManifestAxisAssignmentRange& range) const
+{
+    std::vector<uint32_t> constraintValueIndices(range.Values.size());
+    std::span<const int64_t> axisValues = manifest.AxisValues(axis_index);
+    // flatten input constraint values (actual values) into the index of that value in the
+    // axisValues array (i.e, get the digit in the radix of this axis)
+    for (const auto&& [index, val] : std::views::enumerate(range.Values))
+    {
+        auto iter = std::ranges::find(axisValues, val.IntegralValue);
+        if (iter == axisValues.end())
+        {
+            // TODO TODO TODO: our error handling state
+            // leaving this stubbed for now as just an exception
+            throw std::runtime_error("Constraint value not found in axis values.");
+        }
+        const uint32_t valueIndex = static_cast<uint32_t>(std::distance(axisValues.begin(), iter));
+        constraintValueIndices[index] = valueIndex;
+    }
+    return constraintValueIndices;
+}
+
+std::vector<uint32_t> ManifestIndex::stringValueIndices(const uint32_t axis_index, const ManifestAxisAssignmentRange& range) const
+{
+    std::vector<uint32_t> constraintValueIndices(range.Values.size());
+    // axisValues now gives indices into the Strings() table: extract the strings,
+    // and do a lexicographical comparison to back that out into an index. position
+    // of the matching string in this local table gives the index in axisValues
+    auto extractStrView = [&](const int64_t value) -> std::string_view
+    {
+        return manifest.String(static_cast<uint32_t>(value));
+    };
+    std::span<const int64_t> axisValues = manifest.AxisValues(axis_index);
+    std::vector<std::string_view> constraintStrings(axisValues.size());
+    std::ranges::transform(axisValues, constraintStrings.begin(), extractStrView);
+    // get iterators that match from axis.Values to constraintStrings, and use std::distance to convert to indices
+    for (const auto&& [index, val] : std::views::enumerate(range.Values))
+    {
+        auto iter = std::ranges::find(constraintStrings, val.TypeName);
+        if (iter == constraintStrings.end())
+        {
+            // TODO TODO TODO: our error handling state
+            // leaving this stubbed for now as just an exception
+            throw std::runtime_error("Constraint value not found in axis values.");
+        }
+        const uint32_t strIndex = static_cast<uint32_t>(std::distance(constraintStrings.begin(), iter));
+        constraintValueIndices[index] = strIndex;
+    }
+    return constraintValueIndices;
 }
 
 std::vector<VariantKey> ManifestIndex::scan(std::span<const ScanConstraint> constraints) const
