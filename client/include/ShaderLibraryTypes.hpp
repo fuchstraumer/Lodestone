@@ -231,12 +231,20 @@ struct ManifestAxisAssignment
     ManifestAxisValue Value;
 };
 
+struct ManifestAxisAssignmentRange
+{
+    std::string_view AxisName;
+    std::span<const ManifestAxisValue> Values;
+};
+
 /** @brief One resource a shader binds, as the generated library states it. This is the optimized and
  * compact form of the cooker's `ReflectedBinding`. Strings are stored in the cooked data, so views
  * are used here instead of owning strings. It is critical to use the group and binding indices
  * declared here to avoid errors and crashes.
  */
 //NOLINTBEGIN(misc-non-private-member-variables-in-classes)
+// todo-ship: maybe we strip out string_view and span, and just use C-style strings and arrays
+// to avoid the standard library includes in an interface header
 struct BindingInfo
 {
     std::string_view Name;

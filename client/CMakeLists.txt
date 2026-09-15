@@ -4,11 +4,13 @@ set(LODESTONE_CLIENT_HEADERS
     "${CMAKE_SOURCE_DIR}/client/include/ResourceFlags.hpp"
     "${CMAKE_SOURCE_DIR}/client/include/ShaderLibraryTypes.hpp"
     "${CMAKE_SOURCE_DIR}/client/include/ShaderManifest.hpp"
+    "${CMAKE_SOURCE_DIR}/client/include/ShaderManifestIndex.hpp"
     "${CMAKE_SOURCE_DIR}/client/include/VariantKey.hpp")
 
 set(LODESTONE_CLIENT_SOURCES
     "${CMAKE_SOURCE_DIR}/client/src/ResourceFlags.cpp"
     "${CMAKE_SOURCE_DIR}/client/src/ShaderManifest.cpp"
+    "${CMAKE_SOURCE_DIR}/client/src/ShaderManifestIndex.cpp"
     "${CMAKE_SOURCE_DIR}/client/src/VariantKey.cpp")
 
 # Lodestone library and tests link against the above, compiled into a library:
