@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <span>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace lodestone
@@ -76,19 +77,36 @@ struct ManifestQueryBuilder
 class ManifestIndex
 {
 public:
-    ManifestIndex(ShaderManifestView view) noexcept;
+    ManifestIndex(ShaderManifestView view);
 
     [[nodiscard]] const ShaderManifestView& View() const noexcept;
     /** @brief Direct decode: "expand" a variant key into that values matching that key */
-    [[nodiscard]] std::vector<ManifestAxisValue> Decode(VariantKey key) const noexcept;
+    [[nodiscard]] std::vector<ManifestAxisValue> Decode(VariantKey key) const;
     /** @brief Returns every variant that exists, in (sorted) key order. Useful for total 
       * precaching of everything a manifest could generate as shader state */
-    [[nodiscard]] std::vector<DecodedVariant> Enumerate() const noexcept;
+    [[nodiscard]] std::vector<DecodedVariant> Enumerate() const;
     /** @brief Opens a new query, used to retrieve specific variants for actual runtime rendering or use */
     [[nodiscard]] ManifestQueryBuilder Query() const noexcept;
     /** @brief Effectively the form and system that Query() uses when closed: ever axis absent from input 
       * constraints is considered unconstrained and uses just the default value (canonical value, effectively) */
-    [[nodiscard]] std::vector<VariantKey> Select(std::span<const ManifestAxisAssignmentRange> constraints) const noexcept;
+    [[nodiscard]] std::vector<VariantKey> Select(std::span<const ManifestAxisAssignmentRange> constraints) const;
+
+private:
+
+    struct ScanConstraint
+    {
+        uint32_t AxisIndex;
+        std::span<const uint32_t> AllowedValueIndices;
+    };
+
+    [[nodiscard]] ManifestAxisValue decodeAxis(uint32_t axis_index, uint32_t value_index) const noexcept;
+    [[nodiscard]] std::vector<VariantKey> scan(std::span<const ScanConstraint> constraints) const;
+
+    ShaderManifestView manifest;
+    std::vector<uint32_t> radices;
+    std::vector<uint64_t> placeValues;
+    // todo: maybe a packed vector (sorted) that we use std::find on might be better for our use case? (test)
+    std::unordered_map<std::string_view, uint32_t> axisNameToIndex;
 };
 
 }
