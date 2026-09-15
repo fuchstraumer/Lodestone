@@ -104,9 +104,8 @@ std::vector<VariantKey> ManifestIndex::Select(std::span<const ManifestAxisAssign
     {
         const uint32_t axisIndex = axisNameToIndex.at(range.AxisName);
         const ManifestAxis& axis = manifest.Axis(axisIndex);
-        // don't like my syntax here? think this is ugly? then you hate women
-        // (each function maps concrete values to their corresponding indices in the axis values array)
-        // (this just constructs the result vector right in ScanConstraint succinctly thats all)
+        // map input constraint values (given as actual concrete values) to the indices
+        // of that value in axisValues space
         std::vector<uint32_t> valueIndices;
         if (axis.Domain != AxisValueDomain::Type)
         {
