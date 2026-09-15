@@ -8,7 +8,6 @@ set(LODESTONE_CLIENT_HEADERS
 
 set(LODESTONE_CLIENT_SOURCES
     "${CMAKE_SOURCE_DIR}/client/src/ResourceFlags.cpp"
-    "${CMAKE_SOURCE_DIR}/client/src/ShaderLibraryTypes.cpp"
     "${CMAKE_SOURCE_DIR}/client/src/ShaderManifest.cpp"
     "${CMAKE_SOURCE_DIR}/client/src/VariantKey.cpp")
 

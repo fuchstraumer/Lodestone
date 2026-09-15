@@ -318,7 +318,7 @@ namespace
         const std::span<const uint32_t> resources = view.ResourceList(readVariant.ResourceListIndex);
         const std::span<const ManifestFootprint> footprints =
             view.FootprintList(readVariant.FootprintListIndex);
-        const std::span<const ManifestSlot> slots = view.Slots(readVariant);
+        const std::span<const ManifestSlot> slots = view.VariantSlots(readVariant);
 
         if (entry_point_index >= slots.size())
         {

@@ -269,29 +269,8 @@ struct BindingInfo
 
     /** @brief The members of a uniform block. Empty for every other binding kind. */
     std::span<const UniformMemberInfo> Members;
-
-    /** @brief Byte size the graph must create, or zero when the shader states no element count. */
-    [[nodiscard]] uint64_t DerivedByteSize() const noexcept;
-    /** @brief Validate the resource binding, ensuring it is correctly configured. */
-    [[nodiscard]] bool Validate() const noexcept;
 };
 //NOLINTEND(misc-non-private-member-variables-in-classes)
-
-/** @brief Finds one uniform block member by name. A missing name returns nullptr, and that must be an
- * error: it means the CPU side names a field the shader does not have. */
-[[nodiscard]] const UniformMemberInfo* FindUniformMember(std::span<const UniformMemberInfo> members,
-                                                         std::string_view name) noexcept;
-
-/** @brief Finds one binding by the name the shader gave it.
- *
- * Compile() uses this to turn a declared binding name into a group and a binding index. A missing
- * name returns nullptr, and that must be an error naming both the shader and the declaration. A
- * silent default here would bind the wrong resource. */
-[[nodiscard]] const BindingInfo* FindBindingByName(std::span<const BindingInfo> bindings,
-                                                   std::string_view name) noexcept;
-
-[[nodiscard]] bool IsBufferBinding(BindingKind kind) noexcept;
-[[nodiscard]] bool IsTextureBinding(BindingKind kind) noexcept;
 
 } // namespace lodestone
 

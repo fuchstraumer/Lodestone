@@ -347,8 +347,14 @@ static_assert(k_IsManifestRecord<ManifestAxis>);
 /**
  * @brief Spans over one manifest byte span, checked once when it opens.
  *
- * Open() checks the magic, the version, and that every section lies inside the file. After it returns
- * a view, no accessor can read outside the span, so the accessors stay branch-light.
+ * Open() checks the full structure of the data in the manifest, from verifying simple
+ * things like the header magic and version, to performing a full cross-reference check
+ * and validating all stored indices read within bounds. This means that after Open()
+ * returns a view, all subsequent accessor calls are guaranteed to be safe and within bounds.
+ * (effectively meaning it's branch-free)
+ * @note This class does not provide any facilities for modifying the manifest; it is strictly read-only.
+ * This also stays purely in the vocabulary of the manifest itself, for reading or accessing
+ * data in the vocabulary of authorship use the `ShaderManifestIndex`
  */
 class ShaderManifestView
 {
@@ -384,10 +390,8 @@ public:
     /** @brief The entry-point specific information for one entry point of one variant. */
     [[nodiscard]] const ManifestSlot* FindSlot(uint32_t entry_point, VariantKey variant) const noexcept;
     /** @brief One slot for each entry point of this variant, in entry point order. */
-    [[nodiscard]] std::span<const ManifestSlot> Slots(const ManifestVariant& variant) const noexcept;
-    /** @brief Every slot, in file order. */
+    [[nodiscard]] std::span<const ManifestSlot> VariantSlots(const ManifestVariant& variant) const noexcept;
     [[nodiscard]] std::span<const ManifestSlot> SlotTable() const noexcept;
-
 private:
     std::span<const std::byte> bytes;
     const ShaderManifestHeader* header{ nullptr };

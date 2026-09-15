@@ -362,7 +362,7 @@ std::span<const ManifestSlot> ShaderManifestView::SlotTable() const noexcept
     return slots;
 }
 
-std::span<const ManifestSlot> ShaderManifestView::Slots(const ManifestVariant& variant) const noexcept
+std::span<const ManifestSlot> ShaderManifestView::VariantSlots(const ManifestVariant& variant) const noexcept
 {
     return slots.subspan(variant.FirstSlot, variant.SlotCount);
 }
