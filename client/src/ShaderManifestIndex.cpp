@@ -36,7 +36,7 @@ ManifestIndex::ManifestIndex(ShaderManifestView view) : manifest(view)
     std::exclusive_scan(radices.rbegin(),
                         radices.rend(),
                         placeValues.rbegin(),
-                        1,
+                        static_cast<uint64_t>(1),
                         std::multiplies<uint64_t>{});
     
 }
@@ -107,10 +107,25 @@ std::vector<VariantKey> ManifestIndex::Select(std::span<const ManifestAxisAssign
         // don't like my syntax here? think this is ugly? then you hate women
         // (each function maps concrete values to their corresponding indices in the axis values array)
         // (this just constructs the result vector right in ScanConstraint succinctly thats all)
-        scanConstraints.emplace_back(axisIndex,
-                                     axis.Domain != AxisValueDomain::Type ? integralValueIndices(axisIndex, range) :
-                                                                            stringValueIndices(axisIndex, range));
+        std::vector<uint32_t> valueIndices;
+        if (axis.Domain != AxisValueDomain::Type)
+        {
+            valueIndices = integralValueIndices(axisIndex, range);
+        }
+        else
+        {
+            valueIndices = stringValueIndices(axisIndex, range);
+        }
+
+        // there's no error handling here, the QueryBuilder is the one that gives you that
+        if (valueIndices.empty())
+        {
+            return {};
+        }
+
+        scanConstraints.emplace_back(axisIndex, std::move(valueIndices));
     }
+
     // sorting scanConstraints makes matching from constraints to axes a little more efficient
     // less important than the keys being sorted, and the subspan construction that happens later
     // range much not contain any duplicate axes, as this would violate the uniqueness assumption in the scan logic
@@ -155,9 +170,7 @@ std::vector<uint32_t> ManifestIndex::integralValueIndices(const uint32_t axis_in
         auto iter = std::ranges::find(axisValues, val.IntegralValue);
         if (iter == axisValues.end())
         {
-            // TODO TODO TODO: our error handling state
-            // leaving this stubbed for now as just an exception
-            throw std::runtime_error("Constraint value not found in axis values.");
+            return {};
         }
         const uint32_t valueIndex = static_cast<uint32_t>(std::distance(axisValues.begin(), iter));
         constraintValueIndices[index] = valueIndex;
@@ -184,9 +197,7 @@ std::vector<uint32_t> ManifestIndex::stringValueIndices(const uint32_t axis_inde
         auto iter = std::ranges::find(constraintStrings, val.TypeName);
         if (iter == constraintStrings.end())
         {
-            // TODO TODO TODO: our error handling state
-            // leaving this stubbed for now as just an exception
-            throw std::runtime_error("Constraint value not found in axis values.");
+            return {};
         }
         const uint32_t strIndex = static_cast<uint32_t>(std::distance(constraintStrings.begin(), iter));
         constraintValueIndices[index] = strIndex;

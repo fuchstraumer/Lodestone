@@ -61,10 +61,10 @@ struct ManifestQueryBuilder
     [[nodiscard]] ManifestQueryBuilder WhereAnyOf(std::string_view axis_name, std::span<const std::string_view> values) const noexcept;
 
     // These are the terminal functions, which effectively close a query and return the final result
-    [[nodiscard]] std::vector<VariantKey> Keys() const noexcept;
-    [[nodiscard]] std::vector<DecodedVariant> Variants() const noexcept;
+    [[nodiscard]] QueryResult<std::vector<VariantKey>> Keys() const noexcept;
+    [[nodiscard]] QueryResult<std::vector<DecodedVariant>> Variants() const noexcept;
     /** @brief Returns the first VariantKey matching the query, or INVALID_VARIANT if none exist. */
-    [[nodiscard]] VariantKey First() const noexcept;
+    [[nodiscard]] QueryResult<VariantKey> First() const noexcept;
 
     /** @brief Returns the size of the current query result set: doesn't trigger retrieval like others */
     [[nodiscard]] size_t Size() const noexcept;

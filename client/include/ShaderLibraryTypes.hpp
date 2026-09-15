@@ -162,7 +162,8 @@ enum class AxisValueDomain : uint8_t
     Boolean,
     Integral,
     Enum,
-    Type
+    Type,
+    Count
 };
 
 /** @brief One vertex shader input.
