@@ -381,7 +381,10 @@ public:
     [[nodiscard]] std::span<const ManifestVariant> Variants() const noexcept;
     [[nodiscard]] std::span<const VariantKey> VariantKeys() const noexcept;
     [[nodiscard]] std::span<const ManifestAxis> Axes() const noexcept;
+    [[nodiscard]] const ManifestAxis& Axis(uint32_t axis_index) const noexcept;
+    [[nodiscard]] std::span<const int64_t> AllAxesValues() const noexcept;
     [[nodiscard]] std::span<const int64_t> AxisValues(uint32_t axis_index) const noexcept;
+    [[nodiscard]] int64_t AxisValue(uint32_t axis_index, uint32_t value_index) const noexcept;
     [[nodiscard]] std::span<const ManifestVertexInput> VertexInputs(uint32_t raster_index) const noexcept;
     [[nodiscard]] std::span<const ManifestColorTarget> ColorTargets(uint32_t raster_index) const noexcept;
     [[nodiscard]] bool WritesFragDepth(uint32_t raster_index) const noexcept;

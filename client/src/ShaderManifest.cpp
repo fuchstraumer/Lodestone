@@ -402,20 +402,26 @@ std::span<const ManifestAxis> ShaderManifestView::Axes() const noexcept
     return axes;
 }
 
+const ManifestAxis& ShaderManifestView::Axis(uint32_t axis_index) const noexcept
+{
+    return axes[axis_index];
+}
+
+std::span<const int64_t> ShaderManifestView::AllAxesValues() const noexcept
+{
+    return axisValues;
+}
+
 std::span<const int64_t> ShaderManifestView::AxisValues(uint32_t axis_index) const noexcept
 {
-    if (axis_index >= axes.size())
-    {
-        return {};
-    }
-
     const ManifestAxis& axis = axes[axis_index];
-    if (axis.FirstValue > axisValues.size() || axis.ValueCount > axisValues.size() - axis.FirstValue)
-    {
-        return {};
-    }
-
     return axisValues.subspan(axis.FirstValue, axis.ValueCount);
+}
+
+int64_t ShaderManifestView::AxisValue(uint32_t axis_index, uint32_t value_index) const noexcept
+{
+    const ManifestAxis& axis = axes[axis_index];
+    return axisValues[axis.FirstValue + value_index];
 }
 
 std::span<const ManifestVertexInput> ShaderManifestView::VertexInputs(uint32_t raster_index) const noexcept
