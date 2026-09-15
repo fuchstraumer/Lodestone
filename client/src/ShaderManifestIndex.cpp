@@ -204,21 +204,21 @@ std::vector<VariantKey> ManifestIndex::scan(std::span<const ScanConstraint> cons
     // the range is just [0, radix - 1] for that axis.
     uint64_t minKey = 0u;
     uint64_t maxKey = 0u;
-    for (const auto&& [axisIndex, radix] : std::views::enumerate(radices))
+    uint32_t constraintCursor = 0u;
+    for (int64_t axisIndex = 0; std::cmp_less(axisIndex, radices.size()); ++axisIndex)
     {
         uint32_t minDigit = 0u;
-        uint32_t maxDigit = radix - 1;
-        // todo-ship: input constraints are sorted by axis index before calling this function
-        const auto constraintIter = std::ranges::lower_bound(constraints,
-                                                             axisIndex,
-                                                             std::less<uint32_t>{},
-                                                             &ScanConstraint::AxisIndex);
-        if (constraintIter != constraints.end())
+        uint32_t maxDigit = radices[axisIndex] - 1;
+        // simpler logic now that we have sorted constraints... just walk it alongside the axis walk,
+        // no searching with lower_bound needed
+        if (std::cmp_less(constraintCursor, constraints.size()) &&
+            std::cmp_equal(constraints[constraintCursor].AxisIndex , axisIndex))
         {
-            // std::ranges::minmax is pretty cool, neat!
-            const auto [minValue, maxValue] = std::ranges::minmax(constraintIter->AllowedValueIndices);
+            const auto [minValue, maxValue] =
+                std::ranges::minmax(constraints[constraintCursor].AllowedValueIndices);
             minDigit = minValue;
             maxDigit = maxValue;
+            ++constraintCursor;
         }
 
         minKey += static_cast<uint64_t>(minDigit) * placeValues[axisIndex];
