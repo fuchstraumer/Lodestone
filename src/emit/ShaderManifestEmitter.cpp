@@ -738,10 +738,6 @@ namespace
             }
 
             tables.Axes.push_back(record);
-            for (const PermutationValue& value : axis.GetValues())
-            {
-                tables.Values.emplace_back(PermutationValueToInt64(value));
-            }
         }
 
         return tables;
