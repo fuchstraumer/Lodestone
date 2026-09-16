@@ -32,16 +32,24 @@ struct PermutationAxis
     [[nodiscard]] size_t NumValues() const noexcept;
     [[nodiscard]] std::span<const PermutationValue> GetValues() const noexcept;
     [[nodiscard]] const PermutationValue& GetDefault() const noexcept;
-
+    
+    void SetEnumCaseParams(std::string enum_type_name, std::vector<RawEnumCase> enum_cases) noexcept;
     void SetInterfaceAxisParams(std::string interface_name, std::vector<RawInterfaceImpl> interface_impls) noexcept;
     [[nodiscard]] std::string_view InterfaceName() const noexcept;
     [[nodiscard]] const RawInterfaceImpl& InterfaceImpl(uint32_t idx) const noexcept;
+    [[nodiscard]] const RawEnumCase& EnumCase(uint32_t idx) const noexcept;
+    /** @brief Get full qualified name of enum case at given index. like below, used to save one include where this is used */
+    [[nodiscard]] std::string_view EnumTypeName() const noexcept;
+    [[nodiscard]] std::string_view EnumCaseName(uint32_t idx) const noexcept;
     /** @brief Shortcut to get the name of the interface axis at `idx`, to avoid extra includes where this is used */
     [[nodiscard]] std::string_view InterfaceImplTypeName(uint32_t idx) const noexcept;
 private:
     std::vector<PermutationValue> values;
-    std::string interfaceName; // e.g, IBrdfImpl: the root interface that a Type axis instantiates
+    // rootName either holds root interface for type axis, or root enum type for enum axis
+    // in either case, full instantiation of either type requires some kind of "root" name
+    std::string rootName;
     std::vector<RawInterfaceImpl> interfaceImpls;
+    std::vector<RawEnumCase> enumCases;
 };
 
 }

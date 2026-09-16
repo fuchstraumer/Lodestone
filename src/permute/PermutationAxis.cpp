@@ -1,5 +1,6 @@
 #include "permute/PermutationAxis.hpp"
-#include "compile/RawLibrary.hpp"
+#include "ShaderLibraryTypes.hpp"
+#include "permute/PermutationTypes.hpp"
 #include "permute/PermutationValue.hpp"
 #include <cstddef>
 #include <cstdint>
@@ -47,15 +48,21 @@ const PermutationValue& PermutationAxis::GetDefault() const noexcept
     return values.front();
 }
 
+void PermutationAxis::SetEnumCaseParams(std::string enum_type_name, std::vector<RawEnumCase> enum_cases) noexcept
+{
+    rootName = std::move(enum_type_name);
+    enumCases = std::move(enum_cases);
+}
+
 void PermutationAxis::SetInterfaceAxisParams(std::string interface_name, std::vector<RawInterfaceImpl> interface_impls) noexcept
 {
-    interfaceName = std::move(interface_name);
+    rootName = std::move(interface_name);
     interfaceImpls = std::move(interface_impls);
 }
 
 std::string_view PermutationAxis::InterfaceName() const noexcept
 {
-    return interfaceName;
+    return rootName;
 }
 
 const RawInterfaceImpl& PermutationAxis::InterfaceImpl(uint32_t idx) const noexcept
@@ -66,6 +73,21 @@ const RawInterfaceImpl& PermutationAxis::InterfaceImpl(uint32_t idx) const noexc
 std::string_view PermutationAxis::InterfaceImplTypeName(uint32_t idx) const noexcept
 {
     return interfaceImpls[static_cast<size_t>(idx)].TypeName;
+}
+
+const RawEnumCase& PermutationAxis::EnumCase(uint32_t idx) const noexcept
+{
+    return enumCases[static_cast<size_t>(idx)];
+}
+
+std::string_view PermutationAxis::EnumTypeName() const noexcept
+{
+    return rootName;
+}
+
+std::string_view PermutationAxis::EnumCaseName(uint32_t idx) const noexcept
+{
+    return enumCases[static_cast<size_t>(idx)].Name;
 }
 
 } // namespace lodestone

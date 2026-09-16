@@ -37,6 +37,30 @@ struct RawInterfaceImpl
     }
 };
 
+struct RawEnumCase
+{
+    std::string Name; // name of *this* enum value
+    int64_t Value{ 0 }; // kept as int64_t for use with size expressions
+
+    constexpr bool operator==(const RawEnumCase& other) const noexcept
+    {
+        return Name == other.Name && Value == other.Value;
+    }
+
+    constexpr bool operator<(const RawEnumCase& other) const noexcept
+    {
+        if (Name < other.Name)
+        {
+            return true;
+        }
+        else
+        {
+            // should hopefully only sort on this
+            return Value < other.Value;
+        }
+    }
+};
+
 }
 
 #endif // !LODESTONE_PERMUTATION_TYPES_HPP
