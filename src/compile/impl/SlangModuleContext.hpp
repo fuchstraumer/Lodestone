@@ -33,7 +33,7 @@ public:
 
     [[nodiscard]] CookError Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink);
     [[nodiscard]] CookError RunBootstrap();
-    [[nodiscard]] CookResult<std::span<const RawAxisDeclaration>> ReadDeclaredAxes();
+    [[nodiscard]] CookResult<std::vector<RawAxisDeclaration>> BuildDeclaredAxes() const;
     [[nodiscard]] slang::IGlobalSession* GlobalSession() const noexcept;
     [[nodiscard]] slang::ISession* Session() const noexcept;
     [[nodiscard]] std::vector<slang::IComponentType*> BaseComponents() const noexcept;
@@ -68,17 +68,27 @@ private:
     // `axisDeclarations`. A `__include`d file declared with `implementing` reflects as an Unsupported
     // node that holds the real declarations as its children, so the walk must descend, not stop at the
     // module's top level.
+
+    struct AxesBuildContext
+    {
+        std::vector<RawAxisDeclaration> AxisDeclarations;
+        std::vector<InterfaceAxisStub> InterfaceAxisStubs;
+        std::vector<InterfaceAxisImplStub> InterfaceAxisImplStubs;
+    };
+
     [[nodiscard]] CookError collectAxesFromDecl(slang::DeclReflection* reflection,
-                                                std::string_view module_name);
-    [[nodiscard]] CookResult<std::optional<RawAxisDeclaration>> buildAxisDecl(slang::DeclReflection* reflection);
+                                                std::string_view module_name,
+                                                AxesBuildContext& axes_build_context) const;
+    [[nodiscard]] CookResult<std::optional<RawAxisDeclaration>> buildAxisDecl(slang::DeclReflection* reflection) const;
     [[nodiscard]] CookResult<std::string> extractSingleAttribute(slang::DeclReflection* decl_reflection,
                                                                  slang::Attribute* attribute,
-                                                                 std::string_view attr_name);
+                                                                 std::string_view attr_name) const;
     [[nodiscard]] CookError stageInterfaceStruct(slang::DeclReflection* reflection,
-                                                 std::string_view module_name);
-    [[nodiscard]] CookError buildInterfaceAxes();
+                                                 std::string_view module_name,
+                                                 AxesBuildContext& axes_build_context) const;
+    [[nodiscard]] CookError buildInterfaceAxes(AxesBuildContext& axes_build_context) const;
     [[nodiscard]] CookError rejectResourceMembers(slang::TypeReflection* type,
-                                                  std::string_view type_name);
+                                                  std::string_view type_name) const;
 
     std::string cacheDirectory;
     Slang::ComPtr<slang::IGlobalSession> globalSession;
@@ -91,11 +101,8 @@ private:
     std::vector<std::string> moduleSourceStrings;
     PlacementKind placementKind{ PlacementKind::None };
     DiagnosticSink* diagnosticSink{ nullptr };
-    std::vector<RawAxisDeclaration> axisDeclarations;
-
-    std::vector<InterfaceAxisStub> interfaceAxisStubs;
-    std::vector<InterfaceAxisImplStub> interfaceAxisImplStubs;
 };
+
 }
 
 #endif // !LODESTONE_SLANG_MODULE_CONTEXT_HPP

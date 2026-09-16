@@ -197,13 +197,9 @@ CookError SlangModuleContext::RunBootstrap()
     return bootstrapResult;
 }
 
-CookResult<std::span<const RawAxisDeclaration>> SlangModuleContext::ReadDeclaredAxes()
+CookResult<std::vector<RawAxisDeclaration>> SlangModuleContext::BuildDeclaredAxes() const
 {
-    if (!axisDeclarations.empty())
-    {
-        return axisDeclarations;
-    }
-
+    AxesBuildContext axesBuildContext;
     const int64_t loadedModuleCount = static_cast<int64_t>(session->getLoadedModuleCount());
     for (int64_t i = 0; i < loadedModuleCount; ++i)
     {
@@ -214,7 +210,10 @@ CookResult<std::span<const RawAxisDeclaration>> SlangModuleContext::ReadDeclared
             const char* moduleNamePtr = moduleReflection->getName();
             const std::string_view moduleNameSv =
                 moduleNamePtr != nullptr ? std::string_view(moduleNamePtr) : std::string_view();
-            const CookError collected = collectAxesFromDecl(moduleReflection, moduleNameSv);
+            const CookError collected = collectAxesFromDecl(moduleReflection,
+                                                            moduleNameSv,
+                                                            axesBuildContext);
+
             if (!collected)
             {
                 return std::unexpected(collected);
@@ -222,17 +221,19 @@ CookResult<std::span<const RawAxisDeclaration>> SlangModuleContext::ReadDeclared
         }
     }
 
-    const CookError interfacesBuilt = buildInterfaceAxes();
+    const CookError interfacesBuilt = buildInterfaceAxes(axesBuildContext);
     if (!interfacesBuilt)
     {
         return std::unexpected(interfacesBuilt);
     }
 
-    return axisDeclarations;
+    return std::move(axesBuildContext.AxisDeclarations);
 }
 
 //NOLINTBEGIN(misc-no-recursion)
-CookError SlangModuleContext::collectAxesFromDecl(slang::DeclReflection* reflection, std::string_view module_name)
+CookError SlangModuleContext::collectAxesFromDecl(slang::DeclReflection* reflection,
+                                                  std::string_view module_name,
+                                                  AxesBuildContext& axes_build_context) const
 {
     const unsigned int childCount = reflection->getChildrenCount();
     for (unsigned int j = 0u; j < childCount; ++j)
@@ -255,13 +256,13 @@ CookError SlangModuleContext::collectAxesFromDecl(slang::DeclReflection* reflect
             }
             if (axisDeclResult->has_value())
             {
-                axisDeclarations.emplace_back(std::move(**axisDeclResult));
+                axes_build_context.AxisDeclarations.emplace_back(std::move(**axisDeclResult));
             }
         }
         else if (child->getKind() == slang::DeclReflection::Kind::Struct)
         {   
             // ls_axis_interface or ls_axis_interface_impl values
-            const CookError axisDataStaged = stageInterfaceStruct(child, module_name);
+            const CookError axisDataStaged = stageInterfaceStruct(child, module_name, axes_build_context);
             if (!axisDataStaged)
             {
                 return axisDataStaged;
@@ -271,7 +272,7 @@ CookError SlangModuleContext::collectAxesFromDecl(slang::DeclReflection* reflect
         {
             // A `__include`/`implementing` fragment reflects as an Unsupported node whose children are
             // the real declarations. `getChild`/`getChildrenCount` are safe on such a node, so descend.
-            const CookError nested = collectAxesFromDecl(child, module_name);
+            const CookError nested = collectAxesFromDecl(child, module_name, axes_build_context);
             if (!nested)
             {
                 return nested;
@@ -488,7 +489,7 @@ CookError SlangModuleContext::buildSlangComponents()
     return CookError::Success;
 }
 
-CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(slang::DeclReflection* reflection)
+CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(slang::DeclReflection* reflection) const
 {
     slang::VariableReflection* variableReflection = reflection->asVariable();
     if (variableReflection == nullptr)
@@ -639,7 +640,7 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
 
 CookResult<std::string> SlangModuleContext::extractSingleAttribute(slang::DeclReflection* reflection,
                                                                    slang::Attribute* attribute,
-                                                                   std::string_view attr_name)
+                                                                   std::string_view attr_name) const
 {
     size_t length = 0u;
     const char* text = attribute->getArgumentValueString(0u, &length);
@@ -662,7 +663,9 @@ CookResult<std::string> SlangModuleContext::extractSingleAttribute(slang::DeclRe
     return std::string(text, length);
 }
 
-CookError SlangModuleContext::stageInterfaceStruct(slang::DeclReflection* reflection, std::string_view module_name)
+CookError SlangModuleContext::stageInterfaceStruct(slang::DeclReflection* reflection,
+                                                   std::string_view module_name,
+                                                   AxesBuildContext& axes_build_context) const
 {
     // this is gonna be a doozy
     slang::TypeReflection* type = reflection->getType();
@@ -705,7 +708,7 @@ CookError SlangModuleContext::stageInterfaceStruct(slang::DeclReflection* reflec
             stub.SourceLine = static_cast<int32_t>(sourceLoc.line);
             stub.SourceColumn = static_cast<int32_t>(sourceLoc.column);
         }
-        interfaceAxisStubs.emplace_back(std::move(stub));
+        axes_build_context.InterfaceAxisStubs.emplace_back(std::move(stub));
         return CookError::Success;
     }
 
@@ -745,13 +748,13 @@ CookError SlangModuleContext::stageInterfaceStruct(slang::DeclReflection* reflec
     stub.Type = type;
     stub.Impl.Module = std::string(module_name);
     stub.Impl.TypeName = std::move(typeName);
-    interfaceAxisImplStubs.emplace_back(std::move(stub));
+    axes_build_context.InterfaceAxisImplStubs.emplace_back(std::move(stub));
     return CookError::Success;
 }
 
-CookError SlangModuleContext::buildInterfaceAxes()
+CookError SlangModuleContext::buildInterfaceAxes(AxesBuildContext& axes_build_context) const
 {
-    if (interfaceAxisStubs.empty())
+    if (axes_build_context.InterfaceAxisStubs.empty())
     {
         return CookError::Success;
     }
@@ -766,15 +769,16 @@ CookError SlangModuleContext::buildInterfaceAxes()
                            CookError::SlangProgramLayoutNotFound,
                            errStr);
     }
+    
 
-    for (const InterfaceAxisStub& stub : interfaceAxisStubs)
+    for (const InterfaceAxisStub& stub : axes_build_context.InterfaceAxisStubs)
     {
         // match each extern to the one exact interface it actaully conforms to
         std::string matchedInterfaceName;
 
         // validate there is at least one matching interface, and that there's not multiple conformity
         // we'll have to traverse this list again later, but that shouldn't be too costly
-        for (const InterfaceAxisImplStub& implStub : interfaceAxisImplStubs)
+        for (const InterfaceAxisImplStub& implStub : axes_build_context.InterfaceAxisImplStubs)
         {
             slang::TypeReflection* interfaceType = programLayout->findTypeByName(implStub.InterfaceName.c_str());
             // now check to see if implStub is a subtype of the outer type
@@ -824,7 +828,7 @@ CookError SlangModuleContext::buildInterfaceAxes()
         };
 
         slang::TypeReflection* interfaceType = programLayout->findTypeByName(matchedInterfaceName.c_str());
-        for (const InterfaceAxisImplStub& implStub : interfaceAxisImplStubs)
+        for (const InterfaceAxisImplStub& implStub : axes_build_context.InterfaceAxisImplStubs)
         {
             // now add the conforming implementations to the axis declaration, since we've confirmed this 
             // interface axis has at least one conforming implementation and is otherwise valid
@@ -855,17 +859,13 @@ CookError SlangModuleContext::buildInterfaceAxes()
         }
 
         std::ranges::sort(axisDecl.InterfaceImpls, std::less{});
-        axisDeclarations.emplace_back(std::move(axisDecl));
+        axes_build_context.AxisDeclarations.emplace_back(std::move(axisDecl));
     }
 
-    interfaceAxisStubs.clear();
-    interfaceAxisStubs.shrink_to_fit();
-    interfaceAxisImplStubs.clear();
-    interfaceAxisImplStubs.shrink_to_fit();
     return CookError::Success;
 }
 
-CookError SlangModuleContext::rejectResourceMembers(slang::TypeReflection* type, std::string_view type_name)
+CookError SlangModuleContext::rejectResourceMembers(slang::TypeReflection* type, std::string_view type_name) const
 {
     // we have to reject interface types that declare resource members, as that's not valid with this 
     // model for link-time specialization (resource binding layout is made concrete before link-time)

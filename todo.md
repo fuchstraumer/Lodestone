@@ -23,6 +23,10 @@
   - Add them to the evaluator as derived symbols. When a name resolves to a derived symbol, evaluate its stored expression recursively against the same context, so the leaves bottom out at axes and extern defaults and the value tracks the per-variant axis values. A folded value captured from reflection would be wrong: it freezes at the declaration defaults and ignores the axes.
   - Guard against a cycle in the derived-symbol graph (a derived const that names another), and cache a name's evaluated result per variant so a diamond is not recomputed.
 # Cook driver and manifest
+- Clean up cookerdriver. This is getting a bit ridiculous: it's a hugely complex.cpp, all the anonymous namespace functions are declared
+  and defined together, it could all be condensed considerably. Might be worth using the FSM approach we tried in VeloxRhi, where we use
+  a variant of discrete states and step through them. Then each state and it's functionality could go in a file, and it would help
+  make control flow more clear.
 - Store axis values in the manifest as `uint32`, not `int64`. The `AxisValues` table is `int64` today
   only because the emitter fills it through `PermutationValueToInt64` (`PermutationValue.hpp`), a helper
   that exists to widen a value to the **size-expression evaluator's** working type. The evaluator does

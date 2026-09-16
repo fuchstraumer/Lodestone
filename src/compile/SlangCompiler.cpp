@@ -126,16 +126,16 @@ std::vector<std::string_view> SlangCompiler::ModuleSourceStringViews() const noe
     return bootstrapContext->ModuleSourceStringViews();
 }
 
-std::span<const RawAxisDeclaration> SlangCompiler::AxisDeclarations() const noexcept
+std::vector<RawAxisDeclaration> SlangCompiler::BuildAxisDeclarations() const noexcept
 {
-    auto result = bootstrapContext->ReadDeclaredAxes();
+    CookResult<std::vector<RawAxisDeclaration>> result = bootstrapContext->BuildDeclaredAxes();
     if (result)
     {
-        return *result;
+        return std::move(*result);
     }
     else
     {
-        return std::span<const RawAxisDeclaration>{};
+        return std::vector<RawAxisDeclaration>{};
     }
 }
 
