@@ -1,0 +1,265 @@
+{
+    "stage": "resolved",
+    "module": "EnumAxisTest",
+    "variantCount": 6,
+    "variants": [
+        {
+            "index": 0,
+            "suffix": "_QualityLevel::Low_false",
+            "description": "QUALITY=QualityLevel::Low, DITHER=false",
+            "bindings": [
+                {
+                    "name": "gPixels",
+                    "scope": "",
+                    "placementKind": "bound",
+                    "group": 0,
+                    "binding": 0,
+                    "kind": "StorageBuffer",
+                    "elementStride": 12,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Buffer",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "samplerType": "Invalid",
+                    "uniformMembers": []
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "csMain",
+                    "stage": "Compute",
+                    "workgroup": {
+                        "x": 64,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 256,
+                    "targetTextHash": 2860032759112908215,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 1,
+            "suffix": "_QualityLevel::Low_true",
+            "description": "QUALITY=QualityLevel::Low, DITHER=true",
+            "bindings": [
+                {
+                    "name": "gPixels",
+                    "scope": "",
+                    "placementKind": "bound",
+                    "group": 0,
+                    "binding": 0,
+                    "kind": "StorageBuffer",
+                    "elementStride": 12,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Buffer",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "samplerType": "Invalid",
+                    "uniformMembers": []
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "csMain",
+                    "stage": "Compute",
+                    "workgroup": {
+                        "x": 64,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 274,
+                    "targetTextHash": 12607622312389927876,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 2,
+            "suffix": "_QualityLevel::High_false",
+            "description": "QUALITY=QualityLevel::High, DITHER=false",
+            "bindings": [
+                {
+                    "name": "gPixels",
+                    "scope": "",
+                    "placementKind": "bound",
+                    "group": 0,
+                    "binding": 0,
+                    "kind": "StorageBuffer",
+                    "elementStride": 12,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Buffer",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "samplerType": "Invalid",
+                    "uniformMembers": []
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "csMain",
+                    "stage": "Compute",
+                    "workgroup": {
+                        "x": 64,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 274,
+                    "targetTextHash": 14558350100475202171,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 3,
+            "suffix": "_QualityLevel::High_true",
+            "description": "QUALITY=QualityLevel::High, DITHER=true",
+            "bindings": [
+                {
+                    "name": "gPixels",
+                    "scope": "",
+                    "placementKind": "bound",
+                    "group": 0,
+                    "binding": 0,
+                    "kind": "StorageBuffer",
+                    "elementStride": 12,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Buffer",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "samplerType": "Invalid",
+                    "uniformMembers": []
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "csMain",
+                    "stage": "Compute",
+                    "workgroup": {
+                        "x": 64,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 292,
+                    "targetTextHash": 1306713769940407504,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 4,
+            "suffix": "_QualityLevel::Medium_false",
+            "description": "QUALITY=QualityLevel::Medium, DITHER=false",
+            "bindings": [
+                {
+                    "name": "gPixels",
+                    "scope": "",
+                    "placementKind": "bound",
+                    "group": 0,
+                    "binding": 0,
+                    "kind": "StorageBuffer",
+                    "elementStride": 12,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Buffer",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "samplerType": "Invalid",
+                    "uniformMembers": []
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "csMain",
+                    "stage": "Compute",
+                    "workgroup": {
+                        "x": 64,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 274,
+                    "targetTextHash": 13616869062700423000,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 5,
+            "suffix": "_QualityLevel::Medium_true",
+            "description": "QUALITY=QualityLevel::Medium, DITHER=true",
+            "bindings": [
+                {
+                    "name": "gPixels",
+                    "scope": "",
+                    "placementKind": "bound",
+                    "group": 0,
+                    "binding": 0,
+                    "kind": "StorageBuffer",
+                    "elementStride": 12,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Buffer",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "samplerType": "Invalid",
+                    "uniformMembers": []
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "csMain",
+                    "stage": "Compute",
+                    "workgroup": {
+                        "x": 64,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 292,
+                    "targetTextHash": 16153572548926594028,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                }
+            ]
+        }
+    ]
+}

@@ -35,7 +35,14 @@ import sys
 import tempfile
 
 STAGES = ("space", "variants", "raw", "resolved", "interned", "cooked")
-DEFAULT_MODULE = "tests/assets/compute/Ocean/OceanFft.slang"
+# The default regime cooks each module and compares its six dumps. OceanFft is the reference module.
+# EnumAxisTest pins the enum reflection read: its space dump carries the case tags (5, 1, 10), so a
+# sign or width bug in the tag read fails here even though the manifest stores only the case names.
+# Each module's dumps are named by its stem, so the two sets never collide.
+DEFAULT_MODULES = (
+    "tests/assets/compute/Ocean/OceanFft.slang",
+    "tests/assets/EnumAxis/EnumAxisTest.slang",
+)
 KNOWN_GOOD = "tests/known_good"
 
 
@@ -87,9 +94,61 @@ def cook(cooker: pathlib.Path, module: pathlib.Path, out_directory: pathlib.Path
         raise SystemExit(f"the cook failed with exit code {result.returncode}")
 
 
+def check_module(cooker: pathlib.Path, module: pathlib.Path, known_good: pathlib.Path,
+                 context: int, accept: bool) -> list:
+    """Cooks one module and compares its six dumps. Returns a label for each stage that differs.
+
+    Each dump is named by the module stem, so two modules never write the same file. The report
+    prints the stem beside the stage, so a mixed run stays readable."""
+    stem = module.stem
+    differing = []
+    with tempfile.TemporaryDirectory() as temporary:
+        out_directory = pathlib.Path(temporary)
+        cook(cooker, module, out_directory)
+
+        for stage in STAGES:
+            name = f"{stem}.stage-{stage}.json"
+            produced = out_directory / name
+            accepted = known_good / name
+
+            if not produced.exists():
+                print(f"  MISSING   {stem} {stage:<9} the cook wrote no dump for this stage")
+                differing.append(f"{stem}/{stage}")
+                continue
+
+            if not accepted.exists():
+                print(f"  NEW       {stem} {stage:<9} no known good file exists yet")
+                differing.append(f"{stem}/{stage}")
+                if accept:
+                    shutil.copyfile(produced, accepted)
+                continue
+
+            left = normalize(accepted)
+            right = normalize(produced)
+            if left == right:
+                print(f"  same      {stem} {stage}")
+                continue
+
+            changed = sum(1 for line in difflib.ndiff(left, right) if line[0] in "+-")
+            print(f"  DIFFERS   {stem} {stage:<9} {changed} lines")
+            differing.append(f"{stem}/{stage}")
+
+            for line in difflib.unified_diff(
+                left, right, fromfile=f"known_good/{name}", tofile=f"cooked/{name}",
+                n=context, lineterm="",
+            ):
+                print(f"      {line}")
+
+            if accept:
+                shutil.copyfile(produced, accepted)
+
+    return differing
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--module", default=DEFAULT_MODULE, help="module to cook")
+    parser.add_argument("--module", default=None,
+                        help="cook only this module, instead of the default set")
     parser.add_argument("--preset", default="ninja-clang-cl", help="build preset directory")
     parser.add_argument("--config", default="RelWithDebInfo", help="Debug or RelWithDebInfo")
     parser.add_argument(
@@ -102,65 +161,33 @@ def main() -> int:
 
     root = find_repository_root()
     cooker = find_cooker(root, arguments.preset, arguments.config)
-    module = root / arguments.module
-    if not module.exists():
-        raise SystemExit(f"no module at {module}")
+
+    entries = [arguments.module] if arguments.module else list(DEFAULT_MODULES)
+    modules = []
+    for entry in entries:
+        module = root / entry
+        if not module.exists():
+            raise SystemExit(f"no module at {module}")
+        modules.append(module)
 
     known_good = root / KNOWN_GOOD
-    stem = module.stem
 
-    with tempfile.TemporaryDirectory() as temporary:
-        out_directory = pathlib.Path(temporary)
-        cook(cooker, module, out_directory)
+    differing = []
+    for module in modules:
+        differing.extend(check_module(cooker, module, known_good, arguments.context, arguments.accept))
 
-        differing = []
-        for stage in STAGES:
-            name = f"{stem}.stage-{stage}.json"
-            produced = out_directory / name
-            accepted = known_good / name
+    total_stages = len(modules) * len(STAGES)
+    if not differing:
+        print("all stages match the known good dumps")
+        return 0
 
-            if not produced.exists():
-                print(f"  MISSING   {stage:<9} the cook wrote no dump for this stage")
-                differing.append(stage)
-                continue
+    if arguments.accept:
+        print(f"accepted {len(differing)} changed dumps into {KNOWN_GOOD}")
+        return 0
 
-            if not accepted.exists():
-                print(f"  NEW       {stage:<9} no known good file exists yet")
-                differing.append(stage)
-                if arguments.accept:
-                    shutil.copyfile(produced, accepted)
-                continue
-
-            left = normalize(accepted)
-            right = normalize(produced)
-            if left == right:
-                print(f"  same      {stage}")
-                continue
-
-            changed = sum(1 for line in difflib.ndiff(left, right) if line[0] in "+-")
-            print(f"  DIFFERS   {stage:<9} {changed} lines")
-            differing.append(stage)
-
-            for line in difflib.unified_diff(
-                left, right, fromfile=f"known_good/{name}", tofile=f"cooked/{name}",
-                n=arguments.context, lineterm="",
-            ):
-                print(f"      {line}")
-
-            if arguments.accept:
-                shutil.copyfile(produced, accepted)
-
-        if not differing:
-            print("all stages match the known good dumps")
-            return 0
-
-        if arguments.accept:
-            print(f"accepted {len(differing)} changed dumps into {KNOWN_GOOD}")
-            return 0
-
-        print(f"{len(differing)} of {len(STAGES)} stages differ")
-        print("Read the report. Run again with --accept only when the change is intended.")
-        return 1
+    print(f"{len(differing)} of {total_stages} stages differ")
+    print("Read the report. Run again with --accept only when the change is intended.")
+    return 1
 
 
 if __name__ == "__main__":

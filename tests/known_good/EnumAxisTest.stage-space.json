@@ -1,0 +1,37 @@
+{
+    "stage": "space",
+    "module": "EnumAxisTest",
+    "axisCount": 2,
+    "spaceSize": 6,
+    "axes": [
+        {
+            "name": "QUALITY",
+            "kind": "None",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Enum",
+            "values": [
+                "QualityLevel::Low",
+                "QualityLevel::High",
+                "QualityLevel::Medium"
+            ],
+            "enumCaseValues": [
+                5,
+                1,
+                10
+            ],
+            "activeWhen": null
+        },
+        {
+            "name": "DITHER",
+            "kind": "None",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Boolean",
+            "values": [
+                "false",
+                "true"
+            ],
+            "activeWhen": null
+        }
+    ],
+    "require": []
+}

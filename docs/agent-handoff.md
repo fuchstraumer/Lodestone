@@ -764,5 +764,10 @@ sign/width bug in the cook path would pass silently. Three planned pieces, one d
   scalar type to `EnumTagKind` at the wall (`ScalarTypeToEnumTagKind`) and calls `DecodeEnumTag`.
   `EnumTagDecodeTest` (unit, no compiler) covers each width, sign extension, the unsigned maximum, and the
   `UInt64` wrap above 2^63. This is why the test count is now 20 (15 unit).
-- Surface enum case values in a dump so a known-good baseline verifies the reflection read end to end.
+- **DONE (2026-09-16): a known-good baseline verifies the reflection read end to end.** The `space`
+  stage dump now emits a conditional `enumCaseValues` array for an enum axis (`WriteAxis` in
+  `StageDump.cpp`), so OceanFft's dumps stay byte-identical. `check-known-good.py` iterates a module set
+  (OceanFft plus EnumAxisTest), and `tests/known_good/EnumAxisTest.stage-*.json` pins the read. The space
+  baseline records `[5, 1, 10]` beside `Low/High/Medium`, so a sign, width, or order bug fails here.
 - An enum axis in the client `ManifestIndexTest` for the name/decode/query path plus the `Domain` tag.
+  This one is client-side, so it belongs with the author's query-surface work.
