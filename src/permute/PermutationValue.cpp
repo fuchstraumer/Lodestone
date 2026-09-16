@@ -9,6 +9,21 @@
 namespace lodestone
 {
 
+namespace
+{
+    // A module-name- and path-safe token for one axis value. For enum values, we can't 
+    // use the qualified name as :: is not legal in module names. Instead, join with _
+    // to keep module names unique and as a parent-child set of the typename
+    std::string ValueNameToken(const PermutationAxis& axis, const PermutationValue& value)
+    {
+        if (value.GetType() == PermutationValue::Type::Enum)
+        {
+            return std::format("{}_{}", axis.EnumTypeName(), value.AsEnumCase(axis));
+        }
+        return ValueToSlangLiteral(axis, value);
+    }
+}
+
 PermutationValue PermutationValue::MakeEnum(uint32_t ordinal) noexcept
 {
     PermutationValue value{};
@@ -159,6 +174,17 @@ std::string MakeExportedConstantSource(const PermutationAxis& axis, const Permut
                            axis.InterfaceName(),
                            impl.TypeName);
     }
+    else if (value.GetType() == PermutationValue::Type::Enum)
+    {
+        // Same as the interface case: the synthetic module is its own TU, so it must import the module
+        // that declares the enum. The constant is typed as the enum itself (not the `enum` keyword),
+        // and the value is the qualified case, e.g. `QualityLevel::Low`.
+        return std::format("import {};\nexport static const {} {} = {};\n",
+                           axis.Module(),
+                           axis.EnumTypeName(),
+                           axis.Name,
+                           value.AsQualifiedEnum(axis));
+    }
     else
     {
         return std::format("export static const {} {} = {};\n",
@@ -170,12 +196,12 @@ std::string MakeExportedConstantSource(const PermutationAxis& axis, const Permut
 
 std::string MakeVariantModuleName(const PermutationAxis& axis, const PermutationValue& value)
 {
-    return std::format("{}_{}", axis.Name, ValueToSlangLiteral(axis, value));
+    return std::format("{}_{}", axis.Name, ValueNameToken(axis, value));
 }
 
 std::string MakeVariantModulePath(const PermutationAxis& axis, const PermutationValue& value)
 {
-    return std::format("{}_{}.slang", axis.Name, ValueToSlangLiteral(axis, value));
+    return std::format("{}_{}.slang", axis.Name, ValueNameToken(axis, value));
 }
 
 } // namespace lodestone

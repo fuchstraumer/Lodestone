@@ -59,6 +59,7 @@ PermutationAxis::PermutationAxis(std::string name,
                                  AxisValueDomain value_domain,
                                  std::string active_when,
                                  std::string root_name,
+                                 std::string root_module,
                                  std::vector<RawEnumCase> enum_cases) noexcept
     : Name(std::move(name)),
       Kind(kind),
@@ -67,6 +68,7 @@ PermutationAxis::PermutationAxis(std::string name,
       ActiveWhen(std::move(active_when)),
       values(std::move(_values)),
       rootName(std::move(root_name)),
+      rootModule(std::move(root_module)),
       enumCases(std::move(enum_cases))
 {
 }
@@ -121,6 +123,11 @@ const RawEnumCase& PermutationAxis::EnumCase(uint32_t idx) const noexcept
 std::string_view PermutationAxis::EnumTypeName() const noexcept
 {
     return rootName;
+}
+
+std::string_view PermutationAxis::Module() const noexcept
+{
+    return rootModule;
 }
 
 std::string_view PermutationAxis::EnumCaseName(uint32_t idx) const noexcept

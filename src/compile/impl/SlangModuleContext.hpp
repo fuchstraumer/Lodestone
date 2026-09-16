@@ -79,7 +79,8 @@ private:
     [[nodiscard]] CookError collectAxesFromDecl(slang::DeclReflection* reflection,
                                                 std::string_view module_name,
                                                 AxesBuildContext& axes_build_context) const;
-    [[nodiscard]] CookResult<std::optional<RawAxisDeclaration>> buildAxisDecl(slang::DeclReflection* reflection) const;
+    [[nodiscard]] CookResult<std::optional<RawAxisDeclaration>> buildAxisDecl(slang::DeclReflection* reflection,
+                                                                              std::string_view module_name) const;
     [[nodiscard]] CookResult<std::string> extractSingleAttribute(slang::DeclReflection* decl_reflection,
                                                                  slang::Attribute* attribute,
                                                                  std::string_view attr_name) const;

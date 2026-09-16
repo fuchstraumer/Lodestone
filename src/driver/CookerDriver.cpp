@@ -548,6 +548,7 @@ namespace
                                 AxisValueDomain::Enum,
                                 rawAxis.ActiveWhen,
                                 rawAxis.RootName,
+                                rawAxis.RootModule,
                                 rawAxis.EnumCases);
             }
             else

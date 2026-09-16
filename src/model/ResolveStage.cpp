@@ -249,6 +249,7 @@ ResolveContext MakeResolveContext(const PermutationAssignment& canonical,
 
     for (const PermutationBinding& binding : canonical)
     {
+        // todo-ship: handle enums here (map case name to integral value)
         context.Symbols.push_back(
             AttrExprSymbol{ .Name = binding.Axis->Name, .Value = PermutationValueToInt64(binding.Value) });
     }

@@ -249,7 +249,7 @@ CookError SlangModuleContext::collectAxesFromDecl(slang::DeclReflection* reflect
             // A variable is an axis candidate. buildAxisDecl returns nullopt for a variable that
             // carries no axis attribute, which is the common case, so a nullopt is skipped and never
             // an error.
-            CookResult<std::optional<RawAxisDeclaration>> axisDeclResult = buildAxisDecl(child);
+            CookResult<std::optional<RawAxisDeclaration>> axisDeclResult = buildAxisDecl(child, module_name);
             if (!axisDeclResult)
             {
                 return axisDeclResult.error();
@@ -489,7 +489,8 @@ CookError SlangModuleContext::buildSlangComponents()
     return CookError::Success;
 }
 
-CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(slang::DeclReflection* reflection) const
+CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(slang::DeclReflection* reflection,
+                                                                                std::string_view module_name) const
 {
     slang::VariableReflection* variableReflection = reflection->asVariable();
     if (variableReflection == nullptr)
@@ -536,6 +537,9 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
 
         const char* enumTypeName = typeReflection->getName();
         result.RootName = enumTypeName != nullptr ? enumTypeName : "<TypeNameResolutionFailed>";
+        // The synthetic module for each enum value imports this so the enum type resolves. We use the
+        // module the axis variable lives in, which declares the enum in the common case.
+        result.RootModule = std::string(module_name);
         // slang repurposes the field accessors for enum types to return the enum cases, in declaration order
         // we handle value retrieval explicitly since size expressions may reference them, and we don't want to
         // assume enums are just linearly incremented sequences

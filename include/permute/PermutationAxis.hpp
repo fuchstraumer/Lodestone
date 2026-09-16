@@ -41,6 +41,7 @@ struct PermutationAxis
                              AxisValueDomain value_domain,
                              std::string active_when,
                              std::string root_name,
+                             std::string root_module,
                              std::vector<RawEnumCase> enum_cases) noexcept;
 
     std::string Name;
@@ -63,11 +64,16 @@ struct PermutationAxis
     [[nodiscard]] std::string_view EnumCaseName(uint32_t idx) const noexcept;
     /** @brief Shortcut to get the name of the interface axis at `idx`, to avoid extra includes where this is used */
     [[nodiscard]] std::string_view InterfaceImplTypeName(uint32_t idx) const noexcept;
+    
+    /** @brief The module that declares the type this axis refers to, so as to construct the synthetic module correctly */
+    [[nodiscard]] std::string_view Module() const noexcept;
 private:
     std::vector<PermutationValue> values;
     // rootName either holds root interface for type axis, or root enum type for enum axis
     // in either case, full instantiation of either type requires some kind of "root" name
     std::string rootName;
+    // module declaring rootName's type, for an enum axis's synthetic import (empty for other axes)
+    std::string rootModule;
     std::vector<RawInterfaceImpl> interfaceImpls;
     std::vector<RawEnumCase> enumCases;
 };
