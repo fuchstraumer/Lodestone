@@ -60,6 +60,15 @@ add_lodestone_unit_test(InterfaceAxisCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/interface_axis_output"
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/InterfaceAxis/InterfaceAxisTest.slang")
+# The same driver, on an enum-axis module. `EnumAxisTest.slang` declares an `[ls_axis_enum]` extern
+# const whose Slang enum has explicit, non-ascending case values. The axis read reflects the enum's
+# cases (names and values); the manifest stores the case names, and the digit stays the declaration
+# order, so a cook that assumed "case index == case value" would produce wrong data. Crossed with a
+# boolean axis it is a product of six variants.
+add_lodestone_unit_test(EnumAxisCookTest CookTest.cpp
+    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/enum_axis_output"
+              --verify-deterministic
+              "${CMAKE_SOURCE_DIR}/tests/assets/EnumAxis/EnumAxisTest.slang")
 # The one test in this suite that asserts a cook FAILS. Phase E step E0c needed it.
 #
 # Every other cook test states that a good module cooks. A check that never fires and a check that

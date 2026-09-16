@@ -25,7 +25,7 @@ if not exist "%BIN%" (
 set "FAILED=0"
 
 for %%T in ("%BIN%\*Test.exe") do (
-    if /I not "%%~nT"=="CookTest" if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" (
+    if /I not "%%~nT"=="CookTest" if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" if /I not "%%~nT"=="EnumAxisCookTest" (
         "%%~fT" >nul 2>&1
         if errorlevel 1 (
             echo [FAIL] %%~nT
@@ -56,6 +56,16 @@ if errorlevel 1 (
     set "FAILED=1"
 ) else (
     echo [ ok ] InterfaceAxisCookTest
+)
+
+REM The enum-axis end-to-end cook. It cooks six variants over an Enum axis (three cases addressed by
+REM name, with non-ascending underlying values) crossed with a boolean axis.
+"%BIN%\EnumAxisCookTest.exe" -o "%REPO%\build\%PRESET%\tests\enum_axis_output" --verify-deterministic "%REPO%\tests\assets\EnumAxis\EnumAxisTest.slang" >nul 2>&1
+if errorlevel 1 (
+    echo [FAIL] EnumAxisCookTest
+    set "FAILED=1"
+) else (
+    echo [ ok ] EnumAxisCookTest
 )
 
 REM The same driver, on the probe module for the entry point parameter scope. It cooks one variant.

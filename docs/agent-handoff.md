@@ -725,3 +725,32 @@ Ordered steps:
     (like `Type`), not raw ints.
 11. Test: add an enum axis (with at least one explicit, non-ascending case value) to a test shader and
     cover reflection -> manifest -> query-by-name -> decode -> suggestion.
+
+**Status (2026-09-16): the cook path is done and verified; the client path has two known bugs.**
+`EnumAxisCookTest` cooks `tests/assets/EnumAxis/EnumAxisTest.slang` (a `public enum QualityLevel { Low=5,
+High=1, Medium=10 }` enum axis crossed with a boolean, six variants) and passes `--verify-deterministic`;
+the full suite (19 targets) and the six known-good dumps are green. Cook-side steps 1-4 and 7 were
+already done by the author; this session fixed the synthetic-module generation (step 5), which was
+broken three ways:
+- `MakeExportedConstantSource` emitted `export static const enum QUALITY = ...` (the `enum` keyword from
+  `ValueToSlangTypeName`) instead of the enum's type name -> a parse error. It now has its own enum
+  branch: `import <module>; export static const <EnumTypeName> <Name> = <EnumTypeName>::<Case>;`.
+- `MakeVariantModuleName`/`Path` embedded the qualified literal `QualityLevel::Low`, whose `::` is legal
+  in neither a module name nor a Windows path. A new `ValueNameToken` uses the bare case name for enums.
+- The synthetic module never imported the enum's module, so the type could not resolve. `RawAxisDeclaration`
+  now carries `RootModule` (captured in `buildAxisDecl` as the module the axis variable lives in),
+  threaded through `PermutationAxis::EnumModule()` into the import. Limitation: this is the axis
+  variable's module, which is the enum's module in the common case (enum declared alongside the axis or
+  in the root module); an enum imported non-`public`/non-exported from a third module is not yet handled.
+- The enum type must be `public` (same as an interface axis's interface/impls), or the synthetic import
+  cannot see it. This is a shader-authoring constraint, not a cooker bug; worth documenting for authors.
+
+Step 6 (enum in a size expression) is still deferred; the case ints are captured but unused.
+
+**The client path (steps 8-10) still has two stragglers to fix** (flagged earlier this session, left to
+the author since the query files were being actively edited): `Select` still routes `Enum` to
+`integralValueIndices` instead of `stringValueIndices` (`client/src/ShaderManifestIndex.cpp`, the
+`if (axis.Domain != Type)` branch), and `where` still has the stale `Integral`-satisfies-`Enum`
+interchange with a now-false comment. `decodeAxis` and `where`'s validation branch were already
+correctly moved to the name path. Neither is exercised until the builder terminals are defined, so no
+test is red yet.
