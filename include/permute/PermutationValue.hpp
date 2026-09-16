@@ -21,15 +21,17 @@ struct PermutationValue
         Invalid = 0,
         Bool,
         UInt,
+        Enum, // Handled like interface type
         Type // Interface type
     };
 
-    constexpr PermutationValue() noexcept : type(Type::Invalid), uintValue(static_cast<uint32_t>(0)) {}
-    constexpr explicit PermutationValue(bool value) noexcept : type(Type::Bool), boolValue(value) {}
+    constexpr PermutationValue() noexcept : type(Type::Invalid) {}
+    constexpr explicit PermutationValue(bool value) noexcept : type(Type::Bool), uintValue(value ? 1u : 0u) {}
     constexpr explicit PermutationValue(uint32_t value) noexcept : type(Type::UInt), uintValue(value) {}
 
     // Interface types store their values as the ordinal/index within the Axis' type list
     static PermutationValue MakeType(uint32_t ordinal) noexcept;
+    static PermutationValue MakeEnum(uint32_t ordinal) noexcept;
 
     [[nodiscard]] bool IsValid() const noexcept;
     [[nodiscard]] Type GetType() const noexcept;
@@ -37,6 +39,8 @@ struct PermutationValue
     [[nodiscard]] uint32_t AsUInt() const noexcept;
     /** @brief Returns the type name of this type, as it is stored by the parent axis for this value */
     [[nodiscard]] std::string_view AsType(const PermutationAxis& axis) const noexcept;
+    [[nodiscard]] std::string_view AsEnum(const PermutationAxis& axis) const noexcept;
+    [[nodiscard]] uint32_t AsEnumLiteral(const PermutationAxis& axis) const noexcept;
 
     [[nodiscard]] bool operator==(const PermutationValue& other) const noexcept;
     [[nodiscard]] bool operator!=(const PermutationValue& other) const noexcept;
@@ -44,13 +48,9 @@ struct PermutationValue
 
 private:
     Type type;
-    //NOLINTBEGIN(readability-identifier-naming)
-    union
-    {
-        uint32_t uintValue{ 0u };
-        bool boolValue;
-    };
-    //NOLINTEND(readability-identifier-naming)
+    // for enum and type values: an ordinal index within the axis' value space
+    // for enums: the literal values are stored on the axis, in a separate list
+    uint32_t uintValue{ 0u };
 };
 
 /** Widens any axis value to the integer type the size-expression evaluator works in. A `bool` axis

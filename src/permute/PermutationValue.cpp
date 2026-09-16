@@ -9,6 +9,14 @@
 namespace lodestone
 {
 
+PermutationValue PermutationValue::MakeEnum(uint32_t ordinal) noexcept
+{
+    PermutationValue value{};
+    value.type = Type::Enum;
+    value.uintValue = ordinal;
+    return value;
+}
+
 PermutationValue PermutationValue::MakeType(uint32_t ordinal) noexcept
 {
     PermutationValue value{};
@@ -30,12 +38,18 @@ PermutationValue::Type PermutationValue::GetType() const noexcept
 // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
 bool PermutationValue::AsBool() const noexcept
 {
-    return boolValue;
+    return static_cast<bool>(uintValue);
 }
 
 uint32_t PermutationValue::AsUInt() const noexcept
 {
     return uintValue;
+}
+
+std::string_view PermutationValue::AsEnum(const PermutationAxis& axis) const noexcept
+{
+    // returns scoped name, since slang requires all enums to be scoped by default
+    return axis.EnumCaseFullName(uintValue);
 }
 
 std::string_view PermutationValue::AsType(const PermutationAxis& axis) const noexcept
@@ -50,19 +64,7 @@ bool PermutationValue::operator==(const PermutationValue& other) const noexcept
         return false;
     }
 
-    switch (type)
-    {
-    case Type::Bool:
-        return boolValue == other.boolValue;
-    case Type::UInt:
-        [[fallthrough]];
-    case Type::Type:
-        return uintValue == other.uintValue;
-    case Type::Invalid:
-        return true;
-    }
-
-    return false;
+    return uintValue == other.uintValue;
 }
 
 bool PermutationValue::operator!=(const PermutationValue& other) const noexcept
@@ -77,36 +79,13 @@ bool PermutationValue::operator<(const PermutationValue& other) const noexcept
         return type < other.type;
     }
 
-    switch (type)
-    {
-    case Type::Bool:
-        return static_cast<int>(boolValue) < static_cast<int>(other.boolValue);
-    case Type::UInt:
-        [[fallthrough]];
-    case Type::Type:
-        return uintValue < other.uintValue;
-    case Type::Invalid:
-        return false;
-    }
-
-    return false;
+    return uintValue < other.uintValue;
 }
 // NOLINTEND(cppcoreguidelines-pro-type-union-access)
 
 int64_t PermutationValueToInt64(const PermutationValue& value) noexcept
 {
-    switch (value.GetType())
-    {
-    case PermutationValue::Type::Bool:
-        return value.AsBool() ? 1 : 0;
-    case PermutationValue::Type::UInt:
-        [[fallthrough]];
-    case PermutationValue::Type::Type:
-        return static_cast<int64_t>(value.AsUInt());
-    case PermutationValue::Type::Invalid:
-        return -1;
-    }
-    return -1;
+    return static_cast<int64_t>(value.AsUInt());
 }
 
 std::string ValueToSlangLiteral(const PermutationAxis& axis, const PermutationValue& value)
@@ -117,6 +96,8 @@ std::string ValueToSlangLiteral(const PermutationAxis& axis, const PermutationVa
         return value.AsBool() ? "true" : "false";
     case PermutationValue::Type::UInt:
         return std::to_string(value.AsUInt());
+    case PermutationValue::Type::Enum:
+        return std::string{ value.AsEnum(axis) };
     case PermutationValue::Type::Type:
         return std::string{ value.AsType(axis) };
     case PermutationValue::Type::Invalid:
@@ -132,6 +113,8 @@ std::string ValueToPrintableString(const PermutationValue& value) noexcept
     case PermutationValue::Type::Bool:
         return value.AsBool() ? "true" : "false";
     case PermutationValue::Type::UInt:
+        [[fallthrough]];
+    case PermutationValue::Type::Enum:
         [[fallthrough]];
     case PermutationValue::Type::Type:
         return std::format("{}", value.AsUInt());
@@ -149,6 +132,8 @@ std::string ValueToSlangTypeName(const PermutationValue& value)
         return "bool";
     case PermutationValue::Type::UInt:
         return "uint";
+    case PermutationValue::Type::Enum:
+        return "enum";
     case PermutationValue::Type::Type:
         return "type";
     default:
