@@ -3,7 +3,6 @@
 #include "Diagnostics.hpp"
 #include "TransparentHash.hpp"
 #include "VariantKey.hpp"
-#include "compile/RawLibrary.hpp"
 #include "compile/SymbolTable.hpp"
 #include "permute/AttributeExpression.hpp"
 #include "permute/PermutationAssignment.hpp"
@@ -13,9 +12,7 @@
 #include "permute/PolicyDocument.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cassert>
-#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -25,13 +22,11 @@
 #include <iterator>
 #include <limits>
 #include <magic_enum/magic_enum.hpp>
-#include <optional>
 #include <print>
 #include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -54,10 +49,7 @@ namespace
     [[nodiscard]] CookResult<bool> CheckRequires(std::ptrdiff_t depth,
                                                  const std::vector<AttrExprSymbol>& symbols,
                                                  const RequireReadyMap& require_ready_at,
-                                                 DiagnosticSink& sink);
-    [[nodiscard]] AxisKind AxisKindFromString(std::string_view str);
-    [[nodiscard]] CookResult<std::vector<PermutationValue>> ValuesFromStr(const std::string_view str,
-                                                                          DiagnosticSink& sink);  
+                                                 DiagnosticSink& sink); 
 
 } // namespace
 
@@ -564,106 +556,6 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
 }
 //NOLINTEND(misc-no-recursion)
 
-CookResult<PermutationSpace> BuildPermutationSpace(const SymbolTable& symbol_table,
-                                                   std::span<std::string_view> module_names,
-                                                   std::span<const RawAxisDeclaration> raw_axes,
-                                                   DiagnosticSink& sink)
-{
-    // First step: prune axes in raw axes that aren't actually used
-    auto extractNameStrView = [](const RawAxisDeclaration& raw_axis)
-    {
-        return std::string_view{ raw_axis.Name };
-    };
-    std::vector<std::string_view> axisNamesVec = raw_axes |
-                                                 std::views::transform(extractNameStrView) |
-                                                 std::ranges::to<std::vector<std::string_view>>();
-    std::vector<std::string_view> missingAxisNames = symbol_table.MissingTokens(module_names, axisNamesVec);
-
-    // build the condensed span - use views and filter to remove the axes from raw_axes that aren't
-    // used in any of the source code for the given modules.
-    auto filteredAxes = raw_axes |
-                        std::views::filter([&missingAxisNames](const RawAxisDeclaration& raw_axis)
-                        {
-                            return std::ranges::find(missingAxisNames, raw_axis.Name) == missingAxisNames.end();
-                        });
-    
-    // Just for info sake (and because we can filter this), if missingAxisNames is not empty, we can log which axes were missing.
-    if (!missingAxisNames.empty())
-    {
-        auto foldStrNames = [](std::span<std::string_view> names)
-        {
-            return std::ranges::fold_left(names, std::string{}, [](std::string acc, std::string_view name)
-            {
-                if (!acc.empty())
-                {
-                    acc += ", ";
-                }
-                acc += name;
-                return acc;
-            });
-        };
-
-        std::string messageStr =
-            std::format("The following axes were declared but not used in any module: {}", foldStrNames(missingAxisNames));
-        ReportInfo(sink, std::move(messageStr));
-    }
-
-    // Second step: build the axes, using the filtered list of only the axes that are actually used
-    std::vector<PermutationAxis> axes;
-    for (const RawAxisDeclaration& rawAxis : filteredAxes)
-    {
-        const AxisKind kind = AxisKindFromString(rawAxis.Kind);
-        // values extraction - fork on boolean, if not boolean it's just a comma split
-        std::vector<PermutationValue> values;
-        AxisValueDomain valueDomain{ AxisValueDomain::None };
-        if (rawAxis.IsBooleanAxis)
-        {
-            constexpr static std::array<PermutationValue, 2> k_BoolValues
-            {
-                PermutationValue{ false }, PermutationValue{ true }
-            };
-            values.append_range(k_BoolValues);
-            valueDomain = AxisValueDomain::Boolean;
-        }
-        else if (rawAxis.IsInterfaceAxis)
-        {
-            // build the expanded list of permutation values for the interface axis.
-            // each value is just the index of that interface implementation in the list of all implementations
-            for (uint32_t i = 0; std::cmp_less(i, rawAxis.InterfaceImpls.size()); ++i)
-            {
-                values.emplace_back(PermutationValue::MakeType(i));
-            }
-            valueDomain = AxisValueDomain::Type;
-        }
-        else
-        {
-            CookResult<std::vector<PermutationValue>> splitValues = ValuesFromStr(rawAxis.AxisValues, sink);
-            if (!splitValues)
-            {
-                return std::unexpected(splitValues.error());
-            }
-            values = std::move(*splitValues);
-            valueDomain = AxisValueDomain::Integral;
-        }
-
-        axes.emplace_back(rawAxis.Name,
-                          values,
-                          kind,
-                          EarliestBindingTime::Cook,
-                          valueDomain,
-                          rawAxis.ActiveWhen);
-
-        // awkward format to do this in currently, might be better 
-        if (rawAxis.IsInterfaceAxis)
-        {
-            auto& interfaceAxis = axes.back();
-            interfaceAxis.SetInterfaceAxisParams(rawAxis.InterfaceName, rawAxis.InterfaceImpls);
-        }
-    }
-
-    return PermutationSpace{ axes };
-}
-
 namespace
 {
     std::vector<AttrExprSymbol> AsAttrExprSymbols(const std::vector<ExternConstantDefault>& defaults)
@@ -764,65 +656,6 @@ namespace
         return true;
     }
 
-    AxisKind AxisKindFromString(std::string_view str)
-    {
-        if (str.empty())
-        {
-            return AxisKind::None;
-        }
-        else
-        {
-            // make sure to use case-insensitive, otherwise "tuning" would not match AxisKind::Tuning
-            std::optional<AxisKind> kind = magic_enum::enum_cast<AxisKind>(str, magic_enum::case_insensitive);
-            if (kind.has_value())
-            {
-                return kind.value();
-            }
-            else
-            {
-                return AxisKind::None;
-            }
-        }
-    }
-
-    CookResult<std::vector<PermutationValue>> ValuesFromStr(const std::string_view str,
-                                                            DiagnosticSink& sink)
-    {
-        std::vector<PermutationValue> values;
-
-        auto csvView = str |
-                       std::views::split(',');
-        
-        for (auto chunk : csvView)
-        {
-            std::string_view valueStr = std::string_view(std::ranges::data(chunk), std::ranges::size(chunk));
-            // we have to trim leading and trailing whitespace, if it's present, as from_chars will fail 
-            // if we don't make sure to trim it out
-            const size_t firstNonSpace = valueStr.find_first_not_of(" \t\r\n");
-            if (firstNonSpace == std::string_view::npos)
-            {
-                continue;
-            }
-            const size_t lastNonSpace = valueStr.find_last_not_of(" \t\r\n");
-            valueStr = valueStr.substr(firstNonSpace, lastNonSpace - firstNonSpace + 1);
-
-            uint32_t value{ 0u };
-            std::from_chars_result result = std::from_chars(valueStr.data(),
-                                                            valueStr.data() + valueStr.size(),
-                                                            value);
-            if (result.ec != std::errc())
-            {
-                const std::string_view sysErrStr = magic_enum::enum_name(result.ec);
-                const std::string errStr =
-                    std::format("Failed to parse value '{}', error code: {}", valueStr, sysErrStr);
-                return std::unexpected(ReportError(sink, CookError::FromCharsFailed, errStr));
-            }
-            
-            values.emplace_back(value);
-        }
-
-        return values;
-    }
 }
 
 } // namespace lodestone

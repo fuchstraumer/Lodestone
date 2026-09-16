@@ -33,6 +33,44 @@ PermutationAxis::PermutationAxis(std::string name,
 {
 }
 
+PermutationAxis::PermutationAxis(std::string name,
+                                 std::vector<PermutationValue> _values,
+                                 AxisKind kind,
+                                 EarliestBindingTime binding_time,
+                                 AxisValueDomain value_domain,
+                                 std::string active_when,
+                                 std::string root_name,
+                                 std::vector<RawInterfaceImpl> interface_impls) noexcept
+    : Name(std::move(name)),
+      Kind(kind),
+      BindingTime(binding_time),
+      ValueDomain(value_domain),
+      ActiveWhen(std::move(active_when)),
+      values(std::move(_values)),
+      rootName(std::move(root_name)),
+      interfaceImpls(std::move(interface_impls))
+{
+}
+
+PermutationAxis::PermutationAxis(std::string name,
+                                 std::vector<PermutationValue> _values,
+                                 AxisKind kind,
+                                 EarliestBindingTime binding_time,
+                                 AxisValueDomain value_domain,
+                                 std::string active_when,
+                                 std::string root_name,
+                                 std::vector<RawEnumCase> enum_cases) noexcept
+    : Name(std::move(name)),
+      Kind(kind),
+      BindingTime(binding_time),
+      ValueDomain(value_domain),
+      ActiveWhen(std::move(active_when)),
+      values(std::move(_values)),
+      rootName(std::move(root_name)),
+      enumCases(std::move(enum_cases))
+{
+}
+
 size_t PermutationAxis::NumValues() const noexcept
 {
     return values.size();

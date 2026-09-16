@@ -16,12 +16,32 @@ namespace lodestone
 
 struct PermutationAxis
 {
-    PermutationAxis(std::string name,
-                    std::vector<PermutationValue> values,
-                    AxisKind kind,
-                    EarliestBindingTime binding_time,
-                    AxisValueDomain value_domain,
-                    std::string active_when = {}) noexcept;
+    // I know these ctors are ugly but it lets us inplace-construct during space build at least
+
+    explicit PermutationAxis(std::string name,
+                             std::vector<PermutationValue> values,
+                             AxisKind kind,
+                             EarliestBindingTime binding_time,
+                             AxisValueDomain value_domain,
+                             std::string active_when = {}) noexcept;
+
+    explicit PermutationAxis(std::string name,
+                             std::vector<PermutationValue> values,
+                             AxisKind kind,
+                             EarliestBindingTime binding_time,
+                             AxisValueDomain value_domain,
+                             std::string active_when,
+                             std::string root_name,
+                             std::vector<RawInterfaceImpl> interface_impls) noexcept;
+
+    explicit PermutationAxis(std::string name,
+                             std::vector<PermutationValue> values,
+                             AxisKind kind,
+                             EarliestBindingTime binding_time,
+                             AxisValueDomain value_domain,
+                             std::string active_when,
+                             std::string root_name,
+                             std::vector<RawEnumCase> enum_cases) noexcept;
 
     std::string Name;
     AxisKind Kind{ AxisKind::None };

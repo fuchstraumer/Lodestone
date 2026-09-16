@@ -682,7 +682,7 @@ namespace
     {
         for (const PermutationValue& value : values)
         {
-            tables.Values.emplace_back(PermutationValueToInt64(value));
+            tables.Values.emplace_back(value.AsUInt());
         }
     }
 
@@ -693,7 +693,7 @@ namespace
     {
         for (const PermutationValue& value : values)
         {
-            std::string_view valName = value.AsType(axis);
+            std::string_view valName = axis.ValueDomain == AxisValueDomain::Type ? value.AsType(axis) : value.AsEnumCase(axis);
             uint32_t valNameIdx = strings.Add(valName);
             tables.Values.emplace_back(static_cast<int64_t>(valNameIdx));
         }
@@ -724,10 +724,11 @@ namespace
             case lodestone::AxisValueDomain::Boolean:
                 [[fallthrough]];
             case lodestone::AxisValueDomain::Integral:
-                [[fallthrough]];
-            case lodestone::AxisValueDomain::Enum:
                 AppendLiteralValues(tables, axisValues);
                 break;
+            case lodestone::AxisValueDomain::Enum:
+                // Enum case actually should be handled like a type, by appending the string values
+                [[fallthrough]];
             case lodestone::AxisValueDomain::Type:
                 // typename appending requires appending the strings, and
                 // then indices to those strings in the values table

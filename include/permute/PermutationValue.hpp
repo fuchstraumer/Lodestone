@@ -39,7 +39,8 @@ struct PermutationValue
     [[nodiscard]] uint32_t AsUInt() const noexcept;
     /** @brief Returns the type name of this type, as it is stored by the parent axis for this value */
     [[nodiscard]] std::string_view AsType(const PermutationAxis& axis) const noexcept;
-    [[nodiscard]] std::string_view AsEnum(const PermutationAxis& axis) const noexcept;
+    [[nodiscard]] std::string_view AsEnumCase(const PermutationAxis& axis) const noexcept;
+    [[nodiscard]] std::string AsQualifiedEnum(const PermutationAxis& axis) const noexcept;
     [[nodiscard]] uint32_t AsEnumLiteral(const PermutationAxis& axis) const noexcept;
 
     [[nodiscard]] bool operator==(const PermutationValue& other) const noexcept;

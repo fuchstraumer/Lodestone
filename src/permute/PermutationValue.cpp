@@ -46,15 +46,20 @@ uint32_t PermutationValue::AsUInt() const noexcept
     return uintValue;
 }
 
-std::string_view PermutationValue::AsEnum(const PermutationAxis& axis) const noexcept
-{
-    // returns scoped name, since slang requires all enums to be scoped by default
-    return axis.EnumCaseFullName(uintValue);
-}
-
 std::string_view PermutationValue::AsType(const PermutationAxis& axis) const noexcept
 {
     return axis.InterfaceImplTypeName(uintValue);
+}
+
+std::string_view PermutationValue::AsEnumCase(const PermutationAxis& axis) const noexcept
+{
+    return axis.EnumCaseName(uintValue);
+}
+
+std::string PermutationValue::AsQualifiedEnum(const PermutationAxis& axis) const noexcept
+{
+    // returns scoped name, since slang requires all enums to be scoped by default
+    return std::format("{}::{}", axis.EnumTypeName(), axis.EnumCaseName(uintValue));
 }
 
 bool PermutationValue::operator==(const PermutationValue& other) const noexcept
@@ -97,7 +102,7 @@ std::string ValueToSlangLiteral(const PermutationAxis& axis, const PermutationVa
     case PermutationValue::Type::UInt:
         return std::to_string(value.AsUInt());
     case PermutationValue::Type::Enum:
-        return std::string{ value.AsEnum(axis) };
+        return std::string{ value.AsQualifiedEnum(axis) };
     case PermutationValue::Type::Type:
         return std::string{ value.AsType(axis) };
     case PermutationValue::Type::Invalid:

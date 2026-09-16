@@ -612,16 +612,116 @@ built in four phases. The text follows ASD-STE100.
   the index. That bug hid because `VerifyManifestRoundTrip` was orphaned (`EmitLibraryModules` had no
   caller, against rule 3 of `CLAUDE.md`); it is wired back in.
 - **Phase 1 done.** The strong key and the shared codec, described above.
-- **Phase 2 done, unverified.** The manifest carries the axis schema. `ManifestAxis` holds the name,
-  value count, and `Kind`/`Domain`/`BindingTime` bytes (the axis enums moved to
-  `client/include/ShaderLibraryTypes.hpp`, one source of truth for the cooker and the client). An
-  `AxisValues` table holds each value; for a `Type` axis the value names a string, the implementation
-  type name. `Open` validates the axis and value tables, string indices included.
-- **Phase 3 in progress.** The client query surface. `QueryAxisValue` and `ManifestAxisAssignment`
-  are added. The open work: a `Decode(key, out-span)` that unpacks through the cached radices; a
-  whole-space enumeration that decodes every key for a rendergraph to walk and precache; and a
-  value-set filter that matches by digit tests on the raw key.
+- **Phase 2 done.** The manifest carries the axis schema. `ManifestAxis` holds the name, value count,
+  and `Kind`/`Domain`/`BindingTime` bytes (the axis enums live in `client/include/ShaderLibraryTypes.hpp`,
+  one source of truth for the cooker and the client). An `AxisValues` table holds each value; for a
+  `Type` axis the value names a string, the implementation type name. `Open` validates the axis and value
+  tables, string indices included. A `BuildAxisTables` fossil that wrote the value table twice was
+  removed.
+- **Phase 3 mostly done (builds green; 17 tests + 6 known-good dumps pass).** The client query surface is
+  `client/include/ShaderManifestIndex.hpp` + `client/src/ShaderManifestIndex.cpp`, in
+  `lodestone_client_internal`. Built and working:
+  - `ManifestIndex` holds the view plus caches built at construction: `radices` (= `ManifestAxis::ValueCount`),
+    `placeValues` (suffix product via `exclusive_scan` over reversed radices; the multiplier for axis j),
+    and an `axisNameToIndex` map.
+  - `Decode(key)` and `Enumerate()` unpack keys through `UnpackVariantKey` and a shared private
+    `decodeAxis` (one place, so the two loops cannot drift).
+  - `scan(span<ScanConstraint>)` filters the sorted `VariantKeys()` by a per-axis digit test, after a
+    `lower_bound`/`upper_bound` band pre-narrowing (min/max key from per-axis min/max digits; a cursor
+    merge over sorted constraints, O(K+C)). `ScanConstraint` is `{ uint32_t AxisIndex;
+    std::vector<uint32_t> AllowedValueIndices }` (owned).
+  - `Select(span<QueryAxisRange>)` resolves each range to a `ScanConstraint`, sorts by axis, calls `scan`.
+    Unknown axis or value returns an empty result, never throws.
+  - `ManifestQueryBuilder` is value-semantic (every `Where` returns a new builder, so a cached base query
+    stays immutable). `Where(bool/uint32/string_view)` validate against the axis, push a `QueryError` on a
+    miss, and merge into one `QueryAxisRange` per axis. `QueryError::Suggestion` carries the nearest
+    accepted name (`lodestone::suggest`, `max(1, len/3)` budget) for a mistyped axis name or Type value.
+  - `QueryAxisValue` is `{ Domain Type; uint32_t IntegralValue; string_view TypeName }` -- the old
+    `bool BoolValue` union member was deleted; booleans store 0/1 in `IntegralValue`.
+
+  Still open (the leftover items):
+  - **Builder terminals declared, not defined:** `Keys`, `First`, `Variants`, `Size`, `IsValid`,
+    `Errors`. Check validity, then route through `scan` (Keys), `Decode` each (Variants), early-out
+    (First), count without materializing (Size). Nothing exercises `Select`/`scan`/suggestions end to end
+    until these land.
+  - **`WhereAnyOf` / `WhereAnyOfBoolean` declared, not defined.** Add multiple values to one axis
+    constraint; `WhereAnyOfBoolean` is the sugar for `{true,false}`.
+  - **Value factories** (`AxisBool`/`AxisInt`/`AxisType`) for the raw `Select` path were never added;
+    with the union gone, `AxisBool` writes `IntegralValue = 0/1`. Optional until a caller hand-builds a
+    `QueryAxisRange`.
+  - **Duplicate-axis coalescing not implemented.** Two `Where`s on one axis append both values;
+    `scan`'s cursor merge assumes one constraint per axis. Plan: coalesce on insert in the builder
+    (intersect allowed sets; empty intersection is the impossible-query error), so `scan` never sees a
+    duplicate. Harmless only because the terminals do not run yet.
+  - **No `ManifestIndexTest`.** Build one from `ShaderManifestRejectTest`'s byte-builder with a Boolean +
+    a Type axis; first end-to-end test of the query path, and it confirms the boolean fix through `Select`.
+  - **`QueryError::AxisName` dangles on an unknown axis** -- it views the caller's string, not the
+    manifest (`Suggestion` is always a manifest view and is safe). Pre-existing; decide copy-vs-document
+    when the `Errors()` surface is finalized.
+
+**Two data-format follow-ups (both touch `AxisValues`; do them in one manifest version bump).** See
+`todo.md` "Cook driver and manifest" and "Permutation system".
+- **Axis values `int64` -> `uint32`.** They are `int64` only because the emitter reused
+  `PermutationValueToInt64` (the size-expression evaluator's widener). Every value is `uint32` at the
+  source and every consumer casts back down. Keep the evaluator on `int64`; store `uint32`.
+- **Enum axes are name axes, like interface/Type axes** -- see §14a.
 
 **Verify with:** `scripts\build.bat RelWithDebInfo ninja-clang-cl`, then `scripts\run-tests.bat
-RelWithDebInfo ninja-clang-cl` (seventeen targets), then `python scripts\check-known-good.py` (six
-dumps). The Phase 2 and Phase 3 edits are unverified; run all three before you trust a green claim.
+RelWithDebInfo ninja-clang-cl` (17 targets), then `python scripts\check-known-good.py` (6 dumps). The
+tree builds green with all tests and dumps passing as of this writing.
+
+## 14a. Enum axis plan (the current task, 2026-09-16)
+
+A Slang `enum` used as the type of an `[ls_axis_enum]` `extern static const` is a permutation axis whose
+values are the enum cases. Slang reflects the cases fully, so users declare nothing twice: `[ls_axis_enum]`
+needs **no** string argument, because the const's type *is* the enum -- which also erases the
+name-mismatch risk of listing case names in the attribute.
+
+Reflection facts (verified in `third_party/slang`): the const's type reflects as `TypeReflection` with
+`Kind::Enum`; `getFieldCount()`/`getFieldByIndex(i)` return the cases as `VariableReflection`
+(`slang-reflection-api.cpp:572`/`:603`); each case gives `getName()` and `getDefaultValueInt(int64_t*)`
+(the real assigned value, so explicit/non-ascending values are handled). `magic_enum` is the wrong tool
+(it reflects C++ enums; this is a Slang enum seen only through reflection).
+
+Key decision: the enum's integer value is **cook-time only** (size-expression evaluation, and generating
+the bound shader literal). No runtime consumer needs it, so the manifest stores an enum value exactly
+like a Type/interface axis: the case **name** as a string index. `Domain == Enum` distinguishes it. The
+digit is the declaration-order position. This means enum reuses the Type/interface machinery on both
+sides of the wall; the only enum-specific code is cook-side.
+
+Ordered steps:
+1. Declare `[ls_axis_enum]` in `tests/assets/LodestoneAttributes.slang` (targets `Var`, like
+   `ls_axis_boolean`; no argument).
+2. `RawAxisDeclaration` (`include/compile/RawLibrary.hpp:57`): add `bool IsEnumAxis` and
+   `std::vector<RawEnumCase> EnumCases` with `RawEnumCase { std::string Name; int64_t Value; }`. The enum
+   type name reuses the consolidated `RootName` field (shared with interface axes -- both anchor on one
+   named root type; only the use differs). `Value` is optional for the first pass (see step 3).
+3. `buildAxisDecl` (`src/compile/impl/SlangModuleContext.cpp:454`): add an `ls_axis_enum` check to the
+   early-out at line 465 and to the mutual-exclusivity guards. When present, reflect
+   `variableReflection->getType()`, assert `getKind() == TypeReflection::Kind::Enum` (a non-enum type is
+   an author error, not a nullopt), store its `getName()` as `RootName`, and walk
+   `getFieldCount()`/`getFieldByIndex(i)` (these return the enum CASES, in declaration order) ->
+   `getName()` into `EnumCases`. The case value (`getDefaultValueInt`, deprecated in favor of
+   `getDefaultValueBlob`) is only needed once a size expression may name an enum axis (step 6); the first
+   pass captures names alone. Declare the axis const with an explicit enum type in the test shader to
+   avoid inferred-type reflection surprises.
+4. `BuildPermutationSpace` (`src/permute/PermutationSpace.cpp`): add an enum branch building a
+   `PermutationAxis` with `ValueDomain = Enum`, one value per case. Reuse the Type/ordinal machinery (the
+   axis holds the case names like an interface axis holds impl names); carry the case ints on the axis for
+   the evaluator.
+5. Literal generation (`src/permute/PermutationValue.cpp`, `ValueToSlangLiteral` /
+   `MakeExportedConstantSource`): an enum value emits as `<EnumTypeName>.<CaseName>`, not an int.
+6. Evaluator (only if a size expression may name an enum axis): map an enum axis value to its case int in
+   `MakeResolveContext` / `PermutationValueToInt64` (`src/model/ResolveStage.cpp:253`). Skip until a
+   shader needs an enum numerically; capture the int regardless.
+7. Emitter (`src/emit/ShaderManifestEmitter.cpp`, the `BuildAxisTables` switch near line 722): move
+   `Enum` from `AppendLiteralValues` to `AppendStringValues` -- write each case name's string index.
+8. Client `decodeAxis` (`client/src/ShaderManifestIndex.cpp`): move `Enum` out of the Integral
+   fallthrough into the `Type` branch (`TypeName = String(currValue)`).
+9. Client `where` (same file): the `Integral`-satisfies-`Enum` interchange becomes
+   `Type`(string/name)-satisfies-`Enum`; route enum resolution through `stringValueIndices`. Enum is
+   queried by name via the `Where(string_view)` overload.
+10. `ValidateAxes` (`client/src/ShaderManifest.cpp`): validate an `Enum` axis's values as string indices
+    (like `Type`), not raw ints.
+11. Test: add an enum axis (with at least one explicit, non-ascending case value) to a test shader and
+    cover reflection -> manifest -> query-by-name -> decode -> suggestion.
