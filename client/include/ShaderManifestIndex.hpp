@@ -33,6 +33,9 @@ struct QueryAxisRange
 {
     std::string_view AxisName;
     std::vector<QueryAxisValue> Values;
+    // AxisIndex to keep constraints sorted. Trivial and tiny and easy to add 
+    // so that's why we're growing this struct to include it
+    uint32_t AxisIndex{ 0u };
 };
 
 enum class QueryErrorCode : uint8_t
@@ -86,11 +89,11 @@ struct ManifestQueryBuilder
                                              std::string_view type_or_enum_name) const noexcept;
 
     // For the boolean multi-parameter case, there's no need to even pass values... it's true or false
-    [[nodiscard]] ManifestQueryBuilder WhereAnyOfBoolean(std::string_view axis_name) const noexcept;
-    [[nodiscard]] ManifestQueryBuilder WhereAnyOf(std::string_view axis_name, std::span<const uint32_t> values) const noexcept;
+    [[nodiscard]] ManifestQueryBuilder WhereAnyOfBoolean(std::string_view axis_name) const;
+    [[nodiscard]] ManifestQueryBuilder WhereAnyOf(std::string_view axis_name, std::span<const uint32_t> values) const;
     [[nodiscard]] ManifestQueryBuilder WhereAnyOf(std::string_view axis_name,
                                                   AxisValueDomain domain,
-                                                  std::span<const std::string_view> values) const noexcept;
+                                                  std::span<const std::string_view> values) const;
 
     // These are the terminal functions, which effectively close a query and return the final result
     [[nodiscard]] QueryResult<std::vector<VariantKey>> Keys() const noexcept;
@@ -105,6 +108,8 @@ struct ManifestQueryBuilder
 private:
     // does the actual legwork for where, but means we're not duplicating all the bloody logic per public Where() overload
     [[nodiscard]] ManifestQueryBuilder where(std::string_view axis_name, QueryAxisValue value) const noexcept;
+    // overload to coalesce work for WhereAnyOf functions, assuming shared value domain
+    [[nodiscard]] ManifestQueryBuilder whereAnyOf(std::string_view axis_name, std::vector<QueryAxisValue> value) const noexcept;
     const class ManifestIndex* index{ nullptr };
     std::vector<QueryError> errors;
     // Since we can have multiple values as constraints per axis, we use a vector of QueryAxisRange.
