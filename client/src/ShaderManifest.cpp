@@ -1166,7 +1166,9 @@ namespace
                                             .Detail = axis.ValueCount };
             }
 
-            if (axis.Domain == AxisValueDomain::Type)
+            // both types and enums have values stored in string blob, verify integrity of the string indices
+            if (axis.Domain == AxisValueDomain::Type ||
+                axis.Domain == AxisValueDomain::Enum)
             {
                 // validate that all the values - which are actually indices into the string table - are in range
                 const std::span<const AxisValueType> allAxesValueSpan =

@@ -15,6 +15,12 @@
 #include <utility>
 #include <vector>
 
+#ifdef __clang__
+#pragma clang diagnostic push
+// suppress these bc I'm doing them all quite intentionally here
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#endif
+
 namespace lodestone
 {
 
@@ -33,27 +39,28 @@ namespace
 
 ManifestQueryBuilder::ManifestQueryBuilder(const class ManifestIndex& _index) noexcept : index(&_index)
 {
-
 }
 
 ManifestQueryBuilder ManifestQueryBuilder::Where(std::string_view axis_name, bool value) const noexcept
 {
     // A boolean axis is an integral axis with values {0, 1}, so store the boolean as its 0/1 integral
     // and let it share the integral resolution and decode paths.
-    QueryAxisValue newValue{ .Type = AxisValueDomain::Boolean, .IntegralValue = value ? 1u : 0u, .TypeName = {} };
+    QueryAxisValue newValue{ .Type = AxisValueDomain::Boolean, .IntegralValue = value ? 1u : 0u, .Name = {} };
     return where(axis_name, newValue);
 
 }
 
 ManifestQueryBuilder ManifestQueryBuilder::Where(std::string_view axis_name, uint32_t value) const noexcept
 {
-    QueryAxisValue newValue{ .Type = AxisValueDomain::Integral, .IntegralValue = value, .TypeName = {} };
+    QueryAxisValue newValue{ .Type = AxisValueDomain::Integral, .IntegralValue = value, .Name = {} };
     return where(axis_name, newValue);
 }
 
-ManifestQueryBuilder ManifestQueryBuilder::Where(std::string_view axis_name, std::string_view type_name) const noexcept
+ManifestQueryBuilder ManifestQueryBuilder::Where(std::string_view axis_name,
+                                                 AxisValueDomain domain,
+                                                 std::string_view type_or_enum_name) const noexcept
 {
-    QueryAxisValue newValue{ .Type = AxisValueDomain::Type, .IntegralValue=0u, .TypeName = type_name };
+    QueryAxisValue newValue{ .Type = domain, .IntegralValue=0u, .Name = type_or_enum_name };
     return where(axis_name, newValue);
 }
 
@@ -79,12 +86,7 @@ ManifestQueryBuilder ManifestQueryBuilder::where(std::string_view axis_name, Que
     const uint32_t axisIndex = indexIter->second;
     const ManifestAxis& axis = index->manifest.Axis(axisIndex);
 
-    // The value's domain must match the axis. An Integral value also satisfies an Enum axis,
-    // since enum values are stored as plain integers.
-    const bool domainMatches = (value.Type == axis.Domain) ||
-                               (value.Type == AxisValueDomain::Integral &&
-                                axis.Domain == AxisValueDomain::Enum);
-    if (!domainMatches)
+    if (value.Type != axis.Domain)
     {
         result.errors.emplace_back(QueryErrorCode::IncorrectValueDomain,
                                    axis_name,
@@ -94,26 +96,26 @@ ManifestQueryBuilder ManifestQueryBuilder::where(std::string_view axis_name, Que
 
     // Confirm the axis actually declares the requested value. A Boolean axis always holds both
     // 0 and 1, so only Type and Integral/Enum axes need the lookup.
-    if (axis.Domain == AxisValueDomain::Type)
+    if (axis.Domain == AxisValueDomain::Type || axis.Domain == AxisValueDomain::Enum)
     {
-        // Type axis values are indices into the string table; resolve them and compare by name.
+        // Type + Enum axis values are indices into the string table; resolve them and compare by name.
         auto extractStrView = [&](const AxisValueType string_index) -> std::string_view
         {
             return index->manifest.String(string_index);
         };
-        const std::vector<std::string_view> axisTypeNames = index->manifest.AxisValues(axisIndex) |
-                                                            std::views::transform(extractStrView) |
-                                                            std::ranges::to<std::vector>();
-        if (std::ranges::find(axisTypeNames, value.TypeName) == axisTypeNames.end())
+        const std::vector<std::string_view> axisValueNames = index->manifest.AxisValues(axisIndex) |
+                                                             std::views::transform(extractStrView) |
+                                                             std::ranges::to<std::vector>();
+        if (std::ranges::find(axisValueNames, value.Name) == axisValueNames.end())
         {
             result.errors.emplace_back(QueryErrorCode::ValueNotInAxis,
                                        axis_name,
                                        0u,
-                                       NearestName(value.TypeName, axisTypeNames));
+                                       NearestName(value.Name, axisValueNames));
             return result;
         }
     }
-    else if (axis.Domain != AxisValueDomain::Boolean)
+    else if (axis.Domain == AxisValueDomain::Integral)
     {
         std::span<const AxisValueType> axisValues = index->manifest.AxisValues(axisIndex);
         if (std::ranges::find(axisValues, value.IntegralValue) == axisValues.end())
@@ -238,13 +240,13 @@ std::vector<VariantKey> ManifestIndex::Select(std::span<const QueryAxisRange> co
         // map input constraint values (given as actual concrete values) to the indices
         // of that value in axisValues space
         std::vector<uint32_t> valueIndices;
-        if (axis.Domain != AxisValueDomain::Type)
+        if (axis.Domain == AxisValueDomain::Type || axis.Domain == AxisValueDomain::Enum)
         {
-            valueIndices = integralValueIndices(axisIndex, range);
+            valueIndices = stringValueIndices(axisIndex, range);
         }
         else
         {
-            valueIndices = stringValueIndices(axisIndex, range);
+            valueIndices = integralValueIndices(axisIndex, range);
         }
 
         // there's no error handling here, the QueryBuilder is the one that gives you that
@@ -274,13 +276,14 @@ QueryAxisValue ManifestIndex::decodeAxis(uint32_t axis_index, uint32_t value_ind
     case AxisValueDomain::Boolean:
         [[fallthrough]];
     case AxisValueDomain::Integral:
-        [[fallthrough]];
-    case AxisValueDomain::Enum:
         result.IntegralValue = currValue;
         break;
+    case AxisValueDomain::Enum:
+        // enums handled like interface strings, it's the case name
+        [[fallthrough]];
     case AxisValueDomain::Type:
         // read type name from string table
-        result.TypeName = manifest.String(currValue);
+        result.Name = manifest.String(currValue);
         break;
     case AxisValueDomain::None:
         std::unreachable();
@@ -323,7 +326,7 @@ std::vector<uint32_t> ManifestIndex::stringValueIndices(const uint32_t axis_inde
     // get iterators that match from axis.Values to constraintStrings, and use std::distance to convert to indices
     for (const auto&& [index, val] : std::views::enumerate(range.Values))
     {
-        auto iter = std::ranges::find(constraintStrings, val.TypeName);
+        auto iter = std::ranges::find(constraintStrings, val.Name);
         if (iter == constraintStrings.end())
         {
             return {};

@@ -162,8 +162,7 @@ enum class AxisValueDomain : uint8_t
     Boolean,
     Integral,
     Enum,
-    Type,
-    Count
+    Type
 };
 
 /** @brief The type used to represent values of a permutation axis, particularly when stored or reflected.

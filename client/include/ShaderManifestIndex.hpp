@@ -20,11 +20,11 @@ namespace lodestone
 struct QueryAxisValue
 {
     AxisValueDomain Type{ AxisValueDomain::None };
-    // removed previously untagged union. manifest stores everything as int64_t anyways.
-    uint32_t IntegralValue{ 0u };
-    // todo-ship: It might be too easy for clients to make this go null, for recursive calls or
-    // high-level construction of queries. Decide if that's an antipattern or what we want to support
-    std::string_view TypeName;
+    // removed previously untagged union. manifest stores everything as AxisValueType anyways.
+    AxisValueType IntegralValue{ 0u };
+    // for Interface axes, the name of the specific implementation
+    // for Enum axes, the name of the specific case
+    std::string_view Name;
 };
 
 /** @brief Collection of values constraining a single axis. Most clients should not use or build
@@ -79,12 +79,18 @@ struct ManifestQueryBuilder
       * case (this allows child queries to be built as sub-categories varied more dynamically) */
     [[nodiscard]] ManifestQueryBuilder Where(std::string_view axis_name, bool value) const noexcept;
     [[nodiscard]] ManifestQueryBuilder Where(std::string_view axis_name, uint32_t value) const noexcept;
-    [[nodiscard]] ManifestQueryBuilder Where(std::string_view axis_name, std::string_view type_name) const noexcept;
+    /** @brief Must provide `domain`, as a named axis value could be an interface or enum, so we can't
+     * disambiguate user intention by name alone. */
+    [[nodiscard]] ManifestQueryBuilder Where(std::string_view axis_name,
+                                             AxisValueDomain domain,
+                                             std::string_view type_or_enum_name) const noexcept;
 
     // For the boolean multi-parameter case, there's no need to even pass values... it's true or false
     [[nodiscard]] ManifestQueryBuilder WhereAnyOfBoolean(std::string_view axis_name) const noexcept;
     [[nodiscard]] ManifestQueryBuilder WhereAnyOf(std::string_view axis_name, std::span<const uint32_t> values) const noexcept;
-    [[nodiscard]] ManifestQueryBuilder WhereAnyOf(std::string_view axis_name, std::span<const std::string_view> values) const noexcept;
+    [[nodiscard]] ManifestQueryBuilder WhereAnyOf(std::string_view axis_name,
+                                                  AxisValueDomain domain,
+                                                  std::span<const std::string_view> values) const noexcept;
 
     // These are the terminal functions, which effectively close a query and return the final result
     [[nodiscard]] QueryResult<std::vector<VariantKey>> Keys() const noexcept;
