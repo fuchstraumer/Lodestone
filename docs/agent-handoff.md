@@ -602,7 +602,7 @@ built in four phases. The text follows ASD-STE100.
 - Radices are `ManifestAxis::ValueCount`, already serialized. Do not add a manifest radices field. Cache
   the radices and the per-axis place-values on the view at `Open`. A single-axis constraint is one
   div-and-mod on the raw key: `digit_j = (key / place_j) % radix_j`, no full decode. The filter type is a
-  value-set per axis (`ManifestAxisAssignmentRange`).
+  value-set per axis (`QueryAxisRange`).
 
 **Phase state:**
 
@@ -617,7 +617,7 @@ built in four phases. The text follows ASD-STE100.
   `client/include/ShaderLibraryTypes.hpp`, one source of truth for the cooker and the client). An
   `AxisValues` table holds each value; for a `Type` axis the value names a string, the implementation
   type name. `Open` validates the axis and value tables, string indices included.
-- **Phase 3 in progress.** The client query surface. `ManifestAxisValue` and `ManifestAxisAssignment`
+- **Phase 3 in progress.** The client query surface. `QueryAxisValue` and `ManifestAxisAssignment`
   are added. The open work: a `Decode(key, out-span)` that unpacks through the cached radices; a
   whole-space enumeration that decodes every key for a rendergraph to walk and precache; and a
   value-set filter that matches by digit tests on the raw key.

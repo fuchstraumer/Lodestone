@@ -211,33 +211,6 @@ struct UniformMemberInfo
     uint32_t ArrayCount{ 1u };
 };
 
-/** @brief One axis value: represents a single possible value for a permutation axis in the shader. */
-struct ManifestAxisValue
-{
-    AxisValueDomain Type{ AxisValueDomain::None };
-    union
-    {
-        bool BoolValue;
-        uint32_t IntegralValue{ 0u };
-    };
-    std::string_view TypeName;
-};
-
-/** @brief Used to build queries for variants: a span of these provides the complete set of parameters
-  * we need to find and return a specific variant. */
-// todo-ship: Use this API and these two structs more to identify how else we could shape or improve this query API
-struct ManifestAxisAssignment
-{
-    std::string_view AxisName;
-    ManifestAxisValue Value;
-};
-
-struct ManifestAxisAssignmentRange
-{
-    std::string_view AxisName;
-    std::span<const ManifestAxisValue> Values;
-};
-
 /** @brief One resource a shader binds, as the generated library states it. This is the optimized and
  * compact form of the cooker's `ReflectedBinding`. Strings are stored in the cooked data, so views
  * are used here instead of owning strings. It is critical to use the group and binding indices
