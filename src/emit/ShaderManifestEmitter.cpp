@@ -675,7 +675,7 @@ namespace
     struct AxisTables
     {
         std::vector<ManifestAxis> Axes;
-        std::vector<int64_t> Values;
+        std::vector<AxisValueType> Values;
     };
 
     void AppendLiteralValues(AxisTables& tables, std::span<const PermutationValue> values)
