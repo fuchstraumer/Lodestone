@@ -14,6 +14,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <expected>
 #include <filesystem>
 #include <format>
@@ -41,6 +42,42 @@ namespace
         result += module_name;
         result += ".slang-module";
         return result;
+    }
+
+    template<typename T>
+    int64_t ReadSlangEnumCaseBlobAs(const void* data)
+    {
+        T result{};
+        std::memcpy(&result, data, sizeof(T));
+        return static_cast<int64_t>(result);
+    }
+
+    int64_t ReadSlangEnumCaseBlob(slang::TypeReflection* refl, const void* data)
+    {
+        using slang::TypeReflection;
+        // clang will warn about not handling all cases, but we're handling all integral scalar types
+        switch (refl->getScalarType())
+        {
+        case TypeReflection::ScalarType::Int8:
+            return ReadSlangEnumCaseBlobAs<int8_t>(data);
+        case TypeReflection::ScalarType::UInt8:
+            return ReadSlangEnumCaseBlobAs<uint8_t>(data);
+        case TypeReflection::ScalarType::Int16:
+            return ReadSlangEnumCaseBlobAs<int16_t>(data);
+        case TypeReflection::ScalarType::UInt16:
+            return ReadSlangEnumCaseBlobAs<uint16_t>(data);
+        case TypeReflection::ScalarType::Int32:
+            return ReadSlangEnumCaseBlobAs<int32_t>(data);
+        case TypeReflection::ScalarType::UInt32:
+            return ReadSlangEnumCaseBlobAs<uint32_t>(data);
+        case TypeReflection::ScalarType::Int64:
+            return ReadSlangEnumCaseBlobAs<int64_t>(data);
+        case TypeReflection::ScalarType::UInt64:
+            return ReadSlangEnumCaseBlobAs<uint64_t>(data);
+        default:
+            assert(false && "Unsupported scalar type for enum case blob");
+            return 0;
+        }
     }
 
 }
@@ -460,9 +497,10 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
     }
 
     slang::Attribute* booleanAxisAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_axis_boolean");
+    slang::Attribute* enumAxisAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_axis_enum");
     slang::Attribute* valuesAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_axis_values");
-    // early out: if neither attribute is present, this is not an axis declaration
-    if ((booleanAxisAttr == nullptr) && (valuesAttr == nullptr))
+    // early out: if none of the attributes are present, this is not an axis declaration
+    if ((booleanAxisAttr == nullptr) && (valuesAttr == nullptr) && (enumAxisAttr == nullptr))
     {
         return std::nullopt;
     }
@@ -482,14 +520,59 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
         result.IsBooleanAxis = true;
     }
 
+    if (enumAxisAttr != nullptr)
+    {
+        result.IsEnumAxis = true;
+        slang::TypeReflection* typeReflection = variableReflection->getType();
+        if (typeReflection == nullptr || typeReflection->getKind() != slang::TypeReflection::Kind::Enum)
+        {
+            const std::string errStr =
+                std::format("Variable '{}' has an enum axis attribute but is not of enum type", variableName);
+            return std::unexpected(ReportError(*diagnosticSink,
+                                                CookError::AttributeExpressionParseFailed,
+                                                errStr));
+        }
+
+        const char* enumTypeName = typeReflection->getName();
+        result.RootName = enumTypeName != nullptr ? enumTypeName : "<TypeNameResolutionFailed>";
+        // slang repurposes the field accessors for enum types to return the enum cases, in declaration order
+        // we handle value retrieval explicitly since size expressions may reference them, and we don't want to
+        // assume enums are just linearly incremented sequences
+        const uint32_t enumCaseCount = typeReflection->getFieldCount();
+        result.EnumCases.reserve(enumCaseCount);
+        for (int32_t i = 0; std::cmp_less(i, enumCaseCount); ++i)
+        {
+            slang::VariableReflection* caseVar = typeReflection->getFieldByIndex(i);
+            if (caseVar == nullptr)
+            {
+                const std::string errStr = 
+                    std::format("Failed to retrieve enum case at index {} for variable '{}'", i, variableName);
+                return std::unexpected(ReportError(*diagnosticSink,
+                                                    CookError::AttributeExpressionParseFailed,
+                                                    errStr));
+            }
+
+            const char* caseName = caseVar->getName();
+            Slang::ComPtr<slang::IBlob> caseValueBlob;
+            // unpack and interpret the enum case value from the blob
+            int64_t caseValue = 0;
+            if (SLANG_SUCCEEDED(caseVar->getDefaultValueBlob(caseValueBlob.writeRef())))
+            {
+                const void* caseValueData = caseValueBlob->getBufferPointer();
+                caseValue = ReadSlangEnumCaseBlob(typeReflection, caseValueData);
+            }
+            result.EnumCases.emplace_back(caseName != nullptr ? caseName : "<CaseNameResolutionFailed>", caseValue);
+        }
+    }
+
     result.Name = variableName;
     if (valuesAttr != nullptr)
     {
         // can't have both a values attribute and a boolean axis: the two are mutually exclusive
-        if (result.IsBooleanAxis)
+        if (result.IsBooleanAxis || result.IsEnumAxis)
         {
             const std::string errStr =
-                std::format("Variable '{}' cannot have both a boolean axis and axis values", variableName);
+                std::format("Variable '{}' cannot have both a boolean axis or enum axis and axis values", variableName);
             return std::unexpected(ReportError(*diagnosticSink,
                                                     CookError::AttributeExpressionParseFailed,
                                                     errStr));
@@ -542,7 +625,7 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
     slang::SourceLocation sourceLoc;
     if (SLANG_SUCCEEDED(session->getDeclSourceLocation(reflection, &sourceLoc)))
     {
-        result.SourceFile = sourceLoc.filePath != nullptr ? sourceLoc.filePath : "<unknown>";
+        result.SourceFile = sourceLoc.filePath != nullptr ? sourceLoc.filePath : "<SourceLocFileResolutionFailed>";
         result.SourceLine = static_cast<int32_t>(sourceLoc.line);
         result.SourceColumn = static_cast<int32_t>(sourceLoc.column);
     }
@@ -736,7 +819,7 @@ CookError SlangModuleContext::buildInterfaceAxes()
             .SourceFile = stub.SourceFile.empty() ? "<unknown>" : stub.SourceFile,
             .SourceLine = stub.SourceLine,
             .SourceColumn = stub.SourceColumn,
-            .InterfaceName = matchedInterfaceName,
+            .RootName = matchedInterfaceName,
             .InterfaceImpls = {}
         };
 

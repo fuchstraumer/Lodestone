@@ -48,6 +48,13 @@ public struct ls_axis_booleanAttribute
 {
 };
 
+/** shortcut to declare an enum axis: attached to an enum value `extern static const`, so author
+  * knows the possible values for the axis and reflection can extract the very same. keeps it simple */ 
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct ls_axis_enumAttribute
+{
+};
+
 /** List of values used for an axis constraint */
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct ls_axis_valuesAttribute
