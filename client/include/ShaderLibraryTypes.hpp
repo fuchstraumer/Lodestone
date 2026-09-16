@@ -166,6 +166,11 @@ enum class AxisValueDomain : uint8_t
     Count
 };
 
+/** @brief The type used to represent values of a permutation axis, particularly when stored or reflected.
+  * @note Declared as a using alias in case we need to widen or otherwise change this in the future, as has
+  * happened when it was mistakenly implemented as a wider signed type. */
+using AxisValueType = uint32_t;
+
 /** @brief One vertex shader input.
  *
  * WGSL keeps only `@location`. The semantic name and index live in the Slang source and in no part of

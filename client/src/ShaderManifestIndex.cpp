@@ -60,8 +60,8 @@ ManifestQueryBuilder ManifestQueryBuilder::Where(std::string_view axis_name, std
 ManifestQueryBuilder ManifestQueryBuilder::where(std::string_view axis_name, QueryAxisValue value) const noexcept
 {
     // We copy as we descend, because otherwise modifications to the query would affect the original object.
-    // This won't work for cases where we set high-level root constraints, then branch into ones we want
-    // to actually bake
+    // That wouldn't work for cases where we set high-level root constraints, then branch into ones we want
+    // to actually bake... so a copy it is. Keep in mind this query should not be on the hot path at all.
     ManifestQueryBuilder result{ *this };
     // verify axis_name is valid, push an error if not
     auto indexIter = index->axisNameToIndex.find(axis_name);
@@ -97,9 +97,9 @@ ManifestQueryBuilder ManifestQueryBuilder::where(std::string_view axis_name, Que
     if (axis.Domain == AxisValueDomain::Type)
     {
         // Type axis values are indices into the string table; resolve them and compare by name.
-        auto extractStrView = [&](const int64_t string_index) -> std::string_view
+        auto extractStrView = [&](const AxisValueType string_index) -> std::string_view
         {
-            return index->manifest.String(static_cast<uint32_t>(string_index));
+            return index->manifest.String(string_index);
         };
         const std::vector<std::string_view> axisTypeNames = index->manifest.AxisValues(axisIndex) |
                                                             std::views::transform(extractStrView) |
@@ -115,7 +115,7 @@ ManifestQueryBuilder ManifestQueryBuilder::where(std::string_view axis_name, Que
     }
     else if (axis.Domain != AxisValueDomain::Boolean)
     {
-        std::span<const int64_t> axisValues = index->manifest.AxisValues(axisIndex);
+        std::span<const AxisValueType> axisValues = index->manifest.AxisValues(axisIndex);
         if (std::ranges::find(axisValues, value.IntegralValue) == axisValues.end())
         {
             result.errors.emplace_back(QueryErrorCode::ValueNotInAxis, axis_name, value.IntegralValue);
@@ -266,7 +266,7 @@ std::vector<VariantKey> ManifestIndex::Select(std::span<const QueryAxisRange> co
 QueryAxisValue ManifestIndex::decodeAxis(uint32_t axis_index, uint32_t value_index) const noexcept
 {
     const ManifestAxis& axis = manifest.Axis(axis_index);
-    const int64_t currValue = manifest.AxisValue(axis_index, value_index);
+    const AxisValueType currValue = manifest.AxisValue(axis_index, value_index);
     QueryAxisValue result{};
     result.Type = axis.Domain;
     switch (axis.Domain)
@@ -276,11 +276,11 @@ QueryAxisValue ManifestIndex::decodeAxis(uint32_t axis_index, uint32_t value_ind
     case AxisValueDomain::Integral:
         [[fallthrough]];
     case AxisValueDomain::Enum:
-        result.IntegralValue = static_cast<uint32_t>(currValue);
+        result.IntegralValue = currValue;
         break;
     case AxisValueDomain::Type:
         // read type name from string table
-        result.TypeName = manifest.String(static_cast<uint32_t>(currValue));
+        result.TypeName = manifest.String(currValue);
         break;
     case AxisValueDomain::None:
         std::unreachable();
@@ -291,7 +291,7 @@ QueryAxisValue ManifestIndex::decodeAxis(uint32_t axis_index, uint32_t value_ind
 std::vector<uint32_t> ManifestIndex::integralValueIndices(const uint32_t axis_index, const QueryAxisRange& range) const
 {
     std::vector<uint32_t> constraintValueIndices(range.Values.size());
-    std::span<const int64_t> axisValues = manifest.AxisValues(axis_index);
+    std::span<const AxisValueType> axisValues = manifest.AxisValues(axis_index);
     // flatten input constraint values (actual values) into the index of that value in the
     // axisValues array (i.e, get the digit in the radix of this axis)
     for (const auto&& [index, val] : std::views::enumerate(range.Values))
@@ -313,9 +313,9 @@ std::vector<uint32_t> ManifestIndex::stringValueIndices(const uint32_t axis_inde
     // axisValues now gives indices into the Strings() table: extract the strings,
     // and do a lexicographical comparison to back that out into an index. position
     // of the matching string in this local table gives the index in axisValues
-    auto extractStrView = [&](const int64_t value) -> std::string_view
+    auto extractStrView = [&](const AxisValueType value) -> std::string_view
     {
-        return manifest.String(static_cast<uint32_t>(value));
+        return manifest.String(value);
     };
     const std::vector<std::string_view> constraintStrings = manifest.AxisValues(axis_index) |
                                                             std::views::transform(extractStrView) |

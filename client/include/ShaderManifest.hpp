@@ -25,7 +25,7 @@ namespace lodestone
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 2u;
+inline constexpr uint32_t k_ShaderManifestVersion = 3u;
 
 // clang-tidy complains about enums being too big, but uint32_t means
 // the error struct is 16bytes, which is great alignment and still compact
@@ -382,9 +382,9 @@ public:
     [[nodiscard]] std::span<const VariantKey> VariantKeys() const noexcept;
     [[nodiscard]] std::span<const ManifestAxis> Axes() const noexcept;
     [[nodiscard]] const ManifestAxis& Axis(uint32_t axis_index) const noexcept;
-    [[nodiscard]] std::span<const int64_t> AllAxesValues() const noexcept;
-    [[nodiscard]] std::span<const int64_t> AxisValues(uint32_t axis_index) const noexcept;
-    [[nodiscard]] int64_t AxisValue(uint32_t axis_index, uint32_t value_index) const noexcept;
+    [[nodiscard]] std::span<const AxisValueType> AllAxesValues() const noexcept;
+    [[nodiscard]] std::span<const AxisValueType> AxisValues(uint32_t axis_index) const noexcept;
+    [[nodiscard]] AxisValueType AxisValue(uint32_t axis_index, uint32_t value_index) const noexcept;
     [[nodiscard]] std::span<const ManifestVertexInput> VertexInputs(uint32_t raster_index) const noexcept;
     [[nodiscard]] std::span<const ManifestColorTarget> ColorTargets(uint32_t raster_index) const noexcept;
     [[nodiscard]] bool WritesFragDepth(uint32_t raster_index) const noexcept;
@@ -412,7 +412,7 @@ private:
     std::span<const ManifestVariant> variants;
     std::span<const VariantKey> variantKeys;
     std::span<const ManifestAxis> axes;
-    std::span<const int64_t> axisValues;
+    std::span<const AxisValueType> axisValues;
     std::span<const ManifestRaster> rasterStates;
     std::span<const ManifestVertexInput> vertexInputs;
     std::span<const ManifestColorTarget> colorTargets;

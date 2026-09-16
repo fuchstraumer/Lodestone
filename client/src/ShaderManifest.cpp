@@ -317,7 +317,7 @@ ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std:
     view.variants = MakeTable<ManifestVariant>(bytes, parsed.VariantTableOffset, parsed.VariantCount);
     view.variantKeys = MakeTable<VariantKey>(bytes, parsed.VariantKeyTableOffset, parsed.VariantKeyCount);
     view.axes = MakeTable<ManifestAxis>(bytes, parsed.AxisTableOffset, parsed.AxisCount);
-    view.axisValues = MakeTable<int64_t>(bytes, parsed.AxisValueTableOffset, parsed.AxisValueCount);
+    view.axisValues = MakeTable<AxisValueType>(bytes, parsed.AxisValueTableOffset, parsed.AxisValueCount);
     view.rasterStates = MakeTable<ManifestRaster>(bytes, parsed.RasterTableOffset, parsed.RasterCount);
     view.vertexInputs =
         MakeTable<ManifestVertexInput>(bytes, parsed.VertexInputTableOffset, parsed.VertexInputCount);
@@ -407,18 +407,18 @@ const ManifestAxis& ShaderManifestView::Axis(uint32_t axis_index) const noexcept
     return axes[axis_index];
 }
 
-std::span<const int64_t> ShaderManifestView::AllAxesValues() const noexcept
+std::span<const AxisValueType> ShaderManifestView::AllAxesValues() const noexcept
 {
     return axisValues;
 }
 
-std::span<const int64_t> ShaderManifestView::AxisValues(uint32_t axis_index) const noexcept
+std::span<const AxisValueType> ShaderManifestView::AxisValues(uint32_t axis_index) const noexcept
 {
     const ManifestAxis& axis = axes[axis_index];
     return axisValues.subspan(axis.FirstValue, axis.ValueCount);
 }
 
-int64_t ShaderManifestView::AxisValue(uint32_t axis_index, uint32_t value_index) const noexcept
+AxisValueType ShaderManifestView::AxisValue(uint32_t axis_index, uint32_t value_index) const noexcept
 {
     const ManifestAxis& axis = axes[axis_index];
     return axisValues[axis.FirstValue + value_index];
@@ -731,7 +731,7 @@ namespace
             Section{ ShaderManifestTable::AxisValues,
                      parsed.AxisValueTableOffset,
                      parsed.AxisValueCount,
-                     sizeof(int64_t) },
+                     sizeof(AxisValueType) },
             Section{ ShaderManifestTable::Rasters,
                      parsed.RasterTableOffset,
                      parsed.RasterCount,
@@ -1169,18 +1169,18 @@ namespace
             if (axis.Domain == AxisValueDomain::Type)
             {
                 // validate that all the values - which are actually indices into the string table - are in range
-                const std::span<const int64_t> allAxesValueSpan =
-                    MakeTable<int64_t>(bytes, parsed.AxisValueTableOffset, parsed.AxisValueCount);
-                const std::span<const int64_t> axisValueSpan =
+                const std::span<const AxisValueType> allAxesValueSpan =
+                    MakeTable<AxisValueType>(bytes, parsed.AxisValueTableOffset, parsed.AxisValueCount);
+                const std::span<const AxisValueType> axisValueSpan =
                     allAxesValueSpan.subspan(axis.FirstValue, axis.ValueCount);
-                for (const int64_t value : axisValueSpan)
+                for (const AxisValueType value : axisValueSpan)
                 {
-                    if (value < 0 || std::cmp_greater_equal(value, parsed.StringCount))
+                    if (std::cmp_greater_equal(value, parsed.StringCount))
                     {
                         return ShaderManifestError{ .Code = ShaderManifestErrorCode::InvalidAxisTypeStrIndex,
                                                     .Table = ShaderManifestTable::Axes,
                                                     .RecordIndex = i,
-                                                    .Detail = static_cast<uint32_t>(value) };
+                                                    .Detail = value };
                     }
                 }
             }
