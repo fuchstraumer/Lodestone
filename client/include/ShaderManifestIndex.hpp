@@ -20,12 +20,9 @@ namespace lodestone
 struct QueryAxisValue
 {
     AxisValueDomain Type{ AxisValueDomain::None };
-    union
-    {
-        bool BoolValue;
-        uint32_t IntegralValue{ 0u };
-    };
-    // todo-ship: It might be too easy for clients to make this go null, for recursive calls or 
+    // removed previously untagged union. manifest stores everything as int64_t anyways.
+    uint32_t IntegralValue{ 0u };
+    // todo-ship: It might be too easy for clients to make this go null, for recursive calls or
     // high-level construction of queries. Decide if that's an antipattern or what we want to support
     std::string_view TypeName;
 };
@@ -52,6 +49,9 @@ struct QueryError
     QueryErrorCode Code{ QueryErrorCode::Success };
     std::string_view AxisName; // reads into manifest, so should remain valid
     uint32_t Detail{}; // additional context-specific detail about the error
+    // nearest name to what input/client queried for, pointing into manifest
+    // so string_view still works just fine here. uses levenshtein from `lodestone::suggest`
+    std::string_view Suggestion;
 };
 
 // QueryResult comes from the terminal functions - it tells you 

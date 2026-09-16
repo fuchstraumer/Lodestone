@@ -1,6 +1,7 @@
 #include "ShaderManifestIndex.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifest.hpp"
+#include "Suggest.hpp"
 #include "VariantKey.hpp"
 #include <algorithm>
 #include <cassert>
@@ -17,6 +18,19 @@
 namespace lodestone
 {
 
+namespace
+{
+    // The nearest accepted name to a mistyped one, or empty when nothing is close enough. The distance
+    // budget follows clang and rust: one edit per three characters, and at least one.
+    std::string_view NearestName(std::string_view input,
+                                 std::span<const std::string_view> candidates) noexcept
+    {
+        const int32_t maxDistance = std::max<int32_t>(1, static_cast<int32_t>(input.size() / 3u));
+        const std::vector<Suggestion> suggestions = FindSuggestions(input, candidates, maxDistance);
+        return suggestions.empty() ? std::string_view{} : suggestions.front().Text;
+    }
+}
+
 ManifestQueryBuilder::ManifestQueryBuilder(const class ManifestIndex& _index) noexcept : index(&_index)
 {
 
@@ -24,9 +38,11 @@ ManifestQueryBuilder::ManifestQueryBuilder(const class ManifestIndex& _index) no
 
 ManifestQueryBuilder ManifestQueryBuilder::Where(std::string_view axis_name, bool value) const noexcept
 {
-    QueryAxisValue newValue{ .Type = AxisValueDomain::Boolean, .BoolValue = value, .TypeName = {} };
+    // A boolean axis is an integral axis with values {0, 1}, so store the boolean as its 0/1 integral
+    // and let it share the integral resolution and decode paths.
+    QueryAxisValue newValue{ .Type = AxisValueDomain::Boolean, .IntegralValue = value ? 1u : 0u, .TypeName = {} };
     return where(axis_name, newValue);
-    
+
 }
 
 ManifestQueryBuilder ManifestQueryBuilder::Where(std::string_view axis_name, uint32_t value) const noexcept
@@ -51,7 +67,12 @@ ManifestQueryBuilder ManifestQueryBuilder::where(std::string_view axis_name, Que
     auto indexIter = index->axisNameToIndex.find(axis_name);
     if (indexIter == index->axisNameToIndex.end())
     {
-        result.errors.emplace_back(QueryErrorCode::UnknownAxis, axis_name, 0u);
+        const std::vector<std::string_view> axisNames =
+            index->axisNameToIndex | std::views::keys | std::ranges::to<std::vector>();
+        result.errors.emplace_back(QueryErrorCode::UnknownAxis,
+                                   axis_name,
+                                   0u,
+                                   NearestName(axis_name, axisNames));
         return result;
     }
 
@@ -85,7 +106,10 @@ ManifestQueryBuilder ManifestQueryBuilder::where(std::string_view axis_name, Que
                                                             std::ranges::to<std::vector>();
         if (std::ranges::find(axisTypeNames, value.TypeName) == axisTypeNames.end())
         {
-            result.errors.emplace_back(QueryErrorCode::ValueNotInAxis, axis_name, 0u);
+            result.errors.emplace_back(QueryErrorCode::ValueNotInAxis,
+                                       axis_name,
+                                       0u,
+                                       NearestName(value.TypeName, axisTypeNames));
             return result;
         }
     }
@@ -248,8 +272,7 @@ QueryAxisValue ManifestIndex::decodeAxis(uint32_t axis_index, uint32_t value_ind
     switch (axis.Domain)
     {
     case AxisValueDomain::Boolean:
-        result.BoolValue = static_cast<bool>(currValue);
-        break;
+        [[fallthrough]];
     case AxisValueDomain::Integral:
         [[fallthrough]];
     case AxisValueDomain::Enum:

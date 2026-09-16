@@ -7,12 +7,44 @@
 - We should provide a way for clients to call something like `SetDeviceLimits` or `SetApiLimits` - we can use this to validate resource sizing expressions when being run as a live compiler,
   or we can use it against cooked content (in the device form) to make sure we don't try to create a shader a device can't support
 # Permutation system
+- Give enum axes real value names, end to end. Enum axis values are integers under the hood (stored in
+  the manifest `AxisValues` table as int64, same as Integral), but authors will want to write and read
+  them as names, not magic numbers. Needs three pieces: (1) a shader attribute that preserves the enum
+  value names alongside the axis declaration, so the cooker can carry them through; (2) query and policy
+  surfaces that accept the names and map them to the underlying integer; (3) the reverse map for decode
+  and error reporting. `magic_enum` should make the name<->int mapping cheap and avoids the string-table
+  dance that Type axes need (there the value *is* a string index; an enum's value stays an int and only
+  its *name* is a string). Until this lands, an Integral value on an Enum axis is accepted by number
+  only (see `ManifestQueryBuilder::where`, which already treats Integral as valid for an Enum axis), and
+  `ValueNotInAxis` on an enum carries no name suggestion because there are no names to suggest yet.
 - Policy file target keys are flat (`targets.wgsl`, later `targets.dxil`, `targets.spirv`). A platform split is coming: one target profile likely needs several device presets under it, e.g. `minspec`, `recommended`, `mobile`. A preset picks a different `MaxVariants`, `CookValues`, and binding-time lowering. Decide whether a preset nests under a target (`targets.wgsl.mobile`) or forms its own axis in the policy schema. Do this after E5 lands the flat form, so the schema change has a working baseline to move from.
 - Let a size expression name a *derived* constant, not only an axis or an `extern static const`. Today the resolve namespace (`MakeResolveContext`) holds axis values plus captured undriven `extern` defaults, and nothing else. An `internal static const` that is computed from axes (e.g. `VTF_CLUSTER_COUNT = GRID_X * GRID_Y * GRID_Z`) is invisible, so `[ls_element_count("VTF_CLUSTER_COUNT")]` fails with `AttributeExpressionUnknownSymbol`. The author must inline the product or promote the constant to `extern`, which is a usability wart: the shader already states the relationship once, and we make them state it again.
   - Approach: capture each module-scope `const` name together with its defining *expression string* (not a folded value) during the same source scan that reads the extern defaults. The `SymbolTable` already tokenizes every source line (it absorbed the old `ExternConstantScanner`), so it is the natural place to grab these too.
   - Add them to the evaluator as derived symbols. When a name resolves to a derived symbol, evaluate its stored expression recursively against the same context, so the leaves bottom out at axes and extern defaults and the value tracks the per-variant axis values. A folded value captured from reflection would be wrong: it freezes at the declaration defaults and ignores the axes.
   - Guard against a cycle in the derived-symbol graph (a derived const that names another), and cache a name's evaluated result per variant so a diamond is not recomputed.
 # Cook driver and manifest
+- Store axis values in the manifest as `uint32`, not `int64`. The `AxisValues` table is `int64` today
+  only because the emitter fills it through `PermutationValueToInt64` (`PermutationValue.hpp`), a helper
+  that exists to widen a value to the **size-expression evaluator's** working type. The evaluator does
+  signed 64-bit arithmetic and should keep `int64`; the manifest has no such need. Every axis value is
+  `uint32` at the source (`PermutationValue::uintValue`, interface ordinals, and Type-axis string
+  indices are all `uint32`), and every consumer already casts back down to `uint32` (`decodeAxis`,
+  `integralValueIndices`, the view accessors), so the `int64` wastes half the table and adds a lossy
+  downcast. Fix: emit `value.AsUInt()` / the Type string index directly instead of routing through the
+  evaluator's widener.
+  - Touch points: `AppendLiteralValues`/`AppendStringValues` + `AxisTables::Values` (`int64`->`uint32`)
+    in `ShaderManifestEmitter.cpp`; the `AxisValues` section record size in `ValidateTablesInRange`; the
+    view accessors `AxisValues`/`AxisValue`/`AllAxesValues` (`int64`->`uint32`); `ValidateAxes` (its Type
+    string-index check drops the signed `cmp_greater_equal`); the downcasts in `ManifestIndex`. Bump
+    `k_ShaderManifestVersion` (format change; no clients yet, so free to do now).
+  - Signedness: unsigned is correct, because `PermutationValue` is unsigned (`UInt`). A signed axis
+    value (a bias/offset tuning knob) would be a `PermutationValue` model change first; the manifest
+    width follows from there, not the other way around.
+  - Do NOT wrap it in a strong enum the way `VariantKey` is. `VariantKey` earned its enum by
+    disambiguating two identically-typed roles (a dense index vs a packed key). An axis raw value's
+    meaning is `Domain`-dependent (a literal for Bool/Integral/Enum, a string index for Type), which a
+    single enum can't encode: a reader must consult `Domain` regardless, so a wrapper prevents no real
+    bug and only adds `to_underlying` ceremony at every use. Keep it a plain `uint32`.
 - Strong-type the variant key so an index can never be passed where a key is expected. `VariantKey` is
   `using VariantKey = uint64_t` today, an alias with no type safety. That let `ManifestShaderSourceProvider::Source/Bindings/Workgroup`
   forward a dense `variant_index` straight into `ShaderManifestView::FindSlot`, which interprets its
