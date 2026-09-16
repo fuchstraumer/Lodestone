@@ -11,32 +11,33 @@ Text in this file follows ASD-STE100.
 
 ---
 
-## 1. State on 2026-09-14
+## 1. State on 2026-09-16
 
-**The compiler split is complete and the pipeline works. Phase E is done through E7; only E8, the
-documentation pass, remains.** E3 made enumeration one depth-first walk with propagated `Require`
-pruning and an in-walk `MaxVariants` guard. E4 replaced the mixed-radix storage index with a sorted key
-table, so a variant's dense index is now its rank. E4a made `ShaderManifestView::Open` validate the
-whole manifest graph once, so the runtime accessors trust the data. E5 moved the cook policy out of the
-compiled-in registry and into a TOML file that a `PolicyDocument` reads. **E6 moved the axis
-declarations into the shader and deleted the compiled-in registry whole**: the cooker reads each axis
-off its `extern static const` through reflection, so no module data is compiled in. **E7 added interface
-axes**: an `extern struct : IFoo` declared with `ls_axis_interface`, whose implementations carry
-`ls_axis_interface_impl`, cooked by a per-variant `export struct` (see §14). `PolicyDocumentTest`,
-`SymbolTableTest`, and `InterfaceAxisCookTest` bring the suite to seventeen test targets. Phase E step
-E0c added `AccessModelRejectTest`.
+**The compiler split is complete and the pipeline works. Phase E is nearly out the door.** The axis and
+policy engine is finished, including interface and enum axes. Two tracks remain: the client query surface
+(see §14 and §14a), and E8, the documentation pass. E3 made enumeration one depth-first walk with
+propagated `Require` pruning and an in-walk `MaxVariants` guard. E4 replaced the mixed-radix storage
+index with a sorted key table, so a variant's dense index is now its rank. E4a made
+`ShaderManifestView::Open` validate the whole manifest graph once, so the runtime accessors trust the
+data. E5 moved the cook policy out of the compiled-in registry and into a TOML file that a
+`PolicyDocument` reads. **E6 moved the axis declarations into the shader and deleted the compiled-in
+registry whole**: the cooker reads each axis off its `extern static const` through reflection.
+**E7 added interface axes**, and **enum axes followed on 2026-09-16**: `[ls_axis_enum]` on an
+`extern static const` of a `public` Slang enum, cooked by a per-variant `export static const` (see §14a).
 
-**In progress, after E7: the manifest variant-key retrieval path (see §14).** The variant key is now a
-strong type, the cooker and client share one packing codec, and the manifest carries the axis schema.
-The client-side query surface (decode, enumerate, filter) is the open work.
+**In progress: the manifest variant-key retrieval path (see §14 and §14a).** The variant key is a strong
+type, the cooker and client share one packing codec, the manifest carries the axis schema, and
+`ManifestIndex` decodes, enumerates, filters (`scan`), and resolves builder queries with name
+suggestions. The open work is the builder terminals (`Keys`/`First`/`Variants`/`Size`, still declared and
+not defined) and the enum test pieces.
 
 | Configuration | Build | Tests |
 |---|---|---|
-| RelWithDebInfo, `ninja-clang-cl` | green (before the in-progress §14 edits) | 17 of 17 |
+| RelWithDebInfo, `ninja-clang-cl` | green | 19 of 19 |
 
-Thirteen targets are unit tests, and four are cooks. `scripts\run-tests.bat` reports
-`all targets passed`, and `python scripts/check-known-good.py` reports all six stage dumps match. The
-manifest-key edits in §14 are unverified; build and run both before you trust a green claim.
+Fourteen targets are unit tests, and five are cooks (the fifth is `EnumAxisCookTest`).
+`scripts\run-tests.bat` reports `all targets passed`, and `python scripts/check-known-good.py` reports
+all six stage dumps match. This is verified as of 2026-09-16.
 
 **Only the clang tree was rebuilt on 2026-09-01.** `build/ninja-msvc` went with the rest of `build/`
 and has not been configured since. Build it before you trust a claim about MSVC.
@@ -747,10 +748,16 @@ broken three ways:
 
 Step 6 (enum in a size expression) is still deferred; the case ints are captured but unused.
 
-**The client path (steps 8-10) still has two stragglers to fix** (flagged earlier this session, left to
-the author since the query files were being actively edited): `Select` still routes `Enum` to
-`integralValueIndices` instead of `stringValueIndices` (`client/src/ShaderManifestIndex.cpp`, the
-`if (axis.Domain != Type)` branch), and `where` still has the stale `Integral`-satisfies-`Enum`
-interchange with a now-false comment. `decodeAxis` and `where`'s validation branch were already
-correctly moved to the name path. Neither is exercised until the builder terminals are defined, so no
-test is red yet.
+**The client path (steps 8-10) is done** -- the author fixed the two stragglers (`Select` routing `Enum`
+to `stringValueIndices`, and the stale `Integral`-satisfies-`Enum` interchange in `where`). The accessor
+added for the synthetic import was renamed `EnumModule()` -> `PermutationAxis::Module()`, generalized to
+anticipate an interface-type module lookup too (see the `todo.md` "Cook driver and manifest" entry on
+resolving the true declaring module).
+
+**Open testing gap (the current focus):** the enum tag *values* (e.g. 5/1/10) are not surfaced anywhere
+a cook can check -- `StageDump` emits the qualified case *name* (`ValueToSlangLiteral`), and the manifest
+stores names. So `EnumAxisCookTest` exercises the blob decode (`ReadSlangEnumCaseBlobAs<T>` in
+`SlangModuleContext.cpp`) but asserts nothing about it; a sign/width bug would pass silently. Planned:
+(1) a pure unit test of the blob decode, factored Slang-free; (2) surface enum case values in a dump so a
+known-good baseline verifies the reflection read end to end; (3) an enum axis in the client
+`ManifestIndexTest` for the name/decode/query path plus the `Domain` tag.

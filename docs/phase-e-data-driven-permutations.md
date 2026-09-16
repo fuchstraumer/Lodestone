@@ -688,6 +688,7 @@ change **what**. Each one adds capability that no golden file covers.
 | E5 | The toml++ reader behind a facade, the policy file, per-target sections, `CookValues`, `CookIf` (was `CookWhen`), `InertAxesForEntryPoints` (was `ExpectedInfluence`). **Done 2026-09-11** | `PolicyDocumentTest`; the six dumps unchanged, because the cook reads no policy yet | medium |
 | E6 | Axis attributes read at the bootstrap compile, and `k_ModuleSpaces` deleted whole. **Done 2026-09-11**: `ReadDeclaredAxes` recurses through `__include` fragment nodes, `BuildPermutationSpace` builds the space, the `SymbolTable` prunes unused axes | `OceanFft` cooks 35 variants with no registry, the six dumps match, and `SymbolTableTest` | **high** |
 | E7 | Interface axes. E0 removed the enum fallback. **Done 2026-09-14**: `ls_axis_interface` on an `extern struct`, `ls_axis_interface_impl` on each conforming type, staged and matched by `isSubType`, cooked by a per-variant `export struct`, with a `Type` `PermutationValue` holding the impl ordinal | `InterfaceAxisCookTest` | medium |
+| E7b | Enum axes. **Done 2026-09-16**: `[ls_axis_enum]` on an `extern static const` of a `public` Slang enum, cases read from reflection (names and values), the manifest stores the names, and a per-variant `export static const` with a qualified case makes it concrete | `EnumAxisCookTest` | medium |
 | E8 | Documents, and the measured numbers again | — | none |
 
 **E0c, E0, E1, E2, E3, E4, E5, and E6 are complete.** A diversion after E4, call it E4a, hardened the
@@ -720,8 +721,20 @@ Both E6 loose ends are now closed: the dead `VerifyAxisNamesAreDeclared` declara
 
 **E7 is done, on 2026-09-14. Interface axes work.** An `extern struct : IFoo` marked `ls_axis_interface`
 is the axis, each conforming type carries `ls_axis_interface_impl`, and a per-variant `export struct`
-makes the type concrete. Phase E is now complete through E7; only E8, the documentation pass, remains.
-The manifest variant-key retrieval path is the work in flight after it (see `docs/agent-handoff.md` §14).
+makes the type concrete.
+
+**Enum axes work too, on 2026-09-16.** `[ls_axis_enum]` on an `extern static const` of a `public` Slang
+enum makes the axis, and each case becomes a value. The reflection reads the case names and values from
+the enum type. The manifest stores the case names, the same way a Type axis stores its type names, and
+the case value stays a cook-time fact. `EnumAxisCookTest` proves it. The enum type must be `public`, and
+the axis variable's module must declare the enum, so a wider module resolution is a follow-up (see
+`todo.md`).
+
+**Phase E is nearly out the door.** The axis and policy engine is complete. Two tracks remain:
+- **The manifest variant-key retrieval path** (the client query surface, `ManifestIndex`). See
+  `docs/agent-handoff.md` §14 and §14a for its state and the leftover items (builder terminals, the
+  enum test pieces).
+- **E8**, the documentation pass and a fresh measurement of the numbers.
 
 **The empty space holds.** A module with no declared axis once reached `space.front()` on an empty
 vector and aborted the cook, until 2026-08-20. The walk (`expandFrom`, since E3) handles the empty space

@@ -72,8 +72,8 @@ argument it exits 1 on `NoOutputSpecified`, which reads like a failure rather th
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
-Seventeen test targets exist. Thirteen are unit tests, and each one proves a claim the repository
-makes. None of them needs Slang, a compiler, or an asset, and all thirteen together run in under one
+Nineteen test targets exist. Fourteen are unit tests, and each one proves a claim the repository
+makes. None of them needs Slang, a compiler, or an asset, and all fourteen together run in under one
 second.
 
 | Target | Proves |
@@ -91,11 +91,12 @@ second.
 | `ResolveStageTest` | Stage 4 resolves a hand-built `RawVariant` with no Slang present. This test is the proof that the stage 3 and stage 4 split worked, and before phase D step D5 it could not be written at all. |
 | `AccessModelRejectTest` | The target's access model rejects a resource it cannot express. A pointer member under a bound access model fails the cook and names the resource, and a control module still cooks. |
 | `PermutationConstraintTest` | The axis constraint engine. `ActiveWhen` gates an axis the way the old parent link did, `Require` prunes a forbidden combination, and the load check rejects a forward reference, an unknown symbol, and a malformed expression. |
+| `SuggestTest` | The nearest-name suggestion. It measures the edit distance between a mistyped name and the accepted names, and returns the closest one. The cooker and the client both use it for a name rejection. |
 
 An error check prints a diagnostic to `stderr` on purpose. Read the last line for the result.
 
-The last four are different. Each one is the cooker driver, and not an assertion suite.
-`tests/CMakeLists.txt` gives each a command line through `TEST_ARGS`, and all four build from
+The last five are different. Each one is the cooker driver, and not an assertion suite.
+`tests/CMakeLists.txt` gives each a command line through `TEST_ARGS`, and all five build from
 `CookTest.cpp`. Exit code 0 there is a real statement: every variant compiled, every reflection agreed
 with the emitted WGSL, all three round trips read back the same bytes, and two cooks agreed byte for
 byte.
@@ -115,6 +116,11 @@ byte.
   interface axis (`extern struct SHADE_MODE : IShadeMode`) whose three implementations reach the module
   through an `__include`d fragment, crossed with a boolean axis for six variants. Phase E step E7 needed
   it.
+
+- `EnumAxisCookTest` cooks `tests/assets/EnumAxis/EnumAxisTest.slang`. It declares an enum axis
+  (`[ls_axis_enum]` on an `extern static const` of a `public` Slang `enum`) whose three cases hold
+  explicit, non-ascending values, crossed with a boolean axis for six variants. The manifest stores the
+  case names, and the digit stays the declaration order. Phase E needed it.
 
 Each cook writes into its own output directory, so each module cooks on its own. One cook of several
 modules would leave no artifact of `OceanFft` byte identical.
@@ -312,9 +318,11 @@ against a second opinion, and changes nothing. A validator gets a name and no nu
 number would state that every target must supply one. A target supplies a validator only when it can.
 
 1. **Declare.** The axes live in the shader, on `extern static const` (and `extern struct` for an
-   interface axis) declarations, as `ls_axis_*` attributes. `SlangCompiler::PrepareRawModule` reads
-   them at the bootstrap compile through `SlangModuleContext::ReadDeclaredAxes`, and
-   `BuildPermutationSpace` (in `permute/PermutationSpace.cpp`) turns them into a `PermutationSpace`. The
+   interface axis) declarations, as `ls_axis_*` attributes. An interface axis names a concrete type per
+   variant. An enum axis names a `public` Slang enum, and its cases become the axis values by name.
+   `SlangCompiler::PrepareRawModule` reads them at the bootstrap compile through
+   `SlangModuleContext::ReadDeclaredAxes`, and `BuildPermutationSpace` (in `src/driver/CookerDriver.cpp`)
+   turns them into a `PermutationSpace`. The
    `SymbolTable` prunes an axis no reachable source uses, so an imported-but-unused axis leaves the
    space. An axis name cannot drift from its declaration, because only one name exists. A module with
    no declared axis gets an empty space and one variant.
@@ -480,10 +488,14 @@ No module data is compiled in. Phase E step E6 deleted the old registry
 
 An axis is declared in the shader, on its `extern static const` (or `extern struct`, for an interface
 axis) declaration, as an `ls_axis_*` attribute. `tests/assets/LodestoneAttributes.slang` defines the
-attributes: `ls_axis_values`, `ls_axis_boolean`, `ls_axis_active_when`, `ls_axis_kind`,
+attributes: `ls_axis_values`, `ls_axis_boolean`, `ls_axis_active_when`, `ls_axis_kind`, `ls_axis_enum`,
 `ls_axis_interface`, and `ls_axis_interface_impl`. `SlangCompiler::PrepareRawModule` reads them at the
-bootstrap compile through `SlangModuleContext::ReadDeclaredAxes`, and `BuildPermutationSpace` turns them
-into a `PermutationSpace`.
+bootstrap compile through `SlangModuleContext::ReadDeclaredAxes`, and `BuildPermutationSpace` (in
+`src/driver/CookerDriver.cpp`) turns them into a `PermutationSpace`.
+
+An enum axis needs a `public` enum, because the per-variant synthetic module imports the enum's module
+and names the case. The reflection reads each case name and its value. The manifest stores the names, so
+the value stays a cook-time fact for a size expression to use later.
 
 The cook policy is data, not code. A `PolicyDocument` reads a TOML file through toml++, behind a facade
 in `src/permute/PolicyDocument.cpp` (no toml++ type leaves that file). Each module names an
