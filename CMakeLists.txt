@@ -77,6 +77,8 @@ set(LODESTONE_COMMON_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Diagnostics.cpp")
 
 set(LODESTONE_COMPILE_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/EnumTagDecode.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/EnumTagDecode.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/RawLibrary.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/SlangCompiler.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/SlangDiagnosticParser.hpp"

@@ -25,15 +25,14 @@
   the same lookup. May also need the enum case to resolve to a fully module-qualified name for the
   literal. This is the general fix behind the current "enum/interface type must live in the axis
   variable's module" limitation.
-- Test the enum tag-value read, which nothing checks today. `EnumAxisCookTest` cooks an enum axis but
-  cannot observe the case values, because `StageDump` emits the qualified case name and the manifest
-  stores names. So a sign or width bug in `ReadSlangEnumCaseBlobAs<T>` (`SlangModuleContext.cpp`) passes
-  silent. Three pieces:
-  - A pure unit test of the blob decode. Factor the dispatch Slang-free: map `slang::ScalarType` to a
-    small local scalar-kind enum at the wall, and expose a `DecodeEnumTag(kind, bytes) -> int64` that
-    names no Slang type. Test each width with a positive value, a negative value for each signed width
-    (this checks sign extension), the maximum unsigned value, and a `UInt64` value above 2^63 (the
-    accepted wrap case).
+- Test the enum tag-value read, which the cook path does not check. `EnumAxisCookTest` cooks an enum
+  axis but cannot observe the case values, because `StageDump` emits the qualified case name and the
+  manifest stores names. So a sign or width bug in the reflection read passed silent. Two pieces remain:
+  - DONE. A pure unit test of the blob decode. The dispatch is now Slang-free: `compile/EnumTagDecode`
+    declares `EnumTagKind` and `DecodeEnumTag(kind, bytes) -> int64`, which name no Slang type.
+    `SlangModuleContext::ScalarTypeToEnumTagKind` maps the Slang scalar type at the wall.
+    `EnumTagDecodeTest` covers each width with a positive value, a negative value for each signed width
+    (sign extension), the maximum unsigned value, and a `UInt64` value above 2^63 (the accepted wrap).
   - Surface the enum case values in a stage dump (raw or space), then add `EnumAxisTest` to the
     known-good regime, so the reflection read of `Low=5/High=1/Medium=10` is verified end to end.
     `check-known-good.py` cooks one module today, so this needs a second invocation or a small change to

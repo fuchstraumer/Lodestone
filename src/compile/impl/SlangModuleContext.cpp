@@ -3,6 +3,7 @@
 #include "SlangCompilerTypes.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
+#include "compile/EnumTagDecode.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "permute/PermutationValue.hpp"
@@ -44,39 +45,33 @@ namespace
         return result;
     }
 
-    template<typename T>
-    int64_t ReadSlangEnumCaseBlobAs(const void* data)
-    {
-        T result{};
-        std::memcpy(&result, data, sizeof(T));
-        return static_cast<int64_t>(result);
-    }
-
-    int64_t ReadSlangEnumCaseBlob(slang::TypeReflection* refl, const void* data)
+    // Map the enum's Slang scalar type to the Slang-free tag kind. This is the wall: it names the
+    // Slang type, and `DecodeEnumTag` (in compile/EnumTagDecode.hpp) does the read. An enum tag is
+    // always an integer scalar, so the default is a can't-happen.
+    EnumTagKind ScalarTypeToEnumTagKind(slang::TypeReflection::ScalarType scalar)
     {
         using slang::TypeReflection;
-        // clang will warn about not handling all cases, but we're handling all integral scalar types
-        switch (refl->getScalarType())
+        switch (scalar)
         {
         case TypeReflection::ScalarType::Int8:
-            return ReadSlangEnumCaseBlobAs<int8_t>(data);
+            return EnumTagKind::Int8;
         case TypeReflection::ScalarType::UInt8:
-            return ReadSlangEnumCaseBlobAs<uint8_t>(data);
+            return EnumTagKind::UInt8;
         case TypeReflection::ScalarType::Int16:
-            return ReadSlangEnumCaseBlobAs<int16_t>(data);
+            return EnumTagKind::Int16;
         case TypeReflection::ScalarType::UInt16:
-            return ReadSlangEnumCaseBlobAs<uint16_t>(data);
+            return EnumTagKind::UInt16;
         case TypeReflection::ScalarType::Int32:
-            return ReadSlangEnumCaseBlobAs<int32_t>(data);
+            return EnumTagKind::Int32;
         case TypeReflection::ScalarType::UInt32:
-            return ReadSlangEnumCaseBlobAs<uint32_t>(data);
+            return EnumTagKind::UInt32;
         case TypeReflection::ScalarType::Int64:
-            return ReadSlangEnumCaseBlobAs<int64_t>(data);
+            return EnumTagKind::Int64;
         case TypeReflection::ScalarType::UInt64:
-            return ReadSlangEnumCaseBlobAs<uint64_t>(data);
+            return EnumTagKind::UInt64;
         default:
             assert(false && "Unsupported scalar type for enum case blob");
-            return 0;
+            return EnumTagKind::Int32;
         }
     }
 
@@ -564,7 +559,7 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
             if (SLANG_SUCCEEDED(caseVar->getDefaultValueBlob(caseValueBlob.writeRef())))
             {
                 const void* caseValueData = caseValueBlob->getBufferPointer();
-                caseValue = ReadSlangEnumCaseBlob(typeReflection, caseValueData);
+                caseValue = DecodeEnumTag(ScalarTypeToEnumTagKind(typeReflection->getScalarType()), caseValueData);
             }
             result.EnumCases.emplace_back(caseName != nullptr ? caseName : "<CaseNameResolutionFailed>", caseValue);
         }

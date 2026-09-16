@@ -72,8 +72,8 @@ argument it exits 1 on `NoOutputSpecified`, which reads like a failure rather th
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
-Nineteen test targets exist. Fourteen are unit tests, and each one proves a claim the repository
-makes. None of them needs Slang, a compiler, or an asset, and all fourteen together run in under one
+Twenty test targets exist. Fifteen are unit tests, and each one proves a claim the repository
+makes. None of them needs Slang, a compiler, or an asset, and all fifteen together run in under one
 second.
 
 | Target | Proves |
@@ -92,6 +92,7 @@ second.
 | `AccessModelRejectTest` | The target's access model rejects a resource it cannot express. A pointer member under a bound access model fails the cook and names the resource, and a control module still cooks. |
 | `PermutationConstraintTest` | The axis constraint engine. `ActiveWhen` gates an axis the way the old parent link did, `Require` prunes a forbidden combination, and the load check rejects a forward reference, an unknown symbol, and a malformed expression. |
 | `SuggestTest` | The nearest-name suggestion. It measures the edit distance between a mistyped name and the accepted names, and returns the closest one. The cooker and the client both use it for a name rejection. |
+| `EnumTagDecodeTest` | The enum tag-blob decode (`compile/EnumTagDecode`). It reads each integer width, sign-extends a signed tag, zero-extends an unsigned tag, and accepts the `UInt64` wrap above 2^63. It names no Slang type, so the reflection read of an enum case value has a proof that needs no compiler. |
 
 An error check prints a diagnostic to `stderr` on purpose. Read the last line for the result.
 

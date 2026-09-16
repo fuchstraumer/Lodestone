@@ -1,5 +1,6 @@
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
+#include "ShaderLibraryTypes.hpp"
 #include "VariantKey.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
@@ -43,7 +44,7 @@ using lodestone::VariantSet;
 namespace
 {
 
-static const TargetPolicy k_UnboundedTargetPolicy{};
+const TargetPolicy k_UnboundedTargetPolicy{};
 
 // The space owns its axes, so every axis reference below names a position in it. `ParentIndex` 1 is
 // TEST_USE_WAVE_OPS.

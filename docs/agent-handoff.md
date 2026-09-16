@@ -619,7 +619,7 @@ built in four phases. The text follows ASD-STE100.
   `Type` axis the value names a string, the implementation type name. `Open` validates the axis and value
   tables, string indices included. A `BuildAxisTables` fossil that wrote the value table twice was
   removed.
-- **Phase 3 mostly done (builds green; 17 tests + 6 known-good dumps pass).** The client query surface is
+- **Phase 3 mostly done (builds green; 20 tests + 6 known-good dumps pass).** The client query surface is
   `client/include/ShaderManifestIndex.hpp` + `client/src/ShaderManifestIndex.cpp`, in
   `lodestone_client_internal`. Built and working:
   - `ManifestIndex` holds the view plus caches built at construction: `radices` (= `ManifestAxis::ValueCount`),
@@ -668,7 +668,7 @@ built in four phases. The text follows ASD-STE100.
 - **Enum axes are name axes, like interface/Type axes** -- see §14a.
 
 **Verify with:** `scripts\build.bat RelWithDebInfo ninja-clang-cl`, then `scripts\run-tests.bat
-RelWithDebInfo ninja-clang-cl` (17 targets), then `python scripts\check-known-good.py` (6 dumps). The
+RelWithDebInfo ninja-clang-cl` (20 targets), then `python scripts\check-known-good.py` (6 dumps). The
 tree builds green with all tests and dumps passing as of this writing.
 
 ## 14a. Enum axis plan (the current task, 2026-09-16)
@@ -730,7 +730,7 @@ Ordered steps:
 **Status (2026-09-16): the cook path is done and verified; the client path has two known bugs.**
 `EnumAxisCookTest` cooks `tests/assets/EnumAxis/EnumAxisTest.slang` (a `public enum QualityLevel { Low=5,
 High=1, Medium=10 }` enum axis crossed with a boolean, six variants) and passes `--verify-deterministic`;
-the full suite (19 targets) and the six known-good dumps are green. Cook-side steps 1-4 and 7 were
+the full suite (20 targets) and the six known-good dumps are green. Cook-side steps 1-4 and 7 were
 already done by the author; this session fixed the synthetic-module generation (step 5), which was
 broken three ways:
 - `MakeExportedConstantSource` emitted `export static const enum QUALITY = ...` (the `enum` keyword from
@@ -756,8 +756,13 @@ resolving the true declaring module).
 
 **Open testing gap (the current focus):** the enum tag *values* (e.g. 5/1/10) are not surfaced anywhere
 a cook can check -- `StageDump` emits the qualified case *name* (`ValueToSlangLiteral`), and the manifest
-stores names. So `EnumAxisCookTest` exercises the blob decode (`ReadSlangEnumCaseBlobAs<T>` in
-`SlangModuleContext.cpp`) but asserts nothing about it; a sign/width bug would pass silently. Planned:
-(1) a pure unit test of the blob decode, factored Slang-free; (2) surface enum case values in a dump so a
-known-good baseline verifies the reflection read end to end; (3) an enum axis in the client
-`ManifestIndexTest` for the name/decode/query path plus the `Domain` tag.
+stores names. So `EnumAxisCookTest` exercises the reflection read but asserts nothing about it; a
+sign/width bug in the cook path would pass silently. Three planned pieces, one done:
+- **DONE (2026-09-16): a pure unit test of the blob decode, factored Slang-free.** The dispatch moved out
+  from behind the wall: `compile/EnumTagDecode.hpp` declares `EnumTagKind` and
+  `DecodeEnumTag(kind, bytes) -> int64_t`, which name no Slang type. `SlangModuleContext` maps the Slang
+  scalar type to `EnumTagKind` at the wall (`ScalarTypeToEnumTagKind`) and calls `DecodeEnumTag`.
+  `EnumTagDecodeTest` (unit, no compiler) covers each width, sign extension, the unsigned maximum, and the
+  `UInt64` wrap above 2^63. This is why the test count is now 20 (15 unit).
+- Surface enum case values in a dump so a known-good baseline verifies the reflection read end to end.
+- An enum axis in the client `ManifestIndexTest` for the name/decode/query path plus the `Domain` tag.

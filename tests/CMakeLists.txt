@@ -95,3 +95,8 @@ add_lodestone_unit_test(PolicyDocumentTest PolicyDocumentTests.cpp)
 add_lodestone_unit_test(SymbolTableTest SymbolTableTests.cpp)
 add_lodestone_unit_test(SuggestTest SuggestTests.cpp)
 target_link_libraries(SuggestTest PRIVATE lodestone::suggest)
+# Proves the enum tag-blob decode (compile/EnumTagDecode) reads each width, sign-extends a signed
+# tag, zero-extends an unsigned tag, and accepts the UInt64 wrap. It names no Slang type, so it needs
+# no compiler. This closes the gap where a sign or width bug in the reflection read passed silently:
+# StageDump emits the case name and the manifest stores names, so nothing else observes the tag value.
+add_lodestone_unit_test(EnumTagDecodeTest EnumTagDecodeTests.cpp)
