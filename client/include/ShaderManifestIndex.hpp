@@ -89,7 +89,7 @@ struct ManifestQueryBuilder
     // These are the terminal functions, which effectively close a query and return the final result
     [[nodiscard]] QueryResult<std::vector<VariantKey>> Keys() const noexcept;
     [[nodiscard]] QueryResult<std::vector<DecodedVariant>> Variants() const noexcept;
-    /** @brief Returns the first VariantKey matching the query, or INVALID_VARIANT if none exist. */
+    /** @brief Returns the first VariantKey matching the query, or the query's error state. */
     [[nodiscard]] QueryResult<VariantKey> First() const noexcept;
     /** @brief Returns the size of the current query result set: doesn't trigger retrieval like others */
     [[nodiscard]] size_t Size() const noexcept;
@@ -101,8 +101,8 @@ private:
     [[nodiscard]] ManifestQueryBuilder where(std::string_view axis_name, QueryAxisValue value) const noexcept;
     const class ManifestIndex* index{ nullptr };
     std::vector<QueryError> errors;
-    // Since we can have multiple values as constraints per axis, we use a vector of QueryAxisRange
-    // This will be sorted whenever we add a new constraint axis
+    // Since we can have multiple values as constraints per axis, we use a vector of QueryAxisRange.
+    // Kept in insertion order here; Select sorts the derived scan constraints by axis index.
     std::vector<QueryAxisRange> constraints;
 };
 
@@ -114,7 +114,7 @@ private:
 class ManifestIndex
 {
 public:
-    ManifestIndex(ShaderManifestView view);
+    explicit ManifestIndex(ShaderManifestView view);
 
     [[nodiscard]] const ShaderManifestView& View() const noexcept;
     /** @brief Direct decode: "expand" a variant key into that values matching that key */

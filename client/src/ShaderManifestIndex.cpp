@@ -10,7 +10,6 @@
 #include <cstdint>
 #include <ranges>
 #include <span>
-#include <stdexcept>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -57,40 +56,46 @@ ManifestQueryBuilder ManifestQueryBuilder::where(std::string_view axis_name, Que
     }
 
     const uint32_t axisIndex = indexIter->second;
-    // Verify that the axis is indeed a boolean axis
     const ManifestAxis& axis = index->manifest.Axis(axisIndex);
-    if (axis.Domain != value.Type)
+
+    // The value's domain must match the axis. An Integral value also satisfies an Enum axis,
+    // since enum values are stored as plain integers.
+    const bool domainMatches = (value.Type == axis.Domain) ||
+                               (value.Type == AxisValueDomain::Integral &&
+                                axis.Domain == AxisValueDomain::Enum);
+    if (!domainMatches)
     {
-        result.errors.emplace_back(QueryErrorCode::IncorrectValueDomain, axis_name, static_cast<uint32_t>(axis.Domain));
+        result.errors.emplace_back(QueryErrorCode::IncorrectValueDomain,
+                                   axis_name,
+                                   static_cast<uint32_t>(axis.Domain));
+        return result;
     }
 
-    // if not boolean, validate against possible values
-    if (axis.Domain != AxisValueDomain::Boolean)
+    // Confirm the axis actually declares the requested value. A Boolean axis always holds both
+    // 0 and 1, so only Type and Integral/Enum axes need the lookup.
+    if (axis.Domain == AxisValueDomain::Type)
+    {
+        // Type axis values are indices into the string table; resolve them and compare by name.
+        auto extractStrView = [&](const int64_t string_index) -> std::string_view
+        {
+            return index->manifest.String(static_cast<uint32_t>(string_index));
+        };
+        const std::vector<std::string_view> axisTypeNames = index->manifest.AxisValues(axisIndex) |
+                                                            std::views::transform(extractStrView) |
+                                                            std::ranges::to<std::vector>();
+        if (std::ranges::find(axisTypeNames, value.TypeName) == axisTypeNames.end())
+        {
+            result.errors.emplace_back(QueryErrorCode::ValueNotInAxis, axis_name, 0u);
+            return result;
+        }
+    }
+    else if (axis.Domain != AxisValueDomain::Boolean)
     {
         std::span<const int64_t> axisValues = index->manifest.AxisValues(axisIndex);
-        if (axis.Domain != AxisValueDomain::Type &&
-            std::ranges::find(axisValues, value.IntegralValue) == axisValues.end())
+        if (std::ranges::find(axisValues, value.IntegralValue) == axisValues.end())
         {
             result.errors.emplace_back(QueryErrorCode::ValueNotInAxis, axis_name, value.IntegralValue);
             return result;
-        }
-        else if (axis.Domain == AxisValueDomain::Type)
-        {
-            // for type domains, search is worse :'(. axis values represents indices into string table.
-            // have to build that LUT now and look it up
-            auto extractStrView = [&](const int64_t _value) -> std::string_view
-            {
-                return index->manifest.String(static_cast<uint32_t>(_value));
-            };
-            const std::vector<std::string_view> constraintStrings = axisValues |
-                                                                    std::views::transform(extractStrView) |
-                                                                    std::ranges::to<std::vector>();
-            auto foundIter = std::ranges::find(constraintStrings, value.TypeName);
-            if (foundIter == constraintStrings.end())
-            {
-                result.errors.emplace_back(QueryErrorCode::ValueNotInAxis, axis_name, value.IntegralValue);
-                return result;
-            }
         }
     }
 
@@ -197,7 +202,14 @@ std::vector<VariantKey> ManifestIndex::Select(std::span<const QueryAxisRange> co
     scanConstraints.reserve(constraints.size());
     for (const auto& range : constraints)
     {
-        const uint32_t axisIndex = axisNameToIndex.at(range.AxisName);
+        const auto axisIter = axisNameToIndex.find(range.AxisName);
+        if (axisIter == axisNameToIndex.end())
+        {
+            // if axis name not found, return empty: builder does erroring path, Select
+            // doesn't handle errors at all.
+            return {};
+        }
+        const uint32_t axisIndex = axisIter->second;
         const ManifestAxis& axis = manifest.Axis(axisIndex);
         // map input constraint values (given as actual concrete values) to the indices
         // of that value in axisValues space
@@ -336,7 +348,9 @@ std::vector<VariantKey> ManifestIndex::scan(std::span<const ScanConstraint> cons
     std::span<const VariantKey> candidates = manifest.VariantKeys();
     const auto first = std::ranges::lower_bound(candidates, static_cast<VariantKey>(minKey));
     const auto last = std::ranges::upper_bound(candidates, static_cast<VariantKey>(maxKey));
-    assert((first < last) && (first != std::end(candidates)) && (last != std::end(candidates)));
+    // upper_bound returns end() whenever the largest match is the last key, and first == last is a
+    // valid empty result, so the only real invariant is that the band is not inverted.
+    assert(first <= last);
     candidates = std::span<const VariantKey>(first, last);
 
     // now that we have our narrowed band of candidates, we can filter them according to the constraints
