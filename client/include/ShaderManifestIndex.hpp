@@ -151,17 +151,18 @@ private:
         std::vector<uint32_t> AllowedValueIndices;
     };
     
-    /** @brief Filters the keys based on the provided scan constraints - returns a view into manifest
-      * that's better bounded based on the input constraints, to reduce iteration complexity. */
-    [[nodiscard]] std::span<const VariantKey> filterKeys(std::span<const ScanConstraint> constraints) const;
-    /** @brief Returns the first key that matches the given constraints. */
-    [[nodiscard]] VariantKey first(std::span<const ScanConstraint> constraints) const;
+    [[nodiscard]] std::vector<ScanConstraint> convertToScanConstraints(std::span<const QueryAxisRange> query) const;
     /** @brief Effectively the form and system that Query() uses when closed: ever axis absent from input 
       * constraints is considered unconstrained and uses just the default value (canonical value, effectively) */
     [[nodiscard]] std::vector<VariantKey> select(std::span<const QueryAxisRange> constraints) const;
     [[nodiscard]] QueryAxisValue decodeAxis(uint32_t axis_index, uint32_t value_index) const noexcept;
     [[nodiscard]] std::vector<uint32_t> integralValueIndices(const uint32_t axis_index, const QueryAxisRange& range) const;
     [[nodiscard]] std::vector<uint32_t> stringValueIndices(const uint32_t axis_index, const QueryAxisRange& range) const;
+    /** @brief Filters the keys based on the provided scan constraints - returns a view into manifest
+      * that's better bounded based on the input constraints, to reduce iteration complexity. */
+    [[nodiscard]] std::span<const VariantKey> filterKeys(std::span<const ScanConstraint> constraints) const;
+    /** @brief Returns the first key that matches the given constraints. */
+    [[nodiscard]] VariantKey first(std::span<const ScanConstraint> constraints) const;
     [[nodiscard]] std::vector<VariantKey> scan(std::span<const ScanConstraint> constraints) const;
 
     ShaderManifestView manifest;

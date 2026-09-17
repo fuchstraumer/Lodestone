@@ -695,7 +695,7 @@ namespace
         {
             std::string_view valName = axis.ValueDomain == AxisValueDomain::Type ? value.AsType(axis) : value.AsEnumCase(axis);
             uint32_t valNameIdx = strings.Add(valName);
-            tables.Values.emplace_back(static_cast<int64_t>(valNameIdx));
+            tables.Values.emplace_back(valNameIdx);
         }
     }
 

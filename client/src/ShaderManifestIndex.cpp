@@ -147,7 +147,8 @@ std::vector<DecodedVariant> ManifestQueryBuilder::VariantsFromKeys(const std::ve
 
 QueryResult<VariantKey> ManifestQueryBuilder::First() const noexcept
 {
-
+    const std::vector<ManifestIndex::ScanConstraint> scanConstraints = index->convertToScanConstraints(constraints);
+    return index->first(scanConstraints);
 }
 
 ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name, std::vector<QueryAxisValue> values) const noexcept
@@ -323,13 +324,11 @@ ManifestQueryBuilder ManifestIndex::Query() const noexcept
     return ManifestQueryBuilder{ *this };
 }
 
-std::vector<VariantKey> ManifestIndex::select(std::span<const QueryAxisRange> constraints) const
+std::vector<ManifestIndex::ScanConstraint> ManifestIndex::convertToScanConstraints(std::span<const QueryAxisRange> query) const
 {
-    assert(std::ranges::is_sorted(constraints, std::less<uint32_t>{}, &QueryAxisRange::AxisIndex));
-    // first need to construct the scan constraints from the provided axis assignment ranges
     std::vector<ScanConstraint> scanConstraints;
-    scanConstraints.reserve(constraints.size());
-    for (const auto& range : constraints)
+    scanConstraints.reserve(query.size());
+    for (const auto& range : query)
     {
         const ManifestAxis& axis = manifest.Axis(range.AxisIndex);
         // map input constraint values (given as actual concrete values) to the indices
@@ -353,6 +352,14 @@ std::vector<VariantKey> ManifestIndex::select(std::span<const QueryAxisRange> co
         scanConstraints.emplace_back(range.AxisIndex, std::move(valueIndices));
     }
 
+    return scanConstraints;
+}
+
+std::vector<VariantKey> ManifestIndex::select(std::span<const QueryAxisRange> constraints) const
+{
+    assert(std::ranges::is_sorted(constraints, std::less<uint32_t>{}, &QueryAxisRange::AxisIndex));
+    // first need to construct the scan constraints from the provided axis assignment ranges
+    const std::vector<ScanConstraint> scanConstraints = convertToScanConstraints(constraints);
     // sorting scanConstraints makes matching from constraints to axes a little more efficient
     // less important than the keys being sorted, and the subspan construction that happens later
     // range much not contain any duplicate axes, as this would violate the uniqueness assumption in the scan logic
