@@ -58,7 +58,8 @@ enum class QueryErrorCode : uint8_t
     UnknownAxis,
     ValueNotInAxis,
     IncorrectValueDomain, // e.g, tried to use a uint with a bool axis
-    EmptyValueSet, // you can't provide an empty value set to a constraint function
+    EmptyConstraintSet, // you can't provide an empty value set to a constraint function
+    NoVariantForConstraints, // if query.First() returns invalid variant, it's bc the constraints are invalid
     Count
 };
 
@@ -121,7 +122,8 @@ struct ManifestQueryBuilder
     /** @brief If you've already built Keys(), then this will be a (slightly) cheaper way to get the variants 
       * Returns without using QueryResult because Keys() can fail, but Variants() cannot. */
     [[nodiscard]] std::vector<DecodedVariant> VariantsFromKeys(const std::vector<VariantKey>& keys) const noexcept;
-    /** @brief Returns the first VariantKey matching the query, or the query's error state. */
+    /** @brief Returns the first VariantKey matching the query, or the query's error state.
+     *  @note This is quite an inefficient accessor, so prefer using Keys() and Variants() when at all suitable. */
     [[nodiscard]] QueryResult<VariantKey> First() const noexcept;
 
     [[nodiscard]] bool IsValid() const noexcept;

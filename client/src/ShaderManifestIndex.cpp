@@ -240,8 +240,26 @@ std::vector<DecodedVariant> ManifestQueryBuilder::VariantsFromKeys(const std::ve
 
 QueryResult<VariantKey> ManifestQueryBuilder::First() const noexcept
 {
+    if (!errors.empty())
+    {
+        return std::unexpected(errors.front().Code);
+    }
+
     const std::vector<ManifestIndex::ScanConstraint> scanConstraints = index->convertToScanConstraints(constraints);
-    return index->first(scanConstraints);
+    if (scanConstraints.empty())
+    {
+        return std::unexpected(QueryErrorCode::NoVariantForConstraints);
+    }
+
+    VariantKey result = index->first(scanConstraints);
+    if (!result)
+    {
+        return std::unexpected(QueryErrorCode::NoVariantForConstraints);
+    }
+    else
+    {
+        return result;
+    }
 }
 
 bool ManifestQueryBuilder::IsValid() const noexcept
@@ -277,7 +295,7 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
     // give user more information (and we try values.front() after this)
     if (values.empty())
     {
-        result.errors.emplace_back(QueryErrorCode::EmptyValueSet,
+        result.errors.emplace_back(QueryErrorCode::EmptyConstraintSet,
                                    std::string(axis_name));
         return std::nullopt;
     }
