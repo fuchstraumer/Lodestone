@@ -1,0 +1,35 @@
+# Cook policy for the KitchenSink module set. The cook takes the four consumer modules as inputs.
+# KsTypes and KsShading are imported, not cooked, so they have no section here.
+#
+# MaxVariants caps each module. The full cross products are large on purpose, so raise a cap to scale
+# the stress, or lower one to keep a run short. The value sets in the shaders and these caps are the
+# two knobs.
+
+# --- KsGeometry: TONE_MAP(4) x HAS_TANGENTS(2) x VERTEX_COLOR(2) = 16 ---------------------------
+[KsGeometry.targets.wgsl]
+MaxVariants = 64
+
+# --- KsMaterial: BRDF(3) x QUALITY(4) x USE_NORMAL_MAP(2) x USE_DETAIL_MAP(2, gated) x USE_ENV(2)
+#     x SAMPLE_COUNT(4). PrefilterCS reads only the albedo, so every axis is inert for it. ----------
+[KsMaterial.InertAxesForEntryPoints]
+PrefilterCS = ["BRDF", "QUALITY", "USE_NORMAL_MAP", "USE_DETAIL_MAP", "USE_ENV", "SAMPLE_COUNT"]
+
+[KsMaterial.targets.wgsl]
+MaxVariants = 256
+# Require moves to the policy layer as a later extension. When it lands, a line like the one below
+# prunes a forbidden combination for this module. The environment probe has no meaning at low quality.
+# Require = ["!(USE_ENV == 1 && QUALITY == Low)"]
+
+# --- KsVolume: NOISE(3) x QUALITY(4) x GRID_SIZE(3) x USE_WAVE_OPS(2) x WAVE_SIZE(3, gated)
+#     x WRITE_DEBUG(2). BlurCS uses neither wave-op axis. -------------------------------------------
+[KsVolume.InertAxesForEntryPoints]
+BlurCS = ["USE_WAVE_OPS", "WAVE_SIZE", "NOISE", "QUALITY", "WRITE_DEBUG"]
+
+[KsVolume.targets.wgsl]
+MaxVariants = 256
+# Require placeholder: the largest grid at the top quality is out of budget.
+# Require = ["!(GRID_SIZE == 128 && QUALITY == Ultra)"]
+
+# --- KsPost: TONE_MAP(4) x APPLY_BLOOM(2) x APPLY_VIGNETTE(2, gated) x SAMPLE_COUNT(2) = 32 -------
+[KsPost.targets.wgsl]
+MaxVariants = 64
