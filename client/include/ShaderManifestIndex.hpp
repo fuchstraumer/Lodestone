@@ -98,6 +98,9 @@ struct ManifestQueryBuilder
     // These are the terminal functions, which effectively close a query and return the final result
     [[nodiscard]] QueryResult<std::vector<VariantKey>> Keys() const noexcept;
     [[nodiscard]] QueryResult<std::vector<DecodedVariant>> Variants() const noexcept;
+    /** @brief If you've already built Keys(), then this will be a (slightly) cheaper way to get the variants 
+      * Returns without using QueryResult because Keys() can fail, but Variants() cannot. */
+    [[nodiscard]] std::vector<DecodedVariant> VariantsFromKeys(const std::vector<VariantKey>& keys) const noexcept;
     /** @brief Returns the first VariantKey matching the query, or the query's error state. */
     [[nodiscard]] QueryResult<VariantKey> First() const noexcept;
     /** @brief Returns the size of the current query result set: doesn't trigger retrieval like others */
@@ -135,9 +138,6 @@ public:
     [[nodiscard]] std::vector<DecodedVariant> Enumerate() const;
     /** @brief Opens a new query, used to retrieve specific variants for actual runtime rendering or use */
     [[nodiscard]] ManifestQueryBuilder Query() const noexcept;
-    /** @brief Effectively the form and system that Query() uses when closed: ever axis absent from input 
-      * constraints is considered unconstrained and uses just the default value (canonical value, effectively) */
-    [[nodiscard]] std::vector<VariantKey> Select(std::span<const QueryAxisRange> constraints) const;
 
 private:
 
@@ -150,7 +150,15 @@ private:
         uint32_t AxisIndex;
         std::vector<uint32_t> AllowedValueIndices;
     };
-
+    
+    /** @brief Filters the keys based on the provided scan constraints - returns a view into manifest
+      * that's better bounded based on the input constraints, to reduce iteration complexity. */
+    [[nodiscard]] std::span<const VariantKey> filterKeys(std::span<const ScanConstraint> constraints) const;
+    /** @brief Returns the first key that matches the given constraints. */
+    [[nodiscard]] VariantKey first(std::span<const ScanConstraint> constraints) const;
+    /** @brief Effectively the form and system that Query() uses when closed: ever axis absent from input 
+      * constraints is considered unconstrained and uses just the default value (canonical value, effectively) */
+    [[nodiscard]] std::vector<VariantKey> select(std::span<const QueryAxisRange> constraints) const;
     [[nodiscard]] QueryAxisValue decodeAxis(uint32_t axis_index, uint32_t value_index) const noexcept;
     [[nodiscard]] std::vector<uint32_t> integralValueIndices(const uint32_t axis_index, const QueryAxisRange& range) const;
     [[nodiscard]] std::vector<uint32_t> stringValueIndices(const uint32_t axis_index, const QueryAxisRange& range) const;

@@ -5,6 +5,7 @@
 #include "VariantKey.hpp"
 #include <algorithm>
 #include <cassert>
+#include <expected>
 #include <functional>
 #include <iterator>
 #include <numeric>
@@ -104,11 +105,49 @@ QueryResult<std::vector<VariantKey>> ManifestQueryBuilder::Keys() const noexcept
 {
     if (!errors.empty())
     {
-        // return the last error code, since that's the most recent one
-        return std::unexpected(errors.back().Code);
+        // return the first error code, since that's probably the one that broke everything
+        return std::unexpected(errors.front().Code);
     }
 
-    // now validate the constraints
+    // the ManifestIndex Select() method takes QueryAxisRange values, and gives us
+    // back a vector of variant keys. We can just use that
+    return index->select(constraints);
+}
+
+QueryResult<std::vector<DecodedVariant>> ManifestQueryBuilder::Variants() const noexcept
+{
+    auto keysResult = Keys();
+    if (!keysResult)
+    {
+        return std::unexpected(keysResult.error());
+    }
+    const std::vector<VariantKey>& keys = *keysResult;
+
+    // associate variants with their decoded representations
+    std::vector<DecodedVariant> results;
+    results.reserve(keys.size());
+    for (const VariantKey key : keys)
+    {
+        results.emplace_back(key, index->Decode(key));
+    }
+    
+    return results;
+}
+
+std::vector<DecodedVariant> ManifestQueryBuilder::VariantsFromKeys(const std::vector<VariantKey>& keys) const noexcept
+{
+    std::vector<DecodedVariant> results;
+    results.reserve(keys.size());
+    for (const VariantKey key : keys)
+    {
+        results.emplace_back(key, index->Decode(key));
+    }
+    return results;
+}
+
+QueryResult<VariantKey> ManifestQueryBuilder::First() const noexcept
+{
+
 }
 
 ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name, std::vector<QueryAxisValue> values) const noexcept
@@ -284,32 +323,25 @@ ManifestQueryBuilder ManifestIndex::Query() const noexcept
     return ManifestQueryBuilder{ *this };
 }
 
-std::vector<VariantKey> ManifestIndex::Select(std::span<const QueryAxisRange> constraints) const
+std::vector<VariantKey> ManifestIndex::select(std::span<const QueryAxisRange> constraints) const
 {
+    assert(std::ranges::is_sorted(constraints, std::less<uint32_t>{}, &QueryAxisRange::AxisIndex));
     // first need to construct the scan constraints from the provided axis assignment ranges
     std::vector<ScanConstraint> scanConstraints;
     scanConstraints.reserve(constraints.size());
     for (const auto& range : constraints)
     {
-        const auto axisIter = axisNameToIndex.find(range.AxisName);
-        if (axisIter == axisNameToIndex.end())
-        {
-            // if axis name not found, return empty: builder does erroring path, Select
-            // doesn't handle errors at all.
-            return {};
-        }
-        const uint32_t axisIndex = axisIter->second;
-        const ManifestAxis& axis = manifest.Axis(axisIndex);
+        const ManifestAxis& axis = manifest.Axis(range.AxisIndex);
         // map input constraint values (given as actual concrete values) to the indices
         // of that value in axisValues space
         std::vector<uint32_t> valueIndices;
         if (axis.Domain == AxisValueDomain::Type || axis.Domain == AxisValueDomain::Enum)
         {
-            valueIndices = stringValueIndices(axisIndex, range);
+            valueIndices = stringValueIndices(range.AxisIndex, range);
         }
         else
         {
-            valueIndices = integralValueIndices(axisIndex, range);
+            valueIndices = integralValueIndices(range.AxisIndex, range);
         }
 
         // there's no error handling here, the QueryBuilder is the one that gives you that
@@ -318,13 +350,12 @@ std::vector<VariantKey> ManifestIndex::Select(std::span<const QueryAxisRange> co
             return {};
         }
 
-        scanConstraints.emplace_back(axisIndex, std::move(valueIndices));
+        scanConstraints.emplace_back(range.AxisIndex, std::move(valueIndices));
     }
 
     // sorting scanConstraints makes matching from constraints to axes a little more efficient
     // less important than the keys being sorted, and the subspan construction that happens later
     // range much not contain any duplicate axes, as this would violate the uniqueness assumption in the scan logic
-    std::ranges::sort(scanConstraints, std::less<uint32_t>{}, &ScanConstraint::AxisIndex);
     return scan(scanConstraints);
 }
 
@@ -401,7 +432,7 @@ std::vector<uint32_t> ManifestIndex::stringValueIndices(const uint32_t axis_inde
     return constraintValueIndices;
 }
 
-std::vector<VariantKey> ManifestIndex::scan(std::span<const ScanConstraint> constraints) const
+std::span<const VariantKey> ManifestIndex::filterKeys(std::span<const ScanConstraint> constraints) const
 {
     // pre-narrow the above span down to [minKey, maxKey] band that any match must fit in.
     // this subspan still contains many non-matches, but it reduces the number of candidates
@@ -440,8 +471,39 @@ std::vector<VariantKey> ManifestIndex::scan(std::span<const ScanConstraint> cons
     // upper_bound returns end() whenever the largest match is the last key, and first == last is a
     // valid empty result, so the only real invariant is that the band is not inverted.
     assert(first <= last);
-    candidates = std::span<const VariantKey>(first, last);
+    return std::span<const VariantKey>{ first, last };
+}
 
+VariantKey ManifestIndex::first(std::span<const ScanConstraint> constraints) const
+{
+    std::span<const VariantKey> candidates = filterKeys(constraints);
+    if (candidates.empty())
+    {
+        return INVALID_VARIANT; // or some sentinel value indicating no match
+    }
+
+    for (const VariantKey key : candidates)
+    {
+        const uint64_t keyValue = std::to_underlying(key);
+        auto matchFn = [&](const ScanConstraint& constraint) -> bool
+        {
+            const uint32_t digit =
+                static_cast<uint32_t>((keyValue / placeValues[constraint.AxisIndex]) % radices[constraint.AxisIndex]);
+            return std::ranges::contains(constraint.AllowedValueIndices, digit);
+        };
+
+        if (std::ranges::all_of(constraints, matchFn))
+        {
+            return key;
+        }
+    }
+
+    return INVALID_VARIANT;
+}
+
+std::vector<VariantKey> ManifestIndex::scan(std::span<const ScanConstraint> constraints) const
+{
+    std::span<const VariantKey> candidates = filterKeys(constraints);
     // now that we have our narrowed band of candidates, we can filter them according to the constraints
     std::vector<VariantKey> result;
 
