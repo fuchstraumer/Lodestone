@@ -10,9 +10,11 @@
 #include <iterator>
 #include <numeric>
 #include <cstdint>
+#include <optional>
 #include <ranges>
 #include <span>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -101,6 +103,92 @@ ManifestQueryBuilder ManifestQueryBuilder::WhereAnyOf(std::string_view axis_name
     return whereAnyOf(axis_name, std::move(queryValues));
 }
 
+ManifestQueryBuilder ManifestQueryBuilder::WhereNoneOf(std::string_view axis_name, bool value) const noexcept
+{
+    return Where(axis_name, !value);
+}
+
+ManifestQueryBuilder ManifestQueryBuilder::WhereNoneOf(std::string_view axis_name, std::span<const uint32_t> values) const noexcept
+{
+    // All of the WhereNoneOf functions require a bit more work, as we have to first validate against
+    // the input set, then use it to construct the complement set for the WhereNoneOf constraint.
+    // this used to be worse before we added resolveAndValidate and insertConstraint helpers, though
+    ManifestQueryBuilder result{ *this };
+    auto buildAxisValue = [](uint32_t value) -> QueryAxisValue
+    {
+        return QueryAxisValue{ .Type = AxisValueDomain::Integral, .IntegralValue = value, .Name = {} };
+    };
+    std::vector<QueryAxisValue> queryValues = values |
+                                              std::views::transform(buildAxisValue) |
+                                              std::ranges::to<std::vector>();
+    std::optional<uint32_t> axisIndexOpt = resolveAndValidate(result, axis_name, queryValues);
+    if (!axisIndexOpt)
+    {
+        return result;
+    }
+
+    const uint32_t axisIndex = *axisIndexOpt;
+    std::span<const AxisValueType> axisValues = index->manifest.AxisValues(axisIndex);
+    std::vector<QueryAxisValue> complement = axisValues |
+                                             std::views::transform(buildAxisValue) |
+                                             std::ranges::to<std::vector>();
+    
+    auto isInQueryValues = [&queryValues](const QueryAxisValue& value) -> bool
+    {
+        return std::ranges::find(queryValues, value) != queryValues.end();
+    };
+
+    std::erase_if(complement, isInQueryValues);
+
+    result.insertConstraint(axis_name, axisIndex, std::move(complement));
+    return result;
+}
+
+ManifestQueryBuilder ManifestQueryBuilder::WhereNoneOf(std::string_view axis_name,
+                                                       AxisValueDomain domain,
+                                                       std::span<const std::string_view> input_values) const noexcept
+{
+    ManifestQueryBuilder result{ *this };
+    // first, convert input_values to QueryAxisValue so we can validate against the inputs
+    auto buildAxisValue = [domain](std::string_view value) -> QueryAxisValue
+    {
+        return QueryAxisValue{ .Type = domain, .IntegralValue = 0u, .Name = value };
+    };
+
+    std::vector<QueryAxisValue> queryValues = input_values |
+                                              std::views::transform(buildAxisValue) |
+                                              std::ranges::to<std::vector>();
+
+    std::optional<uint32_t> axisIndexOpt = resolveAndValidate(result, axis_name, queryValues);
+    if (!axisIndexOpt)
+    {
+        return result;
+    }
+
+    const uint32_t axisIndex = *axisIndexOpt;
+    // now construct the set compliment, using input_values/queryValues
+    std::span<const AxisValueType> axisValues = index->manifest.AxisValues(axisIndex);
+    auto readStrTable = [&](const AxisValueType& axis_value) -> std::string_view
+    {
+        return index->manifest.String(axis_value);
+    };
+    std::vector<QueryAxisValue> complement = axisValues |
+                                             std::views::transform(readStrTable) |
+                                             std::views::transform(buildAxisValue) |
+                                             std::ranges::to<std::vector>();
+    // complement is now all the possible values for this axis: remove the ones in queryValues
+    auto isInQueryValues = [&](const QueryAxisValue& value) -> bool
+    {
+        return std::ranges::find(queryValues, value) != queryValues.end();
+    };
+
+    // do not ask the standards committee why this overload of erase_if is needed vs remove_if lmao
+    std::erase_if(complement, isInQueryValues);
+    
+    result.insertConstraint(axis_name, axisIndex, std::move(complement));
+    return result;
+}
+
 QueryResult<std::vector<VariantKey>> ManifestQueryBuilder::Keys() const noexcept
 {
     if (!errors.empty())
@@ -151,9 +239,12 @@ QueryResult<VariantKey> ManifestQueryBuilder::First() const noexcept
     return index->first(scanConstraints);
 }
 
-ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name, std::vector<QueryAxisValue> values) const noexcept
+std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBuilder& result,
+                                                                 std::string_view axis_name,
+                                                                 std::span<const QueryAxisValue> values) const
 {
-    ManifestQueryBuilder result{ *this };
+    // this exists mostly because there was a bunch of work duplicated between the where and wherenoneof
+    // functions, which otherwise differ enough by input contract that that we couldn't just reuse `whereAnyOf`
     // verify axis_name is valid, push an error if not
     auto indexIter = index->axisNameToIndex.find(axis_name);
     if (indexIter == index->axisNameToIndex.end())
@@ -164,32 +255,26 @@ ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name
                                    axis_name,
                                    0u,
                                    NearestName(axis_name, axisNames));
-        return result;
+        return std::nullopt;
     }
 
     const uint32_t axisIndex = indexIter->second;
     const ManifestAxis& axis = index->manifest.Axis(axisIndex);
-    // we can just check front(), as we always make sure the vector is contiguous types
+    // just check front() (means one less passed function parameter, and values is homogenous by construction)
     if (values.front().Type != axis.Domain)
     {
         result.errors.emplace_back(QueryErrorCode::IncorrectValueDomain,
                                    axis_name,
                                    static_cast<uint32_t>(axis.Domain));
-        return result;
+        return std::nullopt;
     }
 
     // Confirm the axis actually declares the requested value. A Boolean axis always holds both
     // 0 and 1, so only Type and Integral/Enum axes need the lookup.
+    // we use just linear searches here bc the value vectors should, at MOST, be ~1 dozen entries
     if (axis.Domain == AxisValueDomain::Type || axis.Domain == AxisValueDomain::Enum)
     {
-        // Type + Enum axis values are indices into the string table; resolve them and compare by name.
-        auto extractStrView = [&](const AxisValueType string_index) -> std::string_view
-        {
-            return index->manifest.String(string_index);
-        };
-        const std::vector<std::string_view> axisValueNames = index->manifest.AxisValues(axisIndex) |
-                                                             std::views::transform(extractStrView) |
-                                                             std::ranges::to<std::vector>();
+        const std::vector<std::string_view> axisValueNames = index->stringTableForAxis(axisIndex);
         // create just a view, not vector, to avoid allocating a new container
         auto queryValueNames = values | std::views::transform(&QueryAxisValue::Name);
         for (const auto& queryValueName : queryValueNames)
@@ -200,7 +285,7 @@ ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name
                                            axis_name,
                                            0u,
                                            NearestName(queryValueName, axisValueNames));
-                return result;
+                return std::nullopt;
             }
         }
     }
@@ -217,34 +302,55 @@ ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name
                 result.errors.emplace_back(QueryErrorCode::ValueNotInAxis,
                                            axis_name,
                                            queryValue); // empty suggestion 
-                return result;
+                return std::nullopt;
             }
         }
     }
 
-    // see if axis_name is already in the constraints
-    auto constraintIter = std::ranges::lower_bound(result.constraints,
-                                                   axisIndex,
+    return axisIndex;
+}
+
+void ManifestQueryBuilder::insertConstraint(std::string_view axis_name,
+                                            uint32_t axis_index,
+                                            std::vector<QueryAxisValue> allowed)
+{
+    auto constraintIter = std::ranges::lower_bound(constraints,
+                                                   axis_index,
                                                    std::less<uint32_t>{},
                                                    &QueryAxisRange::AxisIndex);
     // only quirk for lower_bound: it will give location where AxisIndex *could* be inserted
-    if (constraintIter != result.constraints.end() &&
-        constraintIter->AxisIndex == axisIndex)
+    if (constraintIter != constraints.end() &&
+        constraintIter->AxisIndex == axis_index)
     {
         // add value to existing
         QueryAxisRange& constraint = *constraintIter;
         // if we wanted to validate against duplicate values, this would be where to do it
         // for now, I'm not doing it as it's a real mess and I'm not really sure it warrants an error
-        constraint.Values.append_range(values);
-        return result;
+        // pretty sure this move is also totally pointless, it's going to just be a copy nmw
+        constraint.Values.append_range(std::move(allowed));
     }
     else
     {
         // insert a new constraint at the position indicated by lower_bound, which keeps it sorted
-        result.constraints.insert(constraintIter,
-            QueryAxisRange{ axis_name, std::move(values), axisIndex });
+        constraints.insert(constraintIter,
+            QueryAxisRange{ axis_name, std::move(allowed), axis_index });
+    }
+}
+
+ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name, std::vector<QueryAxisValue> values) const noexcept
+{
+    ManifestQueryBuilder result{ *this };
+    // this adds errors to result, but otherwise doesn't modify constraints
+    std::optional<uint32_t> axisIndexOpt = resolveAndValidate(result, axis_name, values);
+    if (!axisIndexOpt)
+    {
         return result;
     }
+
+    // see if axis_name is already in the constraints
+    const uint32_t axisIndex = *axisIndexOpt;
+    result.insertConstraint(axis_name, axisIndex, std::move(values));
+    return result;
 }
 
 ManifestIndex::ManifestIndex(ShaderManifestView view) : manifest(view)
@@ -417,13 +523,7 @@ std::vector<uint32_t> ManifestIndex::stringValueIndices(const uint32_t axis_inde
     // axisValues now gives indices into the Strings() table: extract the strings,
     // and do a lexicographical comparison to back that out into an index. position
     // of the matching string in this local table gives the index in axisValues
-    auto extractStrView = [&](const AxisValueType value) -> std::string_view
-    {
-        return manifest.String(value);
-    };
-    const std::vector<std::string_view> constraintStrings = manifest.AxisValues(axis_index) |
-                                                            std::views::transform(extractStrView) |
-                                                            std::ranges::to<std::vector>();
+    const std::vector<std::string_view> constraintStrings = stringTableForAxis(axis_index);
     // get iterators that match from axis.Values to constraintStrings, and use std::distance to convert to indices
     for (const auto&& [index, val] : std::views::enumerate(range.Values))
     {
@@ -535,6 +635,18 @@ std::vector<VariantKey> ManifestIndex::scan(std::span<const ScanConstraint> cons
     }
 
     return result;
+}
+
+std::vector<std::string_view> ManifestIndex::stringTableForAxis(uint32_t axis_index) const
+{
+    std::span<const AxisValueType> axisValues = manifest.AxisValues(axis_index);
+    auto getStringView = [&](const AxisValueType& value) -> std::string_view
+    {
+        return manifest.String(value);
+    };
+    return axisValues |
+           std::views::transform(getStringView) |
+           std::ranges::to<std::vector>();
 }
 
 }

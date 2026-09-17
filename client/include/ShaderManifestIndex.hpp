@@ -9,6 +9,7 @@
 #include <expected>
 #include <span>
 #include <string_view>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -25,6 +26,18 @@ struct QueryAxisValue
     // for Interface axes, the name of the specific implementation
     // for Enum axes, the name of the specific case
     std::string_view Name;
+
+    constexpr bool operator==(const QueryAxisValue& other) const noexcept
+    {
+        if (Type != other.Type)
+        {
+            return false;
+        }
+        else
+        {
+            return Type == AxisValueDomain::Integral ? IntegralValue == other.IntegralValue : Name == other.Name;
+        }
+    }
 };
 
 /** @brief Collection of values constraining a single axis. Most clients should not use or build
@@ -95,6 +108,13 @@ struct ManifestQueryBuilder
                                                   AxisValueDomain domain,
                                                   std::span<const std::string_view> values) const;
 
+    // Exclusion filters, which allow you to specify values that should be excluded from the query results.
+    [[nodiscard]] ManifestQueryBuilder WhereNoneOf(std::string_view axis_name, bool value) const noexcept;
+    [[nodiscard]] ManifestQueryBuilder WhereNoneOf(std::string_view axis_name, std::span<const uint32_t> values) const noexcept;
+    [[nodiscard]] ManifestQueryBuilder WhereNoneOf(std::string_view axis_name,
+                                                   AxisValueDomain domain,
+                                                   std::span<const std::string_view> values) const noexcept;
+
     // These are the terminal functions, which effectively close a query and return the final result
     [[nodiscard]] QueryResult<std::vector<VariantKey>> Keys() const noexcept;
     [[nodiscard]] QueryResult<std::vector<DecodedVariant>> Variants() const noexcept;
@@ -109,8 +129,17 @@ struct ManifestQueryBuilder
     [[nodiscard]] bool IsValid() const noexcept;
     [[nodiscard]] std::span<const QueryError> Errors() const noexcept;
 private:
-    // does the actual legwork for where, but means we're not duplicating all the bloody logic per public Where() overload
-    [[nodiscard]] ManifestQueryBuilder where(std::string_view axis_name, QueryAxisValue value) const noexcept;
+    // resolves the given axis name, domain, and input values. returns the axis index if successful, nullopt if
+    // any of the validations fails
+    [[nodiscard]] std::optional<uint32_t> resolveAndValidate(ManifestQueryBuilder& result,
+                                                             std::string_view axis_name,
+                                                             std::span<const QueryAxisValue> values) const;
+    // sorted lower_bound insert/merge of `allowed` values either into existing constraints or new placement
+    // operates directly on *this, since we call it through the result object right before it's returned
+    void insertConstraint(std::string_view axis_name,
+                          uint32_t axis_index,
+                          std::vector<QueryAxisValue> allowed);
+
     // overload to coalesce work for WhereAnyOf functions, assuming shared value domain
     [[nodiscard]] ManifestQueryBuilder whereAnyOf(std::string_view axis_name, std::vector<QueryAxisValue> value) const noexcept;
     const class ManifestIndex* index{ nullptr };
@@ -165,6 +194,7 @@ private:
     [[nodiscard]] VariantKey first(std::span<const ScanConstraint> constraints) const;
     [[nodiscard]] std::vector<VariantKey> scan(std::span<const ScanConstraint> constraints) const;
 
+    [[nodiscard]] std::vector<std::string_view> stringTableForAxis(uint32_t axis_index) const;
     ShaderManifestView manifest;
     std::vector<uint32_t> radices;
     std::vector<uint64_t> placeValues;
