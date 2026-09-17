@@ -287,6 +287,14 @@ side. Anything finer than an entry point becomes unmanageable.
 
 Small now, expensive later.
 
+**The manifest redesign is the vehicle for most of this.** After Phase E, the manifest becomes
+multi-module and multi-level (`todo.md`, "Phase F preparation"). That redesign is the cheap moment to
+land the items below: the per-variant capability requirement, the access model on the profile, and the
+placement change. It splits into three scopes: whole-cook data (strings, source, the axes table, the
+target-profile table), per-module logical data (the variant table, profile-invariant), and
+per-(module, profile) data (the baked layout, offsets, and capability requirement). Do these here, not
+after, or the format hardens twice.
+
 **D7 — the target profile carries an access model from the first commit.** Add the field even while
 `Bound` is the only value. The profile is already being built as a stub, so a second field costs
 nothing.
@@ -413,8 +421,20 @@ the author. The cooker and the client may move the value later. Section 3.
 **Interface contract** — what the cooker tells the client: a bind group layout, a pointer table with
 offsets, a push constant range. It follows from the other three.
 
-**Target profile** — a named set of capabilities and one access model. A client maps a live adapter
-onto a profile, and asks the manifest for what that profile can run.
+**Target profile** — a target, an access model, and a capability floor. It is a cooked *form*, not a
+device power tier. A client maps a live adapter onto a profile, and asks the manifest for what that
+profile can run. Device power varies inside one profile, and an axis carries it (section 6).
+
+Three concepts wear two words, and they must stay separate:
+
+- **Target profile** (run time) — the cooked form above. `(target, access model, capability floor)`.
+- **Device preset** (cook policy) — a budget in the policy file, such as `minspec` or `mobile`. It
+  decides which variants and how many the cook bakes for a tier.
+- **Query preset** (client) — a reusable, module-agnostic bundle of query constraints. It decides which
+  variants a run-time query selects.
+
+"How powerful is the device" splits across the last two. The policy decides what is cooked. The query
+decides what is picked. Neither is the profile.
 
 **Lowering** — the pass that takes an axis with its earliest sound binding time, plus a target
 profile, and decides the real binding time for that target.

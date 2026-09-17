@@ -72,8 +72,8 @@ argument it exits 1 on `NoOutputSpecified`, which reads like a failure rather th
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
-Twenty test targets exist. Fifteen are unit tests, and each one proves a claim the repository
-makes. None of them needs Slang, a compiler, or an asset, and all fifteen together run in under one
+Twenty-one test targets exist. Sixteen are unit tests, and each one proves a claim the repository
+makes. None of them needs Slang, a compiler, or an asset, and all sixteen together run in under one
 second.
 
 | Target | Proves |
@@ -93,6 +93,7 @@ second.
 | `PermutationConstraintTest` | The axis constraint engine. `ActiveWhen` gates an axis the way the old parent link did, `Require` prunes a forbidden combination, and the load check rejects a forward reference, an unknown symbol, and a malformed expression. |
 | `SuggestTest` | The nearest-name suggestion. It measures the edit distance between a mistyped name and the accepted names, and returns the closest one. The cooker and the client both use it for a name rejection. |
 | `EnumTagDecodeTest` | The enum tag-blob decode (`compile/EnumTagDecode`). It reads each integer width, sign-extends a signed tag, zero-extends an unsigned tag, and accepts the `UInt64` wrap above 2^63. It names no Slang type, so the reflection read of an enum case value has a proof that needs no compiler. |
+| `ManifestIndexTest` | The client query surface, end to end. It builds a manifest inline through the emitter, with one axis of each domain, then drives `ManifestQueryBuilder` through every valid construction and every error path, plus a sparse manifest and an `ActiveWhen`-gated one. It needs no Slang. |
 
 An error check prints a diagnostic to `stderr` on purpose. Read the last line for the result.
 
@@ -412,6 +413,7 @@ unordered container reached the output.
 | `InternedModule` | `model/CookedLibrary.hpp` | The stage 6 builder. It holds the six interners, and it is the only place the provenance of a collapse survives. |
 | `CookedModule`, `CookedLibrary` | `model/CookedLibrary.hpp` | The frozen model. Every emitter reads this and nothing earlier. |
 | `ShaderManifestView` | `client/include/ShaderManifest.hpp` | Read-only spans over the manifest bytes. Allocates nothing to open. |
+| `ManifestIndex`, `ManifestQueryBuilder` | `client/include/ShaderManifestIndex.hpp` | The client query surface, frozen. `ManifestIndex` decodes and enumerates variants and hands out a value-semantic builder. The builder resolves axis names and values by name, and its terminals (`Keys`, `Variants`, `First`) return keys or an error. A malformed query is an error; a valid query with no variant is an empty set. |
 | `ShaderSourceProvider` | `client/include/ShaderLibraryTypes.hpp` | Where a renderer gets source, bindings, and workgroup size. `Generation()` is the hot-reload hook. |
 
 `ContentHashValue` is xxHash3, 64 bit. `model/ContentHash.hpp` holds the streaming form as well, which the
@@ -526,6 +528,11 @@ A variant is found by its **key**, not by a dense index. `ShaderManifestView::Fi
 dense index. The manifest also carries the axis schema (`ManifestAxis` records with name, value count,
 kind, and domain, plus an `AxisValues` table), so a consumer can enumerate the axes and decode a key
 back into its per-axis values with `UnpackVariantKey`.
+
+A `VariantKey` is an in-session handle, not a save token. A key packs against the axis order and value
+count of one manifest, so a recook can change what it means. To persist a variant, save the decoded axis
+names and values, and rebuild the key on load. The client query surface resolves by name for the same
+reason: a rename or a reorder of axes degrades to an empty result, never to a wrong variant.
 
 ## The velox rename
 

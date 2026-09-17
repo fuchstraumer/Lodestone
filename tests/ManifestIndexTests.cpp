@@ -116,16 +116,19 @@ PermutationSpace MakeSpace()
     return PermutationSpace{ std::move(axes) };
 }
 
-// Emits the manifest bytes for the four-axis module. The space and the module live only for the emit,
-// because the returned bytes are self-contained.
-std::vector<std::byte> BuildManifestBytes()
+// Emits the manifest bytes for the four-axis module, keeping only the variants `keep` accepts. The
+// space and the module live only for the emit, because the returned bytes are self-contained. A subset
+// models a manifest whose cook did not emit every combination: a policy allow-list, or an ActiveWhen
+// gate that pins a child axis when its parent is off. The axis schema stays whole either way, because
+// the space is unchanged; only the key set shrinks.
+template<typename Keep>
+std::vector<std::byte> BuildManifest(Keep keep)
 {
     const PermutationSpace space = MakeSpace();
 
     lodestone::CookedModule module;
     module.Name = "QueryTestModule";
     module.Space = &space;
-    module.SpaceSize = k_TotalVariants;
 
     module.EntryPoints.push_back(
         lodestone::LibraryEntryPoint{ .Name = "MainCS", .Stage = lodestone::ShaderStageKind::Compute });
@@ -156,6 +159,10 @@ std::vector<std::byte> BuildManifestBytes()
                 for (uint32_t shade = 0u; shade < k_Radices[k_ShadeAxis]; ++shade)
                 {
                     const std::array<uint32_t, 4> digits{ dither, quality, tile, shade };
+                    if (!keep(digits))
+                    {
+                        continue;
+                    }
                     module.VariantKeys.push_back(PackVariantKey(digits, k_Radices));
 
                     lodestone::LibraryVariant variant;
@@ -173,10 +180,18 @@ std::vector<std::byte> BuildManifestBytes()
         }
     }
 
+    module.SpaceSize = static_cast<uint64_t>(module.VariantKeys.size());
+
     const std::string manifest = EmitShaderManifest(module);
     std::vector<std::byte> bytes(manifest.size());
     std::memcpy(bytes.data(), manifest.data(), manifest.size());
     return bytes;
+}
+
+// The full cross product: every combination is a cooked variant.
+std::vector<std::byte> BuildManifestBytes()
+{
+    return BuildManifest([](const std::array<uint32_t, 4>&) { return true; });
 }
 
 // Counts the keys of a query, or returns SIZE_MAX when the query is in an error state.
@@ -313,6 +328,9 @@ int main()
     runner.Check(!unknownAxis.Keys().has_value() &&
                  unknownAxis.Keys().error() == QueryErrorCode::UnknownAxis,
                  "the terminal returns the error code");
+    runner.Check(!unknownAxis.First().has_value() &&
+                 unknownAxis.First().error() == QueryErrorCode::UnknownAxis,
+                 "First returns the query error, not a variant");
 
     runner.BeginSection("a value in the wrong domain reports IncorrectValueDomain");
     const ManifestQueryBuilder wrongDomain = index.Query().Where("DITHER", 5u);
@@ -338,6 +356,82 @@ int main()
     runner.Check(!twoErrors.Keys().has_value() &&
                  twoErrors.Keys().error() == QueryErrorCode::UnknownAxis,
                  "the terminal returns the first error code");
+
+    // make sure that empty value sets into constraints report back as expected, but still
+    // make sure the unknown axis is reported before the empty set
+    runner.BeginSection("an empty value set reports EmptyConstraintSet");
+    const std::span<const uint32_t> noInts;
+    const std::span<const std::string_view> noNames;
+    const ManifestQueryBuilder emptyAny = index.Query().WhereAnyOf("TILE", noInts);
+    runner.Check(!emptyAny.IsValid() &&
+                 emptyAny.Errors().front().Code == QueryErrorCode::EmptyConstraintSet,
+                 "WhereAnyOf with no values is rejected");
+    const ManifestQueryBuilder emptyNone = index.Query().WhereNoneOf("TILE", noInts);
+    runner.Check(!emptyNone.IsValid() &&
+                 emptyNone.Errors().front().Code == QueryErrorCode::EmptyConstraintSet,
+                 "WhereNoneOf with no values is rejected");
+    const ManifestQueryBuilder emptyNames = index.Query().WhereAnyOf("QUALITY", AxisValueDomain::Enum, noNames);
+    runner.Check(!emptyNames.IsValid() &&
+                 emptyNames.Errors().front().Code == QueryErrorCode::EmptyConstraintSet,
+                 "an empty named value set is rejected");
+    const ManifestQueryBuilder emptyUnknown = index.Query().WhereAnyOf("NOPE", noInts);
+    runner.Check(!emptyUnknown.IsValid() &&
+                 emptyUnknown.Errors().front().Code == QueryErrorCode::UnknownAxis,
+                 "an unknown axis is reported before the empty set");
+
+    // manifest where one axis value was left out: queries are still valid, because it is an axis value,
+    // but it was not cooked into any variant so the query resolves to an empty span
+    runner.BeginSection("a valid value with no cooked variant returns an empty result");
+    const std::vector<std::byte> sparseBytes =
+        BuildManifest([](const std::array<uint32_t, 4>& digits) { return digits[k_TileAxis] != 2u; });
+    const lodestone::ManifestResult<ShaderManifestView> sparseOpened = ShaderManifestView::Open(sparseBytes);
+    runner.Check(sparseOpened.has_value(), "the sparse manifest opens");
+    if (sparseOpened.has_value())
+    {
+        const ManifestIndex sparse{ sparseOpened.value() };
+        runner.Check(sparse.Enumerate().size() == 24u, "only the kept variants exist");
+        runner.Check(sparse.View().Axis(k_TileAxis).ValueCount == 3u,
+                     "the axis schema still declares all three TILE values");
+        runner.Check(KeyCount(sparse.Query().Where("TILE", 8u)) == 12u, "a present value still matches");
+        const ManifestQueryBuilder absentValue = sparse.Query().Where("TILE", 32u);
+        runner.Check(absentValue.IsValid(), "a declared value is not an error");
+        runner.Check(KeyCount(absentValue) == 0u, "but it names no cooked variant, so the result is empty");
+        runner.Check(!absentValue.First().has_value() &&
+                     absentValue.First().error() == QueryErrorCode::NoVariantForConstraints,
+                     "First reports no variant for the constraints");
+    }
+
+    // An ActiveWhen gate appears at the query layer as a structured hole, not as a schema field: the
+    // query layer has no ActiveWhen concept. Here SHADE is gated on DITHER: when DITHER is false, SHADE
+    // is pinned to its first value (Lambert), so no variant has DITHER false and SHADE Phong.
+    // an ActiveWhen gate is a policy-level selection filter, so it's a structured hole in the manifest
+    // the manifest still declares all axis values, but some combinations are absent from the cooked variants
+    runner.BeginSection("an ActiveWhen-gated axis is a hole in the key set, not a schema change");
+    const std::vector<std::byte> gatedBytes =
+        BuildManifest([](const std::array<uint32_t, 4>& digits)
+                      { return digits[k_DitherAxis] != 0u || digits[k_ShadeAxis] == 0u; });
+    const lodestone::ManifestResult<ShaderManifestView> gatedOpened = ShaderManifestView::Open(gatedBytes);
+    runner.Check(gatedOpened.has_value(), "the gated manifest opens");
+    if (gatedOpened.has_value())
+    {
+        const ManifestIndex gated{ gatedOpened.value() };
+        // if DITHER is false, SHADE is set to Lambert
+        // if DITHER is true, SHADE is allowed to vary fully without restriction
+        runner.Check(gated.Enumerate().size() == 27u, "the gated-off combinations are absent");
+        // as noted: the axis values aren't changed. this is important for the query layer
+        // to behave consistently between cooks that may gate values (so code doesn't need to respond differently)
+        runner.Check(gated.View().Axis(k_ShadeAxis).ValueCount == 2u,
+                     "the gated axis still declares both values in the schema");
+        runner.Check(KeyCount(gated.Query().Where("SHADE", AxisValueDomain::Type, "Phong")) == 9u,
+                     "the gated value exists only where its parent enables it");
+        const ManifestQueryBuilder gatedOff =
+            gated.Query().Where("DITHER", false).Where("SHADE", AxisValueDomain::Type, "Phong");
+        runner.Check(gatedOff.IsValid(), "the gated-off combination uses two valid values");
+        runner.Check(KeyCount(gatedOff) == 0u, "yet it names no variant");
+        runner.Check(!gatedOff.First().has_value() &&
+                     gatedOff.First().error() == QueryErrorCode::NoVariantForConstraints,
+                     "First reports no variant for the gated-off combination");
+    }
 
     return runner.Report();
 }
