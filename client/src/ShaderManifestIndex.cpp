@@ -13,6 +13,7 @@
 #include <optional>
 #include <ranges>
 #include <span>
+#include <string>
 #include <string_view>
 #include <unordered_set>
 #include <utility>
@@ -29,6 +30,14 @@ namespace lodestone
 
 namespace
 {
+    std::vector<QueryAxisValue> AllBooleanValues(std::string_view axis_name)
+    {
+        return {
+            QueryAxisValue{ .Type = AxisValueDomain::Boolean, .IntegralValue = 0u, .Name = axis_name },
+            QueryAxisValue{ .Type = AxisValueDomain::Boolean, .IntegralValue = 1u, .Name = axis_name }
+        };
+    }
+
     // The nearest accepted name to a mistyped one, or empty when nothing is close enough. The distance
     // budget follows clang and rust: one edit per three characters, and at least one.
     std::string_view NearestName(std::string_view input,
@@ -69,12 +78,7 @@ ManifestQueryBuilder ManifestQueryBuilder::Where(std::string_view axis_name,
 
 ManifestQueryBuilder ManifestQueryBuilder::WhereAnyOfBoolean(std::string_view axis_name) const
 {
-    std::vector<QueryAxisValue> values
-    {
-        QueryAxisValue{ .Type = AxisValueDomain::Boolean, .IntegralValue = 0u, .Name = axis_name },
-        QueryAxisValue{ .Type = AxisValueDomain::Boolean, .IntegralValue = 1u, .Name = axis_name }
-    };
-    return whereAnyOf(axis_name, std::move(values));
+    return whereAnyOf(axis_name, AllBooleanValues(axis_name));
 }
 
 ManifestQueryBuilder ManifestQueryBuilder::WhereAnyOf(std::string_view axis_name, std::span<const uint32_t> values) const
@@ -149,6 +153,7 @@ ManifestQueryBuilder ManifestQueryBuilder::WhereNoneOf(std::string_view axis_nam
                                                        std::span<const std::string_view> input_values) const noexcept
 {
     ManifestQueryBuilder result{ *this };
+    
     // first, convert input_values to QueryAxisValue so we can validate against the inputs
     auto buildAxisValue = [domain](std::string_view value) -> QueryAxisValue
     {
@@ -239,6 +244,16 @@ QueryResult<VariantKey> ManifestQueryBuilder::First() const noexcept
     return index->first(scanConstraints);
 }
 
+bool ManifestQueryBuilder::IsValid() const noexcept
+{
+    return errors.empty();
+}
+
+std::span<const QueryError> ManifestQueryBuilder::Errors() const noexcept
+{
+    return errors;
+}
+
 std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBuilder& result,
                                                                  std::string_view axis_name,
                                                                  std::span<const QueryAxisValue> values) const
@@ -252,9 +267,18 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
         const std::vector<std::string_view> axisNames =
             index->axisNameToIndex | std::views::keys | std::ranges::to<std::vector>();
         result.errors.emplace_back(QueryErrorCode::UnknownAxis,
-                                   axis_name,
+                                   std::string(axis_name),
                                    0u,
                                    NearestName(axis_name, axisNames));
+        return std::nullopt;
+    }
+
+    // check for values after at least confirming axis name is valid, since this will
+    // give user more information (and we try values.front() after this)
+    if (values.empty())
+    {
+        result.errors.emplace_back(QueryErrorCode::EmptyValueSet,
+                                   std::string(axis_name));
         return std::nullopt;
     }
 
@@ -264,7 +288,7 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
     if (values.front().Type != axis.Domain)
     {
         result.errors.emplace_back(QueryErrorCode::IncorrectValueDomain,
-                                   axis_name,
+                                   std::string(axis_name),
                                    static_cast<uint32_t>(axis.Domain));
         return std::nullopt;
     }
@@ -282,7 +306,7 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
             if (std::ranges::find(axisValueNames, queryValueName) == axisValueNames.end())
             {
                 result.errors.emplace_back(QueryErrorCode::ValueNotInAxis,
-                                           axis_name,
+                                           std::string(axis_name),
                                            0u,
                                            NearestName(queryValueName, axisValueNames));
                 return std::nullopt;
@@ -300,7 +324,7 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
             if (std::ranges::find(axisValues, queryValue) == axisValues.end())
             {
                 result.errors.emplace_back(QueryErrorCode::ValueNotInAxis,
-                                           axis_name,
+                                           std::string(axis_name),
                                            queryValue); // empty suggestion 
                 return std::nullopt;
             }

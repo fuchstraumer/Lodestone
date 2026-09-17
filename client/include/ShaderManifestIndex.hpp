@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <expected>
 #include <span>
+#include <string>
 #include <string_view>
 #include <optional>
 #include <unordered_map>
@@ -57,17 +58,16 @@ enum class QueryErrorCode : uint8_t
     UnknownAxis,
     ValueNotInAxis,
     IncorrectValueDomain, // e.g, tried to use a uint with a bool axis
+    EmptyValueSet, // you can't provide an empty value set to a constraint function
     Count
 };
 
 struct QueryError
 {
     QueryErrorCode Code{ QueryErrorCode::Success };
-    std::string_view AxisName; // reads into manifest, so should remain valid
+    std::string AxisName; // can name user input, so can't be a string_view
     uint32_t Detail{}; // additional context-specific detail about the error
-    // nearest name to what input/client queried for, pointing into manifest
-    // so string_view still works just fine here. uses levenshtein from `lodestone::suggest`
-    std::string_view Suggestion;
+    std::string_view Suggestion; // read from manifest blob, can be a view
 };
 
 // QueryResult comes from the terminal functions - it tells you 
@@ -123,8 +123,6 @@ struct ManifestQueryBuilder
     [[nodiscard]] std::vector<DecodedVariant> VariantsFromKeys(const std::vector<VariantKey>& keys) const noexcept;
     /** @brief Returns the first VariantKey matching the query, or the query's error state. */
     [[nodiscard]] QueryResult<VariantKey> First() const noexcept;
-    /** @brief Returns the size of the current query result set: doesn't trigger retrieval like others */
-    [[nodiscard]] size_t Size() const noexcept;
 
     [[nodiscard]] bool IsValid() const noexcept;
     [[nodiscard]] std::span<const QueryError> Errors() const noexcept;
