@@ -46,7 +46,7 @@ struct CookerOptions
     std::vector<std::filesystem::path> ModulePaths;
     uint32_t OptimizationLevel{ 0u };
     /** Which `TargetProfile` this cook emits for. `--target` sets it */
-    std::string TargetName{ "wgsl" };
+    std::vector<std::string> TargetNames;
     /** Runs the target's validator, making sure that emitted data matches target binding schema and access
      * model */
     bool ValidateAgainstEmittedText{ true };

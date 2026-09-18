@@ -24,14 +24,6 @@ function(add_lodestone_unit_test NAME)
     add_test(NAME ${NAME} COMMAND ${NAME} ${UNIT_TEST_TEST_ARGS})
     copy_slang_dlls_to_target(${NAME})
 endfunction()
-
-# CookTest is the cooker driver, so it needs a real module to cook. It proves the whole pipeline: the
-# cook fails on a reflection mismatch, on a failed round trip, and on a non-deterministic result, so
-# exit code 0 is a real statement about the output.
-add_lodestone_unit_test(CookTest CookTest.cpp
-    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/cook_test_output"
-              --verify-deterministic
-              "${CMAKE_SOURCE_DIR}/tests/assets/compute/Ocean/OceanFft.slang")
 # The same driver, on the probe module that phase E step E0a needed. `EntryPointParams.slang`
 # declares a `uniform` parameter on two of its three entry points. A cooker that reads the global
 # scope alone gives those parameters no binding, and the cross-check then fails the cook.
@@ -69,6 +61,21 @@ add_lodestone_unit_test(EnumAxisCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/enum_axis_output"
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/EnumAxis/EnumAxisTest.slang")
+# The same driver, on the multi-module KitchenSink set. This is the stress and coverage asset: four
+# consumer modules cook together against one policy, and KsTypes and KsShading are imported for their
+# enum and interface declarations. It crosses every axis kind, groups resources into nested parameter
+# blocks, and reaches 2D, 3D, cube, and array textures, a comparison sampler, and raster targets with a
+# depth write. It shares axis names across modules with different value subsets. It is known to break
+# today, because the axis over an imported type needs the declaring module, not the module where the
+# axis constant was found.
+add_lodestone_unit_test(KitchenSinkCookTest CookTest.cpp
+    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/kitchen_sink_output"
+              --verify-deterministic
+              --policy-file "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KitchenSink.toml"
+              "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KsGeometry.slang"
+              "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KsMaterial.slang"
+              "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KsVolume.slang"
+              "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KsPost.slang")
 # The one test in this suite that asserts a cook FAILS. Phase E step E0c needed it.
 #
 # Every other cook test states that a good module cooks. A check that never fires and a check that

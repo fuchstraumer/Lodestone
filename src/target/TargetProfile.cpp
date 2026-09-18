@@ -1,9 +1,11 @@
 #include "target/TargetProfile.hpp"
+#include "CookerErrors.hpp"
 #include "target/WgslBindingScanner.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
 
 #include <array>
+#include <expected>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -81,23 +83,21 @@ std::string_view ToString(AccessModel model) noexcept
     case AccessModel::Pointer:
         return "pointer";
     case AccessModel::Invalid:
-        [[fallthrough]];
-    default:
         return "invalid";
     }
 }
 
-const TargetProfile* FindTargetProfile(std::string_view name) noexcept
+CookResult<TargetProfile> FindTargetProfile(std::string_view name) noexcept
 {
     for (const TargetProfile& profile : k_TargetProfiles)
     {
         if (profile.Name == name)
         {
-            return &profile;
+            return profile;
         }
     }
 
-    return nullptr;
+    return std::unexpected(CookError::TargetProfileNotFound);
 }
 
 std::span<const std::string_view> GetTargetProfileNames() noexcept

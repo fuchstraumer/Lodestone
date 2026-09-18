@@ -25,6 +25,7 @@ enum class CookError : uint16_t
     CompilerGlobalSessionCreationFailed = 19,
     FailedToLoadModuleDependencySource = 20,
     VariantNotCompiled = 21,
+    TargetProfileNotFound = 22,
 
     ReflectionUnavailable = 40,
     ReflectionMismatch = 41,
@@ -92,6 +93,9 @@ enum class CookError : uint16_t
     FileNotFound = 203,
     FileWriteFailed = 204,
     FromCharsFailed = 205,
+    PermissionDenied = 206,
+    FileAlreadyExists = 207,
+    InvalidPath = 208,
 
     SlangErrors = 220,
     SlangCoreModuleLoadFailed = 221,

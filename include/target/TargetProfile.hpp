@@ -1,8 +1,9 @@
 #pragma once
-#include "ShaderLibraryTypes.hpp"
 #ifndef LODESTONE_TARGET_PROFILE_HPP
 #define LODESTONE_TARGET_PROFILE_HPP
+#include "CookerErrors.hpp"
 #include "model/ShaderDataSchema.hpp"
+#include "ShaderLibraryTypes.hpp"
 #include <cstdint>
 #include <span>
 #include <string>
@@ -71,10 +72,11 @@ struct TargetProfile
     const ResolvedLibraryValidator* Validator{ nullptr };
 };
 
-/**@brief Finds the profile one `--target` name selects. Null for a name the cooker does not have.
+/**@brief Finds the profile one `--target` name selects. Returns an unexpected value for a name the
+ * cooker does not have.
  * This is a compiled in-table, since we have to define a fair bit of target-specific validation code
- * per new target. */
-const TargetProfile* FindTargetProfile(std::string_view name) noexcept;
+ * per new target. This will change in the future, similar to how Permutations became data-driven */
+CookResult<TargetProfile> FindTargetProfile(std::string_view name) noexcept;
 
 /** Every target name this build accepts, for the usage text and for an error message. */
 std::span<const std::string_view> GetTargetProfileNames() noexcept;

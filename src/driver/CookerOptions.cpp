@@ -194,7 +194,7 @@ namespace
 
     CookError ApplyTargetOption(CookerOptions& options, std::string_view value)
     {
-        if (FindTargetProfile(value) == nullptr) [[unlikely]]
+        if (!FindTargetProfile(value)) [[unlikely]]
         {
             std::string validTargetNames;
             for (const std::string_view name : GetTargetProfileNames())
@@ -209,7 +209,7 @@ namespace
         }
         else
         {
-            options.TargetName = std::string{ value };
+            options.TargetNames.emplace_back(value);
             return CookError::Success;
         }
     }

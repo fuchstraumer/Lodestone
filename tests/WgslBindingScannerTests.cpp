@@ -1,3 +1,4 @@
+#include "CookerErrors.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "target/TargetProfile.hpp"
@@ -20,10 +21,12 @@
 using lodestone::BindingComparison;
 using lodestone::BindingKind;
 using lodestone::CompareBindings;
+using lodestone::CookResult;
 using lodestone::ExpectedDeclaredName;
 using lodestone::ReflectedBinding;
 using lodestone::ScanWgslBindings;
 using lodestone::StripSlangNameMangling;
+using lodestone::TargetProfile;
 using lodestone::WgslAddressSpace;
 using lodestone::WgslDeclaredBinding;
 
@@ -199,16 +202,16 @@ int main()
     // interface has to give the same answer as the two functions called directly. If these ever
     // disagree, the adapter grew an opinion it is not allowed to have.
     runner.BeginSection("the target profile reaches the same scanner");
-    const lodestone::TargetProfile* wgslProfile = lodestone::FindTargetProfile("wgsl");
-    runner.Check(wgslProfile != nullptr, "the build has a wgsl profile");
-    runner.Check(wgslProfile != nullptr && wgslProfile->Access == lodestone::AccessModel::Bound,
+    const CookResult<TargetProfile> wgslProfile = lodestone::FindTargetProfile("wgsl");
+    runner.Check(wgslProfile.has_value(), "the build has a wgsl profile");
+    runner.Check(wgslProfile.has_value() && wgslProfile->Access == lodestone::AccessModel::Bound,
                  "wgsl places a resource by group and binding");
-    runner.Check(wgslProfile != nullptr && wgslProfile->Validator != nullptr,
+    runner.Check(wgslProfile.has_value() && wgslProfile->Validator != nullptr,
                  "wgsl can read its own output, so it supplies a validator");
-    runner.Check(lodestone::FindTargetProfile("hlsl") == nullptr,
+    runner.Check(!lodestone::FindTargetProfile("hlsl"),
                  "a target this build does not have resolves to nothing");
 
-    if (wgslProfile != nullptr && wgslProfile->Validator != nullptr)
+    if (wgslProfile.has_value() && wgslProfile->Validator != nullptr)
     {
         const BindingComparison throughInterface =
             wgslProfile->Validator->ValidateEntryPoint(k_Wgsl, agreeingPointers);

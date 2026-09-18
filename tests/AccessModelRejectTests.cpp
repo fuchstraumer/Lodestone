@@ -57,7 +57,7 @@ CookError CookOneModule(const std::filesystem::path& module_path, std::string_vi
 {
     CookerOptions options;
     options.ModulePaths.push_back(module_path);
-    options.TargetName = std::string{ target_name };
+    options.TargetNames.emplace_back(target_name);
     options.OutputPath = "AccessModelReject";
 
     MemoryOutputSink sink;

@@ -21,7 +21,7 @@ class PermutationSpace;
 class DiagnosticSink;
 
 
-/**@brief Specialization of unordered_map using the above hash to allow for string_view queries
+/**@brief Specialization of unordered_map using a transparent hash to allow for string_view queries
   * without copying the key */
 template<typename Value>
 using StringMap = std::unordered_map<std::string, Value, TransparentStringHash, std::equal_to<>>;

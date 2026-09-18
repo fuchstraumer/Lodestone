@@ -734,17 +734,19 @@ namespace
                          CookStatistics& statistics)
     {
         // `ParseCommandLine` already rejected invalid target names, so this cannot be null.
-        const TargetProfile* target = FindTargetProfile(options.TargetName);
-        if (target == nullptr)
+        // changed to vector recently, retrieve from front since there's only one target (ever, for now)
+        CookResult<TargetProfile> targetResult = FindTargetProfile(options.TargetNames.front());
+        if (!targetResult)
         {
             return CookError::UnknownTargetProfile;
         }
+        const TargetProfile targetProfile{ *targetResult };
 
         // This function *just* initializes the compiler: permutation space is built *after* this step
         // since it relies on an initial parse/build of the slang backend module data
         SlangCompiler compiler;
         const CookError prepareResult =
-            BootstrapCompiler(options, module_path, *target, compiler, diagnostics);
+            BootstrapCompiler(options, module_path, targetProfile, compiler, diagnostics);
         if (!prepareResult)
         {
             return prepareResult;
@@ -774,15 +776,15 @@ namespace
 
         // print check state because it makes sure unchecked cooks don't look like checked ones
         const std::string crossCheckStr = std::format("target {} ({} access), cross-check {}",
-                                                      target->Name,
-                                                      ToString(target->Access),
-                                                      DescribeCrossCheckState(*target, options));
+                                                      targetProfile.Name,
+                                                      ToString(targetProfile.Access),
+                                                      DescribeCrossCheckState(targetProfile, options));
         ReportInfo(diagnostics, crossCheckStr);
 
         // get policy now, to get max variant count so enumeration can check against it
         const std::string_view moduleName = compiler.ModuleName();
         const TargetPolicy& currTargetPolicy =
-            policy_document.FindTargetPolicy(moduleName, options.TargetName);
+            policy_document.FindTargetPolicy(moduleName, options.TargetNames.front());
 
         // validate policy against active permutation space
         const CookError policyValidationResult = policy_document.ValidateAgainstSpace(moduleName, *cookPermutationSpace, diagnostics);
@@ -855,7 +857,7 @@ namespace
 
         RawModule rawModule = std::move(rawModuleResult.value());
         const CookError compileVariantsResult = CompileModuleVariants(options,
-                                                                      *target,
+                                                                      targetProfile,
                                                                       compiler,
                                                                       variantSet.value(),
                                                                       internedModule,
