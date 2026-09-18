@@ -36,14 +36,14 @@ namespace
     PolicyDocResult<StringMap<std::vector<std::string>>> ReadInertAxes(const toml::table& module_table);
     PolicyDocResult<AxisCookValues> ReadAxisCookValues(std::string_view axis_name,
                                                        const toml::node& values_node);
-    PolicyDocResult<TargetPolicy> ReadTargetPolicy(const toml::table& target_table);
+    PolicyDocResult<TargetCookPolicy> ReadTargetPolicy(const toml::table& target_table);
     // Reads the optional targets table of one module. Each key is a target profile name.
-    PolicyDocResult<StringMap<TargetPolicy>> ReadTargets(const toml::table& module_table);
+    PolicyDocResult<StringMap<TargetCookPolicy>> ReadTargets(const toml::table& module_table);
     PolicyParseError MakeParseError(const toml::parse_result& result);
     PolicyDocResult<StringMap<ModulePolicyEntry>> BuildModules(const toml::table& root);
     const PermutationAxis* FindDeclaredAxis(std::span<const PermutationAxis> axes, std::string_view name);
     CookError ValidateTargetAndAxisValues(const std::string_view module_name,
-                                          const StringMap<TargetPolicy>& targets,
+                                          const StringMap<TargetCookPolicy>& targets,
                                           const std::span<const PermutationAxis> axes,
                                           DiagnosticSink& sink);
 
@@ -97,10 +97,10 @@ const ModulePolicyEntry* PolicyDocument::FindModule(std::string_view module_name
     return &found->second;
 }
 
-const TargetPolicy& PolicyDocument::FindTargetPolicy(std::string_view module_name,
+const TargetCookPolicy& PolicyDocument::FindTargetPolicy(std::string_view module_name,
                                                      std::string_view target_name) const noexcept
 {
-    static const TargetPolicy empty;
+    static const TargetCookPolicy empty;
 
     const ModulePolicyEntry* entry = FindModule(module_name);
     if (entry == nullptr)
@@ -272,9 +272,9 @@ namespace
         return cookValues;
     }
 
-    PolicyDocResult<TargetPolicy> ReadTargetPolicy(const toml::table& target_table)
+    PolicyDocResult<TargetCookPolicy> ReadTargetPolicy(const toml::table& target_table)
     {
-        TargetPolicy policy;
+        TargetCookPolicy policy;
 
         if (const auto maxVariants = target_table["MaxVariants"])
         {
@@ -319,9 +319,9 @@ namespace
         return policy;
     }
 
-    PolicyDocResult<StringMap<TargetPolicy>> ReadTargets(const toml::table& module_table)
+    PolicyDocResult<StringMap<TargetCookPolicy>> ReadTargets(const toml::table& module_table)
     {
-        StringMap<TargetPolicy> targets;
+        StringMap<TargetCookPolicy> targets;
 
         const auto node = module_table["targets"];
         if (!node)
@@ -344,7 +344,7 @@ namespace
                     ErrorAt(targetNode, std::format("target '{}' must be a table", targetKey.str())));
             }
 
-            PolicyDocResult<TargetPolicy> policy = ReadTargetPolicy(*targetTable);
+            PolicyDocResult<TargetCookPolicy> policy = ReadTargetPolicy(*targetTable);
             if (!policy)
             {
                 return std::unexpected(std::move(policy.error()));
@@ -385,7 +385,7 @@ namespace
 
             entry.InertAxesForEntryPoints = std::move(*inertAxes);
 
-            PolicyDocResult<StringMap<TargetPolicy>> targets = ReadTargets(*moduleTable);
+            PolicyDocResult<StringMap<TargetCookPolicy>> targets = ReadTargets(*moduleTable);
             if (!targets)
             {
                 return std::unexpected(std::move(targets.error()));
@@ -417,7 +417,7 @@ namespace
     }
 
     CookError ValidateTargetAndAxisValues(const std::string_view module_name,
-                                          const StringMap<TargetPolicy>& targets,
+                                          const StringMap<TargetCookPolicy>& targets,
                                           const std::span<const PermutationAxis> axes,
                                           DiagnosticSink& sink)
     {

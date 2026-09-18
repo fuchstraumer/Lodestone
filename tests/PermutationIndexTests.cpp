@@ -36,7 +36,7 @@ using lodestone::PermutationBinding;
 using lodestone::PermutationSpace;
 using lodestone::PermutationValue;
 using lodestone::StderrDiagnosticSink;
-using lodestone::TargetPolicy;
+using lodestone::TargetCookPolicy;
 using lodestone::VariantDescriptor;
 using lodestone::VariantKey;
 using lodestone::VariantSet;
@@ -44,7 +44,7 @@ using lodestone::VariantSet;
 namespace
 {
 
-const TargetPolicy k_UnboundedTargetPolicy{};
+const TargetCookPolicy k_UnboundedTargetPolicy{};
 
 // The space owns its axes, so every axis reference below names a position in it. `ParentIndex` 1 is
 // TEST_USE_WAVE_OPS.

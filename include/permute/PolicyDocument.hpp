@@ -35,7 +35,7 @@ struct AxisCookValues
 };
 
 /** The cook policy for one module on one target profile. */
-struct TargetPolicy
+struct TargetCookPolicy
 {
     uint32_t MaxVariants{ 0u };
     /** @brief Override values for axes in a modules permutation space */
@@ -50,7 +50,7 @@ struct TargetPolicy
 struct ModulePolicyEntry
 {
     StringMap<std::vector<std::string>> InertAxesForEntryPoints;
-    StringMap<TargetPolicy> Targets;
+    StringMap<TargetCookPolicy> Targets;
 };
 
 /**@brief Policy parsing error with location information to make diagnosing/fixing it less painful */
@@ -78,7 +78,7 @@ public:
     [[nodiscard]] const ModulePolicyEntry* FindModule(std::string_view module_name) const noexcept;
     /**@brief Finds the target-specific policy: if unfound, it will return an empty policy. Downstream
       * code then just uses this to use the axes with their values in the shader source. */
-    [[nodiscard]] const TargetPolicy& FindTargetPolicy(std::string_view module_name,
+    [[nodiscard]] const TargetCookPolicy& FindTargetPolicy(std::string_view module_name,
                                                        std::string_view target_name) const noexcept;
     [[nodiscard]] std::span<const std::string> InertAxesForEntryPoint(std::string_view module_name,
                                                                 std::string_view entry_point_name) const noexcept;

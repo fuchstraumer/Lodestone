@@ -23,7 +23,7 @@ namespace lodestone
 
 class PermutationSpace;
 class DiagnosticSink;
-struct TargetPolicy;
+struct TargetCookPolicy;
 using RequireReadyMap = std::unordered_map<std::ptrdiff_t, std::vector<std::string_view>>;
 using AxisValueOverrideMap = std::unordered_map<std::ptrdiff_t, std::vector<PermutationValue>>;
 
@@ -60,7 +60,6 @@ struct VariantDescriptor
  * lookup structure. */
 struct VariantSet
 {
-    const PermutationSpace* Space{ nullptr };
     std::vector<VariantDescriptor> Variants;
     uint64_t SpaceSize{ 0u };
 };
@@ -85,7 +84,7 @@ public:
     [[nodiscard]] bool IsEmpty() const noexcept;
     [[nodiscard]] std::span<const std::string> RequireExpressions() const noexcept;
 
-    [[nodiscard]] CookResult<VariantSet> EnumerateVariants(const TargetPolicy& policy,
+    [[nodiscard]] CookResult<VariantSet> EnumerateVariants(const TargetCookPolicy& policy,
                                                            DiagnosticSink& sink) const;
     [[nodiscard]] CanonicalAssignment CanonicalizeAssignment(const PermutationAssignment& assignment) const;
     [[nodiscard]] VariantKey ComputeVariantKey(const CanonicalAssignment& canonical) const;
@@ -107,7 +106,7 @@ private:
     CookError expandFrom(std::ptrdiff_t depth,
                          PermutationAssignment& partial,
                          const RequireReadyMap& require_ready_at,
-                         const TargetPolicy& policy,
+                         const TargetCookPolicy& policy,
                          const AxisValueOverrideMap& axis_value_overrides,
                          std::vector<VariantDescriptor>& expanded,
                          DiagnosticSink& sink) const;

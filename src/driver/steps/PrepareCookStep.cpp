@@ -1,4 +1,4 @@
-#include "PrepareCookStep.hpp"
+#include "driver/steps/PrepareCookStep.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
 #include "driver/CookerOptions.hpp"
@@ -113,14 +113,17 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input) cons
         }
     }
 
-    // now get target profile
-    CookResult<TargetProfile> targetResult = FindTargetProfile(result.Options.TargetNames.front());
-    if (!targetResult)
+    // now get target profiles for all targets in this cook
+    for (const std::string& targetName : result.Options.TargetNames)
     {
-        return std::unexpected(CookError::TargetProfileNotFound);
+        CookResult<TargetProfile> targetResult = FindTargetProfile(targetName);
+        if (!targetResult)
+        {
+            return std::unexpected(CookError::TargetProfileNotFound);
+        }
+        result.TargetPolicies[targetName] = *targetResult;
     }
-    
-    result.Profile = *targetResult;
+
 
     return PreparedCook{ std::move(result) };
 }

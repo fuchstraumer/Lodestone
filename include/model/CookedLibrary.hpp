@@ -102,6 +102,16 @@ struct InternedModule
     ContentInterner<FootprintList> FootprintListInterner{ &HashFootprintList, k_HashName };
     ContentInterner<VisibilityList> VisibilityInterner{ &HashVisibilityList, k_HashName };
     ContentInterner<ReflectedRasterState> RasterInterner{ &HashReflectedRasterState, k_HashName };
+
+    void DisableDedupe() noexcept
+    {
+        SourceInterner.Disable();
+        ResourceInterner.Disable();
+        ResourceListInterner.Disable();
+        FootprintListInterner.Disable();
+        VisibilityInterner.Disable();
+        RasterInterner.Disable();
+    }
 };
 
 /**@brief Interned tables and information about how efficiently they were built. We store these

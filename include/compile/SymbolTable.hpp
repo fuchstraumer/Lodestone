@@ -51,8 +51,8 @@ namespace lodestone
          * and extern static const decls. */
         void AddSource(std::string_view module_name, std::string_view source_code) noexcept;
         /** @brief Returns the set of tokens not found in the symbol tables for the given modules */
-        [[nodiscard]] std::vector<std::string_view> MissingTokens(std::span<std::string_view> module_names,
-                                                                  std::span<std::string_view> tokens) const;
+        [[nodiscard]] std::vector<std::string_view> MissingTokens(std::span<const std::string_view> module_names,
+                                                                  std::span<const std::string_view> tokens) const;
         /** @brief Returns the set of extern constant declarations not found in the symbol tables for the given module */
         [[nodiscard]] std::vector<ExternConstantDeclaration> ExternConstantsForModule(std::string_view module_name) const;
     private:

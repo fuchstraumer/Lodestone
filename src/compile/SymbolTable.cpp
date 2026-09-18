@@ -186,8 +186,8 @@ namespace lodestone
         }
     }
 
-    std::vector<std::string_view> SymbolTable::MissingTokens(std::span<std::string_view> module_names,
-                                                             std::span<std::string_view> tokens) const
+    std::vector<std::string_view> SymbolTable::MissingTokens(std::span<const std::string_view> module_names,
+                                                             std::span<const std::string_view> tokens) const
     {
         std::vector<std::string_view> missing;
         for (auto token : tokens)

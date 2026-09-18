@@ -699,7 +699,7 @@ error type is a `ShaderManifestError` struct that names the table and the record
 **E5 moved the policy into a TOML file.** A `PolicyDocument` reads the file through toml++, behind a
 facade in `src/permute/PolicyDocument.cpp`. Each module names an `InertAxesForEntryPoints` table and one
 section for each target profile, and a target section carries `MaxVariants`, `CookValues`, and `CookIf`.
-`EnumerateVariants` takes a `const TargetPolicy&` and applies `CookValues` and `CookIf` in the walk.
+`EnumerateVariants` takes a `const TargetCookPolicy&` and applies `CookValues` and `CookIf` in the walk.
 `ValidateAgainstSpace` checks the file against the declared axes, and the driver runs it before
 enumeration. `PermutationValue` lost its signed alternative. The registry lost its policy half, and
 `PermutationPolicy.hpp` is gone. The cook reads no policy file yet, on purpose: a pruning policy would

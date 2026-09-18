@@ -25,7 +25,7 @@ if not exist "%BIN%" (
 set "FAILED=0"
 
 for %%T in ("%BIN%\*Test.exe") do (
-    if /I not "%%~nT"=="CookTest" if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" if /I not "%%~nT"=="EnumAxisCookTest" (
+    if /I not "%%~nT"=="CookTest" if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" if /I not "%%~nT"=="EnumAxisCookTest" if /I not "%%~nT"=="KitchenSinkCookTest" (
         "%%~fT" >nul 2>&1
         if errorlevel 1 (
             echo [FAIL] %%~nT
@@ -84,6 +84,16 @@ if errorlevel 1 (
     set "FAILED=1"
 ) else (
     echo [ ok ] ParameterBlocksCookTest
+)
+
+REM The multi-module KitchenSink cook. Four consumer modules cook together against one policy. It is
+REM the stress and coverage asset, and it is expected to fail until cross-module type resolution lands.
+"%BIN%\KitchenSinkCookTest.exe" -o "%REPO%\build\%PRESET%\tests\kitchen_sink_output" --verify-deterministic --policy-file "%REPO%\tests\assets\KitchenSink\KitchenSink.toml" "%REPO%\tests\assets\KitchenSink\KsGeometry.slang" "%REPO%\tests\assets\KitchenSink\KsMaterial.slang" "%REPO%\tests\assets\KitchenSink\KsVolume.slang" "%REPO%\tests\assets\KitchenSink\KsPost.slang" >nul 2>&1
+if errorlevel 1 (
+    echo [FAIL] KitchenSinkCookTest
+    set "FAILED=1"
+) else (
+    echo [ ok ] KitchenSinkCookTest
 )
 
 if "%FAILED%"=="1" (

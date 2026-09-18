@@ -783,7 +783,7 @@ namespace
 
         // get policy now, to get max variant count so enumeration can check against it
         const std::string_view moduleName = compiler.ModuleName();
-        const TargetPolicy& currTargetPolicy =
+        const TargetCookPolicy& currTargetPolicy =
             policy_document.FindTargetPolicy(moduleName, options.TargetNames.front());
 
         // validate policy against active permutation space

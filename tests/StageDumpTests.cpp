@@ -26,12 +26,12 @@
 #include <utility>
 #include <vector>
 using namespace lodestone;
-using lodestone::TargetPolicy;
+using lodestone::TargetCookPolicy;
 
 namespace
 {
 
-static const TargetPolicy k_UnboundedTargetPolicy{};
+static const TargetCookPolicy k_UnboundedTargetPolicy{};
 
 /** The space dump for this axis is written out in full below. Keep the axis small, because the value
  * of that golden is that a person can read it and see the whole format at once. */

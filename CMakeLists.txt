@@ -103,8 +103,19 @@ set(LODESTONE_COMPILE_IMPL_SOURCES
 set(LODESTONE_DRIVER_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/CookerDriver.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/CookerOptions.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/CookerSteps.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/steps/BuildModuleStep.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/steps/FinalizeModuleStep.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/steps/PrepareCookStep.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/steps/PrepareModuleStep.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/steps/PreparePermutationSpaceStep.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/CookerDriver.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/CookerOptions.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/CookerOptions.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/steps/BuildModuleStep.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/steps/FinalizeModuleStep.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/steps/PrepareCookStep.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/steps/PrepareModuleStep.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/steps/PreparePermutationSpaceStep.cpp")
 
 set(LODESTONE_EMIT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/DedupeReport.hpp"

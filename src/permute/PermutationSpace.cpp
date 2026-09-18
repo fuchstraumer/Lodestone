@@ -80,7 +80,7 @@ std::span<const std::string> PermutationSpace::RequireExpressions() const noexce
     return requireExpressions;
 }
 
-CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetPolicy& policy, DiagnosticSink& sink) const
+CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetCookPolicy& policy, DiagnosticSink& sink) const
 {
     using AxisIndexMapType = std::unordered_map<std::string_view, std::ptrdiff_t, TransparentStringHash, std::equal_to<>>;
     // constructing this with ranges/views so we can make it const, which couldn't
@@ -138,7 +138,6 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetPolicy& p
     }
 
     VariantSet variantSet;
-    variantSet.Space = this;
     variantSet.SpaceSize = ComputeVariantSpaceSize();
     // check if the computed space size exceeds the maximum representable variant key
     // we'll need to change this eventually, but for now we're just using a simple uncompressed
@@ -420,7 +419,7 @@ CookError PermutationSpace::validateRequires(const std::vector<std::string_view>
 CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
                                        PermutationAssignment& partial,
                                        const RequireReadyMap& require_ready_at,
-                                       const TargetPolicy& policy,
+                                       const TargetCookPolicy& policy,
                                        const AxisValueOverrideMap& axis_value_overrides,
                                        std::vector<VariantDescriptor>& expanded,
                                        DiagnosticSink& sink) const

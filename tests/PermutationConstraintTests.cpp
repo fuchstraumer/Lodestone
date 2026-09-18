@@ -19,12 +19,12 @@ using lodestone::PermutationValue;
 using lodestone::RecordingDiagnosticSink;
 using lodestone::StderrDiagnosticSink;
 using lodestone::tests::TestRunner;
-using lodestone::TargetPolicy;
+using lodestone::TargetCookPolicy;
 
 namespace
 {
 
-static const TargetPolicy k_UnboundedTargetPolicy{};
+static const TargetCookPolicy k_UnboundedTargetPolicy{};
 
 void TestActiveWhenGating(TestRunner& runner)
 {

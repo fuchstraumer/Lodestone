@@ -14,6 +14,9 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <optional>
+#include <string_view>
+#include <string>
 #include <vector>
 
 namespace lodestone
@@ -39,7 +42,11 @@ struct SharedCookState
     std::unique_ptr<DiagnosticSink> Diagnostics;
     std::filesystem::path CacheDirectory;
     PolicyDocument Policy;
-    TargetProfile Profile;
+    std::vector<std::string_view> AllModuleNames;
+    std::unique_ptr<class OutputSink> OutputSink;
+    // Resolve policies per target upfront, read later
+    // string_views are views into Options vector of strings, should be fine
+    std::unordered_map<std::string_view, TargetCookPolicy> TargetPolicies;
 };
 
 // Writes SharedState, building the profile and policy document
@@ -49,40 +56,48 @@ struct PreparedCook
     SharedCookState SharedState;
 };
 
-// Stage 1: Declare and enumerate the module + space
-struct PreparedModule
+// Step 1: Bootstrap compiler *per module*, then coalesce back to build the 
+// permutation space for the whole cook. After that, we can proceed to 
+// build the RawModule per-module
+// todo-ship: this also needs to be keyed/varied on target, since that can
+// change the binding model and generally affects results greatly
+struct PreparedCompiler
 {
-    SharedCookState SharedState;
-    // For now, each module gets it's own compiler instance
-    // todo-ship: Symbol table sharing, and module source string info sharing
-    // can help amortize cost of finding symbols, resolving axes, etc
     std::unique_ptr<class SlangCompiler> Compiler;
-    // todo-ship: Each module also get it's own permutation space instance, but this
-    // should also be shared between a whole cook. Maybe.
-    std::unique_ptr<PermutationSpace> Space;
-    // per-target policy: child of per-cook policy document
-    TargetPolicy TargetPolicy;
-    RawModule Module;
 };
 
-// Evaluates the module for the permutation space, building the initial
-// set of variants
-struct ExpandedModule
+// Step 2: Build the permutation space, using all of the modules (and thus
+// compiler instances) from the previous step. This also generates
+// the variant set for a single module.
+// todo-ship: Currently it's still per-module, but that doesn't break
+// anything behavior-wise. It's just a missing improvement.
+struct PreparedPermutationSpace
 {
-    RawModule Module;
+    PermutationSpace Space;
+    std::optional<std::string> SpaceDump;
     VariantSet Variants;
+    std::optional<std::string> VariantDump;
 };
 
-// Compiles and resolves the module into concrete compiled shader variants
+// Stage 3: Combine the built space and the compiler to build the prepared
+// module. Previous seam used to be on RawModule, but this builds that 
+// internally and writes to RawModuleDump as the only artifact of that work
+// which exits this step
+// todo-ship: Thread this step, and use that to scale the shader compiler
+// to the right amount of threads to be about 1.25-1.5x hardware thread counts
+// any further will just choke out the OS, but mild oversubscription is fine
 struct BuiltModule
 {
-    std::vector<CompiledVariant> Variants;
+    InternedModule Module;
+    std::vector<CompiledVariant> CompiledVariants;
+    std::optional<std::string> RawModuleDump;
+    std::optional<std::string> ResolvedModuleDump;
 };
 
-// Freezes the module, interning content and preparing it for dump to disk
-struct FrozenModule
+struct FinalizedModule
 {
     CookedModule Module;
+    std::optional<std::string> Dump;
 };
 
 };

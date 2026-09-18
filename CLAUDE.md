@@ -402,7 +402,7 @@ unordered container reached the output.
 | `VariantDescriptor` | `permute/PermutationAssignment.hpp` | One variant identity. `Active` and `Canonical`. |
 | `CanonicalAssignment` | `permute/PermutationAssignment.hpp` | An assignment that holds every axis of one space. Only `PermutationSpace::CanonicalizeAssignment` builds one, so `ComputeVariantKey` cannot be given a partial assignment. |
 | `VariantKey` | `client/include/VariantKey.hpp` | A variant's identity: a strong `enum class : uint64_t`, a mixed-radix packing of the canonical assignment. `PackVariantKey`/`UnpackVariantKey` are the shared codec the cooker and the client both use. |
-| `PolicyDocument`, `TargetPolicy` | `permute/PolicyDocument.hpp` | The cook policy read from a TOML file: per target a variant budget, a `CookValues` allow-list, and a `CookIf` predicate. `ModulePolicyEntry` carries the per-module expectations to `EnforceModulePolicy`. |
+| `PolicyDocument`, `TargetCookPolicy` | `permute/PolicyDocument.hpp` | The cook policy read from a TOML file: per target a variant budget, a `CookValues` allow-list, and a `CookIf` predicate. `ModulePolicyEntry` carries the per-module expectations to `EnforceModulePolicy`. |
 | `CompiledVariant`, `CompiledEntryPoint` | `model/ShaderDataSchema.hpp` | Compiler output: WGSL text plus reflection. Owns its strings. |
 | `ReflectedBinding` | `model/ShaderDataSchema.hpp` | What the shader states about one resource. The CPU side never writes any of it. `Name` and `ScopeName` together are the identity: two entry points can each declare `albedoMap`. |
 | `RawVariant`, `RawModule` | `compile/RawLibrary.hpp` | Stage 3 output. Everything Slang says, with no opinion about any of it. A `[ls_*]` argument is still the string the author wrote. |
