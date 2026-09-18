@@ -4,6 +4,7 @@
 #include "driver/CookerOptions.hpp"
 #include "driver/CookerSteps.hpp"
 #include "permute/PolicyDocument.hpp"
+#include "target/TargetProfile.hpp"
 #include <chrono>
 #include <cstdint>
 #include <expected>
@@ -41,34 +42,33 @@ CookError ErrorCodeToCookError(std::error_code errc)
     return CookError::SystemError;
 }
 
-CookResult<PrepareCookState> PrepareCookStep::operator()(CookerOptions&& input) const
+CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input) const
 {
-    SharedCookState state;
-    state.Options = std::move(input);
-    state.StartTime = std::chrono::steady_clock::now();
-
+    SharedCookState result;
+    result.StartTime = std::chrono::steady_clock::now();
+    result.Options = std::move(input);
     // build the diagnostics sink
-    state.Diagnostics = std::make_unique<StderrDiagnosticSink>();
+    result.Diagnostics = std::make_unique<StderrDiagnosticSink>();
 
     // gonna reuse this for a few steps, whenever we touch the filesystem (the third rail)
     std::error_code filesystemError;
 
-    if (!std::filesystem::exists(state.Options.ModuleCacheDirectory, filesystemError))
+    if (!std::filesystem::exists(result.Options.ModuleCacheDirectory, filesystemError))
     {
         if (filesystemError)
         {
             return std::unexpected(ErrorCodeToCookError(filesystemError));
         }
-        std::filesystem::create_directories(state.Options.ModuleCacheDirectory, filesystemError);
+        std::filesystem::create_directories(result.Options.ModuleCacheDirectory, filesystemError);
         if (filesystemError)
         {
             return std::unexpected(ErrorCodeToCookError(filesystemError));
         }
     }
     
-    if (state.Options.PolicyFile)
+    if (result.Options.PolicyFile)
     {
-        const std::filesystem::path& policyFilePath = *state.Options.PolicyFile;
+        const std::filesystem::path& policyFilePath = *result.Options.PolicyFile;
         if (!std::filesystem::exists(policyFilePath, filesystemError))
         {
             return filesystemError ? std::unexpected(ErrorCodeToCookError(filesystemError)) :
@@ -96,15 +96,15 @@ CookResult<PrepareCookState> PrepareCookStep::operator()(CookerOptions&& input) 
                 .Context="RunCookOnce",
                 .Related={}
             };
-            state.Diagnostics->Report(std::move(policyDiag));
+            result.Diagnostics->Report(std::move(policyDiag));
             return std::unexpected(CookError::PolicyDocumentLoadFailed);
         }
         // remember, to move properly from expected, dereference the result
-        state.Policy = std::move(*policyDocResult);
+        result.Policy = std::move(*policyDocResult);
     }
 
     // sanity check: do all the module paths exist?
-    for (const std::filesystem::path& modulePath : state.Options.ModulePaths)
+    for (const std::filesystem::path& modulePath : result.Options.ModulePaths)
     {
         if (!std::filesystem::exists(modulePath, filesystemError))
         {
@@ -114,16 +114,15 @@ CookResult<PrepareCookState> PrepareCookStep::operator()(CookerOptions&& input) 
     }
 
     // now get target profile
-    CookResult<TargetProfile> targetResult = FindTargetProfile(state.Options.TargetName);
+    CookResult<TargetProfile> targetResult = FindTargetProfile(result.Options.TargetNames.front());
     if (!targetResult)
     {
         return std::unexpected(CookError::TargetProfileNotFound);
     }
     
-    state.Profile = *targetResult;
+    result.Profile = *targetResult;
 
-
-    
+    return PreparedCook{ std::move(result) };
 }
 
-}
+} // namespace lodestone    

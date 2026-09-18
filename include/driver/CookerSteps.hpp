@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <vector>
 
@@ -36,16 +37,14 @@ struct SharedCookState
     CookStatistics Statistics;
     CookerOptions Options;
     std::unique_ptr<DiagnosticSink> Diagnostics;
+    std::filesystem::path CacheDirectory;
     PolicyDocument Policy;
     TargetProfile Profile;
-    // Each module shares this, but it's initialization
-    // is a bit deferred: so, wrapped in a unique_ptr
-    std::unique_ptr<PermutationSpace> Space;
 };
 
 // Writes SharedState, building the profile and policy document
 // used by all later steps. Does not yet populate permutation space.
-struct PrepareCookState
+struct PreparedCook
 {
     SharedCookState SharedState;
 };
@@ -53,6 +52,16 @@ struct PrepareCookState
 // Stage 1: Declare and enumerate the module + space
 struct PreparedModule
 {
+    SharedCookState SharedState;
+    // For now, each module gets it's own compiler instance
+    // todo-ship: Symbol table sharing, and module source string info sharing
+    // can help amortize cost of finding symbols, resolving axes, etc
+    std::unique_ptr<class SlangCompiler> Compiler;
+    // todo-ship: Each module also get it's own permutation space instance, but this
+    // should also be shared between a whole cook. Maybe.
+    std::unique_ptr<PermutationSpace> Space;
+    // per-target policy: child of per-cook policy document
+    TargetPolicy TargetPolicy;
     RawModule Module;
 };
 
