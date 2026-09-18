@@ -13,7 +13,7 @@ struct PrepareModuleStep
 {
     CookResult<PreparedCompiler> operator()(const SharedCookState& state,
                                             std::filesystem::path module_path,
-                                            std::string_view target_name);
+                                            std::string_view target_name) const;
 };
 
 }

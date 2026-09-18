@@ -15,7 +15,7 @@ struct BuildModuleStep
     CookResult<BuiltModule> operator()(const SharedCookState& shared_state,
                                        const std::string_view& module_name,
                                        const std::string_view& target_name,
-                                       std::unique_ptr<class SlangCompiler> compiler,
+                                       class SlangCompiler* compiler,
                                        const PermutationSpace& space,
                                        const VariantSet& variants) const;
 };

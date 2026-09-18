@@ -17,7 +17,7 @@ namespace lodestone
 
 CookResult<PreparedCompiler> PrepareModuleStep::operator()(const SharedCookState& shared_state,
                                                            std::filesystem::path module_path,
-                                                           std::string_view target_name)
+                                                           std::string_view target_name) const
 {
     // first step: initialize the compiler and have it begin building this particular module
     SlangCompilerCreateInfo createInfo;

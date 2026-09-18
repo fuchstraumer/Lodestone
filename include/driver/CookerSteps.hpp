@@ -8,6 +8,7 @@
 #include "model/ShaderDataSchema.hpp"
 #include "model/CookedLibrary.hpp"
 #include "permute/PermutationSpace.hpp"
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -30,20 +31,34 @@ struct CookStatistics
     uint32_t ReflectionMismatches{ 0u };
     double ElapsedMilliseconds{ 0.0 };
     size_t TotalSourceBytes{ 0u };
+    CookStatistics& operator+=(const CookStatistics& other)
+    {
+        // input does not have to be treated as atomic, just *this
+        std::atomic_ref<uint32_t> atomicModulesCooked{ ModulesCooked };
+        std::atomic_ref<uint32_t> atomicVariantsCompiled{ VariantsCompiled };
+        std::atomic_ref<uint32_t> atomicEntryPointsCompiled{ EntryPointsCompiled };
+        std::atomic_ref<uint32_t> atomicReflectionMismatches{ ReflectionMismatches };
+        std::atomic_ref<double> atomicElapsedMilliseconds{ ElapsedMilliseconds };
+        std::atomic_ref<size_t> atomicTotalSourceBytes{ TotalSourceBytes };
+        atomicModulesCooked.fetch_add(other.ModulesCooked, std::memory_order_relaxed);
+        atomicVariantsCompiled.fetch_add(other.VariantsCompiled, std::memory_order_relaxed);
+        atomicEntryPointsCompiled.fetch_add(other.EntryPointsCompiled, std::memory_order_relaxed);
+        atomicReflectionMismatches.fetch_add(other.ReflectionMismatches, std::memory_order_relaxed);
+        atomicElapsedMilliseconds.fetch_add(other.ElapsedMilliseconds, std::memory_order_relaxed);
+        atomicTotalSourceBytes.fetch_add(other.TotalSourceBytes, std::memory_order_relaxed);
+        return *this;
+    }
 };
 
 // fow now: listing steps using an enum class to spell them out, then going to build structs
 // per step
 struct SharedCookState
 {
-    std::chrono::steady_clock::time_point StartTime;
-    CookStatistics Statistics;
     CookerOptions Options;
     std::unique_ptr<DiagnosticSink> Diagnostics;
     std::filesystem::path CacheDirectory;
     PolicyDocument Policy;
     std::vector<std::string_view> AllModuleNames;
-    std::unique_ptr<class OutputSink> OutputSink;
     // Resolve policies per target upfront, read later
     // string_views are views into Options vector of strings, should be fine
     std::unordered_map<std::string_view, TargetProfile> TargetProfiles;
@@ -92,6 +107,7 @@ struct BuiltModule
     std::vector<CompiledVariant> CompiledVariants;
     std::optional<std::string> RawModuleDump;
     std::optional<std::string> ResolvedModuleDump;
+    CookStatistics Statistics;
 };
 
 struct FinalizedModule

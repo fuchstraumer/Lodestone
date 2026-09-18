@@ -1,114 +1,183 @@
 #include "driver/CookerDriver.hpp"
-#include "CookerErrors.hpp"
-#include "Diagnostics.hpp"
-#include "ShaderLibraryTypes.hpp"
-#include "VariantKey.hpp"
-#include "compile/RawLibrary.hpp"
-#include "compile/SlangCompiler.hpp"
 #include "compile/SymbolTable.hpp"
 #include "driver/CookerOptions.hpp"
-#include "emit/DedupeReport.hpp"
+#include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
+#include "compile/RawLibrary.hpp"
+#include "compile/SlangCompiler.hpp"
+#include "driver/CookerSteps.hpp"
+#include "driver/steps/PrepareCookStep.hpp"
+#include "driver/steps/PrepareModuleStep.hpp"
+#include "driver/steps/PreparePermutationSpaceStep.hpp"
+#include "driver/steps/BuildModuleStep.hpp"
+#include "driver/steps/FinalizeModuleStep.hpp"
 #include "emit/OutputSink.hpp"
-#include "emit/ShaderManifestEmitter.hpp"
-#include "emit/StageDump.hpp"
-#include "model/CookedLibrary.hpp"
-#include "model/ResolveStage.hpp"
-#include "model/ShaderDataSchema.hpp"
-#include "permute/PermutationAssignment.hpp"
-#include "permute/PermutationAxis.hpp"
-#include "permute/PermutationSpace.hpp"
-#include "permute/PermutationValue.hpp"
-#include "permute/PolicyDocument.hpp"
-#include "target/TargetProfile.hpp"
-
 #include <algorithm>
 #include <chrono>
-#include <cstdint>
-#include <cstdio>
+#include <cstddef>
 #include <expected>
-#include <filesystem>
 #include <format>
-#include <functional>
-#include <memory>
 #include <ranges>
 #include <ratio>
-#include <span>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <vector>
 #include "magic_enum/magic_enum.hpp"
+#include "model/CookedLibrary.hpp"
 
 namespace lodestone
 {
 
 namespace
 {
-
-    /** Why the cross-check will or will not run for this cook. */
-    std::string_view DescribeCrossCheckState(const TargetProfile& target,
-                                             const CookerOptions& options) noexcept
+    std::string BuildDumpFileName(std::string_view module_name, std::string_view target_name, StageDumpKind kind)
     {
-        if (target.Validator == nullptr)
-        {
-            return "no validator given/available for this target";
-        }
-
-        return options.ValidateAgainstEmittedText ? "on" : "off by --no-validate";
+        return std::format("{}_{}_{}.dump", module_name, target_name, magic_enum::enum_name(kind));
     }
-
-    CookError EmitLibraryModules(const std::vector<CookedModule>& modules, OutputSink& sink)
-    {
-        for (const CookedModule& module : modules)
-        {
-            const std::string manifest = EmitShaderManifest(module);
-
-            CookError manifestResult = VerifyManifestRoundTrip(module, manifest);
-            if (manifestResult != CookError::Success)
-            {
-                return manifestResult;
-            }
-
-            auto makeManifestFileName = [](const std::string_view module_name)
-            {
-                return std::string(module_name) + ".ldmanifest";
-            };
-
-            manifestResult = sink.WriteArtifact(makeManifestFileName(module.Name), manifest);
-            if (manifestResult != CookError::Success)
-            {
-                return manifestResult;
-            }
-        }
-
-        return CookError::Success;
-    }
-
 } // namespace
 
-CookResult<CookStatistics> RunCookOnce(const CookerOptions& options,
+CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                                        OutputSink& sink,
                                        DiagnosticSink& diagnostics)
 {
-    
+    const std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+    CookStatistics cookStatistics;
+    // note that none of these actually hold state, it just makes calling them as functors easier
+    const static PrepareCookStep PrepareCook;
+    const static PrepareModuleStep PrepareModule;
+    const static PreparePermutationSpaceStep PreparePermutationSpace;
+    const static BuildModuleStep BuildModule;
+    const static FinalizeModuleStep FinalizeModule;
 
-    if (statistics.ReflectionMismatches != 0u)
+    CookResult<PreparedCook> preparedCookResult = PrepareCook(std::move(options));
+    if (!preparedCookResult)
     {
-        return std::unexpected(CookError::ReflectionMismatch);
+        return std::unexpected(preparedCookResult.error());
     }
 
-    const CookError emitResult = EmitLibraryArtifacts(library, sink);
-    if (emitResult != CookError::Success)
+    // now, read options from preparedCookResult
+    const PreparedCook& preparedCook = *preparedCookResult;
+    const SharedCookState& cookState = preparedCook.SharedState;
+
+    std::vector<CookedModule> cookedModules(cookState.Options.ModulePaths.size());
+
+    for (auto&& [moduleIdx, modulePath] : std::views::enumerate(cookState.Options.ModulePaths))
     {
-        return std::unexpected(emitResult);
+        for (const auto& targetName : cookState.Options.TargetNames)
+        {
+            CookResult<PreparedCompiler> preparedModuleResult = PrepareModule(cookState,
+                                                                              modulePath,
+                                                                              targetName);
+            
+            if (!preparedModuleResult)
+            {
+                return std::unexpected(preparedModuleResult.error());
+            }
+
+            const PreparedCompiler& preparedModule = *preparedModuleResult;
+            std::vector<RawAxisDeclaration> rawAxes = preparedModule.Compiler->BuildAxisDeclarations();
+            const std::string_view moduleName = cookState.AllModuleNames[static_cast<size_t>(moduleIdx)];
+            const SymbolTable& symbolTable = preparedModule.Compiler->GetSymbolTable();
+            CookResult<PreparedPermutationSpace> spaceResult = PreparePermutationSpace(cookState,
+                                                                                       moduleName,
+                                                                                       targetName,
+                                                                                       symbolTable,
+                                                                                       std::move(rawAxes));
+            
+            if (!spaceResult)
+            {
+                return std::unexpected(spaceResult.error());
+            }
+
+            const PreparedPermutationSpace& preparedSpace = *spaceResult;
+
+            if (preparedSpace.SpaceDump)
+            {
+                const std::string fileName = BuildDumpFileName(moduleName, targetName, StageDumpKind::Space);
+                CookError writeError = sink.WriteArtifact(fileName, std::move(*preparedSpace.SpaceDump));
+                if (!writeError)
+                {
+                    return std::unexpected(writeError);
+                }
+            }
+
+            if (preparedSpace.VariantDump)
+            {
+                const std::string fileName = BuildDumpFileName(moduleName, targetName, StageDumpKind::Variants);
+                CookError writeError = sink.WriteArtifact(fileName, std::move(*preparedSpace.VariantDump));
+                if (!writeError)
+                {
+                    return std::unexpected(writeError);
+                }
+            }
+
+            CookResult<BuiltModule> buildResult = BuildModule(cookState,
+                                                              moduleName,
+                                                              targetName,
+                                                              preparedModule.Compiler.get(),
+                                                              preparedSpace.Space,
+                                                              preparedSpace.Variants);
+            if (!buildResult)
+            {
+                return std::unexpected(buildResult.error());
+            }
+
+            BuiltModule& builtModule = *buildResult;
+
+            if (builtModule.RawModuleDump)
+            {
+                const std::string fileName = BuildDumpFileName(moduleName, targetName, StageDumpKind::Raw);
+                CookError writeError = sink.WriteArtifact(fileName, std::move(*builtModule.RawModuleDump));
+                if (!writeError)
+                {
+                    return std::unexpected(writeError);
+                }
+            }
+
+            if (builtModule.ResolvedModuleDump)
+            {
+                const std::string fileName = BuildDumpFileName(moduleName, targetName, StageDumpKind::Resolved);
+                CookError writeError = sink.WriteArtifact(fileName, std::move(*builtModule.ResolvedModuleDump));
+                if (!writeError)
+                {
+                    return std::unexpected(writeError);
+                }
+            }
+            
+            // operator+= uses atomic_ref to safely update the statistics in a potentially multithreaded context
+            // we can improve this in the future, but for now that works just fine
+            cookStatistics += builtModule.Statistics;
+
+            // Last step: resolve everything into it's final form.
+            CookResult<FinalizedModule> finalizeResult = FinalizeModule(cookState,
+                                                                        std::move(builtModule.Module),
+                                                                        builtModule.CompiledVariants);
+
+            if (!finalizeResult)
+            {
+                return std::unexpected(finalizeResult.error());
+            }
+
+            if (finalizeResult->Dump)
+            {
+                const std::string fileName = BuildDumpFileName(moduleName, targetName, StageDumpKind::Cooked);
+                CookError writeError = sink.WriteArtifact(fileName, std::move(*finalizeResult->Dump));
+                if (!writeError)
+                {
+                    return std::unexpected(writeError);
+                }
+            }
+
+            // write into slot: when we thread this, that should just work since the vector is never resized after initial allocation
+            cookedModules[static_cast<size_t>(moduleIdx)] = std::move(finalizeResult->Module);
+        }
     }
 
     const std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
     const std::chrono::duration<double, std::milli> elapsed = endTime - startTime;
-    statistics.ElapsedMilliseconds = elapsed.count();
-
-    return statistics;
+    cookStatistics.ElapsedMilliseconds = elapsed.count();
+    return cookStatistics;
 }
 
 namespace
@@ -131,9 +200,6 @@ namespace
         {
             return firstResult;
         }
-
-        // reset the permutation space: remember to remove this once we fix this 
-        cookPermutationSpace.reset();
 
         std::string secondName = std::string{ sink.Describe() } + "_second";
         MemoryOutputSink second{ secondName };

@@ -46,20 +46,19 @@ namespace
                                      const CompiledVariant& variant,
                                      DiagnosticSink& diagnostics);
     void ReportUnreferencedBindings(const CompiledVariant& variant, DiagnosticSink& diagnostics);
-    void CaptureEntryPointsOnce(InternedModule& interned_module, const CompiledVariant& variant);
-    [[nodiscard]] CookError CompileModuleVariants(const SharedCookState& shared_state,
-                                                  const TargetProfile& target,
-                                                  SlangCompiler& compiler,
-                                                  const VariantSet& variant_set,
-                                                  InternedModule& interned_module,
-                                                  RawModule& raw_module,
-                                                  std::vector<CompiledVariant>& out_module_variants);
+    [[nodiscard]] CookResult<CookStatistics> CompileModuleVariants(const SharedCookState& shared_state,
+                                                                   const TargetProfile& target,
+                                                                   SlangCompiler& compiler,
+                                                                   const VariantSet& variant_set,
+                                                                   InternedModule& interned_module,
+                                                                   RawModule& raw_module,
+                                                                   std::vector<CompiledVariant>& out_module_variants);
 }
 
 CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& shared_state,
                                                     const std::string_view& module_name,
                                                     const std::string_view& target_name,
-                                                    std::unique_ptr<SlangCompiler> compiler,
+                                                    SlangCompiler* compiler,
                                                     const PermutationSpace& space,
                                                     const VariantSet& variants) const
 {
@@ -93,17 +92,17 @@ CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& share
         // this should not happen, since we also look this up during bootstrap, but I've been wrong before
         return std::unexpected(targetProfileResult.error());
     }
-    const CookError compileVariantsResult = CompileModuleVariants(shared_state,
-                                                                  *targetProfileResult,
-                                                                  *compiler,
-                                                                  variants,
-                                                                  internedModule,
-                                                                  rawModule,
-                                                                  compiledVariants);
+    CookResult<CookStatistics> compileVariantsResult = CompileModuleVariants(shared_state,
+                                                                             *targetProfileResult,
+                                                                             *compiler,
+                                                                             variants,
+                                                                             internedModule,
+                                                                             rawModule,
+                                                                             compiledVariants);
     
     if (!compileVariantsResult)
     {
-        return std::unexpected(compileVariantsResult);
+        return std::unexpected(compileVariantsResult.error());
     }
 
     // Raw module dump can't actually happen until after the variants have all been built, weirdly enough
@@ -125,6 +124,7 @@ CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& share
         .CompiledVariants = std::move(compiledVariants),
         .RawModuleDump = std::move(rawModuleDump),
         .ResolvedModuleDump = std::move(resolvedModuleDump),
+        .Statistics = *compileVariantsResult
     };
 }
 
@@ -264,19 +264,17 @@ namespace
         }
     }
 
-    [[nodiscard]] CookError CompileModuleVariants(const SharedCookState& shared_state,
-                                                  const TargetProfile& target,
-                                                  SlangCompiler& compiler,
-                                                  const VariantSet& variant_set,
-                                                  InternedModule& interned_module,
-                                                  RawModule& raw_module,
-                                                  std::vector<CompiledVariant>& out_module_variants)
+    [[nodiscard]] CookResult<CookStatistics> CompileModuleVariants(const SharedCookState& shared_state,
+                                                                   const TargetProfile& target,
+                                                                   SlangCompiler& compiler,
+                                                                   const VariantSet& variant_set,
+                                                                   InternedModule& interned_module,
+                                                                   RawModule& raw_module,
+                                                                   std::vector<CompiledVariant>& out_module_variants)
     {
         const bool keepRawVariants = IsStageDumpRequested(shared_state.Options, StageDumpKind::Raw);
+        CookStatistics localStats{};
         auto compileResultsList = compiler.Compile(variant_set.Variants, *shared_state.Diagnostics);
-        // todo-ship: We need to coalesce these stats out of this function, instead of passing them in.
-        // We don't need to read them here, this is just one of the few steps that actually adds to them
-        CookStatistics localStats = shared_state.Statistics;
 
         for (auto&& [idx, result] : std::views::enumerate(compileResultsList))
         {
@@ -286,7 +284,7 @@ namespace
                 const std::string errStr = std::format("variant [{}] failed: {}",
                                                        DescribeAssignment(currVariant.Canonical),
                                                        ToString(result.error()));
-                return ReportError(*shared_state.Diagnostics, result.error(), errStr);
+                return std::unexpected(ReportError(*shared_state.Diagnostics, result.error(), errStr));
             }
 
             const ResolveContext context =
@@ -297,7 +295,7 @@ namespace
                 const std::string errStr = std::format("variant [{}] failed: {}",
                                                        DescribeAssignment(currVariant.Canonical),
                                                        ToString(variantResult.error()));
-                return ReportError(*shared_state.Diagnostics, variantResult.error(), errStr);
+                return std::unexpected(ReportError(*shared_state.Diagnostics, variantResult.error(), errStr));
             }
 
             if (keepRawVariants)
@@ -335,13 +333,13 @@ namespace
                 AppendVariantToModule(interned_module, variant, currVariant.Canonical);
             if (appendResult != CookError::Success)
             {
-                return appendResult;
+                return std::unexpected(appendResult);
             }
 
             out_module_variants.emplace_back(std::move(*variantResult));
         }
 
-        return CookError::Success;
+        return localStats;
     }
 }
 
