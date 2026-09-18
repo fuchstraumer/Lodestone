@@ -3,6 +3,7 @@
 #include "Diagnostics.hpp"
 #include "driver/CookerOptions.hpp"
 #include "driver/CookerSteps.hpp"
+#include "emit/OutputSink.hpp"
 #include "permute/PolicyDocument.hpp"
 #include "target/TargetProfile.hpp"
 #include <chrono>
@@ -49,6 +50,7 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input) cons
     result.Options = std::move(input);
     // build the diagnostics sink
     result.Diagnostics = std::make_unique<StderrDiagnosticSink>();
+    result.OutputSink = std::make_unique<MemoryOutputSink>(result.Options.OutputPath.string());
 
     // gonna reuse this for a few steps, whenever we touch the filesystem (the third rail)
     std::error_code filesystemError;
@@ -121,9 +123,8 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input) cons
         {
             return std::unexpected(CookError::TargetProfileNotFound);
         }
-        result.TargetPolicies[targetName] = *targetResult;
+        result.TargetProfiles[targetName] = *targetResult;
     }
-
 
     return PreparedCook{ std::move(result) };
 }

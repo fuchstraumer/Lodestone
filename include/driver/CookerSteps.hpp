@@ -2,7 +2,6 @@
 #ifndef LODESTONE_COOKER_STEPS_HPP
 #define LODESTONE_COOKER_STEPS_HPP
 #include "Diagnostics.hpp"
-#include "compile/RawLibrary.hpp"
 #include "driver/CookerOptions.hpp"
 #include "permute/PolicyDocument.hpp"
 #include "target/TargetProfile.hpp"
@@ -17,6 +16,7 @@
 #include <optional>
 #include <string_view>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace lodestone
@@ -46,7 +46,7 @@ struct SharedCookState
     std::unique_ptr<class OutputSink> OutputSink;
     // Resolve policies per target upfront, read later
     // string_views are views into Options vector of strings, should be fine
-    std::unordered_map<std::string_view, TargetCookPolicy> TargetPolicies;
+    std::unordered_map<std::string_view, TargetProfile> TargetProfiles;
 };
 
 // Writes SharedState, building the profile and policy document

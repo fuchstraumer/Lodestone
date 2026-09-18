@@ -6,6 +6,7 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <mutex>
 
 /** Where cooked output goes. Kept behind an interface so a future watch-and-serve process can hand
  * sources to a running engine without going through the filesystem. */
@@ -24,9 +25,9 @@ public:
 
     /** Writes an artifact to the output sink: this never outputs just one item, it outputs
      * multiple named artifacts. */
-    virtual CookError WriteArtifact(std::string_view artifact_name,
+    [[nodiscard]] virtual CookError WriteArtifact(std::string_view artifact_name,
                                     std::string_view content) = 0;
-    std::string_view Describe() const noexcept;
+    [[nodiscard]] std::string_view Describe() const noexcept;
 protected:
     std::string name;
 };
