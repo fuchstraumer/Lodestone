@@ -60,6 +60,7 @@ struct CookerOptions
     /** One bit for each `StageDumpKind` the cook must write. `--dump-stage` sets them. */
     uint32_t DumpStageMask{ 0u };
     std::optional<std::filesystem::path> PolicyFile;
+    bool DumpSources{ false };
 };
 
 bool IsStageDumpRequested(const CookerOptions& options, StageDumpKind kind) noexcept;

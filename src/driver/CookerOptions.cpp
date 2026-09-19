@@ -41,6 +41,7 @@ namespace
         "  --dump-stage=<name> write one stage of the pipeline as JSON, beside the other artifacts.\n"
         "                  Repeat the flag for more than one stage. Names: space, variants, raw,\n"
         "                  resolved, interned, cooked, all.\n"
+        "  --dump-sources  write the shader sources to the dump files\n"
         "  --policy-file <path> specify the policy file to use\n";
 
     constexpr std::string_view k_OptimizationPrefix = "--O";
@@ -142,12 +143,18 @@ namespace
         options.MultithreadEntryPointCodegen = false;
     }
 
-    constexpr std::array<SwitchFlag, 5u> k_SwitchFlags{
+    void EnableDumpSources(CookerOptions& options) noexcept
+    {
+        options.DumpSources = true;
+    }
+
+    constexpr std::array<SwitchFlag, 6u> k_SwitchFlags{
         SwitchFlag{ .Name = "--no-dedupe", .Apply = &DisableDedupe },
         SwitchFlag{ .Name = "--verify-deterministic", .Apply = &EnableVerifyDeterminism },
         SwitchFlag{ .Name = "--no-validate", .Apply = &DisableValidateAgainstEmittedText },
         SwitchFlag{ .Name = "--quiet", .Apply = &DisableReflectionReports },
-        SwitchFlag{ .Name = "--single-threaded", .Apply = &DisableMultithreadedCompile }
+        SwitchFlag{ .Name = "--single-threaded", .Apply = &DisableMultithreadedCompile },
+        SwitchFlag{ .Name = "--dump-sources", .Apply = &EnableDumpSources }
     };
 
     const SwitchFlag* FindSwitchFlag(std::string_view argument) noexcept

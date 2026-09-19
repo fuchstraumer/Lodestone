@@ -75,9 +75,10 @@ enum class CookError : uint16_t
 
     // output and diagnostic sink operation errors
     OutputPathInvalid = 120,
-    OutputFileOpenFailed = 121,
-    OutputWriteFailed = 122,
-    ArtifactAlreadyWritten = 123,
+    OutputPathTooLong = 121,
+    OutputFileOpenFailed = 122,
+    OutputWriteFailed = 123,
+    ArtifactAlreadyWritten = 124,
 
     // policy file (TOML) checked against the module's declared axes
     PolicyAxisNotDeclared = 130,

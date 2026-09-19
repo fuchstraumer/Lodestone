@@ -1,5 +1,7 @@
 #include "emit/OutputSink.hpp"
 #include "CookerErrors.hpp"
+#include <cstring>
+#include <cwchar>
 #include <filesystem>
 #include <fstream>
 #include <ios>
@@ -34,6 +36,11 @@ FileOutputSink::~FileOutputSink() = default;
 CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::string_view content)
 {
     const std::filesystem::path artifactPath = path / std::filesystem::path{ artifact_name };
+    // check for length of path
+    if (std::wcslen(artifactPath.c_str()) > 255)
+    {
+        return CookError::OutputPathTooLong;
+    }
 
     std::ofstream stream{ artifactPath, std::ios::binary | std::ios::trunc };
     if (!stream.is_open())
