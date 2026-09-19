@@ -9,7 +9,6 @@
 #include "model/CookedLibrary.hpp"
 #include "permute/PermutationSpace.hpp"
 #include <atomic>
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -58,7 +57,7 @@ struct SharedCookState
     std::unique_ptr<DiagnosticSink> Diagnostics;
     std::filesystem::path CacheDirectory;
     PolicyDocument Policy;
-    std::vector<std::string_view> AllModuleNames;
+    std::vector<std::string> AllModuleNames;
     // Resolve policies per target upfront, read later
     // string_views are views into Options vector of strings, should be fine
     std::unordered_map<std::string_view, TargetProfile> TargetProfiles;

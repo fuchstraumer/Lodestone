@@ -36,7 +36,7 @@ namespace
     CookResult<std::vector<PermutationValue>> ValuesFromStr(const std::string_view str,
                                                             DiagnosticSink& sink);
     CookResult<PermutationSpace> BuildPermutationSpace(const SymbolTable& symbol_table,
-                                                       std::span<const std::string_view> module_names,
+                                                       std::span<const std::string> module_names,
                                                        std::vector<RawAxisDeclaration> raw_axes,
                                                        DiagnosticSink& sink);
 }
@@ -164,7 +164,7 @@ namespace
     }
 
     CookResult<PermutationSpace> BuildPermutationSpace(const SymbolTable& symbol_table,
-                                                       std::span<const std::string_view> module_names,
+                                                       std::span<const std::string> module_names,
                                                        std::vector<RawAxisDeclaration> raw_axes,
                                                        DiagnosticSink& sink)
     {

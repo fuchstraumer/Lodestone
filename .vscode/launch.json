@@ -7,9 +7,13 @@
             "request": "launch",
             "program": "${command:cmake.launchTargetPath}",
             "args": [
-                "-o", "${workspaceFolder}/out/cooked.hpp",
-                "--O3",
-                "${workspaceFolder}/tests/assets/compute/Ocean/OceanFft.slang" ],
+                "-o", "${workspaceFolder}/kitchen_sink_output",
+                "--policy-file", "${workspaceFolder}/tests/assets/KitchenSink/KitchenSink.toml",
+                "${workspaceFolder}/tests/assets/KitchenSink/KsGeometry.slang",
+                "${workspaceFolder}/tests/assets/KitchenSink/KsMaterial.slang",
+                "${workspaceFolder}/tests/assets/KitchenSink/KsVolume.slang",
+                "${workspaceFolder}/tests/assets/KitchenSink/KsPost.slang"
+            ],
             "cwd": "${command:cmake.getLaunchTargetDirectory}",
             "console": "internalConsole"
         },

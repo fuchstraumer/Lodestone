@@ -40,8 +40,11 @@ STAGES = ("space", "variants", "raw", "resolved", "interned", "cooked")
 # sign or width bug in the tag read fails here even though the manifest stores only the case names.
 # Each module's dumps are named by its stem, so the two sets never collide.
 DEFAULT_MODULES = (
-    "tests/assets/compute/Ocean/OceanFft.slang",
-    "tests/assets/EnumAxis/EnumAxisTest.slang",
+    "tests/assets/KitchenSink/KsGeometry.slang",
+    "tests/assets/KitchenSink/KsMaterial.slang",
+    "tests/assets/KitchenSink/KsPost.slang",
+    "tests/assets/KitchenSink/KsShading.slang",
+    "tests/assets/KitchenSink/KsVolume.slang"
 )
 KNOWN_GOOD = "tests/known_good"
 
@@ -85,6 +88,8 @@ def cook(cooker: pathlib.Path, module: pathlib.Path, out_directory: pathlib.Path
             str(out_directory),
             "--dump-stage=all",
             str(module),
+            "--policy-file",
+            str("tests/assets/KitchenSink/KitchenSink.toml")
         ],
         capture_output=True,
         text=True,

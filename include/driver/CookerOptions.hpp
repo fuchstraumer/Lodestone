@@ -63,7 +63,7 @@ struct CookerOptions
 };
 
 bool IsStageDumpRequested(const CookerOptions& options, StageDumpKind kind) noexcept;
-
+std::filesystem::path DefaultModuleCacheDirectory() noexcept;
 CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arguments);
 std::string_view GetUsageText() noexcept;
 

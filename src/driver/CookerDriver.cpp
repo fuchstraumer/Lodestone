@@ -66,6 +66,8 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
     {
         for (const auto& targetName : cookState.Options.TargetNames)
         {
+            // Each module's preparation involves a slang bootstrap compile, which creates the compiler
+            // we'll use later and walks the root (no specializations) source code of the module.
             CookResult<PreparedCompiler> preparedModuleResult = PrepareModule(cookState,
                                                                               modulePath,
                                                                               targetName);
@@ -76,9 +78,14 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
             }
 
             const PreparedCompiler& preparedModule = *preparedModuleResult;
+            // The preparation step allows us to do exactly this part - figure out what axes exist in the module's source code.
             std::vector<RawAxisDeclaration> rawAxes = preparedModule.Compiler->BuildAxisDeclarations();
             const std::string_view moduleName = cookState.AllModuleNames[static_cast<size_t>(moduleIdx)];
             const SymbolTable& symbolTable = preparedModule.Compiler->GetSymbolTable();
+            // The permutation space needs the symbol table for the active module + the raw axes to build itself
+            // With that, it can fully validate and get set up to generate all the possible permutations
+            // (Which are returned in the variants table out of this - not actually containing source code,
+            //  but just keys based on whatever axes and permutations exist in the module's source code)
             CookResult<PreparedPermutationSpace> spaceResult = PreparePermutationSpace(cookState,
                                                                                        moduleName,
                                                                                        targetName,
@@ -112,6 +119,10 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                 }
             }
 
+            // This is the actual meat of the operation: this will use a thread pool to build all the permutations of the 
+            // current module+target pairing concurrently. This step also runs interning, which deduplicates identical
+            // data across permutations. This could probably be pulled out to this level, and ideally at some point I'll
+            // do just that (we could fuse it across the *whole* library instead of per-module), but not yet.
             CookResult<BuiltModule> buildResult = BuildModule(cookState,
                                                               moduleName,
                                                               targetName,
@@ -149,7 +160,10 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
             // we can improve this in the future, but for now that works just fine
             cookStatistics += builtModule.Statistics;
 
-            // Last step: resolve everything into it's final form.
+            // Last step: resolve everything into it's final form. This mostly just "consumes" the memory of the interner,
+            // moving most of it's members into itself: but it also performs some final validation of the source code
+            // and reflection data to make sure that interning/deduplication has been correctly applied.
+            // The key "extra data" from this is just information on the efficiency of dedupe per field type.
             CookResult<FinalizedModule> finalizeResult = FinalizeModule(cookState,
                                                                         std::move(builtModule.Module),
                                                                         builtModule.CompiledVariants);
@@ -258,17 +272,17 @@ namespace
 
 } // namespace
 
-CookResult<CookStatistics> RunCook(const CookerOptions& options, OutputSink& sink)
+CookResult<CookStatistics> RunCook(CookerOptions options, OutputSink& sink)
 {
     // create one diag sink for the *whole* cook
     StderrDiagnosticSink diagnostics;
 
     if (options.VerifyDeterministic)
     {
-        return RunCookTwiceAndCompare(options, sink, diagnostics);
+        return RunCookTwiceAndCompare(std::move(options), sink, diagnostics);
     }
 
-    return RunCookOnce(options, sink, diagnostics);
+    return RunCookOnce(std::move(options), sink, diagnostics);
 }
 
 } // namespace lodestone

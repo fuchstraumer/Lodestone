@@ -108,11 +108,6 @@ namespace
 #pragma clang diagnostic pop
 #endif
 
-    std::filesystem::path DefaultModuleCacheDirectory()
-    {
-        return std::filesystem::temp_directory_path() / "LodestoneShaderCooker";
-    }
-
     /** A flag that takes no argument. The table keeps the parser flat: one row for each switch, and
      * the loop below stays a lookup rather than a chain of comparisons. */
     struct SwitchFlag
@@ -357,6 +352,11 @@ uint32_t AllStageDumpBits() noexcept
 bool IsStageDumpRequested(const CookerOptions& options, StageDumpKind kind) noexcept
 {
     return (options.DumpStageMask & StageDumpBit(kind)) != 0u;
+}
+
+std::filesystem::path DefaultModuleCacheDirectory() noexcept
+{
+    return std::filesystem::temp_directory_path() / "LodestoneShaderCooker";
 }
 
 CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arguments)

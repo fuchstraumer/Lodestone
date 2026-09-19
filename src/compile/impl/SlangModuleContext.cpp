@@ -75,6 +75,88 @@ namespace
         }
     }
 
+    // Pick a tag kind from the case value blob's width, for when Slang will not report the enum's
+    // scalar type. An enum an axis reaches through an `import` reflects with `ScalarType::None`
+    // (measured), but its case value blob still carries the tag at its real width. Slang enums default
+    // to a signed `int`, so assume signed here. The same-module path uses the real scalar type and
+    // never reaches this fallback.
+    EnumTagKind EnumTagKindFromByteWidth(size_t byte_width)
+    {
+        switch (byte_width)
+        {
+        case 1u:
+            return EnumTagKind::Int8;
+        case 2u:
+            return EnumTagKind::Int16;
+        case 4u:
+            return EnumTagKind::Int32;
+        case 8u:
+            return EnumTagKind::Int64;
+        default:
+            assert(false && "Unexpected enum tag byte width");
+            return EnumTagKind::Int32;
+        }
+    }
+
+    // BelongsToModule returns true when the decl tree rooted at `reflection` declares `type`. It matches
+    // by pointer identity: Slang interns a type to one TypeReflection per session, so the type's
+    // declaration and every use of it share one pointer, even across a module boundary.
+    // DeclReflection::getType() returns the declared type for a type declaration (enum, struct,
+    // interface) and a decl-shaped wrapper for a variable, so a variable of `type` does not match here.
+    // Only the declaration does.
+    //NOLINTBEGIN(misc-no-recursion)
+    bool BelongsToModule(slang::TypeReflection* type, slang::DeclReflection* reflection)
+    {
+        const int64_t childCount = reflection->getChildrenCount();
+        for (int64_t i = 0; i < childCount; ++i)
+        {
+            slang::DeclReflection* child = reflection->getChild(i);
+            if (child->getType() == type)
+            {
+                return true;
+            }
+            if (child->getChildrenCount() > 0 && BelongsToModule(type, child))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    //NOLINTEND(misc-no-recursion)
+
+    // FindDeclaringModule returns the name of the loaded module whose own decl tree declares `type`, or
+    // an empty view when no loaded module does. The caller uses it to import the module that declares an
+    // enum an axis references, which differs from the module the axis variable lives in when the type
+    // arrives through an `import`.
+    std::string_view FindDeclaringModule(slang::ISession* session, slang::TypeReflection* type)
+    {
+        if (type == nullptr)
+        {
+            return {};
+        }
+
+        for (int64_t i = 0; i < session->getLoadedModuleCount(); ++i)
+        {
+            slang::IModule* module = session->getLoadedModule(i);
+            if (module == nullptr)
+            {
+                continue;
+            }
+            slang::DeclReflection* moduleReflection = module->getModuleReflection();
+            if (moduleReflection == nullptr)
+            {
+                // A precompiled or builtin module can report no reflection. Skip it rather than walk a
+                // null tree, the same way BuildDeclaredAxes does.
+                continue;
+            }
+            if (BelongsToModule(type, moduleReflection))
+            {
+                return module->getName();
+            }
+        }
+        return {};
+    }
+
 }
 
 constexpr bool k_UseSlangWorkaround = true;
@@ -532,9 +614,14 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
 
         const char* enumTypeName = typeReflection->getName();
         result.RootName = enumTypeName != nullptr ? enumTypeName : "<TypeNameResolutionFailed>";
-        // The synthetic module for each enum value imports this so the enum type resolves. We use the
-        // module the axis variable lives in, which declares the enum in the common case.
-        result.RootModule = std::string(module_name);
+        // The synthetic module for each enum value imports the module that DECLARES the enum, so the
+        // enum type resolves in that per-variant translation unit. The axis variable can live in a
+        // different module that imports the enum, so we find the declaring module by reflection. When
+        // the walk finds nothing, the enum is declared in the axis variable's own module, so fall back
+        // to that.
+        const std::string_view enumDeclaringModule = FindDeclaringModule(Session(), typeReflection);
+        result.RootModule =
+            enumDeclaringModule.empty() ? std::string(module_name) : std::string(enumDeclaringModule);
         // slang repurposes the field accessors for enum types to return the enum cases, in declaration order
         // we handle value retrieval explicitly since size expressions may reference them, and we don't want to
         // assume enums are just linearly incremented sequences
@@ -559,7 +646,15 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
             if (SLANG_SUCCEEDED(caseVar->getDefaultValueBlob(caseValueBlob.writeRef())))
             {
                 const void* caseValueData = caseValueBlob->getBufferPointer();
-                caseValue = DecodeEnumTag(ScalarTypeToEnumTagKind(typeReflection->getScalarType()), caseValueData);
+                // Slang resolves getScalarType() only for an enum reflected from its own declaring
+                // module. An enum an axis reaches through an `import` reports ScalarType::None, so fall
+                // back to the case value blob's width, which is always present.
+                const slang::TypeReflection::ScalarType scalarType = typeReflection->getScalarType();
+                const EnumTagKind enumTagKind =
+                    scalarType != slang::TypeReflection::ScalarType::None
+                        ? ScalarTypeToEnumTagKind(scalarType)
+                        : EnumTagKindFromByteWidth(caseValueBlob->getBufferSize());
+                caseValue = DecodeEnumTag(enumTagKind, caseValueData);
             }
             result.EnumCases.emplace_back(caseName != nullptr ? caseName : "<CaseNameResolutionFailed>", caseValue);
         }

@@ -1,6 +1,7 @@
 #include "compile/SymbolTable.hpp"
 #include "TestHarness.hpp"
 #include <algorithm>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -15,7 +16,7 @@ namespace
 // result by value is safe because each token is a view into the caller's string literals, not into the
 // argument vectors.
 std::vector<std::string_view> Missing(const SymbolTable& table,
-                                      std::vector<std::string_view> modules,
+                                      std::vector<std::string> modules,
                                       std::vector<std::string_view> tokens)
 {
     return table.MissingTokens(modules, tokens);

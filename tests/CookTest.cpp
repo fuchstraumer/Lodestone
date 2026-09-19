@@ -19,19 +19,26 @@ int main(int argc, char** argv)
         arguments.emplace_back(argv[i]);
     }
 
-    const lodestone::CookResult<lodestone::CookerOptions> options = lodestone::ParseCommandLine(arguments);
-    if (!options)
+    lodestone::CookResult<lodestone::CookerOptions> optionsResult = lodestone::ParseCommandLine(arguments);
+    if (!optionsResult)
     {
         std::println(stderr,
                      "[shader_cooker] {}\n{}",
-                     lodestone::ToString(options.error()),
+                     lodestone::ToString(optionsResult.error()),
                      lodestone::GetUsageText());
         return 1;
     }
 
-    lodestone::FileOutputSink sink{ options.value().OutputPath };
+    lodestone::CookerOptions options{ std::move(*optionsResult) };
+    if (options.TargetNames.empty())
+    {
+        // default case for testing, for now.
+        options.TargetNames.emplace_back("wgsl");
+    }
+
+    lodestone::FileOutputSink sink{ options.OutputPath };
     const lodestone::CookResult<lodestone::CookStatistics> statistics =
-        lodestone::RunCook(options.value(), sink);
+        lodestone::RunCook(std::move(options), sink);
 
     if (!statistics)
     {

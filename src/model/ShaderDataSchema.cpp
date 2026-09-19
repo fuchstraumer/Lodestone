@@ -384,18 +384,18 @@ uint64_t HashReflectedRasterState(const ReflectedRasterState& rasterState) noexc
     thread_local StreamingHash compositeHasher;
     compositeHasher.Reset();
     // we could probably reinterpret most of these as byte spans
+
     for (const ReflectedVertexInput& vertexInput : rasterState.VertexInputs)
     {
         compositeHasher.Append(std::string_view{ vertexInput.SemanticName });
-        const std::span<const std::byte> vertexInputScalarsSpan = std::as_bytes(std::span{ &vertexInput, sizeof(vertexInput) });
-        compositeHasher.Append(vertexInputScalarsSpan);
+        const std::span<const ReflectedVertexInput::Packed> vertexInputScalarsSpan = std::span{ &vertexInput.Data, 1 };
+        const std::span<const std::byte> bytes = std::as_bytes(vertexInputScalarsSpan);
+        compositeHasher.Append(bytes);
     }
 
-    for (const ReflectedColorTarget& colorTarget : rasterState.ColorTargets)
-    {
-        const std::span<const std::byte> colorTargetScalarsSpan = std::as_bytes(std::span{ &colorTarget, sizeof(colorTarget) });
-        compositeHasher.Append(colorTargetScalarsSpan);
-    }
+    const std::span<const ReflectedColorTarget> colorTargetsSpan = std::span{ rasterState.ColorTargets.data(), rasterState.ColorTargets.size() };
+    const std::span<const std::byte> colorTargetsBytes = std::as_bytes(colorTargetsSpan);
+    compositeHasher.Append(colorTargetsBytes);
 
     return compositeHasher.Finalize();
 }

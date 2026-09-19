@@ -104,3 +104,12 @@ add_lodestone_unit_test(SuggestTest SuggestTests.cpp)
 target_link_libraries(SuggestTest PRIVATE lodestone::suggest)
 add_lodestone_unit_test(EnumTagDecodeTest EnumTagDecodeTests.cpp)
 add_lodestone_unit_test(ManifestIndexTest ManifestIndexTests.cpp)
+
+# Standalone Slang-only probe (not a unit test). Prints DeclReflection kinds so we can see what an
+# interface vs an enum reports, and whether getType() identity holds. It links ONLY slang, so it
+# builds while lodestone is mid-refactor. Build it directly: --target DeclKindProbe
+add_executable(DeclKindProbe DeclKindProbe.cpp)
+set_target_properties(DeclKindProbe PROPERTIES FOLDER "Tests" CXX_STANDARD 23 CXX_STANDARD_REQUIRED YES)
+target_include_directories(DeclKindProbe PRIVATE "${CMAKE_SOURCE_DIR}/third_party/slang/include")
+target_link_libraries(DeclKindProbe PRIVATE slang)
+copy_slang_dlls_to_target(DeclKindProbe)

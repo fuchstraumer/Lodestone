@@ -51,6 +51,11 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input) cons
     // gonna reuse this for a few steps, whenever we touch the filesystem (the third rail)
     std::error_code filesystemError;
 
+    if (result.Options.ModuleCacheDirectory.empty())
+    {
+        result.Options.ModuleCacheDirectory = DefaultModuleCacheDirectory();
+    }
+
     if (!std::filesystem::exists(result.Options.ModuleCacheDirectory, filesystemError))
     {
         if (filesystemError)
@@ -108,6 +113,10 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input) cons
         {
             return filesystemError ? std::unexpected(ErrorCodeToCookError(filesystemError)) :
                                      std::unexpected(CookError::DirectoryDoesNotExist);
+        }
+        else
+        {
+            result.AllModuleNames.emplace_back(modulePath.stem().string());
         }
     }
 

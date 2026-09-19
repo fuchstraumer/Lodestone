@@ -12,7 +12,7 @@ namespace lodestone
 {
 
 
-CookResult<CookStatistics> RunCook(const CookerOptions& options, OutputSink& sink);
+CookResult<CookStatistics> RunCook(CookerOptions options, OutputSink& sink);
 
 } // namespace lodestone
 
