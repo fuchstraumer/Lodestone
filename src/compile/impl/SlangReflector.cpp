@@ -473,7 +473,8 @@ std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_vari
     const auto epIndex = static_cast<size_t>(entry_point_index);
     const Slang::ComPtr<slang::IMetadata>& metadata = linked_variant.EntryPointMetadata[epIndex];
 
-    auto isUsedLambda = [&metadata](const RawPlacement& placement) -> bool
+    // todo-ship: this will need to be modified per-binding-model
+    auto isPlacementUsed = [&metadata](const RawPlacement& placement) -> bool
     {
         const BoundPlacement* boundPlacement = GetBoundPlacement(placement);
         if (boundPlacement == nullptr)
@@ -489,21 +490,22 @@ std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_vari
         return isUsed;
     };
 
-    // for each global binding, filter it out if it's not used by the entry point
-    // extract just the index from it, and then return the result as a new std::vector<uint32_t>
-    // note that we check entry point usage using the metadata here
-    return std::views::enumerate(global_bindings) |
-           std::views::filter(
-               [&](const auto& pair)
-               {
-                   return isUsedLambda(std::get<1>(pair).Placement);
-               }) |
-           std::views::transform(
-               [](const auto& pair)
-               {
-                   return static_cast<uint32_t>(std::get<0>(pair));
-               }) |
-           std::ranges::to<std::vector<uint32_t>>();
+    std::vector<uint32_t> usedBindingIndices;
+    usedBindingIndices.reserve(global_bindings.size());
+
+    for (const auto&& [index, binding] : std::views::enumerate(global_bindings))
+    {
+        if (!isPlacementUsed(binding.Placement))
+        {
+            continue;
+        }
+
+        usedBindingIndices.emplace_back(static_cast<uint32_t>(index));
+
+    }
+    
+    usedBindingIndices.shrink_to_fit();
+    return usedBindingIndices;
 }
 
 } // namespace
