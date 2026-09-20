@@ -380,7 +380,8 @@ std::optional<ParameterBlockInfo> ReadParameterBlock(slang::TypeLayoutReflection
                                                      const BindingScope& scope)
 {
     const SlangInt rangeIndex = containing_layout->getSubObjectRangeBindingRangeIndex(sub_object_index);
-    if (rangeIndex < 0 || containing_layout->getBindingRangeDescriptorSetIndex(rangeIndex) >= 0)
+    slang::TypeLayoutReflection* leafLayout = containing_layout->getBindingRangeLeafTypeLayout(rangeIndex);
+    if (leafLayout->getKind() != slang::TypeReflection::Kind::ParameterBlock)
     {
         return std::nullopt;
     }
@@ -810,7 +811,8 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
     {
         const slang::BindingType bindingType = containing_layout->getBindingRangeType(rangeIndex);
         // Skip input/output attributes, which slang considers to be part of the global params
-        if (bindingType == slang::BindingType::Unknown || bindingType == slang::BindingType::VaryingInput ||
+        if (bindingType == slang::BindingType::Unknown ||
+            bindingType == slang::BindingType::VaryingInput ||
             bindingType == slang::BindingType::VaryingOutput)
         {
             continue;
@@ -838,6 +840,14 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
         slang::VariableReflection* leafVariable = containing_layout->getBindingRangeLeafVariable(rangeIndex);
         const char* leafName = leafVariable != nullptr ? leafVariable->getName() : nullptr;
 
+        slang::TypeLayoutReflection* leafType = containing_layout->getBindingRangeLeafTypeLayout(rangeIndex);
+        if (leafType->getKind() == slang::TypeReflection::Kind::ParameterBlock)
+        {
+            // We cannot make a binding draft for a parameter block type: that must be handled 
+            // in subobject range walk.
+            continue;
+        }
+
         RawBindingDraft draft;
         draft.Binding.Name = leafName != nullptr ? leafName : std::string{};
         draft.Binding.ScopeName = std::move(scopeNames[static_cast<size_t>(rangeIndex)]);
@@ -847,7 +857,10 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
         draft.Binding.ArrayCount =
             static_cast<uint32_t>(containing_layout->getBindingRangeBindingCount(rangeIndex));
 
-        const CookError applyLayoutError = applyLeafTypeLayout(containing_layout, rangeIndex, bindingType, draft.Binding);
+        const CookError applyLayoutError = applyLeafTypeLayout(containing_layout,
+                                                               rangeIndex,
+                                                               bindingType,
+                                                               draft.Binding);
         if (!applyLayoutError)
         {
             return applyLayoutError;
