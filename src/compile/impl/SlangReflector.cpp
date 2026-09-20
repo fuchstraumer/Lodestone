@@ -556,12 +556,15 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
 
         RawEntryPoint& rawEntryPoint = entryPointResult.value();
 
-        const auto ownedBaseSize = static_cast<uint32_t>(rawVariant.Bindings.size());
+        // set the base size here, before we append the binding drafts for this entrypoint
+        const uint32_t ownedBaseSize = static_cast<uint32_t>(rawVariant.Bindings.size());
         AppendBindingDrafts(entryPointDrafts, rawVariant.Bindings, rawVariant.SizeAttributes);
 
-        // now we need to append the indices of the used bindings for *this* entry point
-        auto newIndices = std::views::iota(ownedBaseSize, static_cast<uint32_t>(rawVariant.Bindings.size()));
-        rawEntryPoint.UsedBindingIndices.append_range(newIndices);
+        // filter to create a new subspan for only this entrypoints bindings, and run the collection of used binding indices on just that
+        std::span<const RawBinding> entryPointBindings = std::span{ rawVariant.Bindings }.subspan(ownedBaseSize);
+        std::vector entryPointIndices = CollectUsedBindingIndices(linked_variant, i, entryPointBindings);
+        rawEntryPoint.UsedBindingIndices.append_range(std::move(entryPointIndices));
+
         // set suffix, and copy over the target text
         rawEntryPoint.VariantSuffix = rawVariant.VariantSuffix;
         rawEntryPoint.TargetText = std::move(linked_variant.EntryPointStrings[static_cast<size_t>(i)]);
