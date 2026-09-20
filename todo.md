@@ -37,6 +37,17 @@
 - Decide the variant key radix now: pack against the root value count (root radix), not the module's
   active subset. Decode stays "digit is position in the value list" and reuses the sparse-key handling.
   The active-value mask then stays metadata, off the decode path.
+  - [2026-09-19 SUPERSEDED] We decided variant keys are per-module, not whole-cook global (see
+    agent-handoff.md 9.5, and the `axis-name-scope-open-question` memory). A module keys in its own
+    radix over its own axes. The root axes table then demotes from an identity mechanism to a storage
+    and dedup optimization, and the per-module value mask stops being a decode-path reconciliation.
+    Shared meaning across modules comes from shared types and query presets, not a global axis. So do
+    NOT build root-radix keys as written above.
+- Manifest is one file per cook, in the container-with-directory shape (agent-handoff.md 9.6). A fixed
+  16-byte prefix (`uint32 magic`, `uint32 version`, `uint64 HeaderSize`) lets a reader load the header
+  alone, then seek to one module or one profile. Keep a module directory (or fixed-size module headers)
+  for an O(1) seek, and a per-profile directory inside each module header. Interior offsets are uint32
+  today (4 GiB cap); decide whether to widen them against what the bundle stores.
 - Per-module value mask: use uint32_t, not uint16_t. A hard 16-value cap is too low for a tuning axis.
   The mask width is an ABI limit. Put the "too many values" nudge in cook diagnostics (like the
   influence matrix), not in the format width.

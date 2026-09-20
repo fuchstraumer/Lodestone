@@ -1,11 +1,8 @@
 #pragma once
 #ifndef LODESTONE_STAGE_DUMP_HPP
 #define LODESTONE_STAGE_DUMP_HPP
-#include "model/CookedLibrary.hpp"
+#include "CookerErrors.hpp"
 #include "driver/CookerOptions.hpp"
-#include "permute/PermutationSpace.hpp"
-#include "compile/RawLibrary.hpp"
-#include "model/ShaderDataSchema.hpp"
 #include <span>
 #include <string>
 #include <string_view>
@@ -24,6 +21,13 @@
  * That's all we need to diff and verify idempotence */
 namespace lodestone
 {
+
+class PermutationSpace;
+struct VariantSet;
+struct RawModule;
+struct CompiledVariant;
+struct InternedModule;
+struct CookedModule;
 
 /** `<module>.stage-<name>.json` */
 std::string MakeStageDumpFileName(std::string_view module_name, StageDumpKind kind);
@@ -46,6 +50,9 @@ std::string DumpInternedModule(const InternedModule& module);
 /** @brief The frozen tables, indices used to key into each table, and the measurements from the interner per
  *  table type (measures collapse/dedupe efficiency) */
 std::string DumpCookedModule(const CookedModule& module);
+/** @brief Dumps the shader source strings to the given subdir under the output sink, keyed by the 
+  * module name on the input cooked module. */
+CookError DumpShaderSources(const CookedModule& module, std::string_view subdir, class OutputSink& sink);
 
 } // namespace lodestone
 

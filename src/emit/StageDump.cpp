@@ -1,5 +1,8 @@
 #include "emit/StageDump.hpp"
+#include "CookerErrors.hpp"
 #include "compile/RawLibrary.hpp"
+#include "emit/OutputSink.hpp"
+#include "model/ContentHash.hpp"
 #include "model/ContentInterner.hpp"
 #include "model/CookedLibrary.hpp"
 #include "driver/CookerOptions.hpp"
@@ -9,15 +12,21 @@
 #include "permute/PermutationSpace.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "permute/PermutationTypes.hpp"
 #include "permute/PermutationValue.hpp"
 
+#include <algorithm>
+#include <filesystem>
+#include <format>
 #include <magic_enum/magic_enum.hpp>
 
 #include <cstddef>
 #include <cstdint>
+#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -812,6 +821,147 @@ std::string DumpCookedModule(const CookedModule& module)
 
     writer.EndObject();
     return FinishDocument(writer);
+}
+
+struct NameValuePair
+{
+    std::string_view Name;
+    std::string_view Value;
+};
+
+constexpr std::string_view TrimWhitespace(std::string_view str) noexcept
+{
+    constexpr std::string_view k_WhiteSpaceChars = " \t\n\r\f";
+    const size_t start = str.find_first_not_of(k_WhiteSpaceChars);
+    if (start == std::string_view::npos)
+    {
+        return {};
+    }
+    const size_t end = str.find_last_not_of(k_WhiteSpaceChars);
+    return str.substr(start, end - start + 1);
+}
+
+static std::vector<NameValuePair> ParseVariantDescription(std::string_view description)
+{
+    std::vector<NameValuePair> result;
+    size_t start = 0;
+    while (start < description.size())
+    {
+        // split between NAME=VALUE first, then use comma as where to close the pair
+        size_t equalPos = description.find('=', start);
+        if (equalPos == std::string_view::npos)
+        {
+            break;
+        }
+        size_t commaPos = description.find(',', equalPos);
+        NameValuePair pair;
+        pair.Name = description.substr(start, equalPos - start);
+        if (commaPos == std::string_view::npos)
+        {
+            pair.Value = description.substr(equalPos + 1);
+        }
+        else
+        {
+            pair.Value = description.substr(equalPos + 1, commaPos - equalPos - 1);
+        }
+
+        result.emplace_back(pair);
+        if (commaPos == std::string_view::npos)
+        {
+            break;
+        }
+        start = commaPos + 1;
+    }
+    return result;
+}
+
+CookError DumpShaderSources(const CookedModule& module, std::string_view subdir, OutputSink& sink)
+{
+    // sneaky little attempt to create output directory, since it probably doesn't exist
+    std::filesystem::path childDir(subdir);
+    std::filesystem::path sinkDir(sink.Describe());
+    std::filesystem::path outputPath = sinkDir / childDir;
+    if (!std::filesystem::exists(outputPath))
+    {
+        // we create this using full path, but later we just use output_directory
+        std::filesystem::create_directories(outputPath);
+    }
+
+    std::unordered_map<uint32_t, std::string> sourceIdxToFilename;
+
+    for (const auto& [sourceIdx, usage] : std::views::enumerate(module.Sources))
+    {
+        const ContentHashValue hashedSource = HashSourceString(module.Sources[sourceIdx]);
+        std::string source = module.Sources[sourceIdx];
+        std::string usageComment = "/*\n    Used by variant(s):\n";
+        for (const auto& variant : module.Variants)
+        {
+            auto iter = std::ranges::find(variant.SourceIndices, sourceIdx);
+            if (iter != variant.SourceIndices.end())
+            {
+                usageComment += "        " + std::string(variant.Suffix) + " - " + std::string(variant.Description) + "\n";
+            }
+        }
+        usageComment += "*/\n";
+        source.insert_range(source.begin(), usageComment);
+
+        std::string filename = std::format("{}_{:016X}.wgsl", module.Name, hashedSource);
+        sourceIdxToFilename[sourceIdx] = filename;
+        std::string outputName = std::format("{}/{}", subdir, filename);
+        CookError writeResult = sink.WriteArtifact(outputName, source);
+        if (!writeResult)
+        {
+            return writeResult;
+        }
+    }
+
+    // use JSON to create a table mapping the hashed filenames to all the variants
+    // (including meta-information) that used that info
+    lodestone::JsonWriter tableWriter(true);
+    tableWriter.BeginObject();
+    tableWriter.KeyString("module", module.Name);
+    
+    tableWriter.Key("variants");
+    tableWriter.BeginArray();
+
+    // Replicate the variant structure to map human-readable descriptions to the hashed files
+    for (const auto& variant : module.Variants)
+    {
+        tableWriter.BeginObject();
+        // Assuming variant has an Index or you can track it via a loop counter
+        tableWriter.KeyString("suffix", variant.Suffix);
+        tableWriter.KeyString("description", variant.Description);
+        
+        tableWriter.Key("sourceFiles");
+        tableWriter.BeginArray();
+        for (uint32_t sourceIdx : variant.SourceIndices)
+        {
+            tableWriter.String(sourceIdxToFilename[sourceIdx]);
+        }
+        tableWriter.EndArray();
+        
+        tableWriter.EndObject();
+    }
+    
+    tableWriter.EndArray();
+    tableWriter.EndObject();
+
+    JsonResult<std::string> jsonResult = tableWriter.Finish();
+    if (!jsonResult)
+    {
+        return CookError::OutputWriteFailed;
+    }
+    else
+    {
+        std::string tableOutputName = std::format("{}/SourceTable.json", subdir);
+        CookError writeResult = sink.WriteArtifact(tableOutputName, jsonResult.value());
+        if (!writeResult)
+        {
+            return writeResult;
+        }
+    }
+
+    return CookError::Success;
 }
 
 } // namespace lodestone

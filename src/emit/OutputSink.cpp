@@ -54,6 +54,8 @@ CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::str
         return CookError::OutputWriteFailed;
     }
 
+    stream.close();
+
     return CookError::Success;
 }
 

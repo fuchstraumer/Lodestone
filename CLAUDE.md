@@ -311,8 +311,13 @@ explicit argument, or an overload, or a named constant the caller passes.
 
 ## Data flow, one cook
 
-`RunCook` in `src/driver/CookerDriver.cpp` is the whole loop. Read that file first. It calls each stage in
-order, for each module path.
+`RunCook` in `src/driver/CookerDriver.cpp` drives the cook. As of 2026-09-19 it is a chain of discrete
+step functors, not one long loop: `PrepareCookStep` once, then `PrepareModuleStep`,
+`PreparePermutationSpaceStep`, `BuildModuleStep`, and `FinalizeModuleStep` for each (module, target)
+pair. `include/driver/CookerSteps.hpp` defines the state each step passes on, the step sources sit in
+`src/driver/steps/`, and `SharedCookState` holds the whole-cook data. A cook now takes several modules
+and several targets. The eight numbered stages below still describe the transformation the steps run, in
+the same order. `docs/agent-handoff.md` section 9 holds the detail. Read that and `CookerDriver.cpp` first.
 
 **A stage transforms. A validator compares.** The pipeline has eight numbered stages, and each one
 takes an input type and gives an output type. A validator reads the output of a stage, compares it
