@@ -1,0 +1,7 @@
+#pragma once
+#ifndef LODESTONE_CONFIG_HPP
+#define LODESTONE_CONFIG_HPP
+
+#cmakedefine01 LODESTONE_ENABLE_WGSL
+
+#endif // !LODESTONE_CONFIG_HPP

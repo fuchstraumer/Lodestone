@@ -57,6 +57,7 @@ set_target_properties(slang PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON 
 
 # Add our various internal libraries first: the client library, and our
 # JSON writer that is used by some of the .exe tools and the cooker lib
+# these are all thin and worth using subdir add with
 add_subdirectory(tools/json)
 add_subdirectory(tools/suggest)
 add_subdirectory(client)
@@ -161,6 +162,25 @@ set(LODESTONE_TARGET_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetProfile.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/target/WgslBindingScanner.cpp")
 
+option(LODESTONE_ENABLE_WGSL "Enable WGSL support in Lodestone" ON)
+# Set up tint configuration if WGSL is being used with Lodestone
+if (LODESTONE_ENABLE_WGSL)
+    set(LODESTONE_DAWN_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/dawn" CACHE PATH
+        "Path to the Dawn/Tint source tree. Point this at a parent project's own Dawn checkout to share it.")
+    # A parent project that embeds lodestone and also builds the full Dawn tree for its own WebGPU
+    # backend already defines tint_api: Dawn's own CMakeLists.txt always adds src/tint. Reuse that
+    # target instead of adding the same source directory a second time, which CMake forbids outright.
+    if (NOT TARGET tint_api)
+        include(cmake/ConfigureTint.cmake)
+        add_subdirectory("${LODESTONE_DAWN_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/lodestone_tint" EXCLUDE_FROM_ALL)
+    endif()
+    add_library(Tint::tint ALIAS tint_api)
+endif()
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/LodestoneConfig.hpp.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/include/LodestoneConfig.hpp"
+    @ONLY)
 
 # Static on purpose. No header marks a symbol dllexport, so a Windows DLL build of this target exports
 # nothing and every consumer fails to link. A SHARED build is a temporary measure for instrumented
@@ -178,15 +198,19 @@ target_include_directories(lodestone PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/client/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/slang/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/magic_enum/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/tomlplusplus/include")
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/tomlplusplus/include"
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/include")
 target_link_libraries(lodestone PRIVATE slang lodestone::client_internal xxHash::xxhash lodestone::json)
+if (LODESTONE_ENABLE_WGSL)
+    target_link_libraries(lodestone PRIVATE Tint::tint)
+endif()
 # /Ob2 and /arch:AVX2 are MSVC spellings, and the full Clang driver rejects both. The pure Clang
 # build therefore gets the GNU spelling of the same two requests. Every other flag decision in this
 # file goes through the compiler test at the top, and this one must also.
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     target_compile_options(lodestone PUBLIC "$<$<CONFIG:RelWithDebInfo>:/Ob2;/arch:AVX2>")
 else()
-    target_compile_options(lodestone PUBLIC "$<$<CONFIG:RelWithDebInfo>:-finline-functions;-mavx2>")
+    target_compile_options(lodestone PUBLIC "$<$<CONFIG:RelWithDebInfo>:-mavx2>")
 endif()
 if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     target_compile_definitions(lodestone PRIVATE "_HAS_CXX23=1")
@@ -217,8 +241,6 @@ if(LODESTONE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
-
-OPTION(LODESTONE_BUILD_TOOLS "Build the standalone tools" ON)
 
 if(LODESTONE_BUILD_TOOLS)
     add_subdirectory(tools/manifest_dump)
