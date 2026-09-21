@@ -17,7 +17,7 @@ public:
     WgslValidator();
     ~WgslValidator() override;
 
-    [[nodiscard]] CookResult<BindingComparison> ValidateEntryPoint(std::string_view source_code,
+    [[nodiscard]] CookResult<BindingComparison> validateEntryPoint(std::string_view source_code,
                                                                    std::span<const ReflectedBinding*> bindings,
                                                                    DiagnosticSink& sink) const final;
 

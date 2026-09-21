@@ -53,14 +53,16 @@ public:
     ResolvedLibraryValidator(ResolvedLibraryValidator&&) = delete;
     ResolvedLibraryValidator& operator=(ResolvedLibraryValidator&&) = delete;
 
-    // todo-ship: Don't we want an overload for the SPIR-V case? That should be a vector of
-    // uint32_t. Maybe best to pass a span of bytes, and interpret as chars or binary as needed.
-    /** `target_text` is what the backend emitted for one entry point. `used` is the subset of the
-     * variant's bindings that this entry point references, which is what reflection claims. */
-    [[nodiscard]] virtual CookResult<BindingComparison> ValidateEntryPoint(std::string_view target_text,
+    /**@brief This outer function exists to sort the input `used` bindings, before passing it to the virtual derived
+     * validateEntryPoint method. This is just a shim that ensures the bindings are sorted before validation. */
+    [[nodiscard]] CookResult<BindingComparison> ValidateEntryPoint(std::string_view target_text,
+                                                                   std::span<const ReflectedBinding*> used,
+                                                                   DiagnosticSink& sink) const;
+
+protected:
+    [[nodiscard]] virtual CookResult<BindingComparison> validateEntryPoint(std::string_view target_text,
                                                                            std::span<const ReflectedBinding*> used,
                                                                            DiagnosticSink& sink) const = 0;
-    
 };
 
 struct TargetProfile

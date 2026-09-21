@@ -3,9 +3,11 @@
 #include "model/ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include <array>
+#include <algorithm>
 #include <expected>
 #include <span>
 #include <string_view>
+#include <vector>
 #include "target/WgslValidator.hpp"
 
 namespace lodestone
@@ -39,6 +41,16 @@ namespace
     constexpr std::array<std::string_view, 1u> k_TargetProfileNames{ k_WgslName };
 
 } // namespace
+
+CookResult<BindingComparison> ResolvedLibraryValidator::ValidateEntryPoint(std::string_view target_text,
+                                                                   std::span<const ReflectedBinding*> used,
+                                                                   DiagnosticSink& sink) const
+{
+    // its just a vector of pointers, so copying is fine (this is the validation path, anyways)
+    std::vector<const ReflectedBinding*> sortedUsed(used.begin(), used.end());
+    std::ranges::sort(sortedUsed, BoundPlacementLess);
+    return validateEntryPoint(target_text, sortedUsed, sink);
+}
 
 std::string_view ToString(AccessModel model) noexcept
 {

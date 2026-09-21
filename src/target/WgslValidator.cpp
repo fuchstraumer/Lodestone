@@ -33,7 +33,7 @@ namespace
 WgslValidator::WgslValidator() = default;
 WgslValidator::~WgslValidator() = default;
 
-CookResult<BindingComparison> WgslValidator::ValidateEntryPoint(std::string_view source_code,
+CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::string_view source_code,
                                                                 std::span<const ReflectedBinding*> bindings,
                                                                 DiagnosticSink& sink) const
 {
