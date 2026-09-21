@@ -158,9 +158,11 @@ set(LODESTONE_PERMUTE_SOURCES
 
 set(LODESTONE_TARGET_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/target/TargetProfile.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/target/WgslBindingScanner.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/target/TargetUtils.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/target/WgslValidator.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetProfile.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/WgslBindingScanner.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetUtils.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/WgslValidator.cpp")
 
 option(LODESTONE_ENABLE_WGSL "Enable WGSL support in Lodestone" ON)
 # Set up tint configuration if WGSL is being used with Lodestone

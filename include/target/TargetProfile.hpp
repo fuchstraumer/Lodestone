@@ -2,20 +2,17 @@
 #ifndef LODESTONE_TARGET_PROFILE_HPP
 #define LODESTONE_TARGET_PROFILE_HPP
 #include "CookerErrors.hpp"
-#include "model/ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include <cstdint>
 #include <span>
 #include <string>
 #include <string_view>
 
-/** What one output target is, and what it can check about itself.
- *
- * This also selects the "AccessModel" for bound shader resources: a target like WGSL requires
- * bound access modeling. Cutting edge Vulkan can use pointers. DX12 and minspec Vulkan (at this point)
- * can use bindless (indexed). */
 namespace lodestone
 {
+
+struct ReflectedBinding;
+class DiagnosticSink;
 
 // todo-ship: unify this with "PlacementKind" in ShaderLibraryTypes.hpp eventually
 /**@brief: How a shader reaches a resource. */
@@ -56,10 +53,14 @@ public:
     ResolvedLibraryValidator(ResolvedLibraryValidator&&) = delete;
     ResolvedLibraryValidator& operator=(ResolvedLibraryValidator&&) = delete;
 
+    // todo-ship: Don't we want an overload for the SPIR-V case? That should be a vector of
+    // uint32_t. Maybe best to pass a span of bytes, and interpret as chars or binary as needed.
     /** `target_text` is what the backend emitted for one entry point. `used` is the subset of the
      * variant's bindings that this entry point references, which is what reflection claims. */
-    [[nodiscard]] virtual BindingComparison ValidateEntryPoint(
-        std::string_view target_text, std::span<const ReflectedBinding*> used) const = 0;
+    [[nodiscard]] virtual CookResult<BindingComparison> ValidateEntryPoint(std::string_view target_text,
+                                                                           std::span<const ReflectedBinding*> used,
+                                                                           DiagnosticSink& sink) const = 0;
+    
 };
 
 struct TargetProfile

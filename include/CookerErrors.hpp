@@ -108,7 +108,11 @@ enum class CookError : uint16_t
     SlangProgramLayoutNotFound = 227,
     SlangMultipleConformingInterfaces = 228,
     SlangNoConformingInterfaces = 229,
-    SlangInterfaceHasResourceMember = 230
+    SlangInterfaceHasResourceMember = 230,
+
+
+    TargetValidationError = 300,
+    TargetValidationEntryPointParseFailed = 301
 };
 
 constexpr bool operator!(CookError error) noexcept
