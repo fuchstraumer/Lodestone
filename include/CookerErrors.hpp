@@ -110,8 +110,8 @@ enum class CookError : uint16_t
     SlangNoConformingInterfaces = 229,
     SlangInterfaceHasResourceMember = 230,
 
-
-    TargetValidationError = 300,
+    // start of target validation errors
+    TargetValidatorUnavailable = 300,
     TargetValidationEntryPointParseFailed = 301
 };
 

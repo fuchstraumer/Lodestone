@@ -26,7 +26,7 @@ namespace
      * the bindings. Bindings *MUST* be sorted, otherwise this comparison won't work. It uses a symmetric walk
      * through bot sets of bindings to keep complexity manageable, and this also serves to elevate binding count
      * and placement mismatches (which are an error). */
-    BindingComparison CompareBindings(std::span<const tint::inspector::ResourceBinding> source_bindings,
+    BindingComparison CompareBindings(std::span<const tint::inspector::ResourceBinding> wgsl_bindings,
                                       std::span<const ReflectedBinding*> reflected_bindings) noexcept;
 }
 
@@ -88,6 +88,37 @@ CookResult<BindingComparison> WgslValidator::ValidateEntryPoint(std::string_view
 
 namespace
 {
+    tint::inspector::ResourceBinding::ResourceType TintTypeForBindingKind(BindingKind kind)
+    {
+        switch (kind)
+        {
+            case BindingKind::Sampler:
+                return tint::inspector::ResourceBinding::ResourceType::kSampler;
+            case BindingKind::Texture:
+                return tint::inspector::ResourceBinding::ResourceType::kSampledTexture;
+            case BindingKind::UniformBuffer:
+                return tint::inspector::ResourceBinding::ResourceType::kUniformBuffer;
+            case BindingKind::ReadOnlyStructuredBuffer:
+            case BindingKind::ReadOnlyStorageBuffer:
+                return tint::inspector::ResourceBinding::ResourceType::kReadOnlyStorageBuffer;
+            case BindingKind::InputRenderTarget:
+                return tint::inspector::ResourceBinding::ResourceType::kInputAttachment;
+            case BindingKind::StructuredBuffer:
+            case BindingKind::StorageBuffer:
+                return tint::inspector::ResourceBinding::ResourceType::kStorageBuffer;
+            case BindingKind::StorageTexture:
+                return tint::inspector::ResourceBinding::ResourceType::kWriteOnlyStorageTexture;
+            // WGSL has no resource type for these: no parameter blocks, no combined texture-samplers,
+            // no inline uniforms, and no ray tracing acceleration structures.
+            case BindingKind::Invalid:
+            case BindingKind::ParameterBlock:
+            case BindingKind::CombinedTextureSampler:
+            case BindingKind::InlineUniform:
+            case BindingKind::RayTracingAccelerationStructure:
+                std::unreachable();
+        }
+        std::unreachable();
+    }
 
     BindingKind ReflectionKindFromTintType(tint::inspector::ResourceBinding::ResourceType tint_kind)
     {
@@ -164,7 +195,7 @@ namespace
         }
     }
 
-    BindingComparison CompareBindings(std::vector<tint::inspector::ResourceBinding> wgsl_bindings,
+    BindingComparison CompareBindings(std::span<const tint::inspector::ResourceBinding> wgsl_bindings,
                                       std::span<const ReflectedBinding*> reflected_bindings) noexcept
     {
         using tint::inspector::ResourceBinding;
@@ -208,10 +239,11 @@ namespace
                                                                     declaredBinding.bind_group,
                                                                     declaredBinding.binding,
                                                                     unmangledName,
-                                                                    ToString(declaredBinding.AddressSpace));
+                                                                    TintTypeToString(declaredBinding.resource_type));
+                    const auto tintKind = TintTypeForBindingKind(reflectedBinding->Kind);
                     const std::string messageSecondHalf = std::format(" : reflection has kind {}, which needs {}\n",
                                                                     ToString(reflectedBinding->Kind),
-                                                                    TintTypeToString(declaredBinding.resource_type));
+                                                                    TintTypeToString(tintKind));
                     comparison.Report += messageFirstHalf + messageSecondHalf;
                 }
 

@@ -42,9 +42,9 @@ namespace
     // reflection cross check: reads emitted text back and compares it against what the reflection
     // claims for the source text. each target decides how to read it's own output, so if `target`
     // is not valid or doesn't contain a validator the function will simply return 0 mismatches.
-    uint32_t ValidateResolvedLibrary(const TargetProfile& target,
-                                     const CompiledVariant& variant,
-                                     DiagnosticSink& diagnostics);
+    CookResult<uint32_t> ValidateResolvedLibrary(const TargetProfile& target,
+                                                 const CompiledVariant& variant,
+                                                 DiagnosticSink& diagnostics);
     void ReportUnreferencedBindings(const CompiledVariant& variant, DiagnosticSink& diagnostics);
     [[nodiscard]] CookResult<CookStatistics> CompileModuleVariants(const SharedCookState& shared_state,
                                                                    const TargetProfile& target,
@@ -199,13 +199,13 @@ namespace
         }
     }
 
-    uint32_t ValidateResolvedLibrary(const TargetProfile& target,
-                                     const CompiledVariant& variant,
-                                     DiagnosticSink& diagnostics)
+    CookResult<uint32_t> ValidateResolvedLibrary(const TargetProfile& target,
+                                                 const CompiledVariant& variant,
+                                                 DiagnosticSink& diagnostics)
     {
         if (target.Validator == nullptr)
         {
-            return 0u;
+            return std::unexpected(CookError::TargetValidatorUnavailable);
         }
 
         uint32_t mismatchCount = 0u;
@@ -222,9 +222,17 @@ namespace
                                                         std::views::transform(extractBinding) |
                                                         std::ranges::to<std::vector>();
 
-            const BindingComparison comparison = target.Validator->ValidateEntryPoint(entryPoint.Code, used);
+            const CookResult<BindingComparison> comparison =
+                target.Validator->ValidateEntryPoint(entryPoint.Code, used, diagnostics);
 
-            if (!comparison.Matches)
+            if (!comparison)
+            {
+                // because most validators load a backend for parsing the source code, there are 
+                // failures not related to reflection mismatches that may occur 
+                // (e.g, the backend parser failed to parse the entry point code)
+                return std::unexpected(comparison.error());
+            }
+            else if (!comparison->Matches)
             {
                 ++mismatchCount;
                 const std::string warningStr =
@@ -233,7 +241,7 @@ namespace
                                 entryPoint.VariantSuffix,
                                 variant.VariantDescription,
                                 target.Name,
-                                comparison.Report);
+                                comparison->Report);
                 ReportWarning(diagnostics, warningStr);
             }
         }
@@ -309,9 +317,14 @@ namespace
 
             if (shared_state.Options.ValidateAgainstEmittedText)
             {
-                const uint32_t mismatches = ValidateResolvedLibrary(target, variant, *shared_state.Diagnostics);
+                const CookResult<uint32_t> mismatches =
+                    ValidateResolvedLibrary(target, variant, *shared_state.Diagnostics);
+                if (!mismatches)
+                {
+                    return std::unexpected(mismatches.error());
+                }
                 std::atomic_ref<uint32_t> mismatchesRef(localStats.ReflectionMismatches);
-                mismatchesRef += mismatches;
+                mismatchesRef += *mismatches;
             }
 
             if (shared_state.Options.ReportReflection)

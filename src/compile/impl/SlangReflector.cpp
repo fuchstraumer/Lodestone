@@ -558,7 +558,7 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
 
         // filter to create a new subspan for only this entrypoints bindings, and run the collection of used binding indices on just that
         std::span<const RawBinding> entryPointBindings = std::span{ rawVariant.Bindings }.subspan(ownedBaseSize);
-        std::vector entryPointIndices = CollectUsedBindingIndices(linked_variant, i, entryPointBindings);
+        std::vector entryPointIndices = CollectUsedBindingIndices(linked_variant, i, entryPointBindings, ownedBaseSize);
         rawEntryPoint.UsedBindingIndices.append_range(std::move(entryPointIndices));
 
         // set suffix, and copy over the target text
@@ -584,7 +584,16 @@ CookError SlangReflector::applyLeafTypeUniformBufferLayout(slang::TypeLayoutRefl
         binding.ByteSize = static_cast<uint64_t>(elementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
     }
 
-    // if bytesize is still 0, we have a problem and should error out
+    // if the *leaf* layout is a parameter block, and the byte size is still 0, there's nothing to find here
+    if (buffer_leaf_layout->getKind() == slang::TypeReflection::Kind::ParameterBlock &&
+        binding.ByteSize == 0u)
+    {
+        return CookError::Success;
+    }
+
+    // If this happens, and this isn't a parameter block, something is amiss. Even if it is a parameter block,
+    // empty ones should be handled by above casing (which then walks the layout further), and for hybrids
+    // (blocks with other blocks inside + some actual data), the byte size should be non-zero
     if (binding.ByteSize == 0u)
     {
         // log a diagnostic so it's clear where this probably came from
