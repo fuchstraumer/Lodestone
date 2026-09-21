@@ -504,6 +504,31 @@ std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_vari
     return usedBindingIndices;
 }
 
+ResourceAccessKind FromSlangAccessType(SlangResourceAccess access)
+{
+    switch (access)
+    {
+    case SLANG_RESOURCE_ACCESS_NONE:
+        return ResourceAccessKind::Invalid;
+    case SLANG_RESOURCE_ACCESS_READ:
+        return ResourceAccessKind::ReadOnly;
+    case SLANG_RESOURCE_ACCESS_READ_WRITE:
+        return ResourceAccessKind::ReadWrite;
+    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+        return ResourceAccessKind::RasterizerOrdered;
+    case SLANG_RESOURCE_ACCESS_APPEND:
+        return ResourceAccessKind::Append;
+    case SLANG_RESOURCE_ACCESS_CONSUME:
+        return ResourceAccessKind::Consume;
+    case SLANG_RESOURCE_ACCESS_WRITE:
+        return ResourceAccessKind::WriteOnly;
+    case SLANG_RESOURCE_ACCESS_FEEDBACK:
+        return ResourceAccessKind::Feedback;
+    case SLANG_RESOURCE_ACCESS_UNKNOWN:
+        return ResourceAccessKind::Invalid;
+    }
+}
+
 } // namespace
 
 namespace lodestone
@@ -638,6 +663,9 @@ CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* conta
     // this will just set shape back to invalid for things like samplers, but otherwise most of the
     // other binding kinds will have their shape determined correctly.
     binding.Shape = FromSlangResourceShape(leafType->getResourceShape());
+    // like above, access type can end up as an invalid value still - but that's contextual, and later
+    // validation layers will catch this based on the actual underlying type of the resource.
+    binding.Access = FromSlangAccessType(leafType->getResourceAccess());
 
     switch (binding.Kind)
     {
@@ -648,7 +676,6 @@ CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* conta
     case BindingKind::StorageTexture:
         binding.StorageFormat =
             FromSlangImageFormat(containing_layout->getBindingRangeImageFormat(range_index));
-        binding.StorageAccess = FromSlangBindingTypeAccess(binding_type);
         [[fallthrough]];
     case BindingKind::CombinedTextureSampler:
         [[fallthrough]];

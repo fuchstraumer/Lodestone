@@ -101,17 +101,20 @@ enum class TextureSampleType : uint8_t
     UnsignedInteger,
 };
 
-/** @brief What a shader does to a storage texture. Stored as separate flags from
- * from a shared accessor since Buffers are either RW or read-only */
-enum class StorageTextureAccess : uint8_t
+/** @brief The kind of accessmodel a shader uses with a resource */
+enum class ResourceAccessKind : uint16_t // increased to 16 for alignment
 {
     Invalid = 0,
     ReadOnly,
     WriteOnly,
     ReadWrite,
+    RasterizerOrdered,
+    Append,
+    Consume,
+    Feedback
 };
 
-enum class SamplerBindingType : uint8_t
+enum class SamplerBindingType : uint16_t // increased to 16 for alignment
 {
     Invalid = 0,
     Filtering,
@@ -223,6 +226,8 @@ struct UniformMemberInfo
 //NOLINTBEGIN(misc-non-private-member-variables-in-classes)
 // todo-ship: maybe we strip out string_view and span, and just use C-style strings and arrays
 // to avoid the standard library includes in an interface header
+// todo-ship: this is already 104 bytes, we should find a way to pack it better. i was only able
+// to cut 8 bytes by changing ordering to get rid of the hidden padding
 struct BindingInfo
 {
     std::string_view Name;
@@ -230,20 +235,18 @@ struct BindingInfo
     uint32_t Group{ static_cast<uint32_t>(-1) };
     uint32_t Binding{ static_cast<uint32_t>(-1) };
     BindingKind Kind{ BindingKind::Invalid };
-
-    /** @brief Size of one structured buffer element, in bytes. Zero for a texture or a sampler. */
-    uint32_t ElementStride{ 0u };
-    /** @brief Total size of a uniform block, in bytes. Zero for every other binding kind. */
-    uint64_t ByteSize{ 0u };
-    uint32_t ArrayCount{ 1u };
     /** @brief Shape is Buffer/Texture[N]/Sampler, etc */
     ResourceShape Shape{ ResourceShape::Invalid };
     TextureSampleType SampleType{ TextureSampleType::Invalid };
     TextureFormat StorageFormat{ TextureFormat::Invalid };
     /** @note Unlike a `Buffer`, `StorageTexture` access type is not part of the Shape value */
-    StorageTextureAccess StorageAccess{ StorageTextureAccess::Invalid };
+    ResourceAccessKind Access{ ResourceAccessKind::Invalid };
     SamplerBindingType SamplerType{ SamplerBindingType::Invalid };
-
+    /** @brief Size of one structured buffer element, in bytes. Zero for a texture or a sampler. */
+    uint32_t ElementStride{ 0u };
+    uint32_t ArrayCount{ 1u };
+    /** @brief Total size of a uniform block, in bytes. Zero for every other binding kind. */
+    uint64_t ByteSize{ 0u };
     /** @brief Element count from a `[ls_element_count]` annotation, already evaluated for this
      * variant. Zero means the shader did not annotate the resource, so the caller must give a size. */
     uint64_t DerivedElementCount{ 0u };
@@ -252,6 +255,7 @@ struct BindingInfo
     uint32_t DerivedExtentX{ 0u };
     uint32_t DerivedExtentY{ 0u };
     uint32_t DerivedExtentZ{ 0u };
+    uint32_t IsStructured{ 0u };
 
     /** @brief The members of a uniform block. Empty for every other binding kind. */
     std::span<const UniformMemberInfo> Members;

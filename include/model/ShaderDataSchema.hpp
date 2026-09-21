@@ -1,6 +1,7 @@
 #pragma once
 #ifndef LODESTONE_DATA_SCHEMA_HPP
 #define LODESTONE_DATA_SCHEMA_HPP
+#include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include <cstdint>
 #include <span>
@@ -111,7 +112,7 @@ struct ReflectedBinding
     ResourceShape Shape{ ResourceShape::Invalid };
     TextureSampleType SampleType{ TextureSampleType::Invalid };
     TextureFormat StorageFormat{ TextureFormat::Invalid };
-    StorageTextureAccess StorageAccess{ StorageTextureAccess::Invalid };
+    ResourceAccessKind Access{ ResourceAccessKind::Invalid };
     SamplerBindingType SamplerType{ SamplerBindingType::Invalid };
 
     /** Filled only for a uniform block. Every other binding kind leaves it empty. */

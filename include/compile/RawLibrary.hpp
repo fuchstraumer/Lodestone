@@ -95,7 +95,7 @@ struct RawBinding
     ResourceShape Shape{ ResourceShape::Invalid };
     TextureSampleType SampleType{ TextureSampleType::Invalid };
     TextureFormat StorageFormat{ TextureFormat::Invalid };
-    StorageTextureAccess StorageAccess{ StorageTextureAccess::Invalid };
+    ResourceAccessKind Access{ ResourceAccessKind::Invalid };
     SamplerBindingType SamplerType{ SamplerBindingType::Invalid };
 
     std::vector<ReflectedUniformMember> UniformMembers;
