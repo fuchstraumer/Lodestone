@@ -6,9 +6,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # cmake/ contains our own FindVulkanHeaders.cmake; must be set before any find_package calls
-list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-find_package(Vulkan REQUIRED)
-set(VulkanHeaders_INCLUDE_DIR ${Vulkan_INCLUDE_DIR} CACHE PATH "" FORCE)
+if (NOT TARGET Vulkan::Vulkan)
+    list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+    find_package(Vulkan REQUIRED)
+    set(VulkanHeaders_INCLUDE_DIR ${Vulkan_INCLUDE_DIR} CACHE PATH "" FORCE)
+endif()
 
 include(cmake/ConfigureBuildFlags.cmake)
 
@@ -206,8 +208,10 @@ source_group("target" FILES ${LODESTONE_TARGET_SOURCES})
 source_group("client" FILES ${LODESTONE_CLIENT_HEADERS} ${LODESTONE_CLIENT_SOURCES})
 
 copy_slang_dlls_to_target(lodestone)
-
-option(LODESTONE_BUILD_TESTS "Build the standalone unit test executables" ON)
+# Lodestone tests don't use google test, but do use ctest
+option(LODESTONE_BUILD_TESTS "Build the standalone unit test executables" ${PROJECT_IS_TOP_LEVEL})
+# These tools are standalone executables mostly intended for debugging or iterative shader work
+option(LODESTONE_BUILD_TOOLS "Build the standalone tools" ${PROJECT_IS_TOP_LEVEL})
 
 if(LODESTONE_BUILD_TESTS)
     enable_testing()
