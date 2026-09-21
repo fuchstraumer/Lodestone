@@ -131,7 +131,7 @@ namespace
         record.Kind = static_cast<uint8_t>(binding.Kind);
         record.Shape = static_cast<uint8_t>(binding.Shape);
         record.SampleType = static_cast<uint8_t>(binding.SampleType);
-        record.StorageAccess = static_cast<uint8_t>(binding.StorageAccess);
+        record.Access = static_cast<uint8_t>(binding.Access);
         record.SamplerType = static_cast<uint8_t>(binding.SamplerType);
 
         record.FirstUniformMember = static_cast<uint32_t>(member_records.size());
@@ -186,7 +186,7 @@ namespace
                record.Kind == static_cast<uint8_t>(binding.Kind) &&
                record.Shape == static_cast<uint8_t>(binding.Shape) &&
                record.SampleType == static_cast<uint8_t>(binding.SampleType) &&
-               record.StorageAccess == static_cast<uint8_t>(binding.StorageAccess) &&
+               record.Access == static_cast<uint8_t>(binding.Access) &&
                record.SamplerType == static_cast<uint8_t>(binding.SamplerType);
     }
 

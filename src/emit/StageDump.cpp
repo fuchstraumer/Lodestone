@@ -171,7 +171,7 @@ namespace
         writer.KeyString("shape", magic_enum::enum_name(binding.Shape));
         writer.KeyString("sampleType", magic_enum::enum_name(binding.SampleType));
         writer.KeyString("storageFormat", magic_enum::enum_name(binding.StorageFormat));
-        writer.KeyString("storageAccess", magic_enum::enum_name(binding.StorageAccess));
+        writer.KeyString("storageAccess", magic_enum::enum_name(binding.Access));
         writer.KeyString("samplerType", magic_enum::enum_name(binding.SamplerType));
         WriteUniformMembers(writer, binding);
         writer.EndObject();
@@ -450,7 +450,7 @@ namespace
             writer.KeyString("shape", magic_enum::enum_name(binding.Shape));
             writer.KeyString("sampleType", magic_enum::enum_name(binding.SampleType));
             writer.KeyString("storageFormat", magic_enum::enum_name(binding.StorageFormat));
-            writer.KeyString("storageAccess", magic_enum::enum_name(binding.StorageAccess));
+            writer.KeyString("storageAccess", magic_enum::enum_name(binding.Access));
             writer.KeyString("samplerType", magic_enum::enum_name(binding.SamplerType));
 
             writer.Key("uniformMembers");

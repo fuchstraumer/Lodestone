@@ -214,7 +214,7 @@ namespace
         binding.Shape = raw_binding.Shape;
         binding.SampleType = raw_binding.SampleType;
         binding.StorageFormat = raw_binding.StorageFormat;
-        binding.StorageAccess = raw_binding.StorageAccess;
+        binding.Access = raw_binding.Access;
         binding.SamplerType = raw_binding.SamplerType;
         binding.UniformMembers = raw_binding.UniformMembers;
         return binding;

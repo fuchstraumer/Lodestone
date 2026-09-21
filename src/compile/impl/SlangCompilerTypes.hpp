@@ -240,19 +240,6 @@ constexpr bool IsResourceTypeKind(slang::TypeReflection::Kind kind) noexcept
     return std::ranges::contains(k_ResourceKinds, kind);
 }
 
-constexpr StorageTextureAccess FromSlangBindingTypeAccess(slang::BindingType binding_type) noexcept
-{
-    switch (binding_type)
-    {
-    case slang::BindingType::MutableTexture:
-        return StorageTextureAccess::ReadWrite;
-    case slang::BindingType::Texture:
-        return StorageTextureAccess::ReadOnly;
-    default:
-        return StorageTextureAccess::Invalid;
-    }
-}
-
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif

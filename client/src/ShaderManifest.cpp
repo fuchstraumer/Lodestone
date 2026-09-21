@@ -513,7 +513,7 @@ ShaderSourceProvider::ShaderSourceProvider(ShaderManifestView _view,
 }
 
 void ShaderSourceProvider::GatherVariantBindings(const ManifestVariant& variant,
-                                                         const std::vector<uint32_t>& member_offsets)
+                                                 const std::vector<uint32_t>& member_offsets)
 {
     const std::span<const ManifestBinding> records = view.Bindings();
     const std::span<const ManifestSlot> allSlots = view.SlotTable();
@@ -538,8 +538,8 @@ void ShaderSourceProvider::GatherVariantBindings(const ManifestVariant& variant,
 }
 
 BindingInfo ShaderSourceProvider::MakeBindingInfo(const ManifestBinding& record,
-                                                          const ManifestFootprint* footprint,
-                                                          uint32_t member_offset) const noexcept
+                                                  const ManifestFootprint* footprint,
+                                                  uint32_t member_offset) const noexcept
 {
     BindingInfo info;
     info.Name = view.String(record.NameString);
@@ -553,7 +553,7 @@ BindingInfo ShaderSourceProvider::MakeBindingInfo(const ManifestBinding& record,
     info.Shape = static_cast<ResourceShape>(record.Shape);
     info.SampleType = static_cast<TextureSampleType>(record.SampleType);
     info.StorageFormat = static_cast<TextureFormat>(record.StorageFormat);
-    info.StorageAccess = static_cast<StorageTextureAccess>(record.StorageAccess);
+    info.Access = static_cast<ResourceAccessKind>(record.Access);
     info.SamplerType = static_cast<SamplerBindingType>(record.SamplerType);
 
     if (footprint != nullptr)
@@ -574,7 +574,7 @@ BindingInfo ShaderSourceProvider::MakeBindingInfo(const ManifestBinding& record,
 }
 
 std::string_view ShaderSourceProvider::Source(uint32_t entry_point,
-                                                      VariantKey variant) const noexcept
+                                              VariantKey variant) const noexcept
 {
     const ManifestSlot* slot = view.FindSlot(entry_point, variant);
     assert(slot != nullptr);
@@ -582,7 +582,7 @@ std::string_view ShaderSourceProvider::Source(uint32_t entry_point,
 }
 
 std::span<const BindingInfo> ShaderSourceProvider::Bindings(uint32_t entry_point,
-                                                                    VariantKey variant) const noexcept
+                                                            VariantKey variant) const noexcept
 {
     const ManifestSlot* slot = view.FindSlot(entry_point, variant);
     assert(slot != nullptr);
@@ -592,7 +592,7 @@ std::span<const BindingInfo> ShaderSourceProvider::Bindings(uint32_t entry_point
 }
 
 WorkgroupSize ShaderSourceProvider::Workgroup(uint32_t entry_point,
-                                                      VariantKey variant) const noexcept
+                                              VariantKey variant) const noexcept
 {
     const ManifestSlot* slot = view.FindSlot(entry_point, variant);
     assert(slot != nullptr);

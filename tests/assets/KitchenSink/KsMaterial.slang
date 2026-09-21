@@ -45,7 +45,9 @@ struct MaterialResources
 {
     [ls_extent_2d("2048", "2048")]
     Texture2D<float4> Albedo;
+    [ls_extent_2d("2048", "2048")]
     Texture2D<float4> NormalMap;
+    [ls_extent_2d("2048", "2048")]
     Texture2D<float4> DetailMap;
     [ls_extent_3d("64", "64", "64")]
     Texture3D<float4> ColorGradeLut;

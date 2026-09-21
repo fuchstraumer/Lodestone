@@ -102,12 +102,38 @@ std::string_view ToString(ShaderStageKind stage) noexcept
     {
     case ShaderStageKind::Vertex:
         return "Vertex";
+    case ShaderStageKind::Hull:
+        return "Hull";
+    case ShaderStageKind::Domain:
+        return "Domain";
     case ShaderStageKind::Fragment:
         return "Fragment";
     case ShaderStageKind::Compute:
         return "Compute";
+    case ShaderStageKind::RayGeneration:
+        return "RayGeneration";
+    case ShaderStageKind::Intersection:
+        return "Intersection";
+    case ShaderStageKind::AnyHit:
+        return "AnyHit";
+    case ShaderStageKind::ClosestHit:
+        return "ClosestHit";
+    case ShaderStageKind::Miss:
+        return "Miss";
+    case ShaderStageKind::Callable:
+        return "Callable";
+    case ShaderStageKind::Mesh:
+        return "Mesh";
+    case ShaderStageKind::Amplification:
+        return "Amplification";
+    case ShaderStageKind::Dispatch:
+        return "Dispatch";
+    case ShaderStageKind::Node:
+        return "Node";
     case ShaderStageKind::Invalid:
         return "Invalid";
+    case ShaderStageKind::Count:
+        std::unreachable();
     }
 
     return "Invalid";
@@ -358,7 +384,7 @@ uint64_t HashReflectedBinding(const ReflectedBinding& binding) noexcept
         static_cast<uint64_t>(binding.Shape),
         static_cast<uint64_t>(binding.SampleType),
         static_cast<uint64_t>(binding.StorageFormat),
-        static_cast<uint64_t>(binding.StorageAccess),
+        static_cast<uint64_t>(binding.Access),
         static_cast<uint64_t>(binding.SamplerType)
     };
     compositeHasher.Append(std::span{ scalarValues, std::size(scalarValues) });

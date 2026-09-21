@@ -2,7 +2,6 @@
 #ifndef LODESTONE_SHADER_LIBRARY_TYPES_HPP
 #define LODESTONE_SHADER_LIBRARY_TYPES_HPP
 #include "ResourceFlags.hpp"
-#include "VariantKey.hpp"
 #include <cstdint>
 #include <span>
 #include <string_view>
@@ -108,7 +107,7 @@ enum class ResourceAccessKind : uint16_t // increased to 16 for alignment
     ReadOnly,
     WriteOnly,
     ReadWrite,
-    RasterizerOrdered,
+    RasterizerOrdered, // this will require VK_EXT_fragment_shader_interlock for SPIRV targets
     Append,
     Consume,
     Feedback
