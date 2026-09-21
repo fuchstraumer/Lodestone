@@ -270,12 +270,6 @@ void CollectDepthWrites(slang::VariableLayoutReflection* var_layout, ReflectedRa
                     });
 }
 
-/** Names the scope of every binding range of one layout, in place.
- *
- * Slang flattens a scope into one list of binding ranges, and `getFieldBindingRangeOffset` is the
- * only thing that says which field a range came from. Walk the fields to recover the path the
- * emitter writes: a struct field adds its name to the chain, and a resource field does not,
- * because the leaf variable already carries that name. */
 /** One reflected number, or nothing.
  *
  * Slang answers `SLANG_UNKNOWN_SIZE` when a value depends on an unresolved generic parameter or
@@ -469,7 +463,8 @@ void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
  * query over the entry point rows would then let one entry point claim the parameter of another. */
 std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_variant,
                                                 SlangInt entry_point_index,
-                                                std::span<const RawBinding> global_bindings)
+                                                std::span<const RawBinding> global_bindings,
+                                                uint32_t index_offset)
 {
     const auto epIndex = static_cast<size_t>(entry_point_index);
     const Slang::ComPtr<slang::IMetadata>& metadata = linked_variant.EntryPointMetadata[epIndex];
@@ -501,10 +496,10 @@ std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_vari
             continue;
         }
 
-        usedBindingIndices.emplace_back(static_cast<uint32_t>(index));
+        usedBindingIndices.emplace_back(index_offset + static_cast<uint32_t>(index));
 
     }
-    
+
     usedBindingIndices.shrink_to_fit();
     return usedBindingIndices;
 }
@@ -1051,7 +1046,7 @@ CookResult<RawEntryPoint> SlangReflector::extractRawEntryPoint(const LinkedVaria
     extractRasterState(entryPointLayout, rawEntryPoint.Stage, rawEntryPoint.Raster);
 
     rawEntryPoint.UsedBindingIndices =
-        CollectUsedBindingIndices(linked_variant, entry_point_index, global_bindings);
+        CollectUsedBindingIndices(linked_variant, entry_point_index, global_bindings, 0u);
 
     // A `uniform` parameter on the entry point takes a placement in the space the global bindings
     // use, and the entry point var layout says where that scope starts.
