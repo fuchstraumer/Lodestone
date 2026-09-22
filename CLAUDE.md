@@ -41,6 +41,14 @@ different toolset, and it leaves a build tree that no longer builds.
 Presets: `ninja-msvc` and `ninja-clang-cl`. Configurations: `Debug` and `RelWithDebInfo`.
 Clang-CL with the MSVC frontend variant is a hard configure error.
 
+`LODESTONE_ENABLE_WGSL` (default ON) pulls in Tint from the Dawn submodule at `third_party/dawn`,
+configured by `cmake/ConfigureTint.cmake`. The WGSL validator parses the emitted text with Tint, so a
+standalone configure needs Python and network access: `DAWN_FETCH_DEPENDENCIES` is ON, and Dawn fetches
+its own dependencies at configure time. A parent project that already builds Dawn (defines `tint_api`)
+shares that target rather than adding it twice. The compile-out for a non-WGSL build is only partial
+today: `WgslValidator` and the wgsl profile are not yet guarded behind the option, so a build with WGSL
+OFF does not link. Finish those guards before relying on the switch.
+
 No build turns on a sanitizer. AddressSanitizer on Windows does not support the debug CRT. ASan
 intercepts `malloc` and `free`, `ucrtbased.dll` allocates through `_malloc_dbg`, and ASan then reports
 the teardown free as a bad free. The test aborts before `main`, and no frame of the stack belongs to
@@ -141,7 +149,9 @@ that `tests/CMakeLists.txt` supplies.
 
 `ParseCommandLine` in `src/driver/CookerOptions.cpp` parses the flags, and `GetUsageText` prints them:
 `--output/-o`, `--cache-dir`, `--O0` to `--O3`, `--target=<name>`, `--no-validate`, `--quiet`,
-`--single-threaded`, `--no-dedupe`, `--verify-deterministic`, and `--dump-stage=<name>`.
+`--single-threaded`, `--no-dedupe`, `--verify-deterministic`, `--dump-stage=<name>`, and
+`--dump-sources`. `--dump-sources` writes every unique compiled source to a per-module subfolder,
+beside a `SourceTable.json` that names each variant by its axis description and its source hashes.
 
 A value flag is a row in `k_ValueFlags`, beside `k_SwitchFlags`. Add a row, not a branch.
 
@@ -171,7 +181,7 @@ is therefore a visible word in a diff: the day a file in `emit/` writes
 | `permute/` | `PermutationValue`, `PermutationAxis`, `PermutationAssignment`, `PermutationSpace`, `PolicyDocument`, `AttributeExpression` | The authoring parameter domain. Stages 1 and 2. Phase E filled this folder. |
 | `compile/` | `SlangCompiler`, `SlangDiagnosticParser`, `RawLibrary`, `Diagnostics`, and `src/compile/impl/` | **The Slang wall. No file outside this folder names a Slang type.** |
 | `model/` | `ResolveStage`, `ShaderDataSchema`, `ContentHash`, `ContentInterner`, `CookedLibrary` | The data that flows, interns, and freezes. Stages 4, 6, and 7. |
-| `target/` | `TargetProfile`, `WgslBindingScanner` | A target, its access model, and its validator. Phase F fills this folder. |
+| `target/` | `TargetProfile`, `TargetUtils`, `WgslValidator` | A target, its access model, and its validator. Phase F fills this folder. |
 | `emit/` | `ShaderLibraryEmitter`, `ShaderManifestEmitter`, `OutputSink`, `StageDump`, `DedupeReport` | Everything that writes through a sink. Stage 8, plus the two reports. |
 | `driver/` | `CookerDriver`, `CookerOptions` | The loop and its command line. |
 
@@ -196,7 +206,7 @@ four headers and nothing else.
 There is no `validate/` folder, and that is worth knowing. Three of the four validators are functions
 inside the file they check: `VerifyLibraryRoundTrip` and `VerifyLayoutRoundTrip` live in
 `src/driver/CookerDriver.cpp`, and `VerifyManifestRoundTrip` lives in
-`src/emit/ShaderManifestEmitter.cpp`. Only `WgslBindingScanner` is its own file. The tree cannot show
+`src/emit/ShaderManifestEmitter.cpp`. Only `WgslValidator` is its own file. The tree cannot show
 that validators rank beside stages, and no arrangement of the current files would.
 
 ## The two problem domains
@@ -374,8 +384,9 @@ number would state that every target must supply one. A target supplies a valida
 Four validators run inside that loop. None of them is a stage.
 
 - **The reflection cross-check**, after stage 4. `ValidateResolvedLibrary` asks the target profile for
-  a validator. The WGSL profile scans `@group`/`@binding` back out of the emitted text with
-  `WgslBindingScanner`, then compares that against the bindings the entry point uses. A mismatch
+  a validator. The WGSL profile parses the emitted text with Tint (`WgslValidator`) and reads the
+  bindings from Tint's inspector, then compares that against the bindings the entry point uses. Tint
+  also proves the emitted WGSL parses and resolves, which the old text scanner could not. A mismatch
   increments a counter, and a nonzero counter fails the cook with `CookError::ReflectionMismatch`. A
   target that supplies no validator skips this, and the cook says which of the three happened.
 - **The library round trip**, after stage 7. `VerifyLibraryRoundTrip` replays every variant through

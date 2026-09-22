@@ -304,3 +304,90 @@ storage and dedup optimization, and the per-module value mask stops being a deco
 - `tests/DeclKindProbe.cpp` is a throwaway Slang-only probe. It links only Slang, so it builds while the
   cooker is mid-refactor. It answered the enum and the block-layout questions this window. Remove it when
   it stops earning its place.
+
+## 10. Update 2026-09-22
+
+### 10.1 State
+
+The cook path is green. All unit tests pass, and the `KitchenSink` cook succeeds. The WGSL validator now
+runs on Tint, not a text scanner, and it passes on every `KitchenSink` variant. The client query surface
+is unchanged and frozen. The manifest is still one file per module in the old shape: the multi-module
+manifest and the container-with-directory header (section 9.6) did not get built this window. They are
+the next feature work, and they are now unblocked.
+
+### 10.2 What this window built
+
+- **The cooker driver is robust.** The step chain from section 9.2 now cooks several modules and several
+  targets without the failures that were open then. The block-of-blocks bug (section 9.3) is fixed: the
+  range walk and the sub-object walk both discriminate on the leaf type kind, so a zero-size
+  `ParameterBlock` container is descended, not drafted as a uniform buffer.
+- **Resource bindings carry tightly scoped kinds.** `BindingKind` no longer folds access and shape into
+  the kind. Access moves to a `ResourceAccess` field, and shape to a `ResourceShape` field.
+  `ResourceShape` is a flag enum: the base shape sits in the low nibble, and array, multisample, shadow,
+  and feedback are flags, which mirrors Slang's own resource-shape layout. Read the base shape with
+  `GetBaseShape`, never a raw `==` against a base value.
+- **The reflection walk extracts every fact Slang exposes off a leaf type.** Shape, access, sample type,
+  storage format, sampler comparison, and the shadow flag that marks a depth texture. Texel buffers read
+  a format or a sample type by access. The sampler field distinguishes only comparison from
+  non-comparison, because filtering is a runtime property the shader does not decide.
+- **`collectStructMembers` walks the element of a structured buffer, not only a uniform buffer.** Field
+  offsets use `SLANG_PARAMETER_CATEGORY_UNIFORM` (bytes) in both cases. The buffer's SRV or UAV nature is
+  a binding-range fact, not a member offset. Matrix layout and array element stride are captured per
+  member, so a CPU packer cannot transpose a matrix or misindex an array.
+- **The text-based WGSL scanner is gone.** `WgslValidator` (in `src/target/`) parses the emitted WGSL
+  with Tint, reads the bindings from Tint's inspector, and compares them against the reflected bindings.
+  Tint also proves the emitted WGSL parses and resolves, which the scanner could not. The validator
+  checks shape and access as well as location and kind.
+- **`--dump-sources` writes every unique compiled source** to a per-module subfolder, beside a
+  `SourceTable.json` that names each variant by its axis description and its source hashes. This makes a
+  reflection mismatch quick to trace: copy the description from the console, find it in the JSON, open the
+  named source file.
+- **Entry-point binding indices are filtered, sorted, and scoped.** Globals are filtered by
+  `isParameterLocationUsed`. Entry-point-owned bindings are filtered over their own index range only, with
+  no re-scan of the globals, so no binding reaches the validator duplicated or unsorted.
+
+### 10.3 The depth-texture gotcha (Slang WGSL)
+
+Slang's WGSL backend does not infer depth-ness from usage. A plain `Texture2DArray<float>` sampled with
+`SampleCmp` emits `texture_2d_array<f32>` plus a compare call, which Tint rejects. Author the shader with
+the explicit `DepthTexture2D` / `DepthTexture2DArray` / `DepthTextureCube` types (and a
+`SamplerComparisonState`), which set the shadow flavor at declaration, and the emitter then writes
+`texture_depth_*`. `KsMaterial`'s shadow cascades moved to `DepthTexture2DArray` for this reason. Issue
+shader-slang/slang#6942. Memory note: `slang-wgsl-depth-textures`.
+
+### 10.4 Deferred, but soon — do not forget
+
+Three capability areas are not built and must not be lost. They are groundwork for Phase F and past it,
+and they cannot defer much longer once a target other than WGSL exists.
+
+- **Bindless (the Indexed and Pointer access models).** The reflected schema (kind, shape, access,
+  format, member layout) is the invariant; placement is the variant. `ResourcePlacement` is already a
+  variant, so the seam exists. Bindless loses per-resource placement but keeps the type and shape facts,
+  and those facts become the only guardrail against a schema mismatch that a driver would otherwise
+  catch. So they matter more under bindless, not less. Add unbounded and runtime-array detection when
+  this lands. Do not design the Indexed and Pointer placement fields until the target is concrete.
+- **Specialization constants.** Slang reflects them (`SPECIALIZATION_CONSTANT` category), and WGSL spells
+  them as `override`. Reserve the schema slot now.
+- **Push constants.** Slang reflects them (`PUSH_CONSTANT_BUFFER` category). Model them as their own
+  category, not folded into a uniform buffer. On Vulkan the plan writes buffer device addresses into the
+  push-constant space, so a push-constant member can be a pointer (the Pointer access model). This ties
+  push constants to the bindless and BDA work.
+
+### 10.5 Build change: Tint through Dawn
+
+`LODESTONE_ENABLE_WGSL` (default ON) pulls in Tint from the Dawn submodule at `third_party/dawn`,
+configured by `cmake/ConfigureTint.cmake`. Standalone configure needs Python and network access, because
+`DAWN_FETCH_DEPENDENCIES` is ON and Dawn fetches its own dependencies at configure time. A parent project
+that already builds Dawn (defines `tint_api`) shares that target. The compile-out for a non-WGSL build is
+only partial: `WgslValidator` and the wgsl profile are not guarded behind the option yet, so a build with
+WGSL OFF does not link. Finish those guards before relying on the switch.
+
+### 10.6 Next
+
+1. **Update the tests for the new fields and enum values** before the manifest work. The reshaped
+   `BindingKind`, the `ResourceShape` flags, `ResourceAccess`, the sampler comparison, matrix layout,
+   array stride, and the struct-member walk are all exercised by the cook and pass, but the unit tests do
+   not yet cover the new shape of the data. `WgslBindingScannerTest` is a stale name: the scanner is gone,
+   so rename the target and repoint it at `WgslValidator`, or retire it.
+2. **Build the multi-module manifest and the container-with-directory header** (section 9.6). This is the
+   feature work that slipped this window.

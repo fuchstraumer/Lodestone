@@ -60,7 +60,7 @@ struct MaterialResources
 struct ShadowResources
 {
     [ls_extent_3d("2048", "2048", "4")]
-    Texture2DArray<float> Cascades;
+    DepthTexture2DArray Cascades;
     SamplerComparisonState CompareSampler;
 };
 

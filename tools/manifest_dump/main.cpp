@@ -155,6 +155,9 @@ void WriteUniformMembers(lodestone::JsonWriter& writer,
         writer.KeyUInt("offset", member.Offset);
         writer.KeyUInt("size", member.Size);
         writer.KeyUInt("arrayCount", member.ArrayCount);
+        writer.KeyUInt("elementStride", member.ElementStride);
+        writer.KeyString("matrixLayout",
+                        magic_enum::enum_name(static_cast<lodestone::MatrixLayout>(member.MatrixLayout)));
         writer.EndObject();
     }
     writer.EndArray();
@@ -171,15 +174,12 @@ void WriteBinding(lodestone::JsonWriter& writer,
     writer.KeyUInt("binding", binding.Binding);
     writer.KeyString("kind", magic_enum::enum_name(static_cast<lodestone::BindingKind>(binding.Kind)));
     writer.KeyString("shape", magic_enum::enum_name(static_cast<lodestone::ResourceShape>(binding.Shape)));
-    writer.KeyString("sampleType",
-                     magic_enum::enum_name(static_cast<lodestone::TextureSampleType>(binding.SampleType)));
+    writer.KeyBool("isComparisonSampler", binding.IsComparisonSampler);
     writer.KeyString("storageFormat",
                      magic_enum::enum_name(static_cast<lodestone::TextureFormat>(binding.StorageFormat)));
     writer.KeyString(
         "storageAccess",
-        magic_enum::enum_name(static_cast<lodestone::StorageTextureAccess>(binding.StorageAccess)));
-    writer.KeyString("samplerType",
-                     magic_enum::enum_name(static_cast<lodestone::SamplerBindingType>(binding.SamplerType)));
+        magic_enum::enum_name(static_cast<lodestone::ResourceAccess>(binding.Access)));
     writer.KeyUInt("byteSize", binding.ByteSize);
     writer.KeyUInt("elementStride", binding.ElementStride);
     writer.KeyUInt("arrayCount", binding.ArrayCount);
