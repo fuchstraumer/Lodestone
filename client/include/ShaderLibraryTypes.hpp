@@ -15,6 +15,13 @@
 namespace lodestone
 {
 
+enum class MatrixLayout : uint8_t
+{
+    Invalid = 0,
+    RowMajor,
+    ColumnMajor,
+};
+
 /** @brief How a shader reaches a resource. Only `Bound` is produced today. */
 enum class PlacementKind : uint8_t
 {
@@ -239,6 +246,9 @@ struct UniformMemberInfo
     uint32_t Offset{ 0u };
     uint32_t Size{ 0u };
     uint32_t ArrayCount{ 1u };
+    uint16_t ElementStride{ 0u };
+    MatrixLayout Layout{ MatrixLayout::Invalid };
+    uint8_t Padding{ 0u }; // added by compiler, placing here manually for explicit visibility
 };
 
 /** @brief One resource a shader binds, as the generated library states it. This is the optimized and

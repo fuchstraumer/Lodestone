@@ -130,9 +130,8 @@ namespace
             GetBoundPlacement(binding.Placement) != nullptr ? PlacementKind::Bound : PlacementKind::None);
         record.Kind = static_cast<uint8_t>(binding.Kind);
         record.Shape = static_cast<uint8_t>(binding.Shape);
-        record.SampleType = static_cast<uint8_t>(binding.SampleType);
+        record.IsComparisonSampler = static_cast<uint8_t>(binding.IsComparisonSampler);
         record.Access = static_cast<uint8_t>(binding.Access);
-        record.SamplerType = static_cast<uint8_t>(binding.SamplerType);
 
         record.FirstUniformMember = static_cast<uint32_t>(member_records.size());
         record.UniformMemberCount = static_cast<uint32_t>(binding.UniformMembers.size());
@@ -144,6 +143,9 @@ namespace
             memberRecord.Offset = member.Offset;
             memberRecord.Size = member.Size;
             memberRecord.ArrayCount = member.ArrayCount;
+            // widen these types to uint32_t, since this is all 8-byte aligned anyways
+            memberRecord.ElementStride = static_cast<uint32_t>(member.ElementStride);
+            memberRecord.MatrixLayout = static_cast<uint32_t>(member.MatrixLayout);
             member_records.emplace_back(memberRecord);
         }
 
@@ -179,15 +181,17 @@ namespace
 
     bool RecordMatchesBinding(const ManifestBinding& record, const ReflectedBinding& binding) noexcept
     {
-        return record.ByteSize == binding.ByteSize && record.Group == GroupOf(binding) &&
-               record.Binding == BindingOf(binding) && record.ElementStride == binding.ElementStride &&
+        return record.ByteSize == binding.ByteSize &&
+               record.Group == GroupOf(binding) &&
+               record.Binding == BindingOf(binding) &&
+               record.ElementStride == binding.ElementStride &&
                record.ArrayCount == binding.ArrayCount &&
                record.StorageFormat == static_cast<uint32_t>(binding.StorageFormat) &&
+               record.UniformMemberCount == static_cast<uint32_t>(binding.UniformMembers.size()) &&
                record.Kind == static_cast<uint8_t>(binding.Kind) &&
                record.Shape == static_cast<uint8_t>(binding.Shape) &&
-               record.SampleType == static_cast<uint8_t>(binding.SampleType) &&
-               record.Access == static_cast<uint8_t>(binding.Access) &&
-               record.SamplerType == static_cast<uint8_t>(binding.SamplerType);
+               record.IsComparisonSampler == static_cast<uint8_t>(binding.IsComparisonSampler) &&
+               record.Access == static_cast<uint8_t>(binding.Access);
     }
 
     CookResult<ShaderManifestView> OpenManifestForCheck(const CookedModule& module,

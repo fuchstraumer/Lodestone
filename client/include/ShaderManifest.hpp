@@ -214,9 +214,8 @@ struct alignas(8) ManifestBinding
     uint8_t Shape{ 0u };
     uint8_t IsComparisonSampler{ 0u };
     uint8_t Access{ 0u };
-    uint8_t SamplerType{ 0u };
     uint8_t Reserved0{ 0u };
-    uint8_t Reserved1{ 0u };
+    uint16_t Reserved1{ 0u };
 };
 
 /**@brief "Footprint" refers to the memory footprint of a resource, insofar as we can declare it. `Kind`
@@ -275,6 +274,8 @@ struct alignas(8) ManifestUniformMember
     uint32_t Offset{ 0u };
     uint32_t Size{ 0u };
     uint32_t ArrayCount{ 1u };
+    uint32_t ElementStride{ 0u };
+    uint32_t MatrixLayout{ 0u };
 };
 
 struct alignas(8) ManifestColorTarget

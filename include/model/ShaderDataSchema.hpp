@@ -83,6 +83,8 @@ struct ReflectedUniformMember
     uint32_t Offset{ 0u };
     uint32_t Size{ 0u };
     uint32_t ArrayCount{ 1u };
+    uint16_t ElementStride{ 0u };
+    MatrixLayout MatrixLayout{ 0u };
 
     friend bool operator==(const ReflectedUniformMember&, const ReflectedUniformMember&) = default;
 };

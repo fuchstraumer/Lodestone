@@ -124,6 +124,8 @@ namespace
             writer.KeyUInt("offset", member.Offset);
             writer.KeyUInt("size", member.Size);
             writer.KeyUInt("arrayCount", member.ArrayCount);
+            writer.KeyUInt("elementStride", member.ElementStride);
+            writer.KeyString("matrixLayout", magic_enum::enum_name(member.MatrixLayout));
             writer.EndObject();
         }
         writer.EndArray();
@@ -172,7 +174,7 @@ namespace
         writer.KeyString("sampleType", magic_enum::enum_name(binding.SampleType));
         writer.KeyString("storageFormat", magic_enum::enum_name(binding.StorageFormat));
         writer.KeyString("storageAccess", magic_enum::enum_name(binding.Access));
-        writer.KeyString("samplerType", magic_enum::enum_name(binding.SamplerType));
+        writer.KeyBool("isComparisonSampler", binding.IsComparisonSampler);
         WriteUniformMembers(writer, binding);
         writer.EndObject();
     }
@@ -451,7 +453,7 @@ namespace
             writer.KeyString("sampleType", magic_enum::enum_name(binding.SampleType));
             writer.KeyString("storageFormat", magic_enum::enum_name(binding.StorageFormat));
             writer.KeyString("storageAccess", magic_enum::enum_name(binding.Access));
-            writer.KeyString("samplerType", magic_enum::enum_name(binding.SamplerType));
+            writer.KeyBool("isComparisonSampler", binding.IsComparisonSampler);
 
             writer.Key("uniformMembers");
             writer.BeginArray();
@@ -462,6 +464,8 @@ namespace
                 writer.KeyUInt("offset", member.Offset);
                 writer.KeyUInt("size", member.Size);
                 writer.KeyUInt("arrayCount", member.ArrayCount);
+                writer.KeyUInt("elementStride", member.ElementStride);
+                writer.KeyString("matrixLayout", magic_enum::enum_name(member.MatrixLayout));
                 writer.EndObject();
             }
             writer.EndArray();
