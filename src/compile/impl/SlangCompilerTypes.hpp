@@ -77,9 +77,9 @@ constexpr BindingKind FromSlangBindingType(slang::BindingType binding_type) noex
     case slang::BindingType::ParameterBlock:
         return BindingKind::ParameterBlock;
     case slang::BindingType::TypedBuffer:
-        [[fallthrough]];
+        return BindingKind::TexelBuffer;
     case slang::BindingType::RawBuffer:
-        return BindingKind::ReadOnlyStructuredBuffer;
+        return BindingKind::StorageBuffer;
     case slang::BindingType::CombinedTextureSampler:
         return BindingKind::CombinedTextureSampler;
     case slang::BindingType::InputRenderTarget:
@@ -89,7 +89,7 @@ constexpr BindingKind FromSlangBindingType(slang::BindingType binding_type) noex
     case slang::BindingType::RayTracingAccelerationStructure:
         return BindingKind::RayTracingAccelerationStructure;
     case slang::BindingType::MutableTypedBuffer:
-        return BindingKind::StructuredBuffer;
+        return BindingKind::TexelBuffer;
     case slang::BindingType::MutableRawBuffer:
         return BindingKind::StorageBuffer;
     case slang::BindingType::MutableTexture:
@@ -103,33 +103,9 @@ constexpr BindingKind FromSlangBindingType(slang::BindingType binding_type) noex
     * shape must be masked out before the comparison. */
 constexpr ResourceShape FromSlangResourceShape(SlangResourceShape shape) noexcept
 {
-    const auto baseShape = static_cast<SlangResourceShape>(shape & SLANG_RESOURCE_BASE_SHAPE_MASK);
-    const bool isArray = (shape & SLANG_TEXTURE_ARRAY_FLAG) != 0;
-    const bool isMultisample = (shape & SLANG_TEXTURE_MULTISAMPLE_FLAG) != 0;
-
-    switch (baseShape)
-    {
-    case SLANG_TEXTURE_1D:
-        return ResourceShape::Texture1D;
-    case SLANG_TEXTURE_2D:
-        if (isMultisample)
-        {
-            return ResourceShape::Texture2DMultisample;
-        }
-        return isArray ? ResourceShape::Texture2DArray : ResourceShape::Texture2D;
-    case SLANG_TEXTURE_3D:
-        return ResourceShape::Texture3D;
-    case SLANG_TEXTURE_CUBE:
-        return isArray ? ResourceShape::TextureCubeArray : ResourceShape::TextureCube;
-    case SLANG_STRUCTURED_BUFFER:
-        [[fallthrough]];
-    case SLANG_BYTE_ADDRESS_BUFFER:
-        [[fallthrough]];
-    case SLANG_TEXTURE_BUFFER:
-        return ResourceShape::Buffer;
-    default:
-        return ResourceShape::Invalid;
-    }
+    // we used to have to convert this, but now the enum values line up almost exactly
+    // (excepting two values we removed, TextureBuffer [redundant] and Unknown [not used])
+    return static_cast<ResourceShape>(shape);
 }
 
 /** Maps the scalar type a texture returns onto the sample type WebGPU wants. A depth texture is

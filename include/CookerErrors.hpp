@@ -35,7 +35,7 @@ enum class CookError : uint16_t
     AttributeExpressionDivideByZero = 45,
     AttributeExpressionOutOfRange = 46,
     PointerTypeNotSupported = 47, // tried to use pointer placements w unsupported target
-    ReflectionCouldNotFindBufferElementSize = 48,
+    ReflectionCouldNotFindBufferElementLayout = 48,
     ReflectionUnsupportedBindingKind = 49,
 
     NoModulesSpecified = 60,

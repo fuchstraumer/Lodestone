@@ -3,6 +3,9 @@
 #include "ShaderLibraryTypes.hpp"
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <format>
 #include <span>
 #include <string>
@@ -23,10 +26,10 @@ std::string_view ToString(BindingKind kind) noexcept
         return "UniformBuffer";
     case BindingKind::ParameterBlock:
         return "ParameterBlock";
-    case BindingKind::ReadOnlyStructuredBuffer:
-        return "ReadOnlyStructuredBuffer";
-    case BindingKind::ReadOnlyStorageBuffer:
-        return "ReadOnlyStorageBuffer";
+    case BindingKind::StorageBuffer:
+        return "StorageBuffer";
+    case BindingKind::TexelBuffer:
+        return "TexelBuffer";
     case BindingKind::CombinedTextureSampler:
         return "CombinedTextureSampler";
     case BindingKind::InputRenderTarget:
@@ -35,10 +38,6 @@ std::string_view ToString(BindingKind kind) noexcept
         return "InlineUniform";
     case BindingKind::RayTracingAccelerationStructure:
         return "RayTracingAccelerationStructure";
-    case BindingKind::StructuredBuffer:
-        return "StructuredBuffer";
-    case BindingKind::StorageBuffer:
-        return "StorageBuffer";
     case BindingKind::StorageTexture:
         return "StorageTexture";
     case BindingKind::Invalid:
@@ -48,31 +47,107 @@ std::string_view ToString(BindingKind kind) noexcept
     return "Invalid";
 }
 
-std::string_view ToString(ResourceShape shape) noexcept
+namespace
 {
-    switch (shape)
+
+/** A fixed-capacity, compile-time string. `ToString(ResourceShape)` composes one name for each raw
+ * shape value into a static table, so it returns a stable `std::string_view` with no run-time work and
+ * no allocation. The capacity covers the longest composite name. A longer name is a compile error, not
+ * a silent overflow, because an out-of-bounds write is not a constant expression. */
+struct ShapeName
+{
+    std::array<char, 64u> Data{};
+    uint8_t Size{ 0u };
+
+    constexpr void Append(std::string_view text) noexcept
     {
-    case ResourceShape::Buffer:
-        return "Buffer";
+        for (const char character : text)
+        {
+            Data[Size] = character;
+            ++Size;
+        }
+    }
+
+    [[nodiscard]] constexpr std::string_view View() const noexcept
+    {
+        return std::string_view{ Data.data(), Size };
+    }
+};
+
+/** The name of one base shape, once the flag bits are masked off. An unknown base reads as `Invalid`. */
+constexpr std::string_view BaseShapeName(ResourceShape base_shape) noexcept
+{
+    switch (base_shape)
+    {
     case ResourceShape::Texture1D:
         return "Texture1D";
     case ResourceShape::Texture2D:
         return "Texture2D";
-    case ResourceShape::Texture2DArray:
-        return "Texture2DArray";
     case ResourceShape::Texture3D:
         return "Texture3D";
     case ResourceShape::TextureCube:
         return "TextureCube";
-    case ResourceShape::TextureCubeArray:
-        return "TextureCubeArray";
-    case ResourceShape::Texture2DMultisample:
-        return "Texture2DMultisample";
-    case ResourceShape::Invalid:
+    case ResourceShape::StructuredBuffer:
+        return "StructuredBuffer";
+    case ResourceShape::ByteAddressBuffer:
+        return "ByteAddressBuffer";
+    case ResourceShape::AccelerationStructure:
+        return "AccelerationStructure";
+    case ResourceShape::TextureSubpass:
+        return "TextureSubpass";
+    default:
         return "Invalid";
     }
+}
 
-    return "Invalid";
+/** Composes one shape value's full name: the base name, then a suffix for each flag bit that is set.
+ * The suffixes append unconditionally, so a stray flag on a buffer still prints (a debug aid) instead
+ * of being hidden. The suffix order matches the old combined-enum spelling (`Texture2DMultisampleArray`)
+ * so existing logs read the same. */
+constexpr ShapeName ComposeShapeName(ResourceShape shape) noexcept
+{
+    ShapeName name;
+    name.Append(BaseShapeName(GetBaseShape(shape)));
+    if (ResourceShapeIsMultisample(shape))
+    {
+        name.Append("Multisample");
+    }
+    if (ResourceShapeIsArray(shape))
+    {
+        name.Append("Array");
+    }
+    if (ResourceShapeIsShadow(shape))
+    {
+        name.Append("Shadow");
+    }
+    if (HasAnyFlag(shape, ResourceShape::FeedbackFlag))
+    {
+        name.Append("Feedback");
+    }
+    return name;
+}
+
+/** Every `ResourceShape` byte value mapped to its composed name. `ResourceShape` is a `uint8_t`, so its
+ * whole value space is 256 entries and the raw value indexes this table directly. Composing each name
+ * from the base and the flags, rather than listing every combination, means a new flag or base shape
+ * needs no edit here. */
+consteval std::array<ShapeName, 256u> BuildShapeNameTable() noexcept
+{
+    std::array<ShapeName, 256u> table{};
+    for (size_t value = 0u; value < table.size(); ++value)
+    {
+        table[value] = ComposeShapeName(static_cast<ResourceShape>(value));
+    }
+    return table;
+}
+
+inline constexpr std::array<ShapeName, 256u> k_ShapeNames = BuildShapeNameTable();
+
+} // namespace
+
+std::string_view ToString(ResourceShape shape) noexcept
+{
+    return k_ShapeNames[static_cast<uint8_t>(shape)].View();
 }
 
 std::string_view ToString(TextureSampleType sample_type) noexcept

@@ -112,10 +112,11 @@ struct ReflectedBinding
     ResourceShape Shape{ ResourceShape::Invalid };
     TextureSampleType SampleType{ TextureSampleType::Invalid };
     TextureFormat StorageFormat{ TextureFormat::Invalid };
-    ResourceAccessKind Access{ ResourceAccessKind::Invalid };
+    ResourceAccess Access{ ResourceAccess::Invalid };
     SamplerBindingType SamplerType{ SamplerBindingType::Invalid };
 
-    /** Filled only for a uniform block. Every other binding kind leaves it empty. */
+    /** Filled for uniform blocks, and structured buffers. Name kept to avoid
+      * churn for little reason. (for now) */
     std::vector<ReflectedUniformMember> UniformMembers;
 
     friend bool operator==(const ReflectedBinding&, const ReflectedBinding&) = default;

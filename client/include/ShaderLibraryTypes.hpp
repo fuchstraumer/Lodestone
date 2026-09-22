@@ -41,14 +41,12 @@ enum class BindingKind : uint8_t
     Texture,
     UniformBuffer,
     ParameterBlock,
-    ReadOnlyStructuredBuffer,
-    ReadOnlyStorageBuffer,
+    StorageBuffer,
+    TexelBuffer,
     CombinedTextureSampler,
     InputRenderTarget,
     InlineUniform,
     RayTracingAccelerationStructure,
-    StructuredBuffer,
-    StorageBuffer,
     StorageTexture
 };
 
@@ -74,19 +72,53 @@ enum class ShaderStageKind : uint8_t
 };
 
 /** @brief The shape of a bound resource, as the shader declares it. This should be viewed
- * as authoritative, where the CPU side only follows from this. */
+ * as authoritative, where the CPU side only follows from this.
+ * @note This is an almost exact mirror of Slang's resource shape definitions, mostly bc
+ * they're better than a huge set of combined enums to represent what flags do with bitwise ops
+ */
 enum class ResourceShape : uint8_t
 {
-    Invalid = 0,
-    Buffer,
-    Texture1D,
-    Texture2D,
-    Texture2DArray,
-    Texture3D,
-    TextureCube,
-    TextureCubeArray,
-    Texture2DMultisample,
+    Invalid = 0x00,
+    Texture1D = 0x01,
+    Texture2D = 0x02,
+    Texture3D = 0x03,
+    TextureCube = 0x04,
+    // TextureBuffer was at 0x05, but it's not at all needed
+    StructuredBuffer = 0x06,
+    ByteAddressBuffer = 0x07,
+    // 0x08 was used for unknown, but that hasn't come up
+    AccelerationStructure = 0x09,
+    TextureSubpass = 0x0A, // added for exact slang parity, but not needed
+
+    // flags, not shapes
+    BaseShapeMask = 0x0F,
+    FeedbackFlag = 0x10,
+    ShadowFlag = 0x20,
+    ArrayFlag = 0x40,
+    MultisampleFlag = 0x80
 };
+
+MAKE_ENUM_CLASS_FLAGS(ResourceShape)
+
+constexpr ResourceShape GetBaseShape(ResourceShape shape)
+{
+    return shape & ResourceShape::BaseShapeMask;
+}
+
+constexpr bool ResourceShapeIsArray(ResourceShape shape)
+{
+    return HasAnyFlag(shape, ResourceShape::ArrayFlag);
+}
+
+constexpr bool ResourceShapeIsMultisample(ResourceShape shape)
+{
+    return HasAnyFlag(shape, ResourceShape::MultisampleFlag);
+}
+
+constexpr bool ResourceShapeIsShadow(ResourceShape shape)
+{
+    return HasAnyFlag(shape, ResourceShape::ShadowFlag);
+}
 
 /** @brief How a shader samples a texture. Users can check this against
  * the formats they create or bind for validation. */
@@ -101,7 +133,7 @@ enum class TextureSampleType : uint8_t
 };
 
 /** @brief The kind of accessmodel a shader uses with a resource */
-enum class ResourceAccessKind : uint16_t // increased to 16 for alignment
+enum class ResourceAccess : uint16_t // increased to 16 for alignment
 {
     Invalid = 0,
     ReadOnly,
@@ -239,7 +271,7 @@ struct BindingInfo
     TextureSampleType SampleType{ TextureSampleType::Invalid };
     TextureFormat StorageFormat{ TextureFormat::Invalid };
     /** @note Unlike a `Buffer`, `StorageTexture` access type is not part of the Shape value */
-    ResourceAccessKind Access{ ResourceAccessKind::Invalid };
+    ResourceAccess Access{ ResourceAccess::Invalid };
     SamplerBindingType SamplerType{ SamplerBindingType::Invalid };
     /** @brief Size of one structured buffer element, in bytes. Zero for a texture or a sampler. */
     uint32_t ElementStride{ 0u };
@@ -254,7 +286,6 @@ struct BindingInfo
     uint32_t DerivedExtentX{ 0u };
     uint32_t DerivedExtentY{ 0u };
     uint32_t DerivedExtentZ{ 0u };
-    uint32_t IsStructured{ 0u };
 
     /** @brief The members of a uniform block. Empty for every other binding kind. */
     std::span<const UniformMemberInfo> Members;
