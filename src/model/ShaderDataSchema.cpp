@@ -47,13 +47,13 @@ std::string_view ToString(BindingKind kind) noexcept
     return "Invalid";
 }
 
+//NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
 namespace
 {
 
-/** A fixed-capacity, compile-time string. `ToString(ResourceShape)` composes one name for each raw
- * shape value into a static table, so it returns a stable `std::string_view` with no run-time work and
- * no allocation. The capacity covers the longest composite name. A longer name is a compile error, not
- * a silent overflow, because an out-of-bounds write is not a constant expression. */
+/** Using constexpr, this structure allows for compile-time composition of shape names from the various
+  * flags present in the mask. To populate it, we just iterate over all possible shape values at compile time
+  * and have that populate the array. Checked in Godbolt: it really does work at compile time! */
 struct ShapeName
 {
     std::array<char, 64u> Data{};
@@ -74,9 +74,9 @@ struct ShapeName
     }
 };
 
-/** The name of one base shape, once the flag bits are masked off. An unknown base reads as `Invalid`. */
 constexpr std::string_view BaseShapeName(ResourceShape base_shape) noexcept
 {
+    // input is masked to extract the base shape before it gets here
     switch (base_shape)
     {
     case ResourceShape::Texture1D:
@@ -100,10 +100,9 @@ constexpr std::string_view BaseShapeName(ResourceShape base_shape) noexcept
     }
 }
 
-/** Composes one shape value's full name: the base name, then a suffix for each flag bit that is set.
- * The suffixes append unconditionally, so a stray flag on a buffer still prints (a debug aid) instead
- * of being hidden. The suffix order matches the old combined-enum spelling (`Texture2DMultisampleArray`)
- * so existing logs read the same. */
+/** Composes the base name by working from the base shape "downards" (in bits). 
+  * Unconditionally appends as it goes, so even invalid combinations still produce
+  * a name, which can help identify invalid or unexpected combinations. */
 constexpr ShapeName ComposeShapeName(ResourceShape shape) noexcept
 {
     ShapeName name;
@@ -127,10 +126,8 @@ constexpr ShapeName ComposeShapeName(ResourceShape shape) noexcept
     return name;
 }
 
-/** Every `ResourceShape` byte value mapped to its composed name. `ResourceShape` is a `uint8_t`, so its
- * whole value space is 256 entries and the raw value indexes this table directly. Composing each name
- * from the base and the flags, rather than listing every combination, means a new flag or base shape
- * needs no edit here. */
+/** Build the names for each value in the span of a uint8_t. This one is consteval,
+ *  so it absolutely runs at compile time. */
 consteval std::array<ShapeName, 256u> BuildShapeNameTable() noexcept
 {
     std::array<ShapeName, 256u> table{};
@@ -149,6 +146,7 @@ std::string_view ToString(ResourceShape shape) noexcept
 {
     return k_ShapeNames[static_cast<uint8_t>(shape)].View();
 }
+//NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 
 std::string_view ToString(TextureSampleType sample_type) noexcept
 {
@@ -439,6 +437,7 @@ std::string DescribeUniformMembers(const ReflectedBinding& binding)
     return description;
 }
 
+//todo-ship: audit and update this. we've changed the field widths quite a bit
 uint64_t HashReflectedBinding(const ReflectedBinding& binding) noexcept
 {
     thread_local StreamingHash compositeHasher;
@@ -460,7 +459,7 @@ uint64_t HashReflectedBinding(const ReflectedBinding& binding) noexcept
         static_cast<uint64_t>(binding.SampleType),
         static_cast<uint64_t>(binding.StorageFormat),
         static_cast<uint64_t>(binding.Access),
-        static_cast<uint64_t>(binding.SamplerType)
+        static_cast<uint64_t>(binding.IsComparisonSampler)
     };
     compositeHasher.Append(std::span{ scalarValues, std::size(scalarValues) });
 

@@ -598,10 +598,42 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
     return rawVariant;
 }
 
-CookError SlangReflector::applyLeafTypeSamplerLayout(slang::TypeLayoutReflection* leaf_layout,
-                                                     slang::TypeReflection* type_layout,
+CookError SlangReflector::applyLeafTypeSamplerLayout(slang::TypeReflection* leaf_type,
                                                      RawBinding& binding) const
 {
+    binding.IsComparisonSampler = false;
+    constexpr static std::string_view k_ComparisonSamplerName = "SamplerComparisonState";
+    const char* typeName = leaf_type->getName();
+    std::string_view typeNameView{ typeName };
+    if (typeNameView == k_ComparisonSamplerName)
+    {
+        binding.IsComparisonSampler = true;
+    }
+    return CookError::Success;
+}
+
+CookError SlangReflector::applyLeafTypeTextureLayout(slang::TypeReflection* leaf_type,
+                                                     RawBinding& binding) const
+{
+    // fixed: we used `getType()` here, but that just gives the texture: the scalar type of a slang
+    // texture is invalid, so to get the actual sample type we need to use `getResourceResultType()`
+    // makes sense, but an easy mistake to make
+    if (slang::TypeReflection* resultType = leaf_type->getResourceResultType(); resultType != nullptr)
+    {
+        binding.SampleType = FromSlangScalarType(resultType->getScalarType());
+    }
+
+    // a depth sample as a result type will read as float at first: check to see if the resource 
+    // shape indicates this is actually sampling depth, and update the sample type accordingly
+    if (binding.SampleType == TextureSampleType::Float && ResourceShapeIsShadow(binding.Shape))
+    {
+        binding.SampleType = TextureSampleType::Depth;
+        // if this is a combined image sampler, update the sampler type as well
+        if (binding.Kind == BindingKind::CombinedTextureSampler)
+        {
+            binding.IsComparisonSampler = true;
+        }
+    }
 
     return CookError::Success;
 }
@@ -648,7 +680,6 @@ CookError SlangReflector::applyLeafTypeUniformBufferLayout(slang::TypeLayoutRefl
 }
 
 CookError SlangReflector::applyLeafTypeStorageBufferLayout(slang::TypeLayoutReflection* leaf_layout,
-                                                           slang::TypeReflection* leaf_type,
                                                            RawBinding& binding) const
 {
     if (GetBaseShape(binding.Shape) == ResourceShape::StructuredBuffer)
@@ -745,27 +776,17 @@ CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* conta
     switch (binding.Kind)
     {
     case BindingKind::Sampler:
-        binding.Shape = ResourceShape::Invalid;
-        binding.SamplerType = SamplerBindingType::Filtering;
-        return CookError::Success;
+        return applyLeafTypeSamplerLayout(leafType, binding);
     case BindingKind::CombinedTextureSampler:
-        binding.SamplerType = SamplerBindingType::Filtering; // just make sure this is set, then fallthrough
         [[fallthrough]];
     case BindingKind::Texture:
-        // fixed: we used `getType()` here, but that just gives the texture: the scalar type of a slang
-        // texture is invalid, so to get the actual sample type we need to use `getResourceResultType()`
-        // makes sense, but an easy mistake to make
-        if (slang::TypeReflection* resultType = leafType->getResourceResultType(); resultType != nullptr)
-        {
-            binding.SampleType = FromSlangScalarType(resultType->getScalarType());
-        }
-        return CookError::Success;
+        return applyLeafTypeTextureLayout(leafType, binding);
     case BindingKind::UniformBuffer:
         return applyLeafTypeUniformBufferLayout(leafLayout, binding);
     case BindingKind::ParameterBlock:
         std::unreachable(); // we filter out parameter blocks well before we get here
     case BindingKind::StorageBuffer:
-        return applyLeafTypeStorageBufferLayout(leafLayout, leafType, binding);
+        return applyLeafTypeStorageBufferLayout(leafLayout, binding);
     case BindingKind::TexelBuffer:
         return applyLeafTypeTexelBufferLayout(leafLayout, range_index, leafType, binding);
     case BindingKind::StorageTexture:
