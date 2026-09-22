@@ -60,7 +60,7 @@ CookedModule MakeSmallModule()
     binding.Placement = lodestone::BoundPlacement{ .Group = 0u, .Binding = 1u };
     binding.Kind = lodestone::BindingKind::StorageBuffer;
     binding.ElementStride = 16u;
-    binding.Shape = lodestone::ResourceShape::Buffer;
+    binding.Shape = lodestone::ResourceShape::StructuredBuffer;
 
     module.Resources.push_back(binding);
     module.ResourceLists.push_back(lodestone::ResourceList{ 0u });

@@ -86,7 +86,7 @@ ReflectedBinding MakeSharedBinding()
     binding.Kind = BindingKind::StorageBuffer;
     binding.ElementStride = 16u;
     binding.ArrayCount = 1u;
-    binding.Shape = ResourceShape::Buffer;
+    binding.Shape = ResourceShape::StructuredBuffer;
     return binding;
 }
 

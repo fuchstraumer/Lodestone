@@ -52,7 +52,7 @@ CompiledVariant MakeVariant(uint64_t index, const std::string& suffix, std::stri
     binding.Kind = BindingKind::StorageBuffer;
     binding.ElementStride = 16u;
     binding.ArrayCount = 1u;
-    binding.Shape = ResourceShape::Buffer;
+    binding.Shape = ResourceShape::StructuredBuffer;
 
     CompiledEntryPoint entryPoint;
     entryPoint.Name = "MainCS";
@@ -121,13 +121,12 @@ RawModule BuildRawModule()
     buffer.Placement = BoundPlacement{ .Group = 0u, .Binding = 1u };
     buffer.Kind = BindingKind::StorageBuffer;
     buffer.ElementStride = 16u;
-    buffer.Shape = ResourceShape::Buffer;
+    buffer.Shape = ResourceShape::StructuredBuffer;
 
     RawBinding sampler;
     sampler.Name = "LinearSampler";
     sampler.Placement = BoundPlacement{ .Group = 0u, .Binding = 0u };
     sampler.Kind = BindingKind::Sampler;
-    sampler.SamplerType = SamplerBindingType::Filtering;
 
     RawSizeAttribute attribute;
     attribute.BindingIndex = 1u;
