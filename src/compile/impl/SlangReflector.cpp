@@ -259,15 +259,16 @@ void CollectColorTargets(slang::VariableLayoutReflection* var_layout, ReflectedR
  * so that tree needs a walk of its own. */
 void CollectDepthWrites(slang::VariableLayoutReflection* var_layout, ReflectedRasterState& raster)
 {
+    auto varyingVisitor = [&raster](const LeafVisit& leaf)
+    {
+        if (IsDepthSemantic(ReadSemanticName(leaf.Var)))
+        {
+            raster.WritesFragDepth = true;
+        }
+    };
     WalkVaryingTree(var_layout,
                     SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT,
-                    [&raster](const LeafVisit& leaf)
-                    {
-                        if (IsDepthSemantic(ReadSemanticName(leaf.Var)))
-                        {
-                            raster.WritesFragDepth = true;
-                        }
-                    });
+                    varyingVisitor);
 }
 
 /** One reflected number, or nothing.
@@ -504,28 +505,28 @@ std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_vari
     return usedBindingIndices;
 }
 
-ResourceAccessKind FromSlangAccessType(SlangResourceAccess access)
+ResourceAccess FromSlangAccessType(SlangResourceAccess access)
 {
     switch (access)
     {
     case SLANG_RESOURCE_ACCESS_NONE:
-        return ResourceAccessKind::Invalid;
+        return ResourceAccess::Invalid;
     case SLANG_RESOURCE_ACCESS_READ:
-        return ResourceAccessKind::ReadOnly;
+        return ResourceAccess::ReadOnly;
     case SLANG_RESOURCE_ACCESS_READ_WRITE:
-        return ResourceAccessKind::ReadWrite;
+        return ResourceAccess::ReadWrite;
     case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-        return ResourceAccessKind::RasterizerOrdered;
+        return ResourceAccess::RasterizerOrdered;
     case SLANG_RESOURCE_ACCESS_APPEND:
-        return ResourceAccessKind::Append;
+        return ResourceAccess::Append;
     case SLANG_RESOURCE_ACCESS_CONSUME:
-        return ResourceAccessKind::Consume;
+        return ResourceAccess::Consume;
     case SLANG_RESOURCE_ACCESS_WRITE:
-        return ResourceAccessKind::WriteOnly;
+        return ResourceAccess::WriteOnly;
     case SLANG_RESOURCE_ACCESS_FEEDBACK:
-        return ResourceAccessKind::Feedback;
+        return ResourceAccess::Feedback;
     case SLANG_RESOURCE_ACCESS_UNKNOWN:
-        return ResourceAccessKind::Invalid;
+        return ResourceAccess::Invalid;
     }
 }
 
@@ -597,6 +598,14 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
     return rawVariant;
 }
 
+CookError SlangReflector::applyLeafTypeSamplerLayout(slang::TypeLayoutReflection* leaf_layout,
+                                                     slang::TypeReflection* type_layout,
+                                                     RawBinding& binding) const
+{
+
+    return CookError::Success;
+}
+
 CookError SlangReflector::applyLeafTypeUniformBufferLayout(slang::TypeLayoutReflection* buffer_leaf_layout,
                                                            RawBinding& binding) const
 {
@@ -625,10 +634,10 @@ CookError SlangReflector::applyLeafTypeUniformBufferLayout(slang::TypeLayoutRefl
         const char* bufferName = buffer_leaf_layout->getName();
         std::string message = std::format("Failed to determine byte size of buffer element {}",
                                           bufferName != nullptr ? bufferName : "<unknown>");
-        return ReportError(*sink, CookError::ReflectionCouldNotFindBufferElementSize, std::move(message));
+        return ReportError(*sink, CookError::ReflectionCouldNotFindBufferElementLayout, std::move(message));
     }
 
-    const CookError uniformWalkResult = collectUniformMembers(elementLayout, binding.UniformMembers);
+    const CookError uniformWalkResult = collectStructMembers(elementLayout, binding.UniformMembers);
 
     if (!uniformWalkResult)
     {
@@ -638,13 +647,71 @@ CookError SlangReflector::applyLeafTypeUniformBufferLayout(slang::TypeLayoutRefl
     return CookError::Success;
 }
 
+CookError SlangReflector::applyLeafTypeStorageBufferLayout(slang::TypeLayoutReflection* leaf_layout,
+                                                           slang::TypeReflection* leaf_type,
+                                                           RawBinding& binding) const
+{
+    if (GetBaseShape(binding.Shape) == ResourceShape::StructuredBuffer)
+    {
+        slang::TypeLayoutReflection* elementLayout = leaf_layout->getElementTypeLayout();
+        if (elementLayout != nullptr)
+        {
+            // if element layout exists and this is a structured buffer, we can get the same info we would
+            // get for a uniform block... member by member names and offsets, which are great to have
+            binding.ElementStride = static_cast<uint32_t>(elementLayout->getSize());
+            const CookError structWalkResult = collectStructMembers(elementLayout, binding.UniformMembers);
+            if (!structWalkResult)
+            {
+                return structWalkResult;
+            }
+            return CookError::Success;
+        }
+        else
+        {
+            std::string message = std::format("Could not find element layout for structured buffer: {}", binding.Name);
+            return ReportError(*sink, CookError::ReflectionCouldNotFindBufferElementLayout, std::move(message));
+        }
+    }
+    else
+    {
+        // element stride is going to be whatever the stride is for byteaddress-style buffers
+        // could be uint32, or raw bytes. we set it to 0 so clients know it is not explicitly defined.
+        binding.ElementStride = 0u;
+    }
+
+    return CookError::Success;
+}
+
+CookError SlangReflector::applyLeafTypeTexelBufferLayout(slang::TypeLayoutReflection* containing_layout,
+                                                         SlangInt range_index,
+                                                         slang::TypeReflection* leaf_type,
+                                                         RawBinding& binding) const
+{
+    // texel buffers hold format-converted texels, so it pretty much holds the same info as a 
+    // texture. really, it's just about the backing memory and dimensionality when it comes to
+    // what makes it any different. 
+    // read-only forms report a sample result type
+    // storage forms (RWBuffer<T>) report a format, from the binding range instead of the element
+    if (binding.Access == ResourceAccess::ReadOnly)
+    {
+        if (slang::TypeReflection* resultType = leaf_type->getResourceResultType(); resultType != nullptr)
+        {
+            binding.SampleType = FromSlangScalarType(resultType->getScalarType());
+        }
+        return CookError::Success;
+    }
+
+    binding.StorageFormat =
+        FromSlangImageFormat(containing_layout->getBindingRangeImageFormat(range_index));
+    return CookError::Success;
+}
+
 /** Reads the size, shape, and type facts off one binding range's leaf type layout.
  *
  * Slang wraps a resource type around the type it carries, so the useful facts sit one level down.
  * A structured buffer reports its element layout. A texture reports the type it returns. */
 CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* containing_layout,
                                               SlangInt range_index,
-                                              slang::BindingType binding_type,
                                               RawBinding& binding) const
 {
     slang::TypeLayoutReflection* leafLayout = containing_layout->getBindingRangeLeafTypeLayout(range_index);
@@ -657,27 +724,32 @@ CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* conta
     slang::TypeReflection* leafType = leafLayout->getType();
     if (leafType == nullptr)
     {
+        // should this not be a warning? maybe an error?
         return CookError::Success;
     }
 
-    // this will just set shape back to invalid for things like samplers, but otherwise most of the
-    // other binding kinds will have their shape determined correctly.
+    // updated: shape needs to also include array and multisample flags, and also tells
+    // us if a buffer is structured/byte address/texture buffer
     binding.Shape = FromSlangResourceShape(leafType->getResourceShape());
     // like above, access type can end up as an invalid value still - but that's contextual, and later
     // validation layers will catch this based on the actual underlying type of the resource.
     binding.Access = FromSlangAccessType(leafType->getResourceAccess());
 
+    // okay, while we used to just switch on the binding kind that's frail: we need to account for 
+    // the full combination of like... "routing" (binding kind), "topology" (shape), and mutability (access type)
+    // different combinations can lead to different interpretations of the binding's properties,
+    // or suggest different items we want to extract from reflection to aid the RHI consumers
+
+    // what we do instead is use the kind as a coarse filter, and then call child functions 
+    // per kind that branch further on shape and access
     switch (binding.Kind)
     {
     case BindingKind::Sampler:
         binding.Shape = ResourceShape::Invalid;
         binding.SamplerType = SamplerBindingType::Filtering;
         return CookError::Success;
-    case BindingKind::StorageTexture:
-        binding.StorageFormat =
-            FromSlangImageFormat(containing_layout->getBindingRangeImageFormat(range_index));
-        [[fallthrough]];
     case BindingKind::CombinedTextureSampler:
+        binding.SamplerType = SamplerBindingType::Filtering; // just make sure this is set, then fallthrough
         [[fallthrough]];
     case BindingKind::Texture:
         // fixed: we used `getType()` here, but that just gives the texture: the scalar type of a slang
@@ -690,38 +762,22 @@ CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* conta
         return CookError::Success;
     case BindingKind::UniformBuffer:
         return applyLeafTypeUniformBufferLayout(leafLayout, binding);
-    case BindingKind::ReadOnlyStructuredBuffer:
-        [[fallthrough]];
-    case BindingKind::ReadOnlyStorageBuffer:
-        [[fallthrough]];
-    case BindingKind::StructuredBuffer:
-        [[fallthrough]];
-    case BindingKind::StorageBuffer:
-        if (slang::TypeLayoutReflection* elementLayout = leafLayout->getElementTypeLayout();
-            elementLayout != nullptr) [[likely]]
-        {
-            binding.ElementStride = static_cast<uint32_t>(elementLayout->getSize());
-            return CookError::Success;
-        }
-        else
-        {
-            std::string message = std::format("Could not find element stride for binding: {}", binding.Name);
-            return ReportError(*sink, CookError::ReflectionCouldNotFindBufferElementSize, std::move(message));
-        }
-    case BindingKind::Invalid:
-        [[fallthrough]];
-    case BindingKind::InlineUniform:
-        [[fallthrough]];
-    case BindingKind::RayTracingAccelerationStructure:
-        [[fallthrough]];
-    case BindingKind::InputRenderTarget:
-        [[fallthrough]];
     case BindingKind::ParameterBlock:
-        {
-            std::string message =
-                std::format("Unsupported binding kind: {}", magic_enum::enum_name(binding.Kind));
-            return ReportError(*sink, CookError::ReflectionUnsupportedBindingKind, std::move(message));
-        }
+        std::unreachable(); // we filter out parameter blocks well before we get here
+    case BindingKind::StorageBuffer:
+        return applyLeafTypeStorageBufferLayout(leafLayout, leafType, binding);
+    case BindingKind::TexelBuffer:
+        return applyLeafTypeTexelBufferLayout(leafLayout, range_index, leafType, binding);
+    case BindingKind::StorageTexture:
+        binding.StorageFormat =
+            FromSlangImageFormat(containing_layout->getBindingRangeImageFormat(range_index));
+        return CookError::Success;
+    case BindingKind::InputRenderTarget:
+    case BindingKind::InlineUniform:
+    case BindingKind::RayTracingAccelerationStructure:
+        return CookError::ReflectionUnsupportedBindingKind;
+    case BindingKind::Invalid:
+        std::unreachable(); // we should never encounter an invalid binding kind here
     }
 
     return CookError::ReflectionUnsupportedBindingKind;
@@ -769,11 +825,11 @@ CookError SlangReflector::collectRawSizeAttributes(slang::VariableReflection* le
     return CookError::Success;
 }
 
-/**Flattens one uniform block into rows of name, offset, and size. Nested fields take
- * a dotted name to reflect the hierarchy. Offset is accumulated from the root of the
- * struct, as slang structures offsets from zero based on recursive walks of all fields.
+/**@brief Flattens one uniform or structured buffer block into rows of name, offset, and size.
+ * Nested fields take a dotted name to reflect the hierarchy. Offset is accumulated from the
+ * root of the struct, as slang structures offsets from zero based on recursive walks of all fields.
  */
-CookError SlangReflector::collectUniformMembers(slang::TypeLayoutReflection* struct_layout,
+CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* struct_layout,
                                                 std::vector<ReflectedUniformMember>& members) const
 {
     if (struct_layout == nullptr || struct_layout->getKind() != slang::TypeReflection::Kind::Struct)
@@ -890,7 +946,6 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
 
         const CookError applyLayoutError = applyLeafTypeLayout(containing_layout,
                                                                rangeIndex,
-                                                               bindingType,
                                                                draft.Binding);
         if (!applyLayoutError)
         {
@@ -935,7 +990,7 @@ CookResult<RawBindingDraft> SlangReflector::readBlockContainer(const ParameterBl
     draft.Binding.Placement = BoundPlacement{ .Group = block.Scope.Base.Group, .Binding = *containerBinding };
     draft.Binding.Kind = BindingKind::UniformBuffer;
     draft.Binding.ByteSize = static_cast<uint64_t>(block.UniformSize);
-    const CookError uniformMembersError = collectUniformMembers(block.ElementLayout, draft.Binding.UniformMembers);
+    const CookError uniformMembersError = collectStructMembers(block.ElementLayout, draft.Binding.UniformMembers);
     if (!uniformMembersError)
     {
         return std::unexpected(uniformMembersError);

@@ -55,13 +55,22 @@ private:
     [[nodiscard]] CookError collectRawSizeAttributes(slang::VariableReflection* leaf_variable,
                                                      std::string_view binding_name,
                                                      std::vector<RawSizeAttribute>& out_attributes) const;
-    [[nodiscard]] CookError collectUniformMembers(slang::TypeLayoutReflection* struct_layout,
+    [[nodiscard]] CookError collectStructMembers(slang::TypeLayoutReflection* struct_layout,
                                                   std::vector<ReflectedUniformMember>& members) const;
-    [[nodiscard]] CookError applyLeafTypeUniformBufferLayout(slang::TypeLayoutReflection* buffer_leaf_layout,
+    [[nodiscard]] CookError applyLeafTypeSamplerLayout(slang::TypeLayoutReflection* leaf_layout,
+                                                       slang::TypeReflection* leaf_type,
+                                                       RawBinding& binding) const;
+    [[nodiscard]] CookError applyLeafTypeUniformBufferLayout(slang::TypeLayoutReflection* leaf_layout,
                                                              RawBinding& binding) const;
+    [[nodiscard]] CookError applyLeafTypeStorageBufferLayout(slang::TypeLayoutReflection* leaf_layout,
+                                                             slang::TypeReflection* leaf_type,
+                                                             RawBinding& binding) const;
+    [[nodiscard]] CookError applyLeafTypeTexelBufferLayout(slang::TypeLayoutReflection* containing_layout,
+                                                           SlangInt range_index,
+                                                           slang::TypeReflection* leaf_type,
+                                                           RawBinding& binding) const;
     [[nodiscard]] CookError applyLeafTypeLayout(slang::TypeLayoutReflection* containing_layout,
                                                 SlangInt range_index,
-                                                slang::BindingType binding_type,
                                                 RawBinding& binding) const;
 
     static void extractRasterState(slang::EntryPointReflection* entry_point_layout,
