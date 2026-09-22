@@ -88,74 +88,87 @@ CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::string_view
 
 namespace
 {
-    tint::inspector::ResourceBinding::ResourceType TintTypeForBindingKind(BindingKind kind)
+    tint::inspector::ResourceBinding::ResourceType ToTintStorageTextureType(ResourceAccess access)
     {
-        switch (kind)
+        using tResourceType = tint::inspector::ResourceBinding::ResourceType;
+        switch (access)
         {
-            case BindingKind::Sampler:
-                return tint::inspector::ResourceBinding::ResourceType::kSampler;
-            case BindingKind::Texture:
-                return tint::inspector::ResourceBinding::ResourceType::kSampledTexture;
-            case BindingKind::UniformBuffer:
-                return tint::inspector::ResourceBinding::ResourceType::kUniformBuffer;
-            case BindingKind::ReadOnlyStructuredBuffer:
-            case BindingKind::ReadOnlyStorageBuffer:
-                return tint::inspector::ResourceBinding::ResourceType::kReadOnlyStorageBuffer;
-            case BindingKind::InputRenderTarget:
-                return tint::inspector::ResourceBinding::ResourceType::kInputAttachment;
-            case BindingKind::StructuredBuffer:
-            case BindingKind::StorageBuffer:
-                return tint::inspector::ResourceBinding::ResourceType::kStorageBuffer;
-            case BindingKind::StorageTexture:
-                return tint::inspector::ResourceBinding::ResourceType::kWriteOnlyStorageTexture;
-            // WGSL has no resource type for these: no parameter blocks, no combined texture-samplers,
-            // no inline uniforms, and no ray tracing acceleration structures.
-            case BindingKind::Invalid:
-            case BindingKind::ParameterBlock:
-            case BindingKind::CombinedTextureSampler:
-            case BindingKind::InlineUniform:
-            case BindingKind::RayTracingAccelerationStructure:
-                std::unreachable();
+        case ResourceAccess::ReadOnly:
+            return tResourceType::kReadOnlyStorageTexture;
+        case ResourceAccess::ReadWrite:
+            return tResourceType::kReadWriteStorageTexture;
+        case ResourceAccess::WriteOnly:
+            return tResourceType::kWriteOnlyStorageTexture;
+        case ResourceAccess::Invalid:
+        case ResourceAccess::RasterizerOrdered:
+        case ResourceAccess::Append:
+        case ResourceAccess::Consume:
+        case ResourceAccess::Feedback:
+            return static_cast<tResourceType>(-1); // invalid access
         }
-        std::unreachable();
     }
 
-    BindingKind ReflectionKindFromTintType(tint::inspector::ResourceBinding::ResourceType tint_kind)
+    // our frontend pulls out the kind, shape, and access (nicely) into separate fields, so going back to a discrete binding type
+    // for most APIs means using these fields together to find the proper binding type (just look at how storage textures work)
+    tint::inspector::ResourceBinding::ResourceType TintTypeForBindingKind(BindingKind kind, ResourceShape shape, ResourceAccess access)
     {
-        switch (tint_kind)
+        using tResourceType = tint::inspector::ResourceBinding::ResourceType;
+        const bool isShadow = ResourceShapeIsShadow(shape);
+        const bool isMultisample = ResourceShapeIsMultisample(shape);
+        switch (kind)
         {
-            case tint::inspector::ResourceBinding::ResourceType::kUniformBuffer:
-                return BindingKind::UniformBuffer;
-            case tint::inspector::ResourceBinding::ResourceType::kStorageBuffer:
-            case tint::inspector::ResourceBinding::ResourceType::kReadOnlyStorageBuffer:
-                return BindingKind::StorageBuffer;
-            case tint::inspector::ResourceBinding::ResourceType::kSampler:
-                return BindingKind::Sampler;
-            case tint::inspector::ResourceBinding::ResourceType::kSampledTexture:
-                return BindingKind::Texture;
-            case tint::inspector::ResourceBinding::ResourceType::kMultisampledTexture:
-                return BindingKind::Invalid; // no multisample texture support yet
-            case tint::inspector::ResourceBinding::ResourceType::kWriteOnlyStorageTexture:
-            case tint::inspector::ResourceBinding::ResourceType::kReadWriteStorageTexture:
-                return BindingKind::StorageTexture;
-            case tint::inspector::ResourceBinding::ResourceType::kDepthTexture:
-            case tint::inspector::ResourceBinding::ResourceType::kDepthMultisampledTexture:
-            case tint::inspector::ResourceBinding::ResourceType::kExternalTexture:
-                return BindingKind::Texture;
-            case tint::inspector::ResourceBinding::ResourceType::kReadOnlyTexelBuffer:
-            case tint::inspector::ResourceBinding::ResourceType::kReadWriteTexelBuffer:
-                return BindingKind::Invalid; // no texel buffer support yet
-            case tint::inspector::ResourceBinding::ResourceType::kInputAttachment:
-                return BindingKind::InputRenderTarget;
-            default:
-                return BindingKind::Invalid; // catch-all for unsupported types
+        case BindingKind::Invalid:
+            return static_cast<tResourceType>(-1); // invalid binding kind
+        case BindingKind::Sampler:
+            return tResourceType::kSampler;
+        case BindingKind::Texture:
+            if (isShadow)
+            {
+                return isMultisample ? tResourceType::kDepthMultisampledTexture : tResourceType::kDepthTexture;
+            }
+            else
+            {
+                return isMultisample ? tResourceType::kMultisampledTexture : tResourceType::kSampledTexture;
+            }
+        case BindingKind::UniformBuffer:
+            return tResourceType::kUniformBuffer;
+        case BindingKind::ParameterBlock:
+            std::unreachable();
+        case BindingKind::StorageBuffer:
+            return (access == ResourceAccess::ReadOnly) ? tResourceType::kReadOnlyStorageBuffer : tResourceType::kStorageBuffer;
+        case BindingKind::TexelBuffer:
+            if (access == ResourceAccess::ReadOnly)
+            {
+                return tResourceType::kReadOnlyTexelBuffer;
+            }
+            else if (access == ResourceAccess::ReadWrite)
+            {
+                return tResourceType::kReadWriteTexelBuffer;
+            }
+            else
+            {
+                return static_cast<tResourceType>(-1); // invalid access
+            }
+        case BindingKind::CombinedTextureSampler:
+            return static_cast<tResourceType>(-1); // CombinedTextureSampler is not directly supported
+        case BindingKind::InputRenderTarget:
+            return tResourceType::kInputAttachment;
+        case BindingKind::InlineUniform:
+        case BindingKind::RayTracingAccelerationStructure:
+            return static_cast<tResourceType>(-1); // InlineUniform is not directly supported
+        case BindingKind::StorageTexture:
+            // separate function bc it's another switch (3 separate values, potentially)
+            return ToTintStorageTextureType(access);
         }
     }
 
     bool TintTypeAgreesWithReflectionKind(tint::inspector::ResourceBinding::ResourceType tint_kind,
-                                          BindingKind reflection_kind)
+                                          BindingKind kind,
+                                          ResourceShape shape,
+                                          ResourceAccess access)
     {
-        return ReflectionKindFromTintType(tint_kind) == reflection_kind;
+        tint::inspector::ResourceBinding::ResourceType reflectionTintType = TintTypeForBindingKind(kind, shape, access);
+        return reflectionTintType == tint_kind;
     }
 
     std::string_view TintTypeToString(tint::inspector::ResourceBinding::ResourceType tint_kind)
@@ -232,7 +245,9 @@ namespace
                 }
 
                 if (!TintTypeAgreesWithReflectionKind(declaredBinding.resource_type,
-                                                      reflectedBinding->Kind))
+                                                      reflectedBinding->Kind,
+                                                      reflectedBinding->Shape,
+                                                      reflectedBinding->Access))
                 {
                     comparison.Matches = false;
                     const std::string messageFirstHalf = std::format("  wgsl declares @group({}) @binding({}) {} as {}",
@@ -240,7 +255,9 @@ namespace
                                                                     declaredBinding.binding,
                                                                     unmangledName,
                                                                     TintTypeToString(declaredBinding.resource_type));
-                    const auto tintKind = TintTypeForBindingKind(reflectedBinding->Kind);
+                    const auto tintKind = TintTypeForBindingKind(reflectedBinding->Kind,
+                                                                 reflectedBinding->Shape,
+                                                                 reflectedBinding->Access);
                     const std::string messageSecondHalf = std::format(" : reflection has kind {}, which needs {}\n",
                                                                     ToString(reflectedBinding->Kind),
                                                                     TintTypeToString(tintKind));
