@@ -57,13 +57,13 @@ private:
                                                      std::vector<RawSizeAttribute>& out_attributes) const;
     [[nodiscard]] CookError collectStructMembers(slang::TypeLayoutReflection* struct_layout,
                                                   std::vector<ReflectedUniformMember>& members) const;
-    [[nodiscard]] CookError applyLeafTypeSamplerLayout(slang::TypeLayoutReflection* leaf_layout,
-                                                       slang::TypeReflection* leaf_type,
+    [[nodiscard]] CookError applyLeafTypeSamplerLayout(slang::TypeReflection* leaf_type,
+                                                       RawBinding& binding) const;
+    [[nodiscard]] CookError applyLeafTypeTextureLayout(slang::TypeReflection* leaf_type,
                                                        RawBinding& binding) const;
     [[nodiscard]] CookError applyLeafTypeUniformBufferLayout(slang::TypeLayoutReflection* leaf_layout,
                                                              RawBinding& binding) const;
     [[nodiscard]] CookError applyLeafTypeStorageBufferLayout(slang::TypeLayoutReflection* leaf_layout,
-                                                             slang::TypeReflection* leaf_type,
                                                              RawBinding& binding) const;
     [[nodiscard]] CookError applyLeafTypeTexelBufferLayout(slang::TypeLayoutReflection* containing_layout,
                                                            SlangInt range_index,

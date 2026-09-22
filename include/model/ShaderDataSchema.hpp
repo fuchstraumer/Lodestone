@@ -113,7 +113,7 @@ struct ReflectedBinding
     TextureSampleType SampleType{ TextureSampleType::Invalid };
     TextureFormat StorageFormat{ TextureFormat::Invalid };
     ResourceAccess Access{ ResourceAccess::Invalid };
-    SamplerBindingType SamplerType{ SamplerBindingType::Invalid };
+    bool IsComparisonSampler{ false };
 
     /** Filled for uniform blocks, and structured buffers. Name kept to avoid
       * churn for little reason. (for now) */

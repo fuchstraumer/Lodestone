@@ -554,7 +554,7 @@ BindingInfo ShaderSourceProvider::MakeBindingInfo(const ManifestBinding& record,
     info.SampleType = static_cast<TextureSampleType>(record.SampleType);
     info.StorageFormat = static_cast<TextureFormat>(record.StorageFormat);
     info.Access = static_cast<ResourceAccess>(record.Access);
-    info.SamplerType = static_cast<SamplerBindingType>(record.SamplerType);
+    info.IsComparisonSampler = record.IsComparisonSampler;
 
     if (footprint != nullptr)
     {

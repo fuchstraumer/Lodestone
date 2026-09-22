@@ -133,7 +133,7 @@ enum class TextureSampleType : uint8_t
 };
 
 /** @brief The kind of accessmodel a shader uses with a resource */
-enum class ResourceAccess : uint16_t // increased to 16 for alignment
+enum class ResourceAccess : uint8_t // increased to 16 for alignment
 {
     Invalid = 0,
     ReadOnly,
@@ -143,14 +143,6 @@ enum class ResourceAccess : uint16_t // increased to 16 for alignment
     Append,
     Consume,
     Feedback
-};
-
-enum class SamplerBindingType : uint16_t // increased to 16 for alignment
-{
-    Invalid = 0,
-    Filtering,
-    NonFiltering,
-    Comparison,
 };
 
 /** @brief The scalar type of one vertex attribute or one color target.
@@ -272,7 +264,7 @@ struct BindingInfo
     TextureFormat StorageFormat{ TextureFormat::Invalid };
     /** @note Unlike a `Buffer`, `StorageTexture` access type is not part of the Shape value */
     ResourceAccess Access{ ResourceAccess::Invalid };
-    SamplerBindingType SamplerType{ SamplerBindingType::Invalid };
+    bool IsComparisonSampler{ false };
     /** @brief Size of one structured buffer element, in bytes. Zero for a texture or a sampler. */
     uint32_t ElementStride{ 0u };
     uint32_t ArrayCount{ 1u };

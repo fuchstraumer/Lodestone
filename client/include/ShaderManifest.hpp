@@ -212,7 +212,7 @@ struct alignas(8) ManifestBinding
     uint8_t PlacementKind{ 0u };
     uint8_t Kind{ 0u };
     uint8_t Shape{ 0u };
-    uint8_t SampleType{ 0u };
+    uint8_t IsComparisonSampler{ 0u };
     uint8_t Access{ 0u };
     uint8_t SamplerType{ 0u };
     uint8_t Reserved0{ 0u };

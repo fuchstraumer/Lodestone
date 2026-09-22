@@ -96,7 +96,7 @@ struct RawBinding
     TextureSampleType SampleType{ TextureSampleType::Invalid };
     TextureFormat StorageFormat{ TextureFormat::Invalid };
     ResourceAccess Access{ ResourceAccess::Invalid };
-    SamplerBindingType SamplerType{ SamplerBindingType::Invalid };
+    bool IsComparisonSampler{ false };
 
     std::vector<ReflectedUniformMember> UniformMembers;
 };

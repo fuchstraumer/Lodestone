@@ -215,7 +215,7 @@ namespace
         binding.SampleType = raw_binding.SampleType;
         binding.StorageFormat = raw_binding.StorageFormat;
         binding.Access = raw_binding.Access;
-        binding.SamplerType = raw_binding.SamplerType;
+        binding.IsComparisonSampler = raw_binding.IsComparisonSampler;
         binding.UniformMembers = raw_binding.UniformMembers;
         return binding;
     }

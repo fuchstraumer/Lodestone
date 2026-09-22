@@ -24,7 +24,8 @@ Checks: >
   -cppcoreguidelines-pro-type-union-access,
   -modernize-use-auto,
   -readability-avoid-const-params-in-decls,
-  -modernize-use-designated-initializers
+  -modernize-use-designated-initializers,
+  -readability-convert-member-functions-to-static
 
 WarningsAsErrors: ''
 HeaderFilterRegex: '.*(src|include|client|tests)/.*'
