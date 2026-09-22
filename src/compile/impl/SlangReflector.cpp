@@ -867,11 +867,16 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
         {
             return;
         }
-        const auto memberSize = static_cast<uint32_t>(leaf.Type->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
-        const auto arrayCount = leaf.Type->getKind() == slang::TypeReflection::Kind::Array
-                                    ? static_cast<uint32_t>(leaf.Type->getElementCount())
-                                    : 1u;
-        const auto isPointerType = leaf.Type->getKind() == slang::TypeReflection::Kind::Pointer;
+        uint32_t memberSize = static_cast<uint32_t>(leaf.Type->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
+        const bool isArray = leaf.Type->getKind() == slang::TypeReflection::Kind::Array;
+        uint32_t arrayCount = 1u;
+        uint16_t stride = 0u;
+        if (isArray)
+        {
+            arrayCount = static_cast<uint32_t>(leaf.Type->getElementCount());
+            stride = static_cast<uint16_t>(leaf.Type->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM));
+        }
+        const bool isPointerType = leaf.Type->getKind() == slang::TypeReflection::Kind::Pointer;
         if (isPointerType && (activePlacementKind == PlacementKind::Bound))
         {
             result = ReportError(
@@ -879,8 +884,27 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
                 CookError::PointerTypeNotSupported,
                 std::format("Bound placement of resource with name {} cannot be a pointer.", name));
         }
+        const bool isMatrix = leaf.Type->getKind() == slang::TypeReflection::Kind::Matrix;
+        MatrixLayout layout{ MatrixLayout::Invalid };
+        if (isMatrix)
+        {
+            // determine layout (if it was an array of matrices, that should be handled already - same with the stride)
+            const SlangMatrixLayoutMode slangLayout = leaf.Type->getMatrixLayoutMode();
+            switch (slangLayout)
+            {
+            case SLANG_MATRIX_LAYOUT_MODE_UNKNOWN:
+                layout = MatrixLayout::Invalid;
+                break;
+            case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
+                layout = MatrixLayout::RowMajor;
+                break;
+            case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
+                layout = MatrixLayout::ColumnMajor;
+                break;
+            }
+        }
 
-        members.emplace_back(std::move(name), leaf.Offset, memberSize, arrayCount);
+        members.emplace_back(std::move(name), leaf.Offset, memberSize, arrayCount, stride, layout);
     };
 
     std::vector<slang::VariableLayoutReflection*> path;
