@@ -38,10 +38,14 @@ CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::string_view
                                                                 DiagnosticSink& sink) const
 {
     using namespace tint;
+    // set the wgsl reader options to just enable all extensions: trust the compiler knew what to output
+    // in the future, we can make this queryable but for now it's not needed
+    wgsl::reader::Options readerOptions;
+    readerOptions.allowed_features = wgsl::AllowedFeatures::Everything();
     // build a source file
     Source::File entrypointSource("source.wgsl", source_code);
 
-    Program entrypointProgram = wgsl::reader::Parse(&entrypointSource);
+    Program entrypointProgram = wgsl::reader::Parse(&entrypointSource, readerOptions);
     if (!entrypointProgram.IsValid())
     {
         std::string tintDiagnostics; tintDiagnostics.reserve(1024);
