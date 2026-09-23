@@ -7,32 +7,37 @@
 #include <string_view>
 
 /**
- * Writes one CookedModule as the binary manifest that `include/shader/ShaderManifest.hpp` reads.
+ * Writes one CookedLibrary as the binary manifest bundle that `client/include/ShaderManifest.hpp` reads.
  *
- * The manifest and the generated C++ carry the same tables from the same frozen model. The C++ form
- * compiles into the program. The manifest form arrives as bytes, so a live cooker can replace it while
- * the program runs.
+ * One cook writes one bundle. The header region holds the whole-cook tables and one header for each
+ * module. The file then holds one extent for each (profile, module) environment, ordered by profile and
+ * then by module, so a renderer reads the modules of one profile in one contiguous read.
  *
- * Every section starts on an 8-byte boundary, because the binding records and the axis values hold
- * 64-bit fields. The reader maps the bytes in place and does not copy them.
+ * Every section starts on an 8-byte boundary, because the binding records, the variant keys, and the axis
+ * masks hold 64-bit fields. The reader maps the bytes in place and does not copy them.
  */
 namespace lodestone
 {
 
+/** The name of the bundle inside the output directory. */
+inline constexpr std::string_view k_ManifestFileName = "ShaderLibrary.ldmanifest";
+
 /** The returned bytes must start on an 8-byte boundary before a reader opens them.
- * `ManifestView::Open` rejects a span that does not, because it maps 64-bit fields in place. A
+ * `BundleView::Open` rejects a span that does not, because it maps 64-bit fields in place. A
  * heap allocated `std::string` satisfies this today, but the type does not promise it. Copy the bytes
- * into an aligned buffer if you ever move them somewhere the alignment is not certain. */
-[[nodiscard]] std::string EmitShaderManifest(const CookedModule& module);
-
-[[nodiscard]] std::string MakeManifestFileName(std::string_view module_name);
-
-/** Reads the manifest back and compares every entry point of every variant against the module it came
- * from. It checks the source bytes, the workgroup size, and each binding field.
+ * into an aligned buffer if you ever move them somewhere the alignment is not certain.
  *
- * This runs on every cook. A manifest that says something different from the generated C++ is the one
- * failure this format could hide, so the check is not optional. */
-[[nodiscard]] CookError VerifyManifestRoundTrip(const CookedModule& module, const std::string& manifest_bytes);
+ * The emit fails when a module axis holds more than 32 values, when two profiles of one module disagree on
+ * its entry points or its axes, or when two variants of one environment share a key. */
+[[nodiscard]] CookResult<std::string> EmitShaderManifest(const CookedLibrary& library);
+
+/** Reads the bundle back and compares every environment against the module it came from. For each entry
+ * point of each variant it checks the source bytes, the workgroup size, each binding field, and the raster
+ * state. For each variant it also decodes the key through the module axes and compares the result with
+ * the canonical assignment, and compares the axis-active mask with the active assignment.
+ *
+ * This runs on every cook. The check is not optional. */
+[[nodiscard]] CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::string& manifest_bytes);
 
 } // namespace lodestone
 
