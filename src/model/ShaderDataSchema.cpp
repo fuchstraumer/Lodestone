@@ -10,6 +10,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <magic_enum/magic_enum.hpp>
 
 namespace lodestone
 {
@@ -141,6 +142,15 @@ consteval std::array<ShapeName, 256u> BuildShapeNameTable() noexcept
 }
 
 inline constexpr std::array<ShapeName, 256u> k_ShapeNames = BuildShapeNameTable();
+
+template<typename T> requires(std::is_trivially_copyable_v<T> && !std::is_pointer_v<T>)
+constexpr std::span<const std::byte, sizeof(T)> ObjectAsBytes(const T& object) noexcept
+{
+    // silly warning, when we have the requires ensuring this cast is actually legitimately safe
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    auto& byteArray = reinterpret_cast<const std::byte(&)[sizeof(T)]>(object);
+    return std::span<const std::byte, sizeof(T)>{ byteArray };
+}
 
 } // namespace
 
@@ -428,12 +438,14 @@ std::string DescribeUniformMembers(const ReflectedBinding& binding)
 
     for (const ReflectedUniformMember& member : binding.UniformMembers)
     {
-        description += std::format("[shader_cooker]       +{} {} ({} bytes{})\n",
-                                   member.Offset,
+        description += std::format("[shader_cooker]       +{} {} ({} bytes{} stride={} matrix={})\n",
+                                   member.Data.Offset,
                                    member.Name,
-                                   member.Size,
-                                   member.ArrayCount > 1u ? std::format(", array={}", member.ArrayCount)
-                                                          : std::string{});
+                                   member.Data.Size,
+                                   member.Data.ArrayCount > 1u ? std::format(", array={}", member.Data.ArrayCount)
+                                                          : std::string{},
+                                   member.Data.ElementStride,
+                                   magic_enum::enum_name(member.Data.MatrixLayout));
     }
 
     return description;
@@ -463,19 +475,13 @@ uint64_t HashReflectedBinding(const ReflectedBinding& binding) noexcept
         static_cast<uint64_t>(binding.Access),
         static_cast<uint64_t>(binding.IsComparisonSampler)
     };
-    compositeHasher.Append(std::span{ scalarValues, std::size(scalarValues) });
+    std::span<const std::byte> scalarValuesBytes = std::as_bytes(std::span{ scalarValues });
+    compositeHasher.Append(scalarValuesBytes);
 
     for (const ReflectedUniformMember& member : binding.UniformMembers)
     {
         compositeHasher.Append(std::string_view{ member.Name });
-        // todo: startlifetimeasarray or asbytes would probably work here
-        const uint64_t memberScalars[]
-        {
-            static_cast<uint64_t>(member.Offset),
-            static_cast<uint64_t>(member.Size),
-            static_cast<uint64_t>(member.ArrayCount)
-        };
-        compositeHasher.Append(std::span{ memberScalars, std::size(memberScalars) });
+        compositeHasher.Append(ObjectAsBytes(member.Data));
     }
 
     return compositeHasher.Finalize();
@@ -490,13 +496,10 @@ uint64_t HashReflectedRasterState(const ReflectedRasterState& rasterState) noexc
     for (const ReflectedVertexInput& vertexInput : rasterState.VertexInputs)
     {
         compositeHasher.Append(std::string_view{ vertexInput.SemanticName });
-        const std::span<const ReflectedVertexInput::Packed> vertexInputScalarsSpan = std::span{ &vertexInput.Data, 1 };
-        const std::span<const std::byte> bytes = std::as_bytes(vertexInputScalarsSpan);
-        compositeHasher.Append(bytes);
+        compositeHasher.Append(ObjectAsBytes(vertexInput.Data));
     }
 
-    const std::span<const ReflectedColorTarget> colorTargetsSpan = std::span{ rasterState.ColorTargets.data(), rasterState.ColorTargets.size() };
-    const std::span<const std::byte> colorTargetsBytes = std::as_bytes(colorTargetsSpan);
+    const std::span<const std::byte> colorTargetsBytes = std::as_bytes(std::span{ rasterState.ColorTargets });
     compositeHasher.Append(colorTargetsBytes);
 
     return compositeHasher.Finalize();

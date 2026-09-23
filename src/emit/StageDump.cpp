@@ -121,11 +121,11 @@ namespace
         {
             writer.BeginObject();
             writer.KeyString("name", member.Name);
-            writer.KeyUInt("offset", member.Offset);
-            writer.KeyUInt("size", member.Size);
-            writer.KeyUInt("arrayCount", member.ArrayCount);
-            writer.KeyUInt("elementStride", member.ElementStride);
-            writer.KeyString("matrixLayout", magic_enum::enum_name(member.MatrixLayout));
+            writer.KeyUInt("offset", member.Data.Offset);
+            writer.KeyUInt("size", member.Data.Size);
+            writer.KeyUInt("arrayCount", member.Data.ArrayCount);
+            writer.KeyUInt("elementStride", member.Data.ElementStride);
+            writer.KeyString("matrixLayout", magic_enum::enum_name(member.Data.MatrixLayout));
             writer.EndObject();
         }
         writer.EndArray();
@@ -461,11 +461,11 @@ namespace
             {
                 writer.BeginObject();
                 writer.KeyString("name", member.Name);
-                writer.KeyUInt("offset", member.Offset);
-                writer.KeyUInt("size", member.Size);
-                writer.KeyUInt("arrayCount", member.ArrayCount);
-                writer.KeyUInt("elementStride", member.ElementStride);
-                writer.KeyString("matrixLayout", magic_enum::enum_name(member.MatrixLayout));
+                writer.KeyUInt("offset", member.Data.Offset);
+                writer.KeyUInt("size", member.Data.Size);
+                writer.KeyUInt("arrayCount", member.Data.ArrayCount);
+                writer.KeyUInt("elementStride", member.Data.ElementStride);
+                writer.KeyString("matrixLayout", magic_enum::enum_name(member.Data.MatrixLayout));
                 writer.EndObject();
             }
             writer.EndArray();

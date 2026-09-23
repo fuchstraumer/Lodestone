@@ -143,6 +143,28 @@ std::string_view ToString(ErrorCode error) noexcept;
  * folds in the table, record index, and `Detail` field, so the reader states where the file is bad */
 std::string DescribeShaderManifestError(const ErrorState& error);
 
+/**@brief A run in an index table. Kind of like a span: it specifies a contiguous subrange of entries.
+*  This goes in the root Manifest scope since it's used by multiple tables. */
+struct alignas(8) Run
+{
+    uint32_t First{ 0u };
+    uint32_t Count{ 0u };
+};
+
+/**@brief Much like run above, but actually embedded in the table rather than being an on-demand structure. */
+struct alignas(8) TableRef
+{
+    uint32_t Offset{ 0u };
+    uint32_t Count{ 0u };
+};
+
+/** @brief A 64 bit version of the above, for spans that could exceed the limits of 32-bit offsets. */
+struct alignas(8) TableRef64
+{
+    uint64_t Offset{ 0u };
+    uint64_t Count{ 0u };
+};
+
 /** @brief The whole-cook header, at offset zero. Every offset in it is absolute.
  *
  * The file is ordered by profile, then by module. The header region (`HeaderSize` bytes) holds this
@@ -222,15 +244,6 @@ struct alignas(8) Axis
     AxisValueDomain Domain{ AxisValueDomain::None };
     EarliestBindingTime BindingTime{ EarliestBindingTime::None };
     uint8_t Pad{ 0u };
-};
-
-/**@brief A run in an index table. Used for a resource list and for a visibility list. Variants can have
-*  different counts of resources, so this allows us to compact them efficiently in the binary schema. 
-*  This goes in the root Manifest scope since it's used by multiple tables. */
-struct alignas(8) Run
-{
-    uint32_t First{ 0u };
-    uint32_t Count{ 0u };
 };
 
 struct alignas(8) ModuleAxis
@@ -429,17 +442,6 @@ struct alignas(8) RasterState
     uint32_t Reserved{ 0u };
 };
 
-/** The reader reinterprets manifest bytes as records, so a record must be a bag of bytes.
-*
-* A record that held a pointer, a `std::string`, or a virtual table would make the reader read a
-* pointer out of a file. Nothing else in this repository catches that.
-*
-* Record sizes and layouts are not pinned yet, as we're still building out this library.*/
-// todo-ship: Better versioning system, graceful extension of fields, converters between versions
-template<typename RecordType>
-inline constexpr bool k_IsManifestRecord =
-    std::is_trivially_copyable_v<RecordType> && alignof(RecordType) <= 8u;
-
 class ModuleView;
 class EnvironmentView;
 
@@ -455,6 +457,8 @@ class EnvironmentView;
 * `EnvironmentView::Open`. A caller that holds the whole file uses `OpenEnvironment`.
 * @note This stays purely in the vocabulary of the manifest itself. For the vocabulary of authorship,
 * use `ManifestIndex`.
+*
+* todo: File-reading open implementation using a better fileread backend (not ifstream)
 */
 class BundleView
 {

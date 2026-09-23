@@ -1,21 +1,4 @@
 # Phase F preparation/edge case fixes
-- Split Manifest into whole-cook and per-module data: all stored in one bundle, but sectioned separately.
-  - String tables and source tables go in the root whole cook segment, along with any high-level metadata
-  - We may want to consider storing all the axis names and their values here too. Then each module
-    can use a similar tabled approach to what we've already used, an index into the root manifests axes
-    table (sorted by declaration order), along with a mask of what values were active for that module
-    [okay yes actually definitely do this]
-  - To make the above more coherent, key root axes by name. That keeps consistency alive, where
-    an axis like `QUALITY` means the same thing in two different modules
-- Make test shader set not use OceanFft and such: create a complex multi-module shader set, which
-  will let us test our multi-module functionality better. Create contrived source code, but make sure
-  we're exercising all of our variant machinery and manifest module segmentation
-- Add a per-variant mask over axes, specifying which axes are active in a variant. The bit index
-  of a set bit gives the *local* index in *the current modules* axes span, which should fill in gaps
-  considerably
-  - This should probably be encoded upfront as a uint64_t, but have handling for cases where 
-    we use more than 64 axes. That would suggest a kind of "chunk size" parameter, which can vary
-    per-module, and then the accessors will have to read that to interpret the masks
 - add query presets, which are module-agnostic
 - make the query system very clearly single-module-only. it can reuse a preset across modules, though
 - make it clear that variant keys are per-session use only. to save or persist a variant, save something 
@@ -24,38 +7,6 @@
     - a load of persisted variants will then need to first decode it's `Values` vector, to compute
       the key, and see if it matches. The `Key` field is somewhat redundant, I suppose, at least in
       persisted data
-- Variant data will need expansion. Each variant should record what capability requirements it was 
-  baked for, and member offsets for shader data must be recorded per target profile. Modules then
-  become arrays of baked data for different access models. What should this segmentation look like?
-  - Three scopes: whole-cook (strings, source, axes, target profiles), per-module logical
-    (the variant table + ModuleAxis runs, profile-invariant), per-(module, profile) (baked layout,
-    offsets, capability requirement). The query layer reads the logical scope only, so it stays
-    profile-agnostic.
-  - A profile is (target, access model, capability floor), a cooked form. Not a device power tier -
-    device power is an axis picked at runtime. Store target even while WebGPU-only, so a later SPIR-V
-    "bound" profile doesn't collide with the WebGPU one.
-- Decide the variant key radix now: pack against the root value count (root radix), not the module's
-  active subset. Decode stays "digit is position in the value list" and reuses the sparse-key handling.
-  The active-value mask then stays metadata, off the decode path.
-  - [2026-09-19 SUPERSEDED] We decided variant keys are per-module, not whole-cook global (see
-    agent-handoff.md 9.5, and the `axis-name-scope-open-question` memory). A module keys in its own
-    radix over its own axes. The root axes table then demotes from an identity mechanism to a storage
-    and dedup optimization, and the per-module value mask stops being a decode-path reconciliation.
-    Shared meaning across modules comes from shared types and query presets, not a global axis. So do
-    NOT build root-radix keys as written above.
-- Manifest is one file per cook, in the container-with-directory shape (agent-handoff.md 9.6). A fixed
-  16-byte prefix (`uint32 magic`, `uint32 version`, `uint64 HeaderSize`) lets a reader load the header
-  alone, then seek to one module or one profile. Keep a module directory (or fixed-size module headers)
-  for an O(1) seek, and a per-profile directory inside each module header. Interior offsets are uint32
-  today (4 GiB cap); decide whether to widen them against what the bundle stores.
-- Per-module value mask: use uint32_t, not uint16_t. A hard 16-value cap is too low for a tuning axis.
-  The mask width is an ABI limit. Put the "too many values" nudge in cook diagnostics (like the
-  influence matrix), not in the format width.
-- Placement must stop being group+binding. Bound is group+binding, pointer is a byte offset, indexed is
-  a heap index. Model placement as a variant so the manifest carries all three access models. This is
-  the field most likely to harden into a WebGPU assumption. Phase F D4, cheap now.
-- Reserve schema slots for push constants and specialization constants now, even without the extract
-  machinery. Then later it is just a Slang-side "what does this shader use?" extract change. Phase F E6.
 - The index hands out a profile-scoped builder (QueryFor(profile)) for the runtime path. Scope the
   profile on the builder, not the whole index, so one index serves tooling, precache-all, and a renderer
   that mixes access models across passes.
@@ -116,20 +67,6 @@
   so the cook tests exercise the axis interactions the single-purpose assets cannot. It should carry a
   size expression that names an axis, so the resolve path is covered too. Do this when the query and
   cook code is otherwise finished; it is a test-asset consolidation, not a blocker.
-## Done 2026-09-22 (new binding schema tests)
-- `WgslBindingScannerTest` retired. The text scanner is gone, so the test is now `WgslValidatorTest`
-  (`tests/WgslValidatorTests.cpp`), which drives `WgslValidator` on Tint. It covers a match, a kind /
-  shape / access / name mismatch, a depth texture and a comparison sampler, storage-buffer shape
-  orthogonality, and a parse failure. The stale `WgslBindingScannerTest.exe` was deleted from the build
-  tree.
-- `ReflectionSchemaTest` added (`tests/ReflectionSchemaTests.cpp`), Slang-free: `GetBaseShape`, the
-  flag predicates, the `ToString` tables, and `ReflectedUniformMember` equality over matrix layout and
-  element stride.
-- Four more tests were stale against the reshaped schema and are fixed: `StageDumpTest`,
-  `DedupeInfluenceTest`, `ManifestIndexTest`, `ShaderManifestRejectTest`. Each used the removed
-  `ResourceShape::Buffer` (now `StructuredBuffer`); `StageDumpTest` also used the removed
-  `RawBinding::SamplerType` / `SamplerBindingType`, which is dropped (a plain sampler is the
-  `IsComparisonSampler = false` default).
 ## Testing findings to resolve
 - `run-tests.bat` line 43 runs `CookTest.exe`, but no `CookTest` target exists in `tests/CMakeLists.txt`
   (only the five named cook variants build from `CookTest.cpp`). So `[FAIL] CookTest` is stale

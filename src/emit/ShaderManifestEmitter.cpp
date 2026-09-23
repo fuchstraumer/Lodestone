@@ -572,12 +572,12 @@ namespace
         {
             manifest::UniformMember memberRecord;
             memberRecord.NameString = strings.Add(member.Name);
-            memberRecord.Offset = member.Offset;
-            memberRecord.Size = member.Size;
-            memberRecord.ArrayCount = member.ArrayCount;
+            memberRecord.Offset = member.Data.Offset;
+            memberRecord.Size = member.Data.Size;
+            memberRecord.ArrayCount = member.Data.ArrayCount;
             // widen these types to uint32_t, since this is all 8-byte aligned anyways
-            memberRecord.ElementStride = static_cast<uint32_t>(member.ElementStride);
-            memberRecord.MatrixLayout = static_cast<uint32_t>(member.MatrixLayout);
+            memberRecord.ElementStride = static_cast<uint32_t>(member.Data.ElementStride);
+            memberRecord.MatrixLayout = static_cast<uint32_t>(member.Data.MatrixLayout);
             member_records.emplace_back(memberRecord);
         }
 
@@ -1266,11 +1266,11 @@ namespace
             const manifest::UniformMember& readMember = readMembers[memberIndex];
 
             const bool matches = view.String(readMember.NameString) == expectedMember.Name &&
-                                 readMember.Offset == expectedMember.Offset &&
-                                 readMember.Size == expectedMember.Size &&
-                                 readMember.ArrayCount == expectedMember.ArrayCount &&
-                                 readMember.ElementStride == static_cast<uint32_t>(expectedMember.ElementStride) &&
-                                 readMember.MatrixLayout == static_cast<uint32_t>(expectedMember.MatrixLayout);
+                                 readMember.Offset == expectedMember.Data.Offset &&
+                                 readMember.Size == expectedMember.Data.Size &&
+                                 readMember.ArrayCount == expectedMember.Data.ArrayCount &&
+                                 readMember.ElementStride == static_cast<uint32_t>(expectedMember.Data.ElementStride) &&
+                                 readMember.MatrixLayout == static_cast<uint32_t>(expectedMember.Data.MatrixLayout);
             if (!matches)
             {
                 return false;

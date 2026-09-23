@@ -80,11 +80,17 @@ using ResourceFootprint = std::variant<std::monostate, BufferFootprint, TextureF
 struct ReflectedUniformMember
 {
     std::string Name;
-    uint32_t Offset{ 0u };
-    uint32_t Size{ 0u };
-    uint32_t ArrayCount{ 1u };
-    uint16_t ElementStride{ 0u };
-    MatrixLayout MatrixLayout{ 0u };
+    // primitive types in this struct so we can hash it as a contiguous block of memory
+    struct Packed
+    {
+        uint32_t Offset{ 0u };
+        uint32_t Size{ 0u };
+        uint32_t ArrayCount{ 1u };
+        uint16_t ElementStride{ 0u };
+        MatrixLayout MatrixLayout{ 0u };
+        uint8_t Padding{ 0u }; // make this safe to hash by explicitly adding+setting padding
+        friend bool operator==(const Packed&, const Packed&) = default;
+    } Data;
 
     friend bool operator==(const ReflectedUniformMember&, const ReflectedUniformMember&) = default;
 };
@@ -173,6 +179,7 @@ std::string_view ToString(VertexScalarType scalar_type) noexcept;
  * and component count should be sufficient for all APIs to create vertex bindings. */
 struct ReflectedVertexInput
 {
+    std::string SemanticName;
     struct Packed
     {
         uint32_t SemanticIndex{ 0u };
@@ -181,7 +188,6 @@ struct ReflectedVertexInput
         uint32_t ComponentCount{ 0u };
         friend bool operator==(const Packed&, const Packed&) = default;
     } Data;
-    std::string SemanticName;
 
     friend bool operator==(const ReflectedVertexInput&, const ReflectedVertexInput&) = default;
 };

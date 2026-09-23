@@ -90,13 +90,22 @@ namespace
     static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ErrorCode::Count),
                   "every ErrorCode needs a description; add a line when you add a code");
 
+    /**The reader reinterprets manifest bytes as records, so a record must be a bag of bytes.
+    * This static assert ensures that types with objects, pointers, etc cannot make it into
+    * the manifest data.*/
+    template<typename RecordType>
+    inline constexpr bool k_IsManifestRecord =
+        std::is_trivially_copyable_v<RecordType> && alignof(RecordType) <= 8u;
+
+    static_assert(k_IsManifestRecord<Run>);
+    static_assert(k_IsManifestRecord<TableRef>);
+    static_assert(k_IsManifestRecord<TableRef64>);
     static_assert(k_IsManifestRecord<Header>);
     static_assert(k_IsManifestRecord<StringRef>);
     static_assert(k_IsManifestRecord<SourceRef>);
     static_assert(k_IsManifestRecord<Profile>);
     static_assert(k_IsManifestRecord<EnvironmentDirectoryEntry>);
     static_assert(k_IsManifestRecord<Axis>);
-    static_assert(k_IsManifestRecord<Run>);
     static_assert(k_IsManifestRecord<ModuleAxis>);
     static_assert(k_IsManifestRecord<ModuleRootHeader>);
     static_assert(k_IsManifestRecord<EntryPoint>);
@@ -112,7 +121,7 @@ namespace
     static_assert(k_IsManifestRecord<ColorTarget>);
     static_assert(k_IsManifestRecord<RasterState>);
 
-    constexpr size_t k_AxisMaskWordBits = 64u;
+    constexpr size_t k_AxisMaskWordBits = std::numeric_limits<uint64_t>::digits;
 
     template<typename RecordType>
     std::span<const RecordType> MakeTable(std::span<const std::byte> bytes,
@@ -147,6 +156,7 @@ namespace
     /** The facts one extent's validators need from the bundle, with the extent itself. */
     struct EnvironmentContext
     {
+        //NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
         const EnvironmentHeader& Environment;
         std::span<const std::byte> Extent;
         uint64_t StringCount;

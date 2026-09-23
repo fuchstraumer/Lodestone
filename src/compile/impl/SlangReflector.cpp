@@ -905,7 +905,12 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
             }
         }
 
-        members.emplace_back(std::move(name), leaf.Offset, memberSize, arrayCount, stride, layout);
+        members.emplace_back(std::move(name),
+                             ReflectedUniformMember::Packed{ leaf.Offset,
+                                                             memberSize,
+                                                             arrayCount,
+                                                             stride,
+                                                             layout });
     };
 
     std::vector<slang::VariableLayoutReflection*> path;
