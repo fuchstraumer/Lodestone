@@ -239,12 +239,22 @@ std::string GenerateDedupeReport(const CookedLibrary& library)
     report += "Note: The dedupe ratio indicates how many artifacts were seen for each unique entry. A higher "
               "ratio means more effective deduplication.\n\n";
 
-    for (const CookedModule& module : library.Modules)
+    // One section for each cooked environment, in the manifest's order: by profile, then by module.
+    const size_t moduleCount = library.ModuleNames.size();
+    for (size_t environmentIndex = 0u; environmentIndex < library.Environments.size(); ++environmentIndex)
     {
+        if (!library.Environments[environmentIndex].has_value())
+        {
+            continue;
+        }
+
+        const CookedModule& module = *library.Environments[environmentIndex];
+        const CookedProfile& profile = library.Profiles[environmentIndex / moduleCount];
         const InternerStatistics& sourceStatistics = module.SourceTable.Interning;
 
-        report += std::format("{}  {} variants x {} entrypoints = {} artifacts\n\n",
+        report += std::format("{} [{}]  {} variants x {} entrypoints = {} artifacts\n\n",
                               module.Name,
+                              profile.TargetName,
                               module.Variants.size(),
                               module.EntryPoints.size(),
                               sourceStatistics.ArtifactsSeen);

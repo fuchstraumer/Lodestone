@@ -343,7 +343,7 @@ namespace
             }
 
             const CookError appendResult =
-                AppendVariantToModule(interned_module, variant, currVariant.Canonical);
+                AppendVariantToModule(interned_module, variant, currVariant);
             if (appendResult != CookError::Success)
             {
                 return std::unexpected(appendResult);

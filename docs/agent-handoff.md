@@ -433,3 +433,54 @@ link-time specialization (not source or AST transformation), an `ls_vertex_attri
 the bound and the pulled arm derive from, and an opt-in portability tier enforced at ingestion. The one
 unknown to prototype first is the bound arm's entry-point synthesis, because Slang ties varying inputs to
 entry-point parameters. This is not scheduled work.
+
+## 12. Update 2026-09-22 (night)
+
+### 12.1 State
+
+The multi-module manifest bundle from section 9.6 is built. The RelWithDebInfo tree is green: every
+unit test and every cook test passes, except the stale `CookTest` script line (section 11.2). The Debug
+tree passes every unit test, and fails `KitchenSinkCookTest` on a Slang assert (section 12.3).
+
+### 12.2 What this window built
+
+- **One bundle for each cook.** `EmitShaderManifest` takes a `CookedLibrary` and writes
+  `ShaderLibrary.ldmanifest`. `CLAUDE.md` ("One output form") holds the layout. The schema is version 4.
+- **Three view types.** `BundleView`, `ModuleView`, and `EnvironmentView` replace `ManifestView`. Each
+  `Open` validates its own scope, so the header region opens alone and an extent opens on its own.
+- **The index reads one environment.** `ManifestIndex` takes an `EnvironmentView`. Its radix is the set
+  bit count of each module axis mask. The builder API did not change.
+- **The driver emits the bundle.** Before this window, `RunCookOnce` never called the manifest emitter,
+  so `VerifyManifestRoundTrip` and the dedup report ran nowhere, and each target overwrote the cooked
+  module of the target before it. The driver now fills a (profile, module) grid and runs
+  `EmitLibraryArtifacts` once. It keeps each `PermutationSpace` on the heap until the emit, because a
+  cooked module points into it.
+- **The round trip checks more.** It decodes each key through the module axes and compares the values
+  with the canonical assignment. It compares each axis-active mask with the active assignment.
+  `LibraryVariant` now carries `Active`, and `AppendVariantToModule` takes the `VariantDescriptor`.
+- **Reserved slots.** `BindingKind::PushConstant` exists, and nothing produces it yet. The specialization
+  constant table exists, and the cooker writes it empty. `Profile::CapabilityFloor` and
+  `Variant::CapabilityRequirement` are zero until the capability set table exists.
+- **A test defect is fixed.** `PermutationConstraintTests.cpp` returned a `std::initializer_list` from a
+  lambda. Its backing array died on return, and a rebuild turned that into a 412 GB allocation.
+
+### 12.3 Measured facts
+
+- **The Debug Slang build asserts on `KsMaterial`.** `loadRootModule` raises
+  `unexpected: duplicate global instruction`. The check is `checkIRDuplicate` in
+  `third_party/slang/source/slang/slang-ir-link.cpp`, inside `#ifdef _DEBUG`, so a release Slang does not
+  run it. It started with the Slang update in commit `557ea09`, the first Debug Slang build since that
+  update. `KsMaterial` fails alone, with an empty module cache. The cook code does not run before this
+  call. Find the duplicate symbol before you trust a Debug KitchenSink result.
+- **A cook with no `--target` cooks zero modules and exits 0.** The cooker console has no default
+  target. `scripts/check-known-good.py` passes no `--target`, so it compares nothing. It also expects
+  `<stem>.stage-<stage>.json`, while the driver writes `<module>_<target>_<Kind>.json`, and
+  `tests/known_good/` holds no `Ks*` file for its default module list.
+
+### 12.4 Next
+
+1. Decide how a cook with no target fails, then repair `check-known-good.py` and accept new known-good
+   dumps for the KitchenSink modules.
+2. `BindingInfo` still carries a fixed `Group` and `Binding`. Give it the placement kind and the payload.
+3. The per-variant axis-active mask is stored and verified, but the query layer does not read it yet.
+   It is the fix for the over-return in section 4.

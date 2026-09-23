@@ -7,6 +7,7 @@
 #include "TestHarness.hpp"
 #include <algorithm>
 #include <initializer_list>
+#include <vector>
 
 using lodestone::AxisKind;
 using lodestone::AxisValueDomain;
@@ -54,7 +55,8 @@ void TestRequirePruning(TestRunner& runner)
     const PermutationAxis tileAxis{ "TILE", tiles, AxisKind::Tuning, EarliestBindingTime::Cook, AxisValueDomain::Integral };
     const PermutationAxis regAxis{ "REG",  regs,  AxisKind::Tuning, EarliestBindingTime::Cook, AxisValueDomain::Integral };
 
-    auto makeAxes = [&]{ return std::initializer_list<PermutationAxis>{ tileAxis, regAxis }; };
+    // A vector, not an initializer_list: a returned initializer_list outlives its backing array.
+    auto makeAxes = [&]{ return std::vector<PermutationAxis>{ tileAxis, regAxis }; };
 
     const PermutationSpace control{ makeAxes() };                                // no Require
     const PermutationSpace gated  { makeAxes(),

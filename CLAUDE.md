@@ -89,7 +89,7 @@ the emitted WGSL. All seventeen together run in under one second.
 | `AttributeExpressionTest` | The attribute expression grammar — arithmetic, comparison, and logic — and every rejection it must make. |
 | `ContentInternerTest` | A hash never decides equality. It supplies a hash that returns one constant, so only the byte comparison can separate the payloads. |
 | `PermutationIndexTest` | A variant index is unique, dense, and stable, and a partial assignment resolves to one variant. |
-| `ShaderManifestRejectTest` | The manifest reader rejects a short, misaligned, or damaged file, and opens a real one. |
+| `ShaderManifestRejectTest` | The bundle reader rejects a short, misaligned, or damaged file, and opens a real one. It also proves that the header region opens alone, that an extent read on its own opens against that bundle, that an environment the cook skipped reads as absent, and that a damaged directory entry or variant key table is rejected by name. |
 | `WgslValidatorTest` | The WGSL cross-check on Tint. It parses fixed WGSL, reads the used bindings from Tint's inspector, and compares them against hand-written reflection. It proves a match, and a mismatch of kind, shape, access, or name. It also proves that a comparison sampler and a depth texture read back correctly, that a storage buffer's structured or raw shape does not change the WGSL kind, and that invalid WGSL is a parse error, not a mismatch. |
 | `ReflectionSchemaTest` | The pure data of the binding schema, with no Slang. The `ResourceShape` flag layout (a base shape in the low nibble plus array, multisample, shadow, and feedback flags, read with `GetBaseShape`), the `ToString` tables for `ResourceShape`, `BindingKind`, and `TextureSampleType`, and the `ReflectedUniformMember` equality that dedup rests on, which includes matrix layout and element stride. |
 | `StageDumpTest` | A stage dump holds the model and no target text, it names itself the way `--dump-stage` names it, and two dumps of one input agree byte for byte. |
@@ -102,7 +102,7 @@ the emitted WGSL. All seventeen together run in under one second.
 | `PermutationConstraintTest` | The axis constraint engine. `ActiveWhen` gates an axis the way the old parent link did, `Require` prunes a forbidden combination, and the load check rejects a forward reference, an unknown symbol, and a malformed expression. |
 | `SuggestTest` | The nearest-name suggestion. It measures the edit distance between a mistyped name and the accepted names, and returns the closest one. The cooker and the client both use it for a name rejection. |
 | `EnumTagDecodeTest` | The enum tag-blob decode (`compile/EnumTagDecode`). It reads each integer width, sign-extends a signed tag, zero-extends an unsigned tag, and accepts the `UInt64` wrap above 2^63. It names no Slang type, so the reflection read of an enum case value has a proof that needs no compiler. |
-| `ManifestIndexTest` | The client query surface, end to end. It builds a manifest inline through the emitter, with one axis of each domain, then drives `ManifestQueryBuilder` through every valid construction and every error path, plus a sparse manifest and an `ActiveWhen`-gated one. It needs no Slang. |
+| `ManifestIndexTest` | The client query surface, end to end. It builds a bundle inline through the emitter, with one axis of each domain, then drives `ManifestQueryBuilder` through every valid construction and every error path, plus a sparse manifest and an `ActiveWhen`-gated one. It proves that two profiles of one module each key their own subset, and that two modules share a root axis only when their values agree in order. It needs no Slang. |
 
 An error check prints a diagnostic to `stderr` on purpose. Read the last line for the result.
 
@@ -163,7 +163,7 @@ A value flag is a row in `k_ValueFlags`, beside `k_SwitchFlags`. Add a row, not 
 exports nothing and every consumer fails to link. A `SHARED` build is for instrumented performance
 analysis only, and it needs `WINDOWS_EXPORT_ALL_SYMBOLS` to link at all.
 
-`tools/manifest_dump` is a real executable. It reads one `.ldshaders` manifest and writes JSON. It
+`tools/manifest_dump` is a real executable. It reads one `ShaderLibrary.ldmanifest` bundle and writes JSON. It
 links only `lodestone::client_internal`, never the cooker or Slang. That link line is the proof that
 the client half stays free of the compiler.
 
@@ -376,11 +376,14 @@ number would state that every target must supply one. A target supplies a valida
    that builder by value and returns a `CookedModule`, so nothing after the freeze can reach an
    interner.
 7. **Key.** Each `LibraryVariant` holds only indices into those tables, plus its dense index.
-8. **Emit.** `EmitLibraryArtifacts` writes through the `OutputSink`:
-   - the C++ header, `sink.PrimaryName()`, from `EmitShaderLibraryHeader`
-   - one C++ source for each module, `<headerStem>_<Module>.cpp`
-   - one binary manifest for each module, `<Module>.ldshaders`, plus `VerifyManifestRoundTrip`
+8. **Emit.** `EmitLibraryArtifacts` (in `src/driver/CookerDriver.cpp`) runs once, after every (module,
+   target) pair has cooked. It reads one `CookedLibrary`, a grid of `CookedModule` values ordered by
+   profile and then by module, and writes through the `OutputSink`:
+   - one binary manifest bundle for the whole cook, `ShaderLibrary.ldmanifest`, plus `VerifyManifestRoundTrip`
    - `ShaderLibrary.dedupe.txt`, from `GenerateDedupeReport`
+
+   A cooked module points into its `PermutationSpace`, so the driver moves each space to the heap and
+   keeps it until the emit is done.
 
 Four validators run inside that loop. None of them is a stage.
 
@@ -429,7 +432,7 @@ unordered container reached the output.
 | `ContentInterner<T>` | `model/ContentInterner.hpp` | Collapses equal payloads, keeps provenance, counts collisions. |
 | `InternedModule` | `model/CookedLibrary.hpp` | The stage 6 builder. It holds the six interners, and it is the only place the provenance of a collapse survives. |
 | `CookedModule`, `CookedLibrary` | `model/CookedLibrary.hpp` | The frozen model. Every emitter reads this and nothing earlier. |
-| `ManifestView` | `client/include/ShaderManifest.hpp` | Read-only spans over the manifest bytes. Allocates nothing to open. |
+| `BundleView`, `ModuleView`, `EnvironmentView` | `client/include/ShaderManifest.hpp` | Read-only spans over the bundle bytes, one type for each scope: the whole cook, one module, and one module cooked for one profile. Each `Open` validates its scope once and allocates nothing. |
 | `ManifestIndex`, `ManifestQueryBuilder` | `client/include/ShaderManifestIndex.hpp` | The client query surface, frozen. `ManifestIndex` decodes and enumerates variants and hands out a value-semantic builder. The builder resolves axis names and values by name, and its terminals (`Keys`, `Variants`, `First`) return keys or an error. A malformed query is an error; a valid query with no variant is an empty set. |
 | `ShaderSourceProvider` | `client/include/ShaderLibraryTypes.hpp` | Where a renderer gets source, bindings, and workgroup size. `Generation()` is the hot-reload hook. |
 
@@ -530,21 +533,40 @@ keeps the axis addresses.
 
 ## One output form: the binary manifest
 
-The cook writes one output form now, the binary manifest, from the `CookedModule`. The C++ header/source
-emitter is gone. `-o` names an output **directory**, and every artifact goes inside it: one
-`<Module>.ldmanifest` for each module, one shared `ShaderLibrary.dedupe.txt`, and, when `--dump-stage`
-asks, the stage-dump JSON files.
+The cook writes one output form, the binary manifest bundle, from the `CookedLibrary`. The C++
+header/source emitter is gone. `-o` names an output **directory**, and every artifact goes inside it:
+one `ShaderLibrary.ldmanifest` for the whole cook, one `ShaderLibrary.dedupe.txt`, and, when
+`--dump-stage` asks, the stage-dump JSON files.
 
-The manifest arrives as bytes. Every cross-reference is an index, never a pointer, so the reader is a
-set of spans and it relocates nothing. Sections start on 8-byte boundaries. A record must be trivially
-copyable, and `k_IsManifestRecord` holds that line. Record **sizes** are not pinned, and
-`ShaderManifest.hpp` says so: the format has no version migration yet, so a record can still grow.
+The bundle has three scopes, and the reader has one view type for each.
 
-A variant is found by its **key**, not by a dense index. `ManifestView::FindSlot` takes a
-`VariantKey` and does a `lower_bound` on the sorted `VariantKeys` table; the position it finds is the
-dense index. The manifest also carries the axis schema (`ManifestAxis` records with name, value count,
-kind, and domain, plus an `AxisValues` table), so a consumer can enumerate the axes and decode a key
-back into its per-axis values with `UnpackVariantKey`.
+- **Whole cook** (`BundleView`). The header region holds the `Header`, one `ModuleRootHeader` for each
+  module, the profile table, the environment directory, the root axes and their values, each module's
+  entry points and `ModuleAxis` run, and the string table. Offsets here are absolute and 64-bit.
+- **One module** (`ModuleView`). The name, the entry points, and the axes. A `ModuleAxis` names a root
+  axis and a 32-bit mask of the values the module uses. The radix of the axis in the module's key is the
+  count of set bits, and digit D selects the D-th set bit.
+- **One module for one profile** (`EnvironmentView`). One extent: the variant keys, the variant records,
+  the per-variant axis-active masks, the slot grid, the sources, and every layout table. Offsets are
+  32-bit and relative to the extent start, so an extent loads into its own buffer with no fixup.
+
+The directory is a dense grid of `ProfileCount * ModuleCount` entries, ordered by profile and then by
+module, and the extents sit in the same order. A renderer reads the header region, then one contiguous
+run of extents for its profile. An entry with a size of zero means the cook skipped that module for that
+profile. Each profile applies its own policy, so two profiles of one module can hold different variants.
+
+Two modules share a root axis when the name, kind, domain, and binding time agree and the module's
+values fit the root values in order. Otherwise the axis gets a root record of its own. A root axis is a
+storage and dedup optimization only: keys are per module, so no key crosses a module boundary.
+
+Every cross-reference is an index or an offset, never a pointer, so the reader is a set of spans and it
+relocates nothing. Sections start on 8-byte boundaries. A record must be trivially copyable, and the
+`k_IsManifestRecord` asserts in `client/src/ShaderManifest.cpp` hold that line. Record **sizes** are not
+pinned: the format has no version migration yet, so a record can still grow.
+
+A variant is found by its **key**, not by a dense index. `EnvironmentView::FindVariant` does a
+`lower_bound` on the sorted key table, and the position it finds is the variant index. The slot for
+(variant V, entry point E) is at `V * EntryPointCount + E`, so a variant stores no slot range.
 
 A `VariantKey` is an in-session handle, not a save token. A key packs against the axis order and value
 count of one manifest, so a recook can change what it means. To persist a variant, save the decoded axis

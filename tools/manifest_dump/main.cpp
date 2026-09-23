@@ -13,6 +13,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace
@@ -106,14 +107,30 @@ std::expected<std::vector<std::byte>, DumpError> ReadFileBytes(const std::filesy
     return bytes;
 }
 
-void WriteEntryPoints(lodestone::JsonWriter& writer, const lodestone::ShaderManifestView& view) noexcept
+namespace manifest = lodestone::manifest;
+
+void WriteProfiles(lodestone::JsonWriter& writer, const manifest::BundleView& bundle) noexcept
+{
+    writer.Key("profiles");
+    writer.BeginArray();
+    for (const manifest::Profile& profile : bundle.Profiles())
+    {
+        writer.BeginObject();
+        writer.KeyString("target", bundle.String(profile.TargetNameString));
+        writer.KeyString("accessModel", magic_enum::enum_name(profile.AccessModel));
+        writer.EndObject();
+    }
+    writer.EndArray();
+}
+
+void WriteEntryPoints(lodestone::JsonWriter& writer, const manifest::ModuleView& module) noexcept
 {
     writer.Key("entryPoints");
     writer.BeginArray();
-    for (const lodestone::ManifestEntryPoint& entryPoint : view.EntryPoints())
+    for (const manifest::EntryPoint& entryPoint : module.EntryPoints())
     {
         writer.BeginObject();
-        writer.KeyString("name", view.String(entryPoint.NameString));
+        writer.KeyString("name", module.Bundle().String(entryPoint.NameString));
         writer.KeyString("stage",
                          magic_enum::enum_name(static_cast<lodestone::ShaderStageKind>(entryPoint.Stage)));
         writer.EndObject();
@@ -121,20 +138,34 @@ void WriteEntryPoints(lodestone::JsonWriter& writer, const lodestone::ShaderMani
     writer.EndArray();
 }
 
-void WriteAxes(lodestone::JsonWriter& writer, const lodestone::ShaderManifestView& view) noexcept
+/** The module's axes as the module keys them: only the values its mask selects, in digit order. A named
+ * value (a type or an enum case) is written as its name. */
+void WriteModuleAxes(lodestone::JsonWriter& writer, const manifest::ModuleView& module) noexcept
 {
     writer.Key("axes");
     writer.BeginArray();
-    for (size_t axisIndex = 0u; axisIndex < view.Axes().size(); axisIndex++)
+    for (uint32_t axisIndex = 0u; axisIndex < module.AxisCount(); axisIndex++)
     {
-        const lodestone::ManifestAxis& axis = view.Axes()[axisIndex];
+        const manifest::Axis& axis = module.AxisData(axisIndex);
+        const bool namedValues =
+            axis.Domain == lodestone::AxisValueDomain::Type || axis.Domain == lodestone::AxisValueDomain::Enum;
         writer.BeginObject();
-        writer.KeyString("name", view.String(axis.NameString));
+        writer.KeyString("name", module.Bundle().String(axis.NameString));
+        writer.KeyUInt("rootAxis", module.ModuleAxes()[axisIndex].AxisIndex);
+        writer.KeyString("domain", magic_enum::enum_name(axis.Domain));
         writer.Key("values");
         writer.BeginArray();
-        for (const int64_t value : view.AxisValues(static_cast<uint32_t>(axisIndex)))
+        for (uint32_t digit = 0u; digit < module.AxisValueCount(axisIndex); digit++)
         {
-            writer.Int(value);
+            const lodestone::AxisValueType value = module.AxisValue(axisIndex, digit);
+            if (namedValues)
+            {
+                writer.String(module.Bundle().String(value));
+            }
+            else
+            {
+                writer.Int(static_cast<int64_t>(value));
+            }
         }
         writer.EndArray();
         writer.EndObject();
@@ -143,12 +174,12 @@ void WriteAxes(lodestone::JsonWriter& writer, const lodestone::ShaderManifestVie
 }
 
 void WriteUniformMembers(lodestone::JsonWriter& writer,
-                         const lodestone::ShaderManifestView& view,
-                         const lodestone::ManifestBinding& binding) noexcept
+                         const manifest::EnvironmentView& view,
+                         const manifest::Binding& binding) noexcept
 {
     writer.Key("members");
     writer.BeginArray();
-    for (const lodestone::ManifestUniformMember& member : view.UniformMembers(binding))
+    for (const manifest::UniformMember& member : view.UniformMembers(binding))
     {
         writer.BeginObject();
         writer.KeyString("name", view.String(member.NameString));
@@ -164,14 +195,16 @@ void WriteUniformMembers(lodestone::JsonWriter& writer,
 }
 
 void WriteBinding(lodestone::JsonWriter& writer,
-                  const lodestone::ShaderManifestView& view,
-                  const lodestone::ManifestBinding& binding) noexcept
+                  const manifest::EnvironmentView& view,
+                  const manifest::Binding& binding) noexcept
 {
     writer.BeginObject();
     writer.KeyString("name", view.String(binding.NameString));
     writer.KeyString("scope", view.String(binding.ScopeString));
-    writer.KeyUInt("group", binding.Group);
-    writer.KeyUInt("binding", binding.Binding);
+    writer.KeyString("placementKind",
+                     magic_enum::enum_name(static_cast<lodestone::PlacementKind>(binding.PlacementKind)));
+    writer.KeyUInt("placementWord0", binding.Placement.Word0);
+    writer.KeyUInt("placementWord1", binding.Placement.Word1);
     writer.KeyString("kind", magic_enum::enum_name(static_cast<lodestone::BindingKind>(binding.Kind)));
     writer.KeyString("shape", magic_enum::enum_name(static_cast<lodestone::ResourceShape>(binding.Shape)));
     writer.KeyBool("isComparisonSampler", binding.IsComparisonSampler);
@@ -183,17 +216,15 @@ void WriteBinding(lodestone::JsonWriter& writer,
     writer.KeyUInt("byteSize", binding.ByteSize);
     writer.KeyUInt("elementStride", binding.ElementStride);
     writer.KeyUInt("arrayCount", binding.ArrayCount);
-    writer.KeyString("placementKind",
-                     magic_enum::enum_name(static_cast<lodestone::PlacementKind>(binding.PlacementKind)));
     WriteUniformMembers(writer, view, binding);
     writer.EndObject();
 }
 
-void WriteBindingsFlat(lodestone::JsonWriter& writer, const lodestone::ShaderManifestView& view) noexcept
+void WriteBindingsFlat(lodestone::JsonWriter& writer, const manifest::EnvironmentView& view) noexcept
 {
     writer.Key("bindings");
     writer.BeginArray();
-    for (const lodestone::ManifestBinding& binding : view.Bindings())
+    for (const manifest::Binding& binding : view.Bindings())
     {
         WriteBinding(writer, view, binding);
     }
@@ -201,7 +232,7 @@ void WriteBindingsFlat(lodestone::JsonWriter& writer, const lodestone::ShaderMan
 }
 
 void WriteRaster(lodestone::JsonWriter& writer,
-                 const lodestone::ShaderManifestView& view,
+                 const manifest::EnvironmentView& view,
                  uint32_t raster_index) noexcept
 {
     writer.Key("raster");
@@ -210,7 +241,7 @@ void WriteRaster(lodestone::JsonWriter& writer,
 
     writer.Key("vertexInputs");
     writer.BeginArray();
-    for (const lodestone::ManifestVertexInput& input : view.VertexInputs(raster_index))
+    for (const manifest::VertexInput& input : view.VertexInputs(raster_index))
     {
         writer.BeginObject();
         writer.KeyString("semanticName", view.String(input.SemanticNameString));
@@ -225,7 +256,7 @@ void WriteRaster(lodestone::JsonWriter& writer,
 
     writer.Key("colorTargets");
     writer.BeginArray();
-    for (const lodestone::ManifestColorTarget& target : view.ColorTargets(raster_index))
+    for (const manifest::ColorTarget& target : view.ColorTargets(raster_index))
     {
         writer.BeginObject();
         writer.KeyUInt("location", target.Location);
@@ -239,7 +270,7 @@ void WriteRaster(lodestone::JsonWriter& writer,
     writer.EndObject();
 }
 
-void WriteFootprint(lodestone::JsonWriter& writer, const lodestone::ManifestFootprint& footprint) noexcept
+void WriteFootprint(lodestone::JsonWriter& writer, const manifest::Footprint& footprint) noexcept
 {
     writer.Key("footprint");
     writer.BeginObject();
@@ -260,10 +291,10 @@ void WriteFootprint(lodestone::JsonWriter& writer, const lodestone::ManifestFoot
 }
 
 void WriteSlot(lodestone::JsonWriter& writer,
-               const lodestone::ShaderManifestView& view,
-               const lodestone::ManifestVariant& variant,
-               const lodestone::ManifestEntryPoint& entry_point,
-               const lodestone::ManifestSlot& slot,
+               const manifest::EnvironmentView& view,
+               const manifest::Variant& variant,
+               const manifest::EntryPoint& entry_point,
+               const manifest::EntryPointInstance& slot,
                bool with_sources) noexcept
 {
     writer.BeginObject();
@@ -281,18 +312,12 @@ void WriteSlot(lodestone::JsonWriter& writer,
     // Resolved the way a consumer resolves it: visibility names a resource of the variant, and the
     // footprint list of that variant says how much of it.
     const std::span<const uint32_t> resources = view.ResourceList(variant.ResourceListIndex);
-    const std::span<const lodestone::ManifestFootprint> footprints =
-        view.FootprintList(variant.FootprintListIndex);
+    const std::span<const manifest::Footprint> footprints = view.FootprintList(variant.FootprintListIndex);
 
     writer.Key("layout");
     writer.BeginArray();
     for (const uint32_t local : view.VisibilityList(slot.VisibilityIndex))
     {
-        if (local >= resources.size() || resources[local] >= view.Bindings().size())
-        {
-            continue;
-        }
-
         writer.BeginObject();
         writer.Key("resource");
         WriteBinding(writer, view, view.Bindings()[resources[local]]);
@@ -317,29 +342,37 @@ void WriteSlot(lodestone::JsonWriter& writer,
 }
 
 void WriteVariants(lodestone::JsonWriter& writer,
-                   const lodestone::ShaderManifestView& view,
+                   const manifest::EnvironmentView& view,
                    bool with_sources) noexcept
 {
     const std::span<const lodestone::VariantKey> keys = view.VariantKeys();
+    const std::span<const manifest::EntryPoint> entryPoints = view.Module().EntryPoints();
     writer.Key("variants");
     writer.BeginArray();
-    for (const lodestone::ManifestVariant& variant : view.Variants())
+    for (uint32_t variantIndex = 0u; variantIndex < view.Variants().size(); variantIndex++)
     {
+        const manifest::Variant& variant = view.Variants()[variantIndex];
         writer.BeginObject();
-        writer.KeyUInt("index", variant.Index);
+        writer.KeyUInt("key", std::to_underlying(keys[variantIndex]));
         writer.KeyString("suffix", view.String(variant.SuffixString));
+
+        writer.Key("activeAxes");
+        writer.BeginArray();
+        for (uint32_t axisIndex = 0u; axisIndex < view.Module().AxisCount(); axisIndex++)
+        {
+            if (view.IsAxisActive(variantIndex, axisIndex))
+            {
+                writer.String(view.String(view.Module().AxisData(axisIndex).NameString));
+            }
+        }
+        writer.EndArray();
 
         writer.Key("slots");
         writer.BeginArray();
-        const std::span<const lodestone::ManifestEntryPoint> entryPoints = view.EntryPoints();
+        const std::span<const manifest::EntryPointInstance> slots = view.VariantSlots(variantIndex);
         for (size_t entryPointIndex = 0u; entryPointIndex < entryPoints.size(); entryPointIndex++)
         {
-            const uint16_t entryPointId = static_cast<uint16_t>(entryPointIndex + 1u);
-            const lodestone::ManifestSlot* slot = view.FindSlot(entryPointId, keys[variant.Index]);
-            if (slot != nullptr)
-            {
-                WriteSlot(writer, view, variant, entryPoints[entryPointIndex], *slot, with_sources);
-            }
+            WriteSlot(writer, view, variant, entryPoints[entryPointIndex], slots[entryPointIndex], with_sources);
         }
         writer.EndArray();
 
@@ -348,17 +381,70 @@ void WriteVariants(lodestone::JsonWriter& writer,
     writer.EndArray();
 }
 
-std::expected<std::string, DumpError> BuildManifestJson(const lodestone::ShaderManifestView& view,
+/** One module: its profile-invariant facts, then one object for each profile that cooked it. */
+DumpError WriteModule(lodestone::JsonWriter& writer,
+                      const manifest::BundleView& bundle,
+                      uint32_t module_index,
+                      bool with_sources) noexcept
+{
+    const manifest::ModuleView module = bundle.Module(module_index);
+    writer.BeginObject();
+    writer.KeyString("name", module.Name());
+    WriteEntryPoints(writer, module);
+    WriteModuleAxes(writer, module);
+
+    writer.Key("environments");
+    writer.BeginArray();
+    for (uint32_t profileIndex = 0u; profileIndex < bundle.Profiles().size(); profileIndex++)
+    {
+        const manifest::ManifestResult<manifest::EnvironmentView> view =
+            bundle.OpenEnvironment(profileIndex, module_index);
+        if (!view.has_value() && view.error().Code == manifest::ErrorCode::EnvironmentNotCooked)
+        {
+            continue;
+        }
+
+        if (!view.has_value())
+        {
+            std::println(stderr,
+                         "Failed to open module {} for profile {}: {}",
+                         module.Name(),
+                         profileIndex,
+                         manifest::DescribeShaderManifestError(view.error()));
+            return DumpError::ManifestOpenFailed;
+        }
+
+        writer.BeginObject();
+        writer.KeyString("target", bundle.String(bundle.Profiles()[profileIndex].TargetNameString));
+        WriteBindingsFlat(writer, *view);
+        WriteVariants(writer, *view, with_sources);
+        writer.EndObject();
+    }
+    writer.EndArray();
+
+    writer.EndObject();
+    return DumpError::Success;
+}
+
+std::expected<std::string, DumpError> BuildManifestJson(const manifest::BundleView& bundle,
                                                         bool pretty,
                                                         bool with_sources) noexcept
 {
     lodestone::JsonWriter writer{ pretty };
     writer.BeginObject();
-    writer.KeyString("moduleName", view.ModuleName());
-    WriteEntryPoints(writer, view);
-    WriteAxes(writer, view);
-    WriteBindingsFlat(writer, view);
-    WriteVariants(writer, view, with_sources);
+    WriteProfiles(writer, bundle);
+
+    writer.Key("modules");
+    writer.BeginArray();
+    for (uint32_t moduleIndex = 0u; moduleIndex < bundle.ModuleCount(); moduleIndex++)
+    {
+        const DumpError written = WriteModule(writer, bundle, moduleIndex, with_sources);
+        if (written != DumpError::Success)
+        {
+            return std::unexpected(written);
+        }
+    }
+    writer.EndArray();
     writer.EndObject();
 
     const lodestone::JsonResult<std::string> result = writer.Finish();
@@ -373,7 +459,7 @@ std::expected<std::string, DumpError> BuildManifestJson(const lodestone::ShaderM
 int PrintUsage() noexcept
 {
     std::println(stderr,
-                 "usage: manifest_dump <manifest.ls_shader_bin> [--compact] [--with-sources] "
+                 "usage: manifest_dump <ShaderLibrary.ldmanifest> [--compact] [--with-sources] "
                  "[-o <output.json>]");
     return 1;
 }
@@ -397,13 +483,13 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    const auto viewResult = lodestone::ShaderManifestView::Open(bytesResult.value());
+    const auto viewResult = manifest::BundleView::Open(bytesResult.value());
     if (!viewResult.has_value())
     {
         std::println(stderr,
                      "Failed to open manifest '{}': {}",
                      options.ManifestPath.string(),
-                     lodestone::DescribeShaderManifestError(viewResult.error()));
+                     manifest::DescribeShaderManifestError(viewResult.error()));
         return 1;
     }
 

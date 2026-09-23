@@ -131,20 +131,28 @@ CompiledVariant MakeSingleEntryPointVariant(uint64_t index, bool first_axis_valu
     return variant;
 }
 
-/** `AppendVariantToModule` takes a `CanonicalAssignment`, so the test reaches it the way the cooker
- * does. */
-CanonicalAssignment MakeAssignment(const PermutationSpace& space,
-                                   const PermutationAxis& first_axis,
-                                   const PermutationAxis& second_axis,
-                                   bool first_axis_value,
-                                   bool second_axis_value)
+/** `AppendVariantToModule` takes a `VariantDescriptor`, so the test builds one the way the cooker
+ * does: canonicalize the active assignment, then key the canonical one. */
+VariantDescriptor MakeDescriptor(const PermutationSpace& space, PermutationAssignment active)
 {
-    const PermutationAssignment active{
-        PermutationBinding{ .Axis = &first_axis, .Value = PermutationValue{ first_axis_value } },
-        PermutationBinding{ .Axis = &second_axis, .Value = PermutationValue{ second_axis_value } }
-    };
+    VariantDescriptor descriptor;
+    descriptor.Canonical = space.CanonicalizeAssignment(active);
+    descriptor.Key = space.ComputeVariantKey(descriptor.Canonical);
+    descriptor.Active = std::move(active);
+    return descriptor;
+}
 
-    return space.CanonicalizeAssignment(active);
+VariantDescriptor MakeAssignment(const PermutationSpace& space,
+                                 const PermutationAxis& first_axis,
+                                 const PermutationAxis& second_axis,
+                                 bool first_axis_value,
+                                 bool second_axis_value)
+{
+    return MakeDescriptor(space,
+                          PermutationAssignment{
+                              PermutationBinding{ .Axis = &first_axis, .Value = PermutationValue{ first_axis_value } },
+                              PermutationBinding{ .Axis = &second_axis,
+                                                  .Value = PermutationValue{ second_axis_value } } });
 }
 
 /** `ConditionalCS` reads the first axis only when the second axis is true. So the variants that hold
@@ -186,10 +194,10 @@ CookedModule BuildModule(const PermutationSpace& space, bool dedupe_enabled)
         for (const bool secondAxisValue : { false, true })
         {
             const CompiledVariant variant = MakeVariant(index, firstAxisValue, secondAxisValue);
-            const CanonicalAssignment canonical =
+            const VariantDescriptor descriptor =
                 MakeAssignment(space, space.Axes()[0], space.Axes()[1], firstAxisValue, secondAxisValue);
 
-            const CookError appended = AppendVariantToModule(module, variant, canonical);
+            const CookError appended = AppendVariantToModule(module, variant, descriptor);
             if (appended != CookError::Success)
             {
                 module.Variants.clear();
@@ -222,11 +230,12 @@ CookedModule BuildSingleEntryPointModule(const PermutationSpace& space, bool ded
     {
         const CompiledVariant variant = MakeSingleEntryPointVariant(index, firstAxisValue);
         // Only the first axis is named. Canonicalization supplies the second.
-        const CanonicalAssignment canonical =
-            space.CanonicalizeAssignment(PermutationAssignment{ PermutationBinding{
-                .Axis = space.Axes().data(), .Value = PermutationValue{ firstAxisValue } } });
+        const VariantDescriptor descriptor = MakeDescriptor(
+            space,
+            PermutationAssignment{
+                PermutationBinding{ .Axis = space.Axes().data(), .Value = PermutationValue{ firstAxisValue } } });
 
-        const CookError appended = AppendVariantToModule(module, variant, canonical);
+        const CookError appended = AppendVariantToModule(module, variant, descriptor);
         if (appended != CookError::Success)
         {
             module.Variants.clear();
@@ -254,10 +263,10 @@ CookedModule BuildConditionalModule(const PermutationSpace& space)
         for (const bool secondAxisValue : { false, true })
         {
             const CompiledVariant variant = MakeConditionalVariant(index, firstAxisValue, secondAxisValue);
-            const CanonicalAssignment canonical =
+            const VariantDescriptor descriptor =
                 MakeAssignment(space, space.Axes()[0], space.Axes()[1], firstAxisValue, secondAxisValue);
 
-            const CookError appended = AppendVariantToModule(module, variant, canonical);
+            const CookError appended = AppendVariantToModule(module, variant, descriptor);
             if (appended != CookError::Success)
             {
                 module.Variants.clear();

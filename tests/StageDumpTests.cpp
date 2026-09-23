@@ -90,8 +90,9 @@ InternedModule BuildTinyInternedModule()
 
     for (const CompiledVariant& variant : variants)
     {
-        const CookError appended = AppendVariantToModule(
-            module, variant, k_EmptySpace.CanonicalizeAssignment(PermutationAssignment{}));
+        VariantDescriptor descriptor;
+        descriptor.Canonical = k_EmptySpace.CanonicalizeAssignment(PermutationAssignment{});
+        const CookError appended = AppendVariantToModule(module, variant, descriptor);
         if (appended != CookError::Success)
         {
             module.Variants.clear();

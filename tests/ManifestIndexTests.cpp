@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -49,7 +50,9 @@ using lodestone::PermutationValue;
 using lodestone::QueryErrorCode;
 using lodestone::RawEnumCase;
 using lodestone::RawInterfaceImpl;
-using lodestone::ShaderManifestView;
+using lodestone::manifest::BundleView;
+using lodestone::manifest::EnvironmentView;
+using lodestone::manifest::ManifestResult;
 using lodestone::VariantKey;
 
 namespace
@@ -116,16 +119,13 @@ PermutationSpace MakeSpace()
     return PermutationSpace{ std::move(axes) };
 }
 
-// Emits the manifest bytes for the four-axis module, keeping only the variants `keep` accepts. The
-// space and the module live only for the emit, because the returned bytes are self-contained. A subset
-// models a manifest whose cook did not emit every combination: a policy allow-list, or an ActiveWhen
-// gate that pins a child axis when its parent is off. The axis schema stays whole either way, because
-// the space is unchanged; only the key set shrinks.
+// Builds the four-axis module, keeping only the variants `keep` accepts. A subset models a cook that
+// did not emit every combination: a policy allow-list, or an ActiveWhen gate that pins a child axis when
+// its parent is off. The axis schema stays whole either way, because the space is unchanged; only the key
+// set shrinks. The module points into `space`, so the space must outlive the emit.
 template<typename Keep>
-std::vector<std::byte> BuildManifest(Keep keep)
+lodestone::CookedModule BuildModule(const PermutationSpace& space, Keep keep)
 {
-    const PermutationSpace space = MakeSpace();
-
     lodestone::CookedModule module;
     module.Name = "QueryTestModule";
     module.Space = &space;
@@ -181,17 +181,110 @@ std::vector<std::byte> BuildManifest(Keep keep)
     }
 
     module.SpaceSize = static_cast<uint64_t>(module.VariantKeys.size());
+    return module;
+}
 
-    const std::string manifest = EmitShaderManifest(module);
-    std::vector<std::byte> bytes(manifest.size());
-    std::memcpy(bytes.data(), manifest.data(), manifest.size());
+bool KeepAll(const std::array<uint32_t, 4>&)
+{
+    return true;
+}
+
+bool KeepSmallTiles(const std::array<uint32_t, 4>& digits)
+{
+    return digits[k_TileAxis] != 2u;
+}
+
+// Emits a library and returns its bytes. The bytes are self-contained, so the modules and their spaces
+// can go once this returns. An emit failure returns no bytes, and the open that follows reports it.
+std::vector<std::byte> EmitBytes(const lodestone::CookedLibrary& library)
+{
+    const lodestone::CookResult<std::string> manifest = EmitShaderManifest(library);
+    if (!manifest.has_value())
+    {
+        return {};
+    }
+
+    std::vector<std::byte> bytes(manifest->size());
+    std::memcpy(bytes.data(), manifest->data(), manifest->size());
     return bytes;
+}
+
+lodestone::CookedProfile MakeProfile(std::string target_name)
+{
+    return lodestone::CookedProfile{ .TargetName = std::move(target_name),
+                                     .AccessModel = lodestone::PlacementKind::Bound };
+}
+
+// One module, cooked for one profile.
+template<typename Keep>
+std::vector<std::byte> BuildManifest(Keep keep)
+{
+    const PermutationSpace space = MakeSpace();
+    lodestone::CookedLibrary library;
+    library.ModuleNames = { "QueryTestModule" };
+    library.Profiles = { MakeProfile("wgsl") };
+    library.Environments.emplace_back(BuildModule(space, keep));
+    return EmitBytes(library);
 }
 
 // The full cross product: every combination is a cooked variant.
 std::vector<std::byte> BuildManifestBytes()
 {
-    return BuildManifest([](const std::array<uint32_t, 4>&) { return true; });
+    return BuildManifest(&KeepAll);
+}
+
+// Opens one environment of a bundle. The views hold spans into `bytes`, so the bytes must outlive them.
+ManifestResult<EnvironmentView> OpenEnvironment(std::span<const std::byte> bytes,
+                                                uint32_t profile_index,
+                                                uint32_t module_index)
+{
+    const ManifestResult<BundleView> bundle = BundleView::Open(bytes);
+    if (!bundle.has_value())
+    {
+        return std::unexpected(bundle.error());
+    }
+
+    return bundle->OpenEnvironment(profile_index, module_index);
+}
+
+// A module with one integral TILE axis, one variant for each value. The key of a one-axis module is its
+// digit, so the keys are 0 to N-1.
+PermutationSpace MakeTileSpace(std::span<const uint32_t> tile_values)
+{
+    std::vector<PermutationAxis> axes;
+    axes.emplace_back("TILE", IntegralValues(tile_values), AxisKind::Tuning, EarliestBindingTime::Cook,
+                      AxisValueDomain::Integral);
+    return PermutationSpace{ std::move(axes) };
+}
+
+lodestone::CookedModule BuildTileModule(std::string name, const PermutationSpace& space)
+{
+    lodestone::CookedModule module;
+    module.Name = std::move(name);
+    module.Space = &space;
+    module.EntryPoints.push_back(
+        lodestone::LibraryEntryPoint{ .Name = "MainCS", .Stage = lodestone::ShaderStageKind::Compute });
+    module.Sources.emplace_back("// wgsl for a tile module");
+    module.ResourceLists.emplace_back();
+    module.FootprintLists.emplace_back();
+    module.VisibilityLists.emplace_back();
+    module.RasterStates.emplace_back();
+
+    const uint32_t valueCount = static_cast<uint32_t>(space.Axes()[0].NumValues());
+    for (uint32_t digit = 0u; digit < valueCount; ++digit)
+    {
+        module.VariantKeys.push_back(VariantKey{ digit });
+        lodestone::LibraryVariant variant;
+        variant.Index = digit;
+        variant.SourceIndices.push_back(0u);
+        variant.VisibilityIndices.push_back(0u);
+        variant.RasterIndices.push_back(0u);
+        variant.Workgroups.emplace_back(lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u });
+        module.Variants.emplace_back(std::move(variant));
+    }
+
+    module.SpaceSize = valueCount;
+    return module;
 }
 
 // Counts the keys of a query, or returns SIZE_MAX when the query is in an error state.
@@ -208,7 +301,7 @@ int main()
     lodestone::tests::TestRunner runner{ "ManifestIndexTests" };
 
     const std::vector<std::byte> bytes = BuildManifestBytes();
-    const lodestone::ManifestResult<ShaderManifestView> opened = ShaderManifestView::Open(bytes);
+    const ManifestResult<EnvironmentView> opened = OpenEnvironment(bytes, 0u, 0u);
     runner.Check(opened.has_value(), "the emitter produces a manifest the reader accepts");
     if (!opened.has_value())
     {
@@ -219,7 +312,7 @@ int main()
 
     runner.BeginSection("the index enumerates and decodes every variant");
     runner.Check(index.Enumerate().size() == k_TotalVariants, "Enumerate returns every variant");
-    runner.Check(index.View().Axes().size() == 4u, "the manifest carries four axes");
+    runner.Check(index.View().Module().AxisCount() == 4u, "the module carries four axes");
 
     // Decode a known key: digits [dither=1, quality=2 (Medium), tile=1 (16), shade=0 (Lambert)].
     const std::array<uint32_t, 4> knownDigits{ 1u, 2u, 1u, 0u };
@@ -382,15 +475,14 @@ int main()
     // manifest where one axis value was left out: queries are still valid, because it is an axis value,
     // but it was not cooked into any variant so the query resolves to an empty span
     runner.BeginSection("a valid value with no cooked variant returns an empty result");
-    const std::vector<std::byte> sparseBytes =
-        BuildManifest([](const std::array<uint32_t, 4>& digits) { return digits[k_TileAxis] != 2u; });
-    const lodestone::ManifestResult<ShaderManifestView> sparseOpened = ShaderManifestView::Open(sparseBytes);
+    const std::vector<std::byte> sparseBytes = BuildManifest(&KeepSmallTiles);
+    const ManifestResult<EnvironmentView> sparseOpened = OpenEnvironment(sparseBytes, 0u, 0u);
     runner.Check(sparseOpened.has_value(), "the sparse manifest opens");
     if (sparseOpened.has_value())
     {
         const ManifestIndex sparse{ sparseOpened.value() };
         runner.Check(sparse.Enumerate().size() == 24u, "only the kept variants exist");
-        runner.Check(sparse.View().Axis(k_TileAxis).ValueCount == 3u,
+        runner.Check(sparse.View().Module().AxisValueCount(k_TileAxis) == 3u,
                      "the axis schema still declares all three TILE values");
         runner.Check(KeyCount(sparse.Query().Where("TILE", 8u)) == 12u, "a present value still matches");
         const ManifestQueryBuilder absentValue = sparse.Query().Where("TILE", 32u);
@@ -410,7 +502,7 @@ int main()
     const std::vector<std::byte> gatedBytes =
         BuildManifest([](const std::array<uint32_t, 4>& digits)
                       { return digits[k_DitherAxis] != 0u || digits[k_ShadeAxis] == 0u; });
-    const lodestone::ManifestResult<ShaderManifestView> gatedOpened = ShaderManifestView::Open(gatedBytes);
+    const ManifestResult<EnvironmentView> gatedOpened = OpenEnvironment(gatedBytes, 0u, 0u);
     runner.Check(gatedOpened.has_value(), "the gated manifest opens");
     if (gatedOpened.has_value())
     {
@@ -420,7 +512,7 @@ int main()
         runner.Check(gated.Enumerate().size() == 27u, "the gated-off combinations are absent");
         // as noted: the axis values aren't changed. this is important for the query layer
         // to behave consistently between cooks that may gate values (so code doesn't need to respond differently)
-        runner.Check(gated.View().Axis(k_ShadeAxis).ValueCount == 2u,
+        runner.Check(gated.View().Module().AxisValueCount(k_ShadeAxis) == 2u,
                      "the gated axis still declares both values in the schema");
         runner.Check(KeyCount(gated.Query().Where("SHADE", AxisValueDomain::Type, "Phong")) == 9u,
                      "the gated value exists only where its parent enables it");
@@ -431,6 +523,85 @@ int main()
         runner.Check(!gatedOff.First().has_value() &&
                      gatedOff.First().error() == QueryErrorCode::NoVariantForConstraints,
                      "First reports no variant for the gated-off combination");
+    }
+
+    // Keys are per module, and each profile applies its own policy, so two profiles of one module can cook
+    // different subsets. An index reads one environment, so it answers for that profile alone.
+    runner.BeginSection("each profile keys its own subset of one module");
+    {
+        const PermutationSpace space = MakeSpace();
+        lodestone::CookedLibrary library;
+        library.ModuleNames = { "QueryTestModule" };
+        library.Profiles = { MakeProfile("wgsl"), MakeProfile("mobile") };
+        library.Environments.emplace_back(BuildModule(space, &KeepAll));
+        library.Environments.emplace_back(BuildModule(space, &KeepSmallTiles));
+        const std::vector<std::byte> twoProfileBytes = EmitBytes(library);
+
+        const ManifestResult<EnvironmentView> full = OpenEnvironment(twoProfileBytes, 0u, 0u);
+        const ManifestResult<EnvironmentView> pruned = OpenEnvironment(twoProfileBytes, 1u, 0u);
+        runner.Check(full.has_value() && pruned.has_value(), "both environments open");
+        if (full.has_value() && pruned.has_value())
+        {
+            const ManifestIndex fullIndex{ *full };
+            const ManifestIndex prunedIndex{ *pruned };
+            runner.Check(fullIndex.Enumerate().size() == k_TotalVariants, "the first profile holds every variant");
+            runner.Check(prunedIndex.Enumerate().size() == 24u, "the second profile holds only its subset");
+            runner.Check(KeyCount(fullIndex.Query().Where("TILE", 32u)) == 12u &&
+                         KeyCount(prunedIndex.Query().Where("TILE", 32u)) == 0u,
+                         "one query gives each profile its own answer");
+            runner.Check(fullIndex.Decode(knownKey)[k_TileAxis].IntegralValue ==
+                             prunedIndex.Decode(knownKey)[k_TileAxis].IntegralValue,
+                         "one key decodes the same way in both profiles");
+        }
+    }
+
+    // Two modules that declare TILE store it once when their values agree in order. The module's value mask
+    // selects its values, so a digit still means the module's own value.
+    runner.BeginSection("two modules share a root axis when their values agree in order");
+    {
+        const std::array<uint32_t, 3> smallTiles{ 8u, 16u, 32u };
+        const std::array<uint32_t, 3> largeTiles{ 16u, 32u, 64u };
+        const std::array<uint32_t, 2> reversedTiles{ 32u, 8u };
+        const PermutationSpace smallSpace = MakeTileSpace(smallTiles);
+        const PermutationSpace largeSpace = MakeTileSpace(largeTiles);
+        const PermutationSpace reversedSpace = MakeTileSpace(reversedTiles);
+
+        lodestone::CookedLibrary library;
+        library.ModuleNames = { "SmallTiles", "LargeTiles", "ReversedTiles" };
+        library.Profiles = { MakeProfile("wgsl") };
+        library.Environments.emplace_back(BuildTileModule("SmallTiles", smallSpace));
+        library.Environments.emplace_back(BuildTileModule("LargeTiles", largeSpace));
+        library.Environments.emplace_back(BuildTileModule("ReversedTiles", reversedSpace));
+        const std::vector<std::byte> sharedBytes = EmitBytes(library);
+
+        const ManifestResult<BundleView> bundle = BundleView::Open(sharedBytes);
+        runner.Check(bundle.has_value(), "the three-module bundle opens");
+        if (bundle.has_value())
+        {
+            runner.Check(bundle->Axes().size() == 2u,
+                         "the two ordered modules share one root axis, and the reversed one gets its own");
+            runner.Check(bundle->Module(0u).ModuleAxes()[0].AxisIndex == bundle->Module(1u).ModuleAxes()[0].AxisIndex,
+                         "the small and large modules name the same root axis");
+            runner.Check(bundle->AxisValues(bundle->Module(1u).ModuleAxes()[0].AxisIndex).size() == 4u,
+                         "the shared root axis holds the union of the values");
+        }
+
+        const ManifestResult<EnvironmentView> large = OpenEnvironment(sharedBytes, 0u, 1u);
+        const ManifestResult<EnvironmentView> reversed = OpenEnvironment(sharedBytes, 0u, 2u);
+        runner.Check(large.has_value() && reversed.has_value(), "the module environments open");
+        if (large.has_value() && reversed.has_value())
+        {
+            const ManifestIndex largeIndex{ *large };
+            const ManifestIndex reversedIndex{ *reversed };
+            runner.Check(largeIndex.Decode(VariantKey{ 0u })[0].IntegralValue == 16u &&
+                             largeIndex.Decode(VariantKey{ 2u })[0].IntegralValue == 64u,
+                         "a digit of the large module decodes to the large module's value");
+            runner.Check(KeyCount(largeIndex.Query().Where("TILE", 64u)) == 1u, "a value only one module has resolves");
+            runner.Check(!largeIndex.Query().Where("TILE", 8u).IsValid(),
+                         "a value only the other module has is not in this module's axis");
+            runner.Check(reversedIndex.Decode(VariantKey{ 0u })[0].IntegralValue == 32u,
+                         "the reversed module keeps its own value order");
+        }
     }
 
     return runner.Report();
