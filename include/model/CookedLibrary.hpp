@@ -10,6 +10,7 @@
 #include "permute/PermutationSpace.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -42,6 +43,7 @@ struct LibraryVariant
     uint64_t Index{ 0u };
     std::string Suffix;
     std::string Description;
+    PermutationAssignment Active;
     CanonicalAssignment Canonical;
     uint32_t ResourceListIndex{ 0u };
     uint32_t FootprintListIndex{ 0u };
@@ -141,20 +143,30 @@ struct CookedModule
     TableStatistics RasterTable;
 };
 
-/** @brief Temp. Slang is designed for big libraries of shaders, but for now we're trying
- *  to ensure core module handling is robust and modular: most Library operations will just
- *  be further fold/combine operations over the datastructures we already have. */
+/** @brief One cooked form of the library: a target and the access model it binds with. */
+struct CookedProfile
+{
+    std::string TargetName;
+    PlacementKind AccessModel{ PlacementKind::None };
+};
+
+/**@brief The whole cook: every module, cooked for every profile.
+ * `Environments` is just the flattened vector for the profiles * modulenames grid. 
+ * Modules are listed together for each profile, so they're linear in memory.
+ * Empty entries just mean that the module was not cooked for that profile. */
 struct CookedLibrary
 {
-    std::vector<CookedModule> Modules;
+    std::vector<std::string> ModuleNames;
+    std::vector<CookedProfile> Profiles;
+    std::vector<std::optional<CookedModule>> Environments;
 };
 
 void DisableDedupe(InternedModule& module) noexcept;
 
-/** Adds one compiled variant to the module, interning each source, layout, and raster state. */
+/** Adds one compiled variant to the module, interning each source, layout, and raster state */
 CookError AppendVariantToModule(InternedModule& module,
                                 const CompiledVariant& variant,
-                                const CanonicalAssignment& canonical);
+                                const VariantDescriptor& descriptor);
 
 /**@brief "Freezes" the module by *consuming* `InternedModule`. CookedModule takes the results, gathering
  * all the data so far in one place. The intent was that CookedModule is a bundle of data, it doesn't hold

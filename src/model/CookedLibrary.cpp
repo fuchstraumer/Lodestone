@@ -102,7 +102,7 @@ void DisableDedupe(InternedModule& module) noexcept
 
 CookError AppendVariantToModule(InternedModule& module,
                                 const CompiledVariant& variant,
-                                const CanonicalAssignment& canonical)
+                                const VariantDescriptor& descriptor)
 {
     if (variant.EntryPoints.size() != module.EntryPoints.size())
     {
@@ -132,7 +132,8 @@ CookError AppendVariantToModule(InternedModule& module,
     record.Index = variant.VariantIndex;
     record.Suffix = variant.VariantSuffix;
     record.Description = variant.VariantDescription;
-    record.Canonical = canonical;
+    record.Active = descriptor.Active;
+    record.Canonical = descriptor.Canonical;
     record.ResourceListIndex = module.ResourceListInterner.Intern(resources, variantOrigin).Index;
     record.FootprintListIndex = module.FootprintListInterner.Intern(variant.Footprints, variantOrigin).Index;
     record.SourceIndices.reserve(variant.EntryPoints.size());
