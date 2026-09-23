@@ -48,13 +48,6 @@
             "configuration": "Debug"
         },
         {
-            "name": "windows-ninja-clang-debug",
-            "displayName": "Win64 Clang Debug",
-            "description": "Builds the project using the Windows x64 Clang (MSVC Install) configure preset",
-            "configurePreset": "ninja-clang-cl",
-            "configuration": "Debug"
-        },
-        {
             "name": "windows-ninja-msvc-relwithdebinfo",
             "displayName": "Win64 MSVC RelWithDebInfo",
             "description": "Builds the project using the Windows x64 MSVC (Ninja) configure preset",
@@ -62,11 +55,32 @@
             "configuration": "RelWithDebInfo"
         },
         {
+            "name": "windows-ninja-msvc-release",
+            "displayName": "Win64 MSVC Release",
+            "description": "Builds the project using the Windows x64 MSVC (Ninja) configure preset",
+            "configurePreset": "ninja-msvc",
+            "configuration": "Release"
+        },
+        {
+            "name": "windows-ninja-clang-debug",
+            "displayName": "Win64 Clang Debug",
+            "description": "Builds the project using the Windows x64 Clang configure preset",
+            "configurePreset": "ninja-clang-cl",
+            "configuration": "Debug"
+        },
+        {
             "name": "windows-ninja-clang-relwithdebinfo",
             "displayName": "Win64 Clang RelWithDebInfo",
-            "description": "Builds the project using the Windows x64 Clang (MSCV Install) configure preset",
+            "description": "Builds the project using the Windows x64 Clang configure preset",
             "configurePreset": "ninja-clang-cl",
             "configuration": "RelWithDebInfo"
+        },
+        {
+            "name": "windows-ninja-clang-release",
+            "displayName": "Win64 Clang Release",
+            "description": "Builds the project using the Windows x64 Clang configure preset",
+            "configurePreset": "ninja-clang-cl",
+            "configuration": "Release"
         }
     ]
 }

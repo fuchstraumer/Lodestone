@@ -9,9 +9,6 @@
             "args": [
                 "-o", "${workspaceFolder}/kitchen_sink_output",
                 "--policy-file", "${workspaceFolder}/tests/assets/KitchenSink/KitchenSink.toml",
-                "--dump-stage=all",
-                "--dump-sources",
-                "--O3",
                 "${workspaceFolder}/tests/assets/KitchenSink/KsGeometry.slang",
                 "${workspaceFolder}/tests/assets/KitchenSink/KsMaterial.slang",
                 "${workspaceFolder}/tests/assets/KitchenSink/KsVolume.slang",

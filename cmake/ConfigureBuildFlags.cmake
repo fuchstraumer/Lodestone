@@ -18,7 +18,8 @@ function(add_shared_msvc_style_build_flags_all_targets)
     # rel is just /O2 with a few extras. Note /Ob3 for absolute max inlining
     add_compile_options(
         "$<$<CONFIG:Debug>:/Od;/Zi;/EHsc>"
-        "$<$<CONFIG:RelWithDebInfo>:/Ob1;/Oi;/Ot;/Gy;/Zo>")
+        "$<$<CONFIG:RelWithDebInfo>:/Ob1;/Oi;/Ot;/Gy;/Zo>"
+        "$<$<CONFIG:Release>:/O2;/GL;/Oi;/Ot;/Ob3>")
     add_link_options($<$<CONFIG:Debug>:/DEBUG>)
     # enable ltcg for relwithdebinfo, but ICF disabled to avoid weird debugger breakpoints
     add_link_options("$<$<CONFIG:RelWithDebInfo>:/DEBUG;>")
@@ -48,13 +49,13 @@ function(add_shared_clang_style_build_flags_all_targets)
     add_compile_options(
         "$<$<CONFIG:Debug>:-O0;-glldb;>"
         "$<$<CONFIG:RelWithDebInfo>:-O1;-g>"
-        "$<$<CONFIG:Release>:-O3;-fno-exceptions;-fno-rtti;-fno-threadsafe-statics>"
-        "$<$<CONFIG:MinSizeRel>:-Oz;-fno-exceptions;-fno-rtti;-fno-threadsafe-statics>")
+        "$<$<CONFIG:Release>:-O3;-flto=thin>"
+        "$<$<CONFIG:MinSizeRel>:-Oz;>")
     add_link_options(
         "-fuse-ld=lld"
         "$<$<CONFIG:Debug>:-O0;-glldb>"
         "$<$<CONFIG:RelWithDebInfo>:-O1;-g>"
-        "$<$<CONFIG:Release>:-O3>"
+        "$<$<CONFIG:Release>:-O3;-flto=thin>"
         "$<$<CONFIG:MinSizeRel>:-Oz>")
 endfunction()
 
