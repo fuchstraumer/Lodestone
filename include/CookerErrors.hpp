@@ -68,6 +68,11 @@ enum class CookError : uint16_t
     ManifestVertexInputMismatch = 100,
     ManifestColorTargetMismatch = 101,
     ManifestRasterStateMismatch = 102,
+    ManifestAxisTooManyValues = 103, // a module axis holds more values than the 32-bit value mask can name
+    ManifestModuleShapeMismatch = 104, // two profiles of one module disagree on its entry points or axes
+    ManifestVariantKeyMismatch = 105, // a key decodes through the module axes to a different assignment
+    ManifestDuplicateVariantKey = 106,
+    ManifestVariantAxisMaskMismatch = 107,
 
     ManifestShaderLayoutVariantIndicesInvalid = 110,
     ManifestShaderLayoutVisiblityIndexInvalid = 111,
