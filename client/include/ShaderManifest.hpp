@@ -72,6 +72,10 @@ enum class ErrorCode : uint32_t
     InvalidModuleAxisIndex = 35,
     InvalidModuleAxisValueMask = 36,
     InvalidSpecializationConstant = 37,
+    EnvironmentNotCooked = 38,
+    InvalidVariantAxisMask = 39,
+    InvalidProfileAccessModel = 40,
+    InvalidVariantSuffixString = 41,
     Count
 };
 
@@ -436,38 +440,130 @@ template<typename RecordType>
 inline constexpr bool k_IsManifestRecord =
     std::is_trivially_copyable_v<RecordType> && alignof(RecordType) <= 8u;
 
+class ModuleView;
+class EnvironmentView;
+
 /**
-* @brief Spans over one manifest byte span, checked once when it opens.
+* @brief Spans over the header region of one cook bundle, checked once when it opens.
 *
-* Open() checks the full structure of the data in the manifest, from verifying simple
-* things like the header magic and version, to performing a full cross-reference check
-* and validating all stored indices read within bounds. This means that after Open()
-* returns a view, all subsequent accessor calls are guaranteed to be safe and within bounds.
-* (effectively meaning it's branch-free)
-* @note This class does not provide any facilities for modifying the manifest; it is strictly read-only.
-* This also stays purely in the vocabulary of the manifest itself, for reading or accessing
-* data in the vocabulary of authorship use the `ShaderManifestIndex`
+* The header region holds every whole-cook table and every module header: strings, axes, profiles, the
+* environment directory, and each module's entry points and axis runs. Open() checks all of it, so every
+* accessor after it runs unchecked (effectively meaning it's branch-free).
+*
+* The span given to Open() can hold the whole file, or only the header region. A renderer that reads the
+* header region first, and then reads the extents of one profile, opens each extent with
+* `EnvironmentView::Open`. A caller that holds the whole file uses `OpenEnvironment`.
+* @note This stays purely in the vocabulary of the manifest itself. For the vocabulary of authorship,
+* use `ManifestIndex`.
 */
-class ManifestView
+class BundleView
 {
 public:
-    ManifestView() noexcept;
+    BundleView() noexcept;
 
-    // Performs deep validation of the manifest data: cross reference checks, consistency verification,
-    // effectively a full validation of the manifest. This means, however, that all the accessors
-    // can run totally unchecked after Open() has successfully returned.
-    static ManifestResult<ManifestView> Open(std::span<const std::byte> bytes) noexcept;
+    static ManifestResult<BundleView> Open(std::span<const std::byte> bytes) noexcept;
 
-    [[nodiscard]] std::string_view ModuleName() const noexcept;
     [[nodiscard]] std::string_view String(uint32_t string_index) const noexcept;
-    [[nodiscard]] std::string_view Source(uint32_t source_index) const noexcept;
+    [[nodiscard]] uint32_t StringCount() const noexcept;
     [[nodiscard]] std::span<const Axis> Axes() const noexcept;
     [[nodiscard]] const Axis& AxisData(uint32_t axis_index) const noexcept;
-    [[nodiscard]] std::span<const AxisValueType> AllAxesValues() const noexcept;
     [[nodiscard]] std::span<const AxisValueType> AxisValues(uint32_t axis_index) const noexcept;
+    [[nodiscard]] std::span<const Profile> Profiles() const noexcept;
+    [[nodiscard]] uint32_t ModuleCount() const noexcept;
+    [[nodiscard]] ModuleView Module(uint32_t module_index) const noexcept;
+    /** @brief The index of the module with this name, or -1 when no module has it. */
+    [[nodiscard]] int32_t FindModule(std::string_view module_name) const noexcept;
+    /** @brief The index of the first profile for this target, or -1 when no profile has it. */
+    [[nodiscard]] int32_t FindProfile(std::string_view target_name) const noexcept;
+    [[nodiscard]] const EnvironmentDirectoryEntry& Environment(uint32_t profile_index,
+                                                               uint32_t module_index) const noexcept;
+    /** @brief Opens one environment out of the span this view was opened with. That span must reach the
+     * extent, so a view over the header region alone returns `EnvironmentExtentOutOfBounds`. */
+    [[nodiscard]] ManifestResult<EnvironmentView> OpenEnvironment(uint32_t profile_index,
+                                                                  uint32_t module_index) const noexcept;
 
-    [[nodiscard]] const ModuleRootHeader& ModuleHeader(uint32_t module_index) const noexcept;
-    [[nodiscard]] std::span<const ModuleRootHeader> LogicalHeaders() const noexcept;
+private:
+    friend class ModuleView;
+    std::span<const std::byte> bytes;
+    const Header* header{ nullptr };
+    std::span<const StringRef> strings;
+    std::span<const Axis> axes;
+    std::span<const AxisValueType> axisValues;
+    std::span<const Profile> profiles;
+    std::span<const ModuleRootHeader> moduleHeaders;
+    std::span<const EnvironmentDirectoryEntry> directory;
+};
+
+/**
+* @brief One module of a bundle: its name, its entry points, and its axes. Nothing here varies by profile.
+*
+* A module axis is a view of one root axis through the module's value mask. Digit D of a variant key
+* selects the D-th set bit of that mask, so the radix of the axis in this module is the count of set bits.
+*/
+class ModuleView
+{
+public:
+    ModuleView() noexcept;
+
+    [[nodiscard]] const BundleView& Bundle() const noexcept;
+    [[nodiscard]] uint32_t Index() const noexcept;
+    [[nodiscard]] std::string_view Name() const noexcept;
+    [[nodiscard]] std::span<const EntryPoint> EntryPoints() const noexcept;
+    [[nodiscard]] std::span<const ModuleAxis> ModuleAxes() const noexcept;
+    [[nodiscard]] uint32_t AxisCount() const noexcept;
+    /** @brief The root axis record behind module axis `local_axis`. */
+    [[nodiscard]] const Axis& AxisData(uint32_t local_axis) const noexcept;
+    /** @brief How many values this module uses on one axis. This is also the radix of that axis. */
+    [[nodiscard]] uint32_t AxisValueCount(uint32_t local_axis) const noexcept;
+    [[nodiscard]] AxisValueType AxisValue(uint32_t local_axis, uint32_t digit) const noexcept;
+    /** @brief The 64-bit words in one variant's axis-active mask: `ceil(AxisCount() / 64)`. */
+    [[nodiscard]] uint32_t AxisMaskWordCount() const noexcept;
+
+private:
+    friend class BundleView;
+    ModuleView(const BundleView& _bundle, uint32_t module_index) noexcept;
+    BundleView bundle;
+    uint32_t moduleIndex{ 0u };
+    std::span<const EntryPoint> entryPoints;
+    std::span<const ModuleAxis> moduleAxes;
+};
+
+/**
+* @brief One module, cooked for one profile: spans over one environment extent, checked once when it opens.
+*
+* Every offset inside an extent is relative to the extent start, so the extent can sit in its own buffer.
+* The variant keys, the variant records, and the axis masks are parallel: the position of a key is the
+* index of its variant. The slot for (variant V, entry point E) is at `V * EntryPointCount + E`.
+*/
+class EnvironmentView
+{
+public:
+    EnvironmentView() noexcept;
+
+    static ManifestResult<EnvironmentView> Open(const BundleView& bundle,
+                                                uint32_t profile_index,
+                                                uint32_t module_index,
+                                                std::span<const std::byte> extent_bytes) noexcept;
+
+    [[nodiscard]] const ModuleView& Module() const noexcept;
+    [[nodiscard]] uint32_t ProfileIndex() const noexcept;
+    [[nodiscard]] const Profile& ProfileRecord() const noexcept;
+    [[nodiscard]] std::string_view String(uint32_t string_index) const noexcept;
+    [[nodiscard]] std::string_view Source(uint32_t source_index) const noexcept;
+
+    [[nodiscard]] std::span<const VariantKey> VariantKeys() const noexcept;
+    [[nodiscard]] std::span<const Variant> Variants() const noexcept;
+    /** @brief The index of the variant with this key, or -1 when this environment did not cook it. */
+    [[nodiscard]] int32_t FindVariant(VariantKey key) const noexcept;
+    [[nodiscard]] std::span<const uint64_t> AxisMask(uint32_t variant_index) const noexcept;
+    [[nodiscard]] bool IsAxisActive(uint32_t variant_index, uint32_t local_axis) const noexcept;
+
+    [[nodiscard]] std::span<const EntryPointInstance> SlotTable() const noexcept;
+    /** @brief One slot for each entry point of this variant, in entry point order. */
+    [[nodiscard]] std::span<const EntryPointInstance> VariantSlots(uint32_t variant_index) const noexcept;
+    /** @brief The entry-point specific information for one entry point of one variant, or null when this
+     * environment did not cook the key. */
+    [[nodiscard]] const EntryPointInstance* FindSlot(uint32_t entry_point, VariantKey variant) const noexcept;
 
     [[nodiscard]] std::span<const Binding> Bindings() const noexcept;
     /** @brief The resources one variant declares. Indices into Bindings(). */
@@ -476,26 +572,22 @@ public:
     [[nodiscard]] std::span<const Footprint> FootprintList(uint32_t list_index) const noexcept;
     /** @brief Which of a variant's resources one entry point reads. Indices into the resource list. */
     [[nodiscard]] std::span<const uint32_t> VisibilityList(uint32_t list_index) const noexcept;
-    [[nodiscard]] std::span<const EntryPoint> EntryPoints() const noexcept;
-    [[nodiscard]] std::span<const Variant> Variants() const noexcept;
-    [[nodiscard]] std::span<const VariantKey> VariantKeys() const noexcept;
-    [[nodiscard]] AxisValueType AxisValue(uint32_t axis_index, uint32_t value_index) const noexcept;
+    [[nodiscard]] std::span<const UniformMember> UniformMembers(const Binding& binding) const noexcept;
     [[nodiscard]] std::span<const VertexInput> VertexInputs(uint32_t raster_index) const noexcept;
     [[nodiscard]] std::span<const ColorTarget> ColorTargets(uint32_t raster_index) const noexcept;
     [[nodiscard]] bool WritesFragDepth(uint32_t raster_index) const noexcept;
-    [[nodiscard]] std::span<const UniformMember> UniformMembers(const Binding& binding) const noexcept;
-    /** @brief The entry-point specific information for one entry point of one variant. */
-    [[nodiscard]] const EntryPointInstance* FindSlot(uint32_t entry_point, VariantKey variant) const noexcept;
-    /** @brief One slot for each entry point of this variant, in entry point order. */
-    [[nodiscard]] std::span<const EntryPointInstance> VariantSlots(const Variant& variant) const noexcept;
-    [[nodiscard]] std::span<const EntryPointInstance> SlotTable() const noexcept;
+    [[nodiscard]] std::span<const SpecializationConstant> SpecializationConstants() const noexcept;
+
 private:
-    std::span<const std::byte> bytes;
-    const Header* header{ nullptr };
-    std::span<const ModuleRootHeader> moduleHeaders;
-    std::span<const EnvironmentHeader> environmentHeaders;
-    std::span<const StringRef> strings;
+    ModuleView module;
+    uint32_t profileIndex{ 0u };
+    std::span<const std::byte> extent;
+    std::span<const VariantKey> variantKeys;
+    std::span<const Variant> variants;
+    std::span<const uint64_t> axisMasks;
+    std::span<const EntryPointInstance> slots;
     std::span<const SourceRef> sources;
+    std::span<const char> sourceBlob;
     std::span<const Binding> bindings;
     std::span<const Run> resourceLists;
     std::span<const uint32_t> resourceIndices;
@@ -503,20 +595,15 @@ private:
     std::span<const Run> footprintLists;
     std::span<const Run> visibilityLists;
     std::span<const uint32_t> visibilityIndices;
-    std::span<const EntryPoint> entryPoints;
-    std::span<const EntryPointInstance> slots;
-    std::span<const Variant> variants;
-    std::span<const VariantKey> variantKeys;
-    std::span<const Axis> axes;
-    std::span<const AxisValueType> axisValues;
     std::span<const RasterState> rasterStates;
     std::span<const VertexInput> vertexInputs;
     std::span<const ColorTarget> colorTargets;
     std::span<const UniformMember> uniformMembers;
+    std::span<const SpecializationConstant> specializationConstants;
 };
 
 /**
- * @brief Serves shader sources out of a manifest instead of out of generated C++.
+ * @brief Serves shader sources out of one environment of a manifest.
  *
  * This is now the only implementation of ShaderSourceProvider, after removal of the old header path.
  * The constructor converts the manifest binding records into BindingInfo once. That is the only
@@ -529,7 +616,7 @@ private:
 class ShaderSourceProvider
 {
 public:
-    ShaderSourceProvider(ManifestView view, uint64_t generation) noexcept;
+    ShaderSourceProvider(EnvironmentView view, uint64_t generation) noexcept;
 
     [[nodiscard]] std::string_view Source(uint32_t entry_point,
                                           VariantKey variant) const noexcept;
@@ -539,10 +626,10 @@ public:
                                           VariantKey variant) const noexcept;
     [[nodiscard]] uint64_t Generation() const noexcept;
 
-    [[nodiscard]] const ManifestView& View() const noexcept;
+    [[nodiscard]] const EnvironmentView& View() const noexcept;
 
 private:
-    ManifestView view;
+    EnvironmentView view;
     /** Built before bindingInfos and reserved to its final size, so the spans below stay valid. */
     std::vector<UniformMemberInfo> memberInfos;
     /** One entry for each slot, gathered from the resource list and the footprint list of the slot's
@@ -553,7 +640,7 @@ private:
     std::vector<uint32_t> slotFirstBinding;
     std::vector<uint32_t> slotBindingCount;
 
-    void GatherVariantBindings(const Variant& variant, const std::vector<uint32_t>& member_offsets);
+    void GatherVariantBindings(uint32_t variant_index, const std::vector<uint32_t>& member_offsets);
     [[nodiscard]] BindingInfo MakeBindingInfo(const Binding& record,
                                               const Footprint* footprint,
                                               uint32_t member_offset) const noexcept;
