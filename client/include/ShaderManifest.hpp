@@ -283,8 +283,6 @@ struct alignas(8) EnvironmentHeader
 
     TableRef Sources{ 0u, 0u };
     TableRef SourceBlob{ 0u, 0u };
-    uint32_t SourceBlobSize{ 0u };
-    uint32_t SourceBlobOffset{ 0u };
 
     TableRef Bindings{ 0u, 0u };
     TableRef ResourceLists{ 0u, 0u };

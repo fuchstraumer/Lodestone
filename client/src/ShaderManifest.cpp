@@ -322,15 +322,16 @@ ManifestResult<BundleView> BundleView::Open(std::span<const std::byte> bytes) no
 
     BundleView view;
     view.bytes = bytes;
+    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     view.header = reinterpret_cast<const Header*>(bytes.data());
     view.strings = Map<StringRef>(bytes, parsed.Strings);
     view.axes = Map<Axis>(bytes, parsed.Axes);
     view.axisValues = Map<AxisValueType>(bytes, parsed.AxesValues);
     view.profiles = Map<Profile>(bytes, parsed.Profiles);
-    view.moduleHeaders = Map<ModuleRootHeader>(bytes, TableRef64{ .Offset = sizeof(Header), .Count = parsed.ModuleCount });
-    view.directory = Map<EnvironmentDirectoryEntry>(bytes,
-                                                    TableRef64{ .Offset = parsed.EnvironmentDirectoryOffset,
-                                                                .Count = parsed.Profiles.Count * parsed.ModuleCount });
+    const TableRef64 rootLoc{ .Offset = sizeof(Header), .Count = parsed.ModuleCount };
+    view.moduleHeaders = Map<ModuleRootHeader>(bytes, rootLoc);
+    const TableRef64 envLoc{ .Offset = parsed.EnvironmentDirectoryOffset, .Count = parsed.Profiles.Count * parsed.ModuleCount };
+    view.directory = Map<EnvironmentDirectoryEntry>(bytes, envLoc);
     return view;
 }
 
@@ -1512,7 +1513,7 @@ namespace
         const std::span<const EntryPointInstance> slotSpan = Map<EntryPointInstance>(extent, slotsLoc);
         const size_t entryPointCount = static_cast<size_t>(context.EntryPointCount);
 
-        for (int32_t variantIdx = 0; std::cmp_less(variantIdx, variantSpan.size()); ++vi)
+        for (int32_t variantIdx = 0; std::cmp_less(variantIdx, variantSpan.size()); ++variantIdx)
         {
             const Variant& variant = variantSpan[variantIdx];
             if (variant.SuffixString >= context.StringCount)

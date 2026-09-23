@@ -109,21 +109,21 @@ int main()
     // dedup keeps them apart and the field survives to the packer.
     ReflectedUniformMember base;
     base.Name = "world";
-    base.Offset = 0u;
-    base.Size = 64u;
-    base.ArrayCount = 1u;
-    base.ElementStride = 16u;
-    base.MatrixLayout = MatrixLayout::RowMajor;
+    base.Data.Offset = 0u;
+    base.Data.Size = 64u;
+    base.Data.ArrayCount = 1u;
+    base.Data.ElementStride = 16u;
+    base.Data.MatrixLayout = MatrixLayout::RowMajor;
 
     ReflectedUniformMember same = base;
     runner.Check(same == base, "two members with identical fields are equal");
 
     ReflectedUniformMember otherLayout = base;
-    otherLayout.MatrixLayout = MatrixLayout::ColumnMajor;
+    otherLayout.Data.MatrixLayout = MatrixLayout::ColumnMajor;
     runner.Check(!(otherLayout == base), "a different matrix layout makes a different member");
 
     ReflectedUniformMember otherStride = base;
-    otherStride.ElementStride = 32u;
+    otherStride.Data.ElementStride = 32u;
     runner.Check(!(otherStride == base), "a different element stride makes a different member");
 
     runner.BeginSection("DescribeBinding reads the shape, stride, size, sample, and array fields");

@@ -52,6 +52,7 @@ namespace
         [[nodiscard]] std::string_view Text(uint32_t string_index) const noexcept;
         [[nodiscard]] const std::vector<manifest::StringRef>& References() const noexcept;
         [[nodiscard]] const std::string& Blob() const noexcept;
+        [[nodiscard]] std::string&& TakeBlob() noexcept;
 
     private:
         std::unordered_map<std::string, uint32_t, TransparentStringHash, std::equal_to<>> lookup;
@@ -128,7 +129,20 @@ namespace
     /** @brief Appends a table of records to the output string, aligned to 8 bytes. Returns the offset
      *  of the first record in the output string where the new records are now located */
     template<typename RecordType>
-    uint64_t AppendTable(std::string& out, const std::vector<RecordType>& records)
+    manifest::TableRef AppendTable(std::string& out, const std::vector<RecordType>& records)
+    {
+        AlignTo8(out);
+        const uint32_t offset = static_cast<uint32_t>(out.size());
+        if (!records.empty())
+        {
+            AppendBytes(out, records.data(), records.size() * sizeof(RecordType));
+        }
+
+        return manifest::TableRef{ offset, static_cast<uint32_t>(records.size()) };
+    }
+
+    template<typename RecordType>
+    manifest::TableRef64 AppendTable64(std::string& out, const std::vector<RecordType>& records)
     {
         AlignTo8(out);
         const uint64_t offset = out.size();
@@ -137,15 +151,7 @@ namespace
             AppendBytes(out, records.data(), records.size() * sizeof(RecordType));
         }
 
-        return offset;
-    }
-
-    /** The same append, for a table inside an extent. Every extent offset is relative to the extent start,
-     * and an extent is its own buffer, so the returned offset is already relative. */
-    template<typename RecordType>
-    uint32_t AppendExtentTable(std::string& out, const std::vector<RecordType>& records)
-    {
-        return static_cast<uint32_t>(AppendTable(out, records));
+        return manifest::TableRef64{ offset, static_cast<uint64_t>(records.size()) };
     }
 
     template<typename PayloadType, typename RecordType, typename MakeRecordFn>
@@ -344,34 +350,29 @@ CookResult<std::string> EmitShaderManifest(const CookedLibrary& library)
     header.Magic = manifest::k_ShaderManifestMagic;
     header.Version = manifest::k_ShaderManifestVersion;
     header.ModuleCount = moduleCount;
-    header.ProfileCount = profileCount;
 
     // The module headers sit right after the header, so the reader finds them with no offset.
     std::string bytes;
     bytes.resize(sizeof(manifest::Header) + (moduleCount * sizeof(manifest::ModuleRootHeader)), '\0');
-
-    header.ProfileTableOffset = AppendTable(bytes, profiles);
-    header.EnvironmentDirectoryOffset = AppendTable(bytes, directory);
-    header.AxisTableOffset = AppendTable(bytes, rootAxisRecords);
-    header.AxisCount = rootAxisRecords.size();
-    header.AxisValueTableOffset = AppendTable(bytes, rootAxisValues);
-    header.AxisValueCount = rootAxisValues.size();
+    header.Profiles = AppendTable64(bytes, profiles);
+    header.Axes = AppendTable64(bytes, rootAxisRecords);
+    header.AxesValues = AppendTable64(bytes, rootAxisValues);
+    manifest::TableRef64 envDir = AppendTable64(bytes, directory);
+    header.EnvironmentDirectoryOffset = envDir.Offset;
 
     for (size_t moduleIndex = 0u; moduleIndex < moduleCount; ++moduleIndex)
     {
         manifest::ModuleRootHeader& moduleHeader = moduleHeaders[moduleIndex];
-        moduleHeader.EntryPointTableOffset = AppendTable(bytes, moduleShapes[moduleIndex].EntryPoints);
-        moduleHeader.EntryPointCount = moduleShapes[moduleIndex].EntryPoints.size();
-        moduleHeader.ModuleAxisTableOffset = AppendTable(bytes, moduleAxes[moduleIndex]);
-        moduleHeader.ModuleAxisCount = moduleAxes[moduleIndex].size();
+        moduleHeader.EntryPoints = AppendTable64(bytes, moduleShapes[moduleIndex].EntryPoints);
+        moduleHeader.ModuleAxes = AppendTable64(bytes, moduleAxes[moduleIndex]);
     }
 
-    header.StringTableOffset = AppendTable(bytes, strings.References());
-    header.StringCount = strings.References().size();
+    header.Strings = AppendTable64(bytes, strings.References());
+
     AlignTo8(bytes);
-    header.StringBlobOffset = bytes.size();
-    header.StringBlobSize = strings.Blob().size();
-    bytes.append(strings.Blob());
+    header.StringBlobs.Offset = bytes.size();
+    header.StringBlobs.Count = strings.Blob().size();
+    bytes.append_range(std::move(strings.TakeBlob()));
 
     AlignTo8(bytes);
     header.HeaderSize = bytes.size();
@@ -525,6 +526,11 @@ namespace
     const std::string& StringTableBuilder::Blob() const noexcept
     {
         return blob;
+    }
+
+    std::string&& StringTableBuilder::TakeBlob() noexcept
+    {
+        return std::move(blob);
     }
 
     void AppendBytes(std::string& out, const void* data, size_t size)
@@ -931,45 +937,33 @@ namespace
         std::string extent;
         extent.resize(sizeof(manifest::EnvironmentHeader), '\0');
 
+        // The variant count sizes these four tables, so each keeps its offset only.
         environment.VariantCount = static_cast<uint32_t>(variants.Variants.size());
-        environment.VariantKeyTableOffset = AppendExtentTable(extent, variants.Keys);
-        environment.VariantTableOffset = AppendExtentTable(extent, variants.Variants);
-        environment.AxisMaskTableOffset = AppendExtentTable(extent, variants.AxisMasks);
-        environment.SlotTableOffset = AppendExtentTable(extent, variants.Slots);
+        environment.VariantKeyTableOffset = AppendTable(extent, variants.Keys).Offset;
+        environment.VariantTableOffset = AppendTable(extent, variants.Variants).Offset;
+        environment.AxisMaskTableOffset = AppendTable(extent, variants.AxisMasks).Offset;
+        environment.SlotTableOffset = AppendTable(extent, variants.Slots).Offset;
 
-        environment.SourceTableOffset = AppendExtentTable(extent, sources.Refs);
-        environment.SourceCount = static_cast<uint32_t>(sources.Refs.size());
+        environment.Sources = AppendTable(extent, sources.Refs);
+        // The count of the blob is in bytes.
         AlignTo8(extent);
-        environment.SourceBlobOffset = static_cast<uint32_t>(extent.size());
-        environment.SourceBlobSize = static_cast<uint32_t>(sources.Blob.size());
+        environment.SourceBlob = manifest::TableRef{ static_cast<uint32_t>(extent.size()),
+                                                     static_cast<uint32_t>(sources.Blob.size()) };
         extent.append(sources.Blob);
 
-        environment.BindingTableOffset = AppendExtentTable(extent, layouts.Bindings);
-        environment.BindingCount = static_cast<uint32_t>(layouts.Bindings.size());
-        environment.ResourceListTableOffset = AppendExtentTable(extent, layouts.ResourceLists);
-        environment.ResourceListCount = static_cast<uint32_t>(layouts.ResourceLists.size());
-        environment.ResourceIndexTableOffset = AppendExtentTable(extent, layouts.ResourceIndices);
-        environment.ResourceIndexCount = static_cast<uint32_t>(layouts.ResourceIndices.size());
-        environment.FootprintTableOffset = AppendExtentTable(extent, layouts.Footprints);
-        environment.FootprintCount = static_cast<uint32_t>(layouts.Footprints.size());
-        environment.FootprintListTableOffset = AppendExtentTable(extent, layouts.FootprintLists);
-        environment.FootprintListCount = static_cast<uint32_t>(layouts.FootprintLists.size());
-        environment.VisibilityListTableOffset = AppendExtentTable(extent, layouts.VisibilityLists);
-        environment.VisibilityListCount = static_cast<uint32_t>(layouts.VisibilityLists.size());
-        environment.VisibilityIndexTableOffset = AppendExtentTable(extent, layouts.VisibilityIndices);
-        environment.VisibilityIndexCount = static_cast<uint32_t>(layouts.VisibilityIndices.size());
-        environment.RasterTableOffset = AppendExtentTable(extent, rasters.Rasters);
-        environment.RasterCount = static_cast<uint32_t>(rasters.Rasters.size());
-        environment.VertexInputTableOffset = AppendExtentTable(extent, rasters.VertexInputs);
-        environment.VertexInputCount = static_cast<uint32_t>(rasters.VertexInputs.size());
-        environment.ColorTargetTableOffset = AppendExtentTable(extent, rasters.ColorTargets);
-        environment.ColorTargetCount = static_cast<uint32_t>(rasters.ColorTargets.size());
-        environment.UniformMemberTableOffset = AppendExtentTable(extent, layouts.UniformMembers);
-        environment.UniformMemberCount = static_cast<uint32_t>(layouts.UniformMembers.size());
-        // reserved: the cooker writes no specialization constant yet, so the table stays empty
-        AlignTo8(extent);
-        environment.SpecializationConstantTableOffset = static_cast<uint32_t>(extent.size());
-        environment.SpecializationConstantCount = 0u;
+        environment.Bindings = AppendTable(extent, layouts.Bindings);
+        environment.ResourceLists = AppendTable(extent, layouts.ResourceLists);
+        environment.ResourceIndices = AppendTable(extent, layouts.ResourceIndices);
+        environment.Footprints = AppendTable(extent, layouts.Footprints);
+        environment.FootprintLists = AppendTable(extent, layouts.FootprintLists);
+        environment.VisibilityLists = AppendTable(extent, layouts.VisibilityLists);
+        environment.VisibilityIndices = AppendTable(extent, layouts.VisibilityIndices);
+        environment.Rasters = AppendTable(extent, rasters.Rasters);
+        environment.VertexInputs = AppendTable(extent, rasters.VertexInputs);
+        environment.ColorTargets = AppendTable(extent, rasters.ColorTargets);
+        environment.UniformMembers = AppendTable(extent, layouts.UniformMembers);
+        // Reserved. The cooker writes no specialization constant yet.
+        environment.SpecConstants = AppendTable(extent, std::vector<manifest::SpecializationConstant>{});
 
         AlignTo8(extent);
         std::memcpy(extent.data(), &environment, sizeof(manifest::EnvironmentHeader));

@@ -222,7 +222,8 @@ int main()
                  "a span longer than the file the header states is SizeMismatch");
 
     std::vector<std::byte> badSection = valid;
-    WriteValue(badSection, offsetof(Header, StringTableOffset), header.HeaderSize - 1u);
+    WriteValue(badSection, offsetof(Header, Strings) + offsetof(lodestone::manifest::TableRef64, Offset),
+               header.HeaderSize - 1u);
     runner.Check(BundleErrorFrom(badSection) == ErrorCode::SectionOutOfBounds,
                  "a table that reaches past the header region is SectionOutOfBounds");
 
