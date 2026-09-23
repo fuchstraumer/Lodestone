@@ -11,7 +11,10 @@
 #include "driver/steps/PreparePermutationSpaceStep.hpp"
 #include "driver/steps/BuildModuleStep.hpp"
 #include "driver/steps/FinalizeModuleStep.hpp"
+#include "emit/DedupeReport.hpp"
 #include "emit/OutputSink.hpp"
+#include "emit/ShaderManifestEmitter.hpp"
+#include "target/TargetProfile.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
@@ -19,6 +22,7 @@
 #include <expected>
 #include <filesystem>
 #include <format>
+#include <memory>
 #include <ranges>
 #include <ratio>
 #include <string>
@@ -34,10 +38,17 @@ namespace lodestone
 
 namespace
 {
+    constexpr std::string_view k_DedupeReportFileName = "ShaderLibrary.dedupe.txt";
+
     std::string BuildDumpFileName(std::string_view module_name, std::string_view target_name, StageDumpKind kind)
     {
         return std::format("{}_{}_{}.json", module_name, target_name, magic_enum::enum_name(kind));
     }
+
+    /** An empty grid of (profile, module) environments, in the order the targets were named. */
+    CookedLibrary MakeEmptyLibrary(const SharedCookState& cook_state);
+    /** Stage 8: the bundle, its round trip, and the dedup report, all from the one frozen library. */
+    CookError EmitLibraryArtifacts(const CookedLibrary& library, OutputSink& sink);
 } // namespace
 
 CookResult<CookStatistics> RunCookOnce(CookerOptions options,
@@ -65,11 +76,16 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
     const PreparedCook& preparedCook = *preparedCookResult;
     const SharedCookState& cookState = preparedCook.SharedState;
 
-    std::vector<CookedModule> cookedModules(cookState.Options.ModulePaths.size());
+    CookedLibrary library = MakeEmptyLibrary(cookState);
+    const size_t moduleCount = library.ModuleNames.size();
+    // For now, cooked modules point into their own permutation spcae, and the libraries have to outlive
+    // this loop. So, we keep the space in unique_ptrs (for now) so all axes stored in outputs remain valid.
+    std::vector<std::unique_ptr<PermutationSpace>> permutationSpaces;
+    permutationSpaces.reserve(library.Environments.size());
 
     for (auto&& [moduleIdx, modulePath] : std::views::enumerate(cookState.Options.ModulePaths))
     {
-        for (const auto& targetName : cookState.Options.TargetNames)
+        for (auto&& [targetIdx, targetName] : std::views::enumerate(cookState.Options.TargetNames))
         {
             // Each module's preparation involves a slang bootstrap compile, which creates the compiler
             // we'll use later and walks the root (no specializations) source code of the module.
@@ -102,7 +118,7 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                 return std::unexpected(spaceResult.error());
             }
 
-            const PreparedPermutationSpace& preparedSpace = *spaceResult;
+            PreparedPermutationSpace& preparedSpace = *spaceResult;
 
             if (preparedSpace.SpaceDump)
             {
@@ -128,11 +144,12 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
             // current module+target pairing concurrently. This step also runs interning, which deduplicates identical
             // data across permutations. This could probably be pulled out to this level, and ideally at some point I'll
             // do just that (we could fuse it across the *whole* library instead of per-module), but not yet.
+            permutationSpaces.emplace_back(std::make_unique<PermutationSpace>(std::move(preparedSpace.Space)));
             CookResult<BuiltModule> buildResult = BuildModule(cookState,
                                                               moduleName,
                                                               targetName,
                                                               preparedModule.Compiler.get(),
-                                                              preparedSpace.Space,
+                                                              *permutationSpaces.back(),
                                                               preparedSpace.Variants);
             if (!buildResult)
             {
@@ -199,8 +216,16 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
             }
 
             // write into slot: when we thread this, that should just work since the vector is never resized after initial allocation
-            cookedModules[static_cast<size_t>(moduleIdx)] = std::move(finalizeResult->Module);
+            const size_t environmentIndex =
+                (static_cast<size_t>(targetIdx) * moduleCount) + static_cast<size_t>(moduleIdx);
+            library.Environments[environmentIndex] = std::move(finalizeResult->Module);
         }
+    }
+
+    const CookError emitError = EmitLibraryArtifacts(library, sink);
+    if (!emitError)
+    {
+        return std::unexpected(emitError);
     }
 
     const std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
@@ -285,6 +310,48 @@ namespace
         return secondResult;
     }
 
+} // namespace
+
+namespace
+{
+    CookedLibrary MakeEmptyLibrary(const SharedCookState& cook_state)
+    {
+        CookedLibrary library;
+        library.ModuleNames = cook_state.AllModuleNames;
+        library.Profiles.reserve(cook_state.Options.TargetNames.size());
+        for (const std::string& targetName : cook_state.Options.TargetNames)
+        {
+            const TargetProfile& profile = cook_state.TargetProfiles.at(targetName);
+            library.Profiles.push_back(
+                CookedProfile{ .TargetName = targetName, .AccessModel = PlacementKindFromAccessModel(profile.Access) });
+        }
+
+        library.Environments.resize(library.Profiles.size() * library.ModuleNames.size());
+        return library;
+    }
+
+    CookError EmitLibraryArtifacts(const CookedLibrary& library, OutputSink& sink)
+    {
+        CookResult<std::string> manifest = EmitShaderManifest(library);
+        if (!manifest)
+        {
+            return manifest.error();
+        }
+
+        const CookError roundTripError = VerifyManifestRoundTrip(library, *manifest);
+        if (!roundTripError)
+        {
+            return roundTripError;
+        }
+
+        const CookError manifestWriteError = sink.WriteArtifact(k_ManifestFileName, *manifest);
+        if (!manifestWriteError)
+        {
+            return manifestWriteError;
+        }
+
+        return sink.WriteArtifact(k_DedupeReportFileName, GenerateDedupeReport(library));
+    }
 } // namespace
 
 CookResult<CookStatistics> RunCook(CookerOptions options, OutputSink& sink)
