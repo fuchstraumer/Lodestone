@@ -1335,8 +1335,8 @@ namespace
         for (int32_t i = 0; std::cmp_less(i, sourceSpan.size()); ++i)
         {
             const SourceRef& reference = sourceSpan[i];
-            if (reference.Length > environment.SourceBlobSize ||
-                reference.Offset > environment.SourceBlobSize - reference.Length)
+            if (reference.Length > environment.SourceBlob.Count ||
+                reference.Offset > environment.SourceBlob.Count - reference.Length)
             {
                 return ErrorState{ .Code = ErrorCode::SourceOutOfBounds,
                                    .Table = ShaderManifestTable::Sources,

@@ -292,7 +292,7 @@ CookResult<std::string> EmitShaderManifest(const CookedLibrary& library)
                 !SameModuleShape(moduleShapes[moduleIndex], EncodeModuleShape(*environment, strings)))
             {
                 std::println(stderr,
-                             "[shader_cooker] module {} states different entry points or axes for target '{}'",
+                             "[lodestone] module {} states different entry points or axes for target '{}'",
                              library.ModuleNames[moduleIndex],
                              library.Profiles[profileIndex].TargetName);
                 return std::unexpected(CookError::ManifestModuleShapeMismatch);
@@ -421,7 +421,7 @@ CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::strin
     if (!opened)
     {
         std::println(stderr,
-                     "[shader_cooker] manifest bundle does not open: {}",
+                     "[lodestone] manifest bundle does not open: {}",
                      manifest::DescribeShaderManifestError(opened.error()));
         return CookError::LibraryRoundTripFailed;
     }
@@ -450,7 +450,7 @@ CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::strin
                 if (view.has_value() || view.error().Code != manifest::ErrorCode::EnvironmentNotCooked)
                 {
                     std::println(stderr,
-                                 "[shader_cooker] manifest holds module {} for target '{}', but the cook did not",
+                                 "[lodestone] manifest holds module {} for target '{}', but the cook did not",
                                  library.ModuleNames[moduleIndex],
                                  library.Profiles[profileIndex].TargetName);
                     return CookError::LibraryRoundTripFailed;
@@ -461,7 +461,7 @@ CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::strin
             if (!view)
             {
                 std::println(stderr,
-                             "[shader_cooker] module {} for target '{}' does not open: {}",
+                             "[lodestone] module {} for target '{}' does not open: {}",
                              library.ModuleNames[moduleIndex],
                              library.Profiles[profileIndex].TargetName,
                              manifest::DescribeShaderManifestError(view.error()));
@@ -477,7 +477,7 @@ CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::strin
     }
 
     std::println(stderr,
-                 "[shader_cooker] manifest round trip verified: {} modules x {} profiles, {} entrypoint variants "
+                 "[lodestone] manifest round trip verified: {} modules x {} profiles, {} entrypoint variants "
                  "read back identical ({} KiB)",
                  moduleCount,
                  library.Profiles.size(),
@@ -709,7 +709,7 @@ namespace
         if (module_axis.Values.size() > k_MaxModuleAxisValues)
         {
             std::println(stderr,
-                         "[shader_cooker] axis '{}' holds {} values, and a module axis can hold at most {}",
+                         "[lodestone] axis '{}' holds {} values, and a module axis can hold at most {}",
                          strings.Text(module_axis.NameString),
                          module_axis.Values.size(),
                          k_MaxModuleAxisValues);
@@ -866,7 +866,7 @@ namespace
         if (duplicate != order.end())
         {
             std::println(stderr,
-                         "[shader_cooker] module {} holds two variants with key {}",
+                         "[lodestone] module {} holds two variants with key {}",
                          module.Name,
                          std::to_underlying(keyOf(*duplicate)));
             return std::unexpected(CookError::ManifestDuplicateVariantKey);
@@ -991,7 +991,7 @@ namespace
         if (bundle.ModuleCount() != library.ModuleNames.size() || bundle.Profiles().size() != library.Profiles.size())
         {
             std::println(stderr,
-                         "[shader_cooker] manifest holds {} modules and {} profiles, the cook produced {} and {}",
+                         "[lodestone] manifest holds {} modules and {} profiles, the cook produced {} and {}",
                          bundle.ModuleCount(),
                          bundle.Profiles().size(),
                          library.ModuleNames.size(),
@@ -1004,7 +1004,7 @@ namespace
             if (bundle.Module(moduleIndex).Name() != library.ModuleNames[moduleIndex])
             {
                 std::println(stderr,
-                             "[shader_cooker] manifest names module '{}', but the cook produced '{}'",
+                             "[lodestone] manifest names module '{}', but the cook produced '{}'",
                              bundle.Module(moduleIndex).Name(),
                              library.ModuleNames[moduleIndex]);
                 return CookError::LibraryRoundTripFailed;
@@ -1018,7 +1018,7 @@ namespace
                 profile.AccessModel != expected.AccessModel)
             {
                 std::println(stderr,
-                             "[shader_cooker] manifest profile {} names target '{}', but the cook produced '{}'",
+                             "[lodestone] manifest profile {} names target '{}', but the cook produced '{}'",
                              profileIndex,
                              bundle.String(profile.TargetNameString),
                              expected.TargetName);
@@ -1036,7 +1036,7 @@ namespace
         if (view.Variants().size() != module.Variants.size())
         {
             std::println(stderr,
-                         "[shader_cooker] manifest module {} holds {} variants, the cook produced {}",
+                         "[lodestone] manifest module {} holds {} variants, the cook produced {}",
                          module.Name,
                          view.Variants().size(),
                          module.Variants.size());
@@ -1050,7 +1050,7 @@ namespace
             const int32_t variantIndex = view.FindVariant(key);
             if (variantIndex < 0)
             {
-                std::println(stderr, "[shader_cooker] manifest holds no variant {} [{}]", variant.Index, variant.Description);
+                std::println(stderr, "[lodestone] manifest holds no variant {} [{}]", variant.Index, variant.Description);
                 return CookError::ManifestMissingVariant;
             }
 
@@ -1093,7 +1093,7 @@ namespace
         if (variant.Canonical.size() != axisCount)
         {
             std::println(stderr,
-                         "[shader_cooker] manifest module {} has {} axes, variant [{}] has {}",
+                         "[lodestone] manifest module {} has {} axes, variant [{}] has {}",
                          moduleView.Name(),
                          axisCount,
                          variant.Description,
@@ -1136,7 +1136,7 @@ namespace
             if (!matches)
             {
                 std::println(stderr,
-                             "[shader_cooker] manifest key {} of module {} decodes axis '{}' differently than "
+                             "[lodestone] manifest key {} of module {} decodes axis '{}' differently than "
                              "variant [{}]",
                              std::to_underlying(key),
                              moduleView.Name(),
@@ -1167,7 +1167,7 @@ namespace
             if (view.IsAxisActive(variant_index, axisIndex) != expected)
             {
                 std::println(stderr,
-                             "[shader_cooker] manifest marks axis '{}' {} in variant [{}], the cook did not",
+                             "[lodestone] manifest marks axis '{}' {} in variant [{}], the cook did not",
                              axis->Name,
                              expected ? "inactive" : "active",
                              variant.Description);
@@ -1193,7 +1193,7 @@ namespace
         }
 
         std::println(stderr,
-                     "[shader_cooker] manifest returns different text for {} variant {} [{}]",
+                     "[lodestone] manifest returns different text for {} variant {} [{}]",
                      module.EntryPoints[entry_point_index].Name,
                      variant.Index,
                      variant.Description);
@@ -1215,7 +1215,7 @@ namespace
         }
 
         std::println(stderr,
-                     "[shader_cooker] manifest returns a different workgroup size for {} variant {}",
+                     "[lodestone] manifest returns a different workgroup size for {} variant {}",
                      module.EntryPoints[entry_point_index].Name,
                      variant.Index);
         return CookError::ManifestVariantWorkgroupSizeMismatch;
@@ -1295,7 +1295,7 @@ namespace
         if (entry_point_index >= slots.size())
         {
             std::println(stderr,
-                         "[shader_cooker] manifest variant {} holds no slot {}",
+                         "[lodestone] manifest variant {} holds no slot {}",
                          variant.Index,
                          entry_point_index);
             return CookError::ManifestVariantMissingEntryPoint;
@@ -1306,7 +1306,7 @@ namespace
         if (visible.size() != expectedLayout.size())
         {
             std::println(stderr,
-                         "[shader_cooker] manifest variant {} entry point {} sees {} resources, the cook "
+                         "[lodestone] manifest variant {} entry point {} sees {} resources, the cook "
                          "produced {}",
                          variant.Index,
                          entry_point_index,
@@ -1323,7 +1323,7 @@ namespace
             if (local >= footprints.size())
             {
                 std::println(stderr,
-                             "[shader_cooker] manifest variant {} resolves resource {} out of range",
+                             "[lodestone] manifest variant {} resolves resource {} out of range",
                              variant.Index,
                              local);
                 return CookError::ManifestVariantResourceResolveOutOfRange;
@@ -1338,7 +1338,7 @@ namespace
                 !ManifestUniformMembersMatch(view, read, *expected.Resource))
             {
                 std::println(stderr,
-                             "[shader_cooker] manifest binding '{}' of variant {} does not match the cook",
+                             "[lodestone] manifest binding '{}' of variant {} does not match the cook",
                              expected.Resource->Name,
                              variant.Index);
                 return CookError::ManifestVariantResourceBindingMismatch;
@@ -1364,7 +1364,7 @@ namespace
                 readInput.ComponentCount != expectedInput.Data.ComponentCount)
             {
                 std::println(stderr,
-                             "[shader_cooker] manifest vertex input '{}' does not match the cook",
+                             "[lodestone] manifest vertex input '{}' does not match the cook",
                              expectedInput.SemanticName);
                 return CookError::ManifestVertexInputMismatch;
             }
@@ -1386,7 +1386,7 @@ namespace
                 readTarget.ComponentCount != expectedTarget.ComponentCount)
             {
                 std::println(stderr,
-                             "[shader_cooker] manifest color target {} does not match the cook",
+                             "[lodestone] manifest color target {} does not match the cook",
                              expectedTarget.Location);
                 return CookError::ManifestColorTargetMismatch;
             }
@@ -1411,7 +1411,7 @@ namespace
             view.WritesFragDepth(rasterIndex) != expectedRaster.WritesFragDepth)
         {
             std::println(stderr,
-                         "[shader_cooker] manifest raster state {} does not match the cook for {}",
+                         "[lodestone] manifest raster state {} does not match the cook for {}",
                          rasterIndex,
                          module.EntryPoints[entry_point_index].Name);
             return CookError::ManifestRasterStateMismatch;
