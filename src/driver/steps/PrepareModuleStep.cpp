@@ -22,7 +22,7 @@ CookResult<PreparedCompiler> PrepareModuleStep::operator()(const SharedCookState
     // first step: initialize the compiler and have it begin building this particular module
     SlangCompilerCreateInfo createInfo;
     createInfo.ModulePath = std::move(module_path);
-    createInfo.ModuleCacheDirectory = shared_state.CacheDirectory;
+    createInfo.ModuleCacheDirectory = shared_state.Options.ModuleCacheDirectory;
     createInfo.OptimizationLevel = shared_state.Options.OptimizationLevel;
     createInfo.MultithreadVariantBuild = shared_state.Options.MultithreadEntryPointCodegen;
     

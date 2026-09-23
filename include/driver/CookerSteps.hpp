@@ -55,7 +55,6 @@ struct SharedCookState
 {
     CookerOptions Options;
     std::unique_ptr<DiagnosticSink> Diagnostics;
-    std::filesystem::path CacheDirectory;
     PolicyDocument Policy;
     std::vector<std::string> AllModuleNames;
     // Resolve policies per target upfront, read later
