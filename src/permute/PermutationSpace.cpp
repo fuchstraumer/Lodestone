@@ -295,12 +295,11 @@ CookResult<std::vector<ExternConstantDefault>> PermutationSpace::CollectUndriven
         const CookResult<int64_t> value = EvaluateExpression(valueText, known, sink);
         if (!value)
         {
-            std::println(stderr,
-                         "[shader_cooker] could not read the default of extern constant '{}' from "
-                         "'{}'. A size expression naming it would silently disagree with the shader.",
-                         constName,
-                         valueText);
-            return std::unexpected(value.error());
+            std::string errorMessage = std::format(
+                "[lodestone] could not read the default of extern constant '{}' from '{}'. A size expression naming it would silently disagree with the shader.",
+                constName,
+                valueText);
+            return std::unexpected(ReportError(sink, value.error(), errorMessage));
         }
 
         defaults.emplace_back(std::string{ constName }, value.value());
@@ -584,7 +583,7 @@ namespace
             // get variant that caused the collision
             const VariantDescriptor& duplicate = *firstDuplicateIter;
             std::println(stderr,
-                         "[shader_cooker] two variants share key {}: [{}] collides. The mixed-radix "
+                         "[lodestone] two variants share key {}: [{}] collides. The mixed-radix "
                          "encoding and the enumerated set disagree.",
                          static_cast<uint64_t>(duplicate.Key),
                          DescribeAssignment(duplicate.Canonical));

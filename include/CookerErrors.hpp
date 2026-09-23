@@ -114,6 +114,7 @@ enum class CookError : uint16_t
     SlangMultipleConformingInterfaces = 228,
     SlangNoConformingInterfaces = 229,
     SlangInterfaceHasResourceMember = 230,
+    SlangCachedModuleWriteFailed = 231,
 
     // start of target validation errors
     TargetValidatorUnavailable = 300,

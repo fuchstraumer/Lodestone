@@ -220,6 +220,8 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                 (static_cast<size_t>(targetIdx) * moduleCount) + static_cast<size_t>(moduleIdx);
             library.Environments[environmentIndex] = std::move(finalizeResult->Module);
         }
+
+        cookStatistics.ModulesCooked += 1;
     }
 
     const CookError emitError = EmitLibraryArtifacts(library, sink);

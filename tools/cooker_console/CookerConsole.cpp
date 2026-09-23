@@ -37,12 +37,12 @@ bool RunCookingPipelineWithArgs(const lodestone::CookerOptions& options)
 
     if (!statistics)
     {
-        std::println(stdout, "[shader_cooker] cook failed: {}", ToString(statistics.error()));
+        std::println(stdout, "[lodestone] cook failed: {}", ToString(statistics.error()));
         return false;
     }
 
     std::println(stdout,
-                 "[shader_cooker] cooked {} modules, {} variants, {} entrypoints, {} KiB of WGSL in {:.1f}ms "
+                 "[lodestone] cooked {} modules, {} variants, {} entrypoints, {} KiB of WGSL in {:.1f}ms "
                  "-> {}",
                  statistics.value().ModulesCooked,
                  statistics.value().VariantsCompiled,

@@ -438,7 +438,7 @@ std::string DescribeUniformMembers(const ReflectedBinding& binding)
 
     for (const ReflectedUniformMember& member : binding.UniformMembers)
     {
-        description += std::format("[shader_cooker]       +{} {} ({} bytes{} stride={} matrix={})\n",
+        description += std::format("[lodestone]       +{} {} ({} bytes{} stride={} matrix={})\n",
                                    member.Data.Offset,
                                    member.Name,
                                    member.Data.Size,

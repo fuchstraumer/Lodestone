@@ -62,7 +62,7 @@ CookResult<std::string> ReadStringArgument(slang::Attribute* attribute,
     if (text == nullptr)
     {
         std::println(stderr,
-                     "[shader_cooker] argument {} of [{}] on '{}' is not a string literal",
+                     "[lodestone] argument {} of [{}] on '{}' is not a string literal",
                      argument_index,
                      attribute->getName(),
                      binding_name);
@@ -297,7 +297,7 @@ std::optional<uint32_t> ReadOffset(slang::VariableLayoutReflection* var_layout,
 void ReportUnresolvedLocation(std::string_view range_kind, SlangInt range_index)
 {
     std::println(stderr,
-                 "[shader_cooker] {} range {} has an unresolved location: link-time constants are "
+                 "[lodestone] {} range {} has an unresolved location: link-time constants are "
                  "affecting reflection output",
                  range_kind,
                  range_index);
@@ -1028,7 +1028,7 @@ CookResult<RawBindingDraft> SlangReflector::readBlockContainer(const ParameterBl
     if (!containerBinding)
     {
         std::println(stderr,
-                     "[shader_cooker] parameter block '{}' holds {} bytes of data and reports no "
+                     "[lodestone] parameter block '{}' holds {} bytes of data and reports no "
                      "container binding",
                      block.Name,
                      block.UniformSize);

@@ -223,7 +223,7 @@ void ThreadPool::workerFunction(const std::stop_token& stop_token,
         const CookError writeCacheError = moduleContext.WriteModuleCache();
         if (writeCacheError != CookError::Success)
         {
-            //batch->ThreadSinks[thread_idx].Report(CookError::ModuleContextInitializationFailed);
+            ReportWarning(batch->ThreadSinks[thread_idx], "Failed to write module cache");
         }
         batch->DoneLatch->count_down();
     }

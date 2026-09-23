@@ -33,7 +33,7 @@ namespace
         if (argument_index >= attribute.Arguments.size())
         {
             std::println(stderr,
-                         "[shader_cooker] [{}] on '{}' is missing argument {}",
+                         "[lodestone] [{}] on '{}' is missing argument {}",
                          ToString(attribute.Kind),
                          binding_name,
                          argument_index);
@@ -50,7 +50,7 @@ namespace
         if (value.value() <= 0)
         {
             std::println(stderr,
-                         "[shader_cooker] extent argument {} on '{}' evaluated to {}, which is not a "
+                         "[lodestone] extent argument {} on '{}' evaluated to {}, which is not a "
                          "valid texture dimension",
                          argument_index,
                          binding_name,
@@ -94,7 +94,7 @@ namespace
         if (attribute.Arguments.empty())
         {
             std::println(stderr,
-                         "[shader_cooker] [{}] on '{}' has no argument",
+                         "[lodestone] [{}] on '{}' has no argument",
                          ToString(attribute.Kind),
                          binding_name);
             return std::unexpected(CookError::AttributeExpressionParseFailed);
@@ -105,7 +105,7 @@ namespace
         if (!value)
         {
             std::println(stderr,
-                         "[shader_cooker] [{}] on '{}' did not evaluate",
+                         "[lodestone] [{}] on '{}' did not evaluate",
                          ToString(attribute.Kind),
                          binding_name);
             return std::unexpected(value.error());
@@ -114,7 +114,7 @@ namespace
         if (value.value() <= 0)
         {
             std::println(stderr,
-                         "[shader_cooker] [{}] on '{}' evaluated to {}, which cannot size a buffer",
+                         "[lodestone] [{}] on '{}' evaluated to {}, which cannot size a buffer",
                          ToString(attribute.Kind),
                          binding_name,
                          value.value());
@@ -144,7 +144,7 @@ namespace
             if (slot != nullptr)
             {
                 std::println(stderr,
-                             "[shader_cooker] '{}' carries [{}] and [{}]; only one may size a resource",
+                             "[lodestone] '{}' carries [{}] and [{}]; only one may size a resource",
                              binding_name,
                              ToString(slot->Kind),
                              ToString(attribute.Kind));
@@ -157,7 +157,7 @@ namespace
         if (count != nullptr && extent != nullptr)
         {
             std::println(stderr,
-                         "[shader_cooker] '{}' carries an element count and an extent; a resource is a "
+                         "[lodestone] '{}' carries an element count and an extent; a resource is a "
                          "buffer or a texture",
                          binding_name);
             return std::unexpected(CookError::ReflectionSizeUnresolved);

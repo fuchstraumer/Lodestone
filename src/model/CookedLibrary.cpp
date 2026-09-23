@@ -107,7 +107,7 @@ CookError AppendVariantToModule(InternedModule& module,
     if (variant.EntryPoints.size() != module.EntryPoints.size())
     {
         std::println(stderr,
-                     "[shader_cooker] variant [{}] has {} entrypoints, but module {} declares {}",
+                     "[lodestone] variant [{}] has {} entrypoints, but module {} declares {}",
                      variant.VariantDescription,
                      variant.EntryPoints.size(),
                      module.Name,

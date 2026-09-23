@@ -204,7 +204,7 @@ namespace
                 validTargetNames += std::string(" ") + std::string(name);
             }
             std::println(stderr,
-                         "[shader_cooker][cooker_options] No target profile named {}. Valid options: {}",
+                         "[lodestone][cooker_options] No target profile named {}. Valid options: {}",
                          value,
                          validTargetNames);
             return CookError::UnknownTargetProfile;

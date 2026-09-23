@@ -81,7 +81,7 @@ void StderrDiagnosticSink::Report(const Diagnostic& diagnostic)
     if (diagnostic.Severity != DiagnosticSeverity::Note)
     {
         std::println(stderr,
-                    "[shader_cooker] {}{}{}: {} [{}]",
+                    "[lodestone] {}{}{}: {} [{}]",
                     FormatLocation(diagnostic),
                     ToString(diagnostic.Severity),
                     FormatCode(diagnostic),
@@ -91,7 +91,7 @@ void StderrDiagnosticSink::Report(const Diagnostic& diagnostic)
     else
     {
         std::println(stderr,
-                    "[shader_cooker] {}{}{}: {}",
+                    "[lodestone] {}{}{}: {}",
                     FormatLocation(diagnostic),
                     ToString(diagnostic.Severity),
                     FormatCode(diagnostic),
@@ -102,12 +102,12 @@ void StderrDiagnosticSink::Report(const Diagnostic& diagnostic)
     {
         if (note.File.empty() || !HasLocation(note.Range))
         {
-            std::println(stderr, "[shader_cooker]   note: {}", note.Message);
+            std::println(stderr, "[lodestone]   note: {}", note.Message);
             continue;
         }
 
         std::println(stderr,
-                     "[shader_cooker]   {}({},{}): note: {}",
+                     "[lodestone]   {}({},{}): note: {}",
                      note.File,
                      note.Range.StartLine,
                      note.Range.StartColumn,
