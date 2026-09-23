@@ -153,13 +153,15 @@ private:
   * returning objects used to actually run queries for VariantKey values. It offers an 
   * interface to simply retrieve all keys and related data - to precache pipelines or layouts
   * - while querying for concrete subsets based on permutation values is left to the query
-  * objects spawned by the index. */
+  * objects spawned by the index.
+  * @note An index reads one environment: one module, cooked for one profile. Variant keys are per
+  * module, and each profile can cook a different subset of them, so a query always names both. */
 class ManifestIndex
 {
 public:
-    explicit ManifestIndex(ManifestView view);
+    explicit ManifestIndex(manifest::EnvironmentView view);
 
-    [[nodiscard]] const ManifestView& View() const noexcept;
+    [[nodiscard]] const manifest::EnvironmentView& View() const noexcept;
     /** @brief Direct decode: "expand" a variant key into that values matching that key */
     [[nodiscard]] std::vector<QueryAxisValue> Decode(VariantKey key) const;
     /** @brief Returns every variant that exists, in (sorted) key order. Useful for total 
@@ -195,7 +197,10 @@ private:
     [[nodiscard]] std::vector<VariantKey> scan(std::span<const ScanConstraint> constraints) const;
 
     [[nodiscard]] std::vector<std::string_view> stringTableForAxis(uint32_t axis_index) const;
-    ManifestView manifest;
+    manifest::EnvironmentView environment;
+    /** @brief The values each module axis uses, in digit order. A module axis selects its values from a
+     * root axis through a mask, so they are not one contiguous run of the root table. */
+    std::vector<std::vector<AxisValueType>> axisValues;
     std::vector<uint32_t> radices;
     std::vector<uint64_t> placeValues;
     // todo: maybe a packed vector (sorted) that we use std::find on might be better for our use case? (test)

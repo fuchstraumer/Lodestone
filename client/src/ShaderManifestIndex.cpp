@@ -132,7 +132,7 @@ ManifestQueryBuilder ManifestQueryBuilder::WhereNoneOf(std::string_view axis_nam
     }
 
     const uint32_t axisIndex = *axisIndexOpt;
-    std::span<const AxisValueType> axisValues = index->manifest.AxisValues(axisIndex);
+    std::span<const AxisValueType> axisValues = index->axisValues[axisIndex];
     std::vector<QueryAxisValue> complement = axisValues |
                                              std::views::transform(buildAxisValue) |
                                              std::ranges::to<std::vector>();
@@ -172,10 +172,10 @@ ManifestQueryBuilder ManifestQueryBuilder::WhereNoneOf(std::string_view axis_nam
 
     const uint32_t axisIndex = *axisIndexOpt;
     // now construct the set compliment, using input_values/queryValues
-    std::span<const AxisValueType> axisValues = index->manifest.AxisValues(axisIndex);
+    std::span<const AxisValueType> axisValues = index->axisValues[axisIndex];
     auto readStrTable = [&](const AxisValueType& axis_value) -> std::string_view
     {
-        return index->manifest.String(axis_value);
+        return index->environment.String(axis_value);
     };
     std::vector<QueryAxisValue> complement = axisValues |
                                              std::views::transform(readStrTable) |
@@ -301,7 +301,7 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
     }
 
     const uint32_t axisIndex = indexIter->second;
-    const ManifestAxis& axis = index->manifest.Axis(axisIndex);
+    const manifest::Axis& axis = index->environment.Module().AxisData(axisIndex);
     // just check front() (means one less passed function parameter, and values is homogenous by construction)
     if (values.front().Type != axis.Domain)
     {
@@ -333,7 +333,7 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
     }
     else if (axis.Domain == AxisValueDomain::Integral)
     {
-        std::span<const AxisValueType> axisValues = index->manifest.AxisValues(axisIndex);
+        std::span<const AxisValueType> axisValues = index->axisValues[axisIndex];
         // same as above, extract a view of all values
         auto queryIntegralValues = values | std::views::transform(&QueryAxisValue::IntegralValue);
         // make sure all values are in the axis values. both containers are sorted, use set_intersection logic
@@ -395,18 +395,27 @@ ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name
     return result;
 }
 
-ManifestIndex::ManifestIndex(ManifestView view) : manifest(view)
+ManifestIndex::ManifestIndex(manifest::EnvironmentView view) : environment(view)
 {
-    std::span<const ManifestAxis> axes = manifest.Axes();
-    radices.resize(axes.size());
-    placeValues.resize(axes.size());
-    axisNameToIndex.reserve(axes.size());
+    const manifest::ModuleView& module = environment.Module();
+    const uint32_t axisCount = module.AxisCount();
+    axisValues.resize(axisCount);
+    radices.resize(axisCount);
+    placeValues.resize(axisCount);
+    axisNameToIndex.reserve(axisCount);
 
-    for (const auto&& [index, axis] : std::views::enumerate(axes))
+    for (uint32_t axisIndex = 0u; axisIndex < axisCount; ++axisIndex)
     {
-        radices[index] = axis.ValueCount;
-        std::string_view axisName = manifest.String(axis.NameString);
-        axisNameToIndex[axisName] = static_cast<uint32_t>(index);
+        // the module's radix for an axis is the count of values it uses, not the root axis value count
+        radices[axisIndex] = module.AxisValueCount(axisIndex);
+        axisValues[axisIndex].reserve(radices[axisIndex]);
+        for (uint32_t digit = 0u; digit < radices[axisIndex]; ++digit)
+        {
+            axisValues[axisIndex].push_back(module.AxisValue(axisIndex, digit));
+        }
+
+        const std::string_view axisName = environment.String(module.AxisData(axisIndex).NameString);
+        axisNameToIndex[axisName] = axisIndex;
     }
 
     // use a backwards exclusive scan to fill the placeValues array with less gross indexing logic
@@ -418,9 +427,9 @@ ManifestIndex::ManifestIndex(ManifestView view) : manifest(view)
     
 }
 
-const ManifestView& ManifestIndex::View() const noexcept
+const manifest::EnvironmentView& ManifestIndex::View() const noexcept
 {
-    return manifest;
+    return environment;
 }
 
 std::vector<QueryAxisValue> ManifestIndex::Decode(VariantKey key) const
@@ -442,7 +451,7 @@ std::vector<QueryAxisValue> ManifestIndex::Decode(VariantKey key) const
 
 std::vector<DecodedVariant> ManifestIndex::Enumerate() const
 {
-    std::span<const VariantKey> variantKeys = manifest.VariantKeys();
+    std::span<const VariantKey> variantKeys = environment.VariantKeys();
     std::vector<DecodedVariant> result(variantKeys.size());
     // we effectively copy decode, but I'm doing it manually here to hoist
     // out the scratch buffer and avoid reallocating that for each call to Decode()
@@ -478,7 +487,7 @@ std::vector<ManifestIndex::ScanConstraint> ManifestIndex::convertToScanConstrain
     scanConstraints.reserve(query.size());
     for (const auto& range : query)
     {
-        const ManifestAxis& axis = manifest.Axis(range.AxisIndex);
+        const manifest::Axis& axis = environment.Module().AxisData(range.AxisIndex);
         // map input constraint values (given as actual concrete values) to the indices
         // of that value in axisValues space
         std::vector<uint32_t> valueIndices;
@@ -516,8 +525,8 @@ std::vector<VariantKey> ManifestIndex::select(std::span<const QueryAxisRange> co
 
 QueryAxisValue ManifestIndex::decodeAxis(uint32_t axis_index, uint32_t value_index) const noexcept
 {
-    const ManifestAxis& axis = manifest.Axis(axis_index);
-    const AxisValueType currValue = manifest.AxisValue(axis_index, value_index);
+    const manifest::Axis& axis = environment.Module().AxisData(axis_index);
+    const AxisValueType currValue = axisValues[axis_index][value_index];
     QueryAxisValue result{};
     result.Type = axis.Domain;
     switch (axis.Domain)
@@ -532,7 +541,7 @@ QueryAxisValue ManifestIndex::decodeAxis(uint32_t axis_index, uint32_t value_ind
         [[fallthrough]];
     case AxisValueDomain::Type:
         // read type name from string table
-        result.Name = manifest.String(currValue);
+        result.Name = environment.String(currValue);
         break;
     case AxisValueDomain::None:
         std::unreachable();
@@ -543,17 +552,17 @@ QueryAxisValue ManifestIndex::decodeAxis(uint32_t axis_index, uint32_t value_ind
 std::vector<uint32_t> ManifestIndex::integralValueIndices(const uint32_t axis_index, const QueryAxisRange& range) const
 {
     std::vector<uint32_t> constraintValueIndices(range.Values.size());
-    std::span<const AxisValueType> axisValues = manifest.AxisValues(axis_index);
+    std::span<const AxisValueType> localValues = axisValues[axis_index];
     // flatten input constraint values (actual values) into the index of that value in the
     // axisValues array (i.e, get the digit in the radix of this axis)
     for (const auto&& [index, val] : std::views::enumerate(range.Values))
     {
-        auto iter = std::ranges::find(axisValues, val.IntegralValue);
-        if (iter == axisValues.end())
+        auto iter = std::ranges::find(localValues, val.IntegralValue);
+        if (iter == localValues.end())
         {
             return {};
         }
-        const uint32_t valueIndex = static_cast<uint32_t>(std::distance(axisValues.begin(), iter));
+        const uint32_t valueIndex = static_cast<uint32_t>(std::distance(localValues.begin(), iter));
         constraintValueIndices[index] = valueIndex;
     }
     return constraintValueIndices;
@@ -614,7 +623,7 @@ std::span<const VariantKey> ManifestIndex::filterKeys(std::span<const ScanConstr
 
     // now use lower_bound and upper_bound (since keys are already sorted) to create the span
     // we actually filter on (as a subspan of the original)
-    std::span<const VariantKey> candidates = manifest.VariantKeys();
+    std::span<const VariantKey> candidates = environment.VariantKeys();
     const auto first = std::ranges::lower_bound(candidates, static_cast<VariantKey>(minKey));
     const auto last = std::ranges::upper_bound(candidates, static_cast<VariantKey>(maxKey));
     // upper_bound returns end() whenever the largest match is the last key, and first == last is a
@@ -681,12 +690,11 @@ std::vector<VariantKey> ManifestIndex::scan(std::span<const ScanConstraint> cons
 
 std::vector<std::string_view> ManifestIndex::stringTableForAxis(uint32_t axis_index) const
 {
-    std::span<const AxisValueType> axisValues = manifest.AxisValues(axis_index);
     auto getStringView = [&](const AxisValueType& value) -> std::string_view
     {
-        return manifest.String(value);
+        return environment.String(value);
     };
-    return axisValues |
+    return axisValues[axis_index] |
            std::views::transform(getStringView) |
            std::ranges::to<std::vector>();
 }
