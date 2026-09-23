@@ -27,7 +27,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 4u;
+inline constexpr uint32_t k_ShaderManifestVersion = 5u;
 
 // clang-tidy complains about enums being too big, but uint32_t means
 // the error struct is 16bytes, which is great alignment and still compact
@@ -182,21 +182,15 @@ struct alignas(8) Header
     // module entries begin immediately after the end of this header:
     // offset not needed because it's based on this objects size
     uint64_t ModuleCount{ 0u };
-    uint64_t ProfileCount{ 0u };
-    uint64_t ProfileTableOffset{ 0u };
+    TableRef64 Profiles{ 0u, 0u };
     /** @brief A dense grid of `ProfileCount * ModuleCount` entries. The entry for (profile P, module M)
      * is at `P * ModuleCount + M`. */
     uint64_t EnvironmentDirectoryOffset{ 0u };
 
-    uint64_t StringCount{ 0u };
-    uint64_t StringTableOffset{ 0u };
-    uint64_t StringBlobSize{ 0u };
-    uint64_t StringBlobOffset{ 0u };
-
-    uint64_t AxisCount{ 0u };
-    uint64_t AxisTableOffset{ 0u };
-    uint64_t AxisValueCount{ 0u };
-    uint64_t AxisValueTableOffset{ 0u };
+    TableRef64 Strings{ 0u, 0u };
+    TableRef64 StringBlobs{ 0u, 0u };
+    TableRef64 Axes{ 0u, 0u };
+    TableRef64 AxesValues{ 0u, 0u };
 };
 
 /** @brief A string in the whole-cook string blob. */
@@ -259,10 +253,8 @@ struct alignas(8) ModuleRootHeader
 {
     uint32_t ModuleNameString{ 0u };
     uint32_t Reserved{ 0u };
-    uint64_t EntryPointCount{ 0u };
-    uint64_t EntryPointTableOffset{ 0u };
-    uint64_t ModuleAxisCount{ 0u };
-    uint64_t ModuleAxisTableOffset{ 0u };
+    TableRef64 EntryPoints{ 0u, 0u };
+    TableRef64 ModuleAxes{ 0u, 0u };
 };
 
 struct alignas(8) EntryPoint
@@ -289,36 +281,23 @@ struct alignas(8) EnvironmentHeader
     uint32_t SlotTableOffset{ 0u };
     uint32_t Reserved{ 0u };
 
-    uint32_t SourceCount{ 0u };
-    uint32_t SourceTableOffset{ 0u };
+    TableRef Sources{ 0u, 0u };
+    TableRef SourceBlob{ 0u, 0u };
     uint32_t SourceBlobSize{ 0u };
     uint32_t SourceBlobOffset{ 0u };
 
-    uint32_t BindingCount{ 0u };
-    uint32_t BindingTableOffset{ 0u };
-    uint32_t ResourceListCount{ 0u };
-    uint32_t ResourceListTableOffset{ 0u };
-    uint32_t ResourceIndexCount{ 0u };
-    uint32_t ResourceIndexTableOffset{ 0u };
-    uint32_t FootprintCount{ 0u };
-    uint32_t FootprintTableOffset{ 0u };
-    uint32_t FootprintListCount{ 0u };
-    uint32_t FootprintListTableOffset{ 0u };
-    uint32_t VisibilityListCount{ 0u };
-    uint32_t VisibilityListTableOffset{ 0u };
-    uint32_t VisibilityIndexCount{ 0u };
-    uint32_t VisibilityIndexTableOffset{ 0u };
-    uint32_t RasterCount{ 0u };
-    uint32_t RasterTableOffset{ 0u };
-    uint32_t VertexInputCount{ 0u };
-    uint32_t VertexInputTableOffset{ 0u };
-    uint32_t ColorTargetCount{ 0u };
-    uint32_t ColorTargetTableOffset{ 0u };
-    uint32_t UniformMemberCount{ 0u };
-    uint32_t UniformMemberTableOffset{ 0u };
-    // Currently unused, but reserved as we are trying to get it up asap
-    uint32_t SpecializationConstantCount{ 0u };
-    uint32_t SpecializationConstantTableOffset{ 0u };
+    TableRef Bindings{ 0u, 0u };
+    TableRef ResourceLists{ 0u, 0u };
+    TableRef ResourceIndices{ 0u, 0u };
+    TableRef Footprints{ 0u, 0u };
+    TableRef FootprintLists{ 0u, 0u };
+    TableRef VisibilityLists{ 0u, 0u };
+    TableRef VisibilityIndices{ 0u, 0u };
+    TableRef Rasters{ 0u, 0u };
+    TableRef VertexInputs{ 0u, 0u };
+    TableRef ColorTargets{ 0u, 0u };
+    TableRef UniformMembers{ 0u, 0u };
+    TableRef SpecConstants{ 0u, 0u };
 };
 
 /** @brief One variant of one environment. Its key is at the same position in the key table. The

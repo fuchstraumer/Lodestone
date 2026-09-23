@@ -123,13 +123,18 @@ namespace
 
     constexpr size_t k_AxisMaskWordBits = std::numeric_limits<uint64_t>::digits;
 
-    template<typename RecordType>
-    std::span<const RecordType> MakeTable(std::span<const std::byte> bytes,
-                                          uint64_t offset,
-                                          uint64_t count) noexcept
+    template<typename RecordType> requires(std::is_trivially_copyable_v<RecordType> && !std::is_pointer_v<RecordType>)
+    std::span<const RecordType> Map(std::span<const std::byte> bytes, TableRef table_ref) noexcept
     {
-        return std::span<const RecordType>{ reinterpret_cast<const RecordType*>(bytes.data() + offset),
-                                            static_cast<size_t>(count) };
+        return std::span<const RecordType>{ reinterpret_cast<const RecordType*>(bytes.data() + table_ref.Offset),
+                                            static_cast<size_t>(table_ref.Count) };
+    }
+    
+    template<typename RecordType> requires(std::is_trivially_copyable_v<RecordType> && !std::is_pointer_v<RecordType>)
+    std::span<const RecordType> Map(std::span<const std::byte> bytes, TableRef64 table_ref) noexcept
+    {
+        return std::span<const RecordType>{ reinterpret_cast<const RecordType*>(bytes.data() + table_ref.Offset),
+                                            static_cast<size_t>(table_ref.Count) };
     }
 
     /**@brief In multiple locations, we store ranges of data in "runs". Each run specifies a contiguous block
@@ -145,11 +150,17 @@ namespace
     }
 
     /** One table to bounds-check: `Count` records of `RecordSize` bytes, starting at `Offset`. */
+    struct Section64
+    {
+        ShaderManifestTable Table;
+        TableRef64 Loc;
+        size_t RecordSize;
+    };
+
     struct Section
     {
         ShaderManifestTable Table;
-        uint64_t Offset;
-        uint64_t Count;
+        TableRef Loc;
         size_t RecordSize;
     };
 
@@ -170,10 +181,12 @@ namespace
 
     /** True when a table of `count` records of `record_size` bytes starts at `offset` and stays inside a
      * region of `region_size` bytes. An empty table at any offset is in bounds. */
-    bool TableIsInBounds(uint64_t offset, uint64_t count, size_t record_size, uint64_t region_size) noexcept;
+    bool TableIsInBounds(TableRef loc, size_t record_size, uint64_t region_size) noexcept;
+    bool TableIsInBounds(TableRef64 loc, size_t record_size, uint64_t region_size) noexcept;
     /** True when a grid of `rows * columns` records fits a region, checked without an overflow. */
     bool GridFitsRegion(uint64_t rows, uint64_t columns, size_t record_size, uint64_t region_size) noexcept;
     ErrorState ValidateSections(std::span<const Section> sections, uint64_t region_size) noexcept;
+    ErrorState ValidateSections(std::span<const Section64> sections, uint64_t region_size) noexcept;
     /** The bit position of the set bit of rank `rank` in `mask`, counted from the least significant bit. */
     uint32_t SelectSetBit(uint32_t mask, uint32_t rank) noexcept;
     uint32_t MaskWordCountForAxes(uint64_t axis_count) noexcept;
@@ -309,14 +322,14 @@ ManifestResult<BundleView> BundleView::Open(std::span<const std::byte> bytes) no
     BundleView view;
     view.bytes = bytes;
     view.header = reinterpret_cast<const Header*>(bytes.data());
-    view.strings = MakeTable<StringRef>(bytes, parsed.StringTableOffset, parsed.StringCount);
-    view.axes = MakeTable<Axis>(bytes, parsed.AxisTableOffset, parsed.AxisCount);
-    view.axisValues = MakeTable<AxisValueType>(bytes, parsed.AxisValueTableOffset, parsed.AxisValueCount);
-    view.profiles = MakeTable<Profile>(bytes, parsed.ProfileTableOffset, parsed.ProfileCount);
-    view.moduleHeaders = MakeTable<ModuleRootHeader>(bytes, sizeof(Header), parsed.ModuleCount);
-    view.directory = MakeTable<EnvironmentDirectoryEntry>(bytes,
-                                                          parsed.EnvironmentDirectoryOffset,
-                                                          parsed.ProfileCount * parsed.ModuleCount);
+    view.strings = Map<StringRef>(bytes, parsed.Strings);
+    view.axes = Map<Axis>(bytes, parsed.Axes);
+    view.axisValues = Map<AxisValueType>(bytes, parsed.AxesValues);
+    view.profiles = Map<Profile>(bytes, parsed.Profiles);
+    view.moduleHeaders = Map<ModuleRootHeader>(bytes, TableRef64{ .Offset = sizeof(Header), .Count = parsed.ModuleCount });
+    view.directory = Map<EnvironmentDirectoryEntry>(bytes,
+                                                    TableRef64{ .Offset = parsed.EnvironmentDirectoryOffset,
+                                                                .Count = parsed.Profiles.Count * parsed.ModuleCount });
     return view;
 }
 
@@ -324,7 +337,7 @@ std::string_view BundleView::String(uint32_t string_index) const noexcept
 {
     assert(header != nullptr && string_index < strings.size());
     const StringRef& reference = strings[string_index];
-    const char* base = reinterpret_cast<const char*>(bytes.data() + header->StringBlobOffset);
+    const char* base = reinterpret_cast<const char*>(bytes.data() + header->StringBlobs.Offset);
     return std::string_view{ base + reference.Offset, reference.Length };
 }
 
@@ -438,8 +451,8 @@ ModuleView::ModuleView(const BundleView& _bundle, uint32_t module_index) noexcep
     moduleIndex{ module_index }
 {
     const ModuleRootHeader& moduleHeader = bundle.moduleHeaders[module_index];
-    entryPoints = MakeTable<EntryPoint>(bundle.bytes, moduleHeader.EntryPointTableOffset, moduleHeader.EntryPointCount);
-    moduleAxes = MakeTable<ModuleAxis>(bundle.bytes, moduleHeader.ModuleAxisTableOffset, moduleHeader.ModuleAxisCount);
+    entryPoints = Map<EntryPoint>(bundle.bytes, moduleHeader.EntryPoints);
+    moduleAxes = Map<ModuleAxis>(bundle.bytes, moduleHeader.ModuleAxes);
 }
 
 const BundleView& ModuleView::Bundle() const noexcept
@@ -533,30 +546,26 @@ ManifestResult<EnvironmentView> EnvironmentView::Open(const BundleView& bundle,
 
     const uint64_t slotCount = static_cast<uint64_t>(parsed.VariantCount) * context.EntryPointCount;
     const uint64_t maskWordCount = static_cast<uint64_t>(parsed.VariantCount) * context.AxisMaskWordCount;
-
-    view.variantKeys = MakeTable<VariantKey>(extent_bytes, parsed.VariantKeyTableOffset, parsed.VariantCount);
-    view.variants = MakeTable<Variant>(extent_bytes, parsed.VariantTableOffset, parsed.VariantCount);
-    view.axisMasks = MakeTable<uint64_t>(extent_bytes, parsed.AxisMaskTableOffset, maskWordCount);
-    view.slots = MakeTable<EntryPointInstance>(extent_bytes, parsed.SlotTableOffset, slotCount);
-    view.sources = MakeTable<SourceRef>(extent_bytes, parsed.SourceTableOffset, parsed.SourceCount);
-    view.sourceBlob = MakeTable<char>(extent_bytes, parsed.SourceBlobOffset, parsed.SourceBlobSize);
-    view.bindings = MakeTable<Binding>(extent_bytes, parsed.BindingTableOffset, parsed.BindingCount);
-    view.resourceLists = MakeTable<Run>(extent_bytes, parsed.ResourceListTableOffset, parsed.ResourceListCount);
-    view.resourceIndices =
-        MakeTable<uint32_t>(extent_bytes, parsed.ResourceIndexTableOffset, parsed.ResourceIndexCount);
-    view.footprints = MakeTable<Footprint>(extent_bytes, parsed.FootprintTableOffset, parsed.FootprintCount);
-    view.footprintLists = MakeTable<Run>(extent_bytes, parsed.FootprintListTableOffset, parsed.FootprintListCount);
-    view.visibilityLists =
-        MakeTable<Run>(extent_bytes, parsed.VisibilityListTableOffset, parsed.VisibilityListCount);
-    view.visibilityIndices =
-        MakeTable<uint32_t>(extent_bytes, parsed.VisibilityIndexTableOffset, parsed.VisibilityIndexCount);
-    view.rasterStates = MakeTable<RasterState>(extent_bytes, parsed.RasterTableOffset, parsed.RasterCount);
-    view.vertexInputs = MakeTable<VertexInput>(extent_bytes, parsed.VertexInputTableOffset, parsed.VertexInputCount);
-    view.colorTargets = MakeTable<ColorTarget>(extent_bytes, parsed.ColorTargetTableOffset, parsed.ColorTargetCount);
-    view.uniformMembers =
-        MakeTable<UniformMember>(extent_bytes, parsed.UniformMemberTableOffset, parsed.UniformMemberCount);
-    view.specializationConstants = MakeTable<SpecializationConstant>(
-        extent_bytes, parsed.SpecializationConstantTableOffset, parsed.SpecializationConstantCount);
+    view.variantKeys = Map<VariantKey>(extent_bytes, TableRef{ .Offset = parsed.VariantKeyTableOffset, .Count = parsed.VariantCount });
+    view.variants = Map<Variant>(extent_bytes, TableRef{ .Offset = parsed.VariantTableOffset, .Count = parsed.VariantCount });
+    const TableRef64 axisMaskTableRef{ .Offset = static_cast<uint64_t>(parsed.AxisMaskTableOffset), .Count = maskWordCount };
+    view.axisMasks = Map<uint64_t>(extent_bytes, axisMaskTableRef);
+    const TableRef64 slotTableRef{ .Offset = static_cast<uint64_t>(parsed.SlotTableOffset), .Count = slotCount };
+    view.slots = Map<EntryPointInstance>(extent_bytes, slotTableRef);
+    view.sources = Map<SourceRef>(extent_bytes, parsed.Sources);
+    view.sourceBlob = Map<char>(extent_bytes, parsed.SourceBlob);
+    view.bindings = Map<Binding>(extent_bytes, parsed.Bindings);
+    view.resourceLists = Map<Run>(extent_bytes, parsed.ResourceLists);
+    view.resourceIndices = Map<uint32_t>(extent_bytes, parsed.ResourceIndices);
+    view.footprints = Map<Footprint>(extent_bytes, parsed.Footprints);
+    view.footprintLists = Map<Run>(extent_bytes, parsed.FootprintLists);
+    view.visibilityLists = Map<Run>(extent_bytes, parsed.VisibilityLists);
+    view.visibilityIndices = Map<uint32_t>(extent_bytes, parsed.VisibilityIndices);
+    view.rasterStates = Map<RasterState>(extent_bytes, parsed.Rasters);
+    view.vertexInputs = Map<VertexInput>(extent_bytes, parsed.VertexInputs);
+    view.colorTargets = Map<ColorTarget>(extent_bytes, parsed.ColorTargets);
+    view.uniformMembers = Map<UniformMember>(extent_bytes, parsed.UniformMembers);
+    view.specializationConstants = Map<SpecializationConstant>(extent_bytes, parsed.SpecConstants);
     return view;
 }
 
@@ -853,21 +862,38 @@ const EnvironmentView& ShaderSourceProvider::View() const noexcept
 namespace
 {
 
-    bool TableIsInBounds(uint64_t offset, uint64_t count, size_t record_size, uint64_t region_size) noexcept
+    bool TableIsInBounds(TableRef loc, size_t record_size, uint64_t region_size) noexcept
     {
-        if (count == 0u)
+        if (loc.Count == 0u)
         {
             return true;
         }
 
         // divide first, so a huge count cannot overflow the multiply
-        if (count > region_size / record_size)
+        if (loc.Count > region_size / record_size)
         {
             return false;
         }
 
-        const uint64_t span = count * record_size;
-        return offset <= region_size && span <= region_size - offset;
+        const uint64_t span = loc.Count * record_size;
+        return loc.Offset <= region_size && span <= region_size - loc.Offset;
+    }
+
+    bool TableIsInBounds(TableRef64 loc, size_t record_size, uint64_t region_size) noexcept
+    {
+        if (loc.Count == 0u)
+        {
+            return true;
+        }
+
+        // divide first, so a huge count cannot overflow the multiply
+        if (loc.Count > region_size / record_size)
+        {
+            return false;
+        }
+
+        const uint64_t span = loc.Count * record_size;
+        return loc.Offset <= region_size && span <= region_size - loc.Offset;
     }
 
     bool GridFitsRegion(uint64_t rows, uint64_t columns, size_t record_size, uint64_t region_size) noexcept
@@ -884,7 +910,20 @@ namespace
     {
         for (const Section& section : sections)
         {
-            if (!TableIsInBounds(section.Offset, section.Count, section.RecordSize, region_size))
+            if (!TableIsInBounds(section.Loc, section.RecordSize, region_size))
+            {
+                return { .Code = ErrorCode::SectionOutOfBounds, .Table = section.Table };
+            }
+        }
+
+        return k_ManifestOk;
+    }
+
+    ErrorState ValidateSections(std::span<const Section64> sections, uint64_t region_size) noexcept
+    {
+        for (const Section64& section : sections)
+        {
+            if (!TableIsInBounds(section.Loc, section.RecordSize, region_size))
             {
                 return { .Code = ErrorCode::SectionOutOfBounds, .Table = section.Table };
             }
@@ -979,16 +1018,15 @@ namespace
     ErrorState ValidateBundleSections(const Header& parsed, [[maybe_unused]] std::span<const std::byte> bytes) noexcept
     {
         // every whole-cook table lives inside the header region, so a reader of that region alone can trust it
-        const std::array<Section, 6u> sections{
-            Section{ ShaderManifestTable::Modules, sizeof(Header), parsed.ModuleCount, sizeof(ModuleRootHeader) },
-            Section{ ShaderManifestTable::Profiles, parsed.ProfileTableOffset, parsed.ProfileCount, sizeof(Profile) },
-            Section{ ShaderManifestTable::Strings, parsed.StringTableOffset, parsed.StringCount, sizeof(StringRef) },
-            Section{ ShaderManifestTable::Strings, parsed.StringBlobOffset, parsed.StringBlobSize, 1u },
-            Section{ ShaderManifestTable::Axes, parsed.AxisTableOffset, parsed.AxisCount, sizeof(Axis) },
-            Section{ ShaderManifestTable::AxisValues,
-                     parsed.AxisValueTableOffset,
-                     parsed.AxisValueCount,
-                     sizeof(AxisValueType) },
+        const TableRef64 moduleLoc{ sizeof(Header), parsed.ModuleCount };
+        const std::array<Section64, 6u> sections
+        {
+            Section64{ ShaderManifestTable::Modules, moduleLoc, sizeof(ModuleRootHeader) },
+            Section64{ ShaderManifestTable::Profiles, parsed.Profiles, sizeof(Profile) },
+            Section64{ ShaderManifestTable::Strings, parsed.Strings, sizeof(StringRef) },
+            Section64{ ShaderManifestTable::Strings, parsed.StringBlobs, 1u },
+            Section64{ ShaderManifestTable::Axes, parsed.Axes, sizeof(Axis) },
+            Section64{ ShaderManifestTable::AxisValues, parsed.AxesValues, sizeof(AxisValueType) },
         };
 
         const ErrorState sectionsValid = ValidateSections(sections, parsed.HeaderSize);
@@ -998,11 +1036,15 @@ namespace
         }
 
         // the directory is a grid, so check the product without overflowing it
-        if (!GridFitsRegion(parsed.ProfileCount, parsed.ModuleCount, sizeof(EnvironmentDirectoryEntry), parsed.HeaderSize) ||
-            !TableIsInBounds(parsed.EnvironmentDirectoryOffset,
-                             parsed.ProfileCount * parsed.ModuleCount,
-                             sizeof(EnvironmentDirectoryEntry),
-                             parsed.HeaderSize))
+        const bool gridFits = GridFitsRegion(parsed.Profiles.Count,
+                                             parsed.ModuleCount,
+                                             sizeof(EnvironmentDirectoryEntry),
+                                             parsed.HeaderSize);
+        const TableRef64 envLoc{ parsed.EnvironmentDirectoryOffset, parsed.Profiles.Count * parsed.ModuleCount };
+        const bool tableInBounds = TableIsInBounds(envLoc,
+                                                   sizeof(EnvironmentDirectoryEntry),
+                                                   parsed.HeaderSize);
+        if (!gridFits || !tableInBounds)
         {
             return { .Code = ErrorCode::SectionOutOfBounds, .Table = ShaderManifestTable::Environments };
         }
@@ -1013,14 +1055,15 @@ namespace
 
     ErrorState ValidateStrings(const Header& parsed, std::span<const std::byte> bytes) noexcept
     {
-        const std::span<const StringRef> stringSpan =
-            MakeTable<StringRef>(bytes, parsed.StringTableOffset, parsed.StringCount);
-        for (uint32_t i = 0u; i < stringSpan.size(); ++i)
+        const std::span<const StringRef> stringSpan = Map<StringRef>(bytes, parsed.Strings);
+        for (int32_t i = 0; std::cmp_less(i, stringSpan.size()); ++i)
         {
             const StringRef& reference = stringSpan[i];
-            if (reference.Length > parsed.StringBlobSize || reference.Offset > parsed.StringBlobSize - reference.Length)
+            if (reference.Length > parsed.StringBlobs.Count || reference.Offset > parsed.StringBlobs.Count - reference.Length)
             {
-                return { .Code = ErrorCode::StringOutOfBounds, .Table = ShaderManifestTable::Strings, .RecordIndex = i };
+                return { .Code = ErrorCode::StringOutOfBounds,
+                         .Table = ShaderManifestTable::Strings,
+                         .RecordIndex = static_cast<uint32_t>(i) };
             }
         }
 
@@ -1031,13 +1074,12 @@ namespace
     {
         // Each axis names a string and owns a run of values in the axis value table. A literal value has
         // nothing to reference, so only the name, the run, and a named value need checking.
-        const std::span<const Axis> axisSpan = MakeTable<Axis>(bytes, parsed.AxisTableOffset, parsed.AxisCount);
-        const std::span<const AxisValueType> allAxesValueSpan =
-            MakeTable<AxisValueType>(bytes, parsed.AxisValueTableOffset, parsed.AxisValueCount);
-        for (uint32_t i = 0u; i < axisSpan.size(); ++i)
+        const std::span<const Axis> axisSpan = Map<Axis>(bytes, parsed.Axes);
+        const std::span<const AxisValueType> allAxesValueSpan = Map<AxisValueType>(bytes, parsed.AxesValues);
+        for (uint32_t i = 0; i < axisSpan.size(); ++i)
         {
             const Axis& axis = axisSpan[i];
-            if (axis.NameString >= parsed.StringCount)
+            if (axis.NameString >= parsed.Strings.Count)
             {
                 return { .Code = ErrorCode::InvalidAxisName,
                          .Table = ShaderManifestTable::Axes,
@@ -1045,7 +1087,7 @@ namespace
                          .Detail = axis.NameString };
             }
 
-            if (static_cast<uint64_t>(axis.FirstValue) + static_cast<uint64_t>(axis.ValueCount) > parsed.AxisValueCount)
+            if (static_cast<uint64_t>(axis.FirstValue) + static_cast<uint64_t>(axis.ValueCount) > parsed.AxesValues.Count)
             {
                 return { .Code = ErrorCode::InvalidAxisValueRange,
                          .Table = ShaderManifestTable::Axes,
@@ -1061,7 +1103,7 @@ namespace
 
             for (const AxisValueType value : allAxesValueSpan.subspan(axis.FirstValue, axis.ValueCount))
             {
-                if (value >= parsed.StringCount)
+                if (value >= parsed.Strings.Count)
                 {
                     return { .Code = ErrorCode::InvalidAxisTypeStrIndex,
                              .Table = ShaderManifestTable::Axes,
@@ -1076,12 +1118,11 @@ namespace
 
     ErrorState ValidateProfiles(const Header& parsed, std::span<const std::byte> bytes) noexcept
     {
-        const std::span<const Profile> profileSpan =
-            MakeTable<Profile>(bytes, parsed.ProfileTableOffset, parsed.ProfileCount);
-        for (uint32_t i = 0u; i < profileSpan.size(); ++i)
+        const std::span<const Profile> profileSpan = Map<Profile>(bytes, parsed.Profiles);
+        for (uint32_t i = 0; i < profileSpan.size(); ++i)
         {
             const Profile& profile = profileSpan[i];
-            if (profile.TargetNameString >= parsed.StringCount)
+            if (profile.TargetNameString >= parsed.Strings.Count)
             {
                 return { .Code = ErrorCode::InvalidProfileTargetName,
                          .Table = ShaderManifestTable::Profiles,
@@ -1103,37 +1144,35 @@ namespace
 
     ErrorState ValidateModuleHeaders(const Header& parsed, std::span<const std::byte> bytes) noexcept
     {
-        const std::span<const ModuleRootHeader> moduleSpan =
-            MakeTable<ModuleRootHeader>(bytes, sizeof(Header), parsed.ModuleCount);
-        for (uint32_t i = 0u; i < moduleSpan.size(); ++i)
+        const TableRef64 modulesLoc{ sizeof(Header), parsed.ModuleCount };
+        const std::span<const ModuleRootHeader> moduleSpan = Map<ModuleRootHeader>(bytes, modulesLoc);
+        for (int32_t i = 0; std::cmp_less(i, moduleSpan.size()); ++i)
         {
             const ModuleRootHeader& moduleHeader = moduleSpan[i];
-            if (moduleHeader.ModuleNameString >= parsed.StringCount)
+            if (moduleHeader.ModuleNameString >= parsed.Strings.Count)
             {
                 return { .Code = ErrorCode::InvalidModuleNameString,
                          .Table = ShaderManifestTable::Modules,
-                         .RecordIndex = i,
+                         .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = moduleHeader.ModuleNameString };
             }
 
-            if (!TableIsInBounds(moduleHeader.EntryPointTableOffset,
-                                 moduleHeader.EntryPointCount,
+            if (!TableIsInBounds(moduleHeader.EntryPoints,
                                  sizeof(EntryPoint),
                                  parsed.HeaderSize))
             {
                 return { .Code = ErrorCode::SectionOutOfBounds,
                          .Table = ShaderManifestTable::EntryPoints,
-                         .RecordIndex = i };
+                         .RecordIndex = static_cast<uint32_t>(i) };
             }
 
-            if (!TableIsInBounds(moduleHeader.ModuleAxisTableOffset,
-                                 moduleHeader.ModuleAxisCount,
+            if (!TableIsInBounds(moduleHeader.ModuleAxes,
                                  sizeof(ModuleAxis),
                                  parsed.HeaderSize))
             {
                 return { .Code = ErrorCode::SectionOutOfBounds,
                          .Table = ShaderManifestTable::ModuleAxes,
-                         .RecordIndex = i };
+                         .RecordIndex = static_cast<uint32_t>(i) };
             }
         }
 
@@ -1142,18 +1181,18 @@ namespace
 
     ErrorState ValidateEntryPoints(const Header& parsed, std::span<const std::byte> bytes) noexcept
     {
-        for (const ModuleRootHeader& moduleHeader : MakeTable<ModuleRootHeader>(bytes, sizeof(Header), parsed.ModuleCount))
+        const TableRef64 modulesLoc{ sizeof(Header), parsed.ModuleCount };
+        for (const ModuleRootHeader& moduleHeader : Map<ModuleRootHeader>(bytes, modulesLoc))
         {
-            const std::span<const EntryPoint> entryPointSpan =
-                MakeTable<EntryPoint>(bytes, moduleHeader.EntryPointTableOffset, moduleHeader.EntryPointCount);
-            for (uint32_t i = 0u; i < entryPointSpan.size(); ++i)
+            const std::span<const EntryPoint> entryPoints = Map<EntryPoint>(bytes, moduleHeader.EntryPoints);
+            for (int32_t i = 0; std::cmp_less(i, entryPoints.size()); ++i)
             {
-                const EntryPoint& entryPoint = entryPointSpan[i];
-                if (entryPoint.NameString >= parsed.StringCount)
+                const EntryPoint& entryPoint = entryPoints[i];
+                if (entryPoint.NameString >= parsed.Strings.Count)
                 {
                     return { .Code = ErrorCode::EntryPointInvalidName,
                              .Table = ShaderManifestTable::EntryPoints,
-                             .RecordIndex = i,
+                             .RecordIndex = static_cast<uint32_t>(i),
                              .Detail = entryPoint.NameString };
                 }
 
@@ -1162,7 +1201,7 @@ namespace
                 {
                     return { .Code = ErrorCode::EntryPointInvalidStage,
                              .Table = ShaderManifestTable::EntryPoints,
-                             .RecordIndex = i,
+                             .RecordIndex = static_cast<uint32_t>(i),
                              .Detail = entryPoint.Stage };
                 }
             }
@@ -1173,19 +1212,19 @@ namespace
 
     ErrorState ValidateModuleAxes(const Header& parsed, std::span<const std::byte> bytes) noexcept
     {
-        const std::span<const Axis> axisSpan = MakeTable<Axis>(bytes, parsed.AxisTableOffset, parsed.AxisCount);
-        for (const ModuleRootHeader& moduleHeader : MakeTable<ModuleRootHeader>(bytes, sizeof(Header), parsed.ModuleCount))
+        const std::span<const Axis> axisSpan = Map<Axis>(bytes, parsed.Axes);
+        const TableRef64 modulesLoc{ sizeof(Header), parsed.ModuleCount };
+        for (const ModuleRootHeader& moduleHeader : Map<ModuleRootHeader>(bytes, modulesLoc))
         {
-            const std::span<const ModuleAxis> moduleAxisSpan =
-                MakeTable<ModuleAxis>(bytes, moduleHeader.ModuleAxisTableOffset, moduleHeader.ModuleAxisCount);
-            for (uint32_t i = 0u; i < moduleAxisSpan.size(); ++i)
+            const std::span<const ModuleAxis> moduleAxisSpan = Map<ModuleAxis>(bytes, moduleHeader.ModuleAxes);
+            for (int32_t i = 0u; std::cmp_less(i, moduleAxisSpan.size()); ++i)
             {
                 const ModuleAxis& moduleAxis = moduleAxisSpan[i];
                 if (moduleAxis.AxisIndex >= axisSpan.size())
                 {
                     return { .Code = ErrorCode::InvalidModuleAxisIndex,
                              .Table = ShaderManifestTable::ModuleAxes,
-                             .RecordIndex = i,
+                             .RecordIndex = static_cast<uint32_t>(i),
                              .Detail = moduleAxis.AxisIndex };
                 }
 
@@ -1196,7 +1235,7 @@ namespace
                 {
                     return { .Code = ErrorCode::InvalidModuleAxisValueMask,
                              .Table = ShaderManifestTable::ModuleAxes,
-                             .RecordIndex = i,
+                             .RecordIndex = static_cast<uint32_t>(i),
                              .Detail = moduleAxis.LiveValuesMask };
                 }
             }
@@ -1207,9 +1246,11 @@ namespace
 
     ErrorState ValidateDirectory(const Header& parsed, std::span<const std::byte> bytes) noexcept
     {
-        const std::span<const EnvironmentDirectoryEntry> directorySpan = MakeTable<EnvironmentDirectoryEntry>(
-            bytes, parsed.EnvironmentDirectoryOffset, parsed.ProfileCount * parsed.ModuleCount);
-        for (uint32_t i = 0u; i < directorySpan.size(); ++i)
+        const uint64_t dirCount = parsed.Profiles.Count * parsed.ModuleCount;
+        const TableRef64 directoryLoc{ parsed.EnvironmentDirectoryOffset, dirCount };
+        const std::span<const EnvironmentDirectoryEntry> directorySpan =
+            Map<EnvironmentDirectoryEntry>(bytes, directoryLoc);
+        for (int32_t i = 0; std::cmp_less(i, directorySpan.size()); ++i)
         {
             const EnvironmentDirectoryEntry& entry = directorySpan[i];
             if (entry.ExtentSize == 0u)
@@ -1227,7 +1268,7 @@ namespace
             {
                 return { .Code = ErrorCode::EnvironmentExtentOutOfBounds,
                          .Table = ShaderManifestTable::Environments,
-                         .RecordIndex = i };
+                         .RecordIndex = static_cast<uint32_t>(i) };
             }
         }
 
@@ -1239,72 +1280,46 @@ namespace
     {
         const EnvironmentHeader& environment = context.Environment;
         const uint64_t extentSize = context.Extent.size();
+        const bool validGrid = GridFitsRegion(environment.VariantCount,
+                                              context.EntryPointCount,
+                                              sizeof(EntryPointInstance),
+                                              extentSize);
+        const TableRef64 slotTableLoc{ environment.SlotTableOffset,
+                                       static_cast<uint64_t>(environment.VariantCount) * context.EntryPointCount };
+        const bool tableInBounds = TableIsInBounds(slotTableLoc,
+                                                   sizeof(EntryPointInstance),
+                                                   extentSize);
 
-        if (!GridFitsRegion(environment.VariantCount, context.EntryPointCount, sizeof(EntryPointInstance), extentSize) ||
-            !TableIsInBounds(environment.SlotTableOffset,
-                             static_cast<uint64_t>(environment.VariantCount) * context.EntryPointCount,
-                             sizeof(EntryPointInstance),
-                             extentSize))
+        if (!validGrid || !tableInBounds)
         {
             return { .Code = ErrorCode::SlotGridSizeMismatch,
                      .Table = ShaderManifestTable::Slots,
                      .Detail = environment.VariantCount };
         }
 
-        const std::array<Section, 17u> sections{
-            Section{ ShaderManifestTable::VariantKeys,
-                     environment.VariantKeyTableOffset,
-                     environment.VariantCount,
-                     sizeof(VariantKey) },
-            Section{ ShaderManifestTable::Variants, environment.VariantTableOffset, environment.VariantCount, sizeof(Variant) },
-            Section{ ShaderManifestTable::AxisMasks,
-                     environment.AxisMaskTableOffset,
-                     static_cast<uint64_t>(environment.VariantCount) * context.AxisMaskWordCount,
-                     sizeof(uint64_t) },
-            Section{ ShaderManifestTable::Sources, environment.SourceTableOffset, environment.SourceCount, sizeof(SourceRef) },
-            Section{ ShaderManifestTable::Sources, environment.SourceBlobOffset, environment.SourceBlobSize, 1u },
-            Section{ ShaderManifestTable::Bindings, environment.BindingTableOffset, environment.BindingCount, sizeof(Binding) },
-            Section{ ShaderManifestTable::ResourceLists,
-                     environment.ResourceListTableOffset,
-                     environment.ResourceListCount,
-                     sizeof(Run) },
-            Section{ ShaderManifestTable::ResourceIndices,
-                     environment.ResourceIndexTableOffset,
-                     environment.ResourceIndexCount,
-                     sizeof(uint32_t) },
-            Section{ ShaderManifestTable::Footprints,
-                     environment.FootprintTableOffset,
-                     environment.FootprintCount,
-                     sizeof(Footprint) },
-            Section{ ShaderManifestTable::FootprintLists,
-                     environment.FootprintListTableOffset,
-                     environment.FootprintListCount,
-                     sizeof(Run) },
-            Section{ ShaderManifestTable::VisibilityLists,
-                     environment.VisibilityListTableOffset,
-                     environment.VisibilityListCount,
-                     sizeof(Run) },
-            Section{ ShaderManifestTable::VisibilityIndices,
-                     environment.VisibilityIndexTableOffset,
-                     environment.VisibilityIndexCount,
-                     sizeof(uint32_t) },
-            Section{ ShaderManifestTable::Rasters, environment.RasterTableOffset, environment.RasterCount, sizeof(RasterState) },
-            Section{ ShaderManifestTable::VertexInputs,
-                     environment.VertexInputTableOffset,
-                     environment.VertexInputCount,
-                     sizeof(VertexInput) },
-            Section{ ShaderManifestTable::ColorTargets,
-                     environment.ColorTargetTableOffset,
-                     environment.ColorTargetCount,
-                     sizeof(ColorTarget) },
-            Section{ ShaderManifestTable::UniformMembers,
-                     environment.UniformMemberTableOffset,
-                     environment.UniformMemberCount,
-                     sizeof(UniformMember) },
-            Section{ ShaderManifestTable::SpecializationConstants,
-                     environment.SpecializationConstantTableOffset,
-                     environment.SpecializationConstantCount,
-                     sizeof(SpecializationConstant) },
+        const TableRef varKeysLoc{ environment.VariantKeyTableOffset, environment.VariantCount };
+        const TableRef varsLoc{ environment.VariantTableOffset, environment.VariantCount };
+        const TableRef axisMasksLoc{ environment.AxisMaskTableOffset,
+                                     environment.VariantCount * context.AxisMaskWordCount };
+        const std::array<Section, 17u> sections
+        {
+            Section{ ShaderManifestTable::VariantKeys, varKeysLoc, sizeof(VariantKey) },
+            Section{ ShaderManifestTable::Variants, varsLoc, sizeof(Variant) },
+            Section{ ShaderManifestTable::AxisMasks, axisMasksLoc, sizeof(uint64_t) },
+            Section{ ShaderManifestTable::Sources, environment.Sources, sizeof(SourceRef) },
+            Section{ ShaderManifestTable::Sources, environment.Sources, 1u },
+            Section{ ShaderManifestTable::Bindings, environment.Bindings, sizeof(Binding) },
+            Section{ ShaderManifestTable::ResourceLists, environment.ResourceLists, sizeof(Run) },
+            Section{ ShaderManifestTable::ResourceIndices, environment.ResourceIndices, sizeof(uint32_t) },
+            Section{ ShaderManifestTable::Footprints, environment.Footprints, sizeof(Footprint) },
+            Section{ ShaderManifestTable::FootprintLists, environment.FootprintLists, sizeof(Run) },
+            Section{ ShaderManifestTable::VisibilityLists, environment.VisibilityLists, sizeof(Run) },
+            Section{ ShaderManifestTable::VisibilityIndices, environment.VisibilityIndices, sizeof(uint32_t) },
+            Section{ ShaderManifestTable::Rasters, environment.Rasters, sizeof(RasterState) },
+            Section{ ShaderManifestTable::VertexInputs, environment.VertexInputs, sizeof(VertexInput) },
+            Section{ ShaderManifestTable::ColorTargets, environment.ColorTargets, sizeof(ColorTarget) },
+            Section{ ShaderManifestTable::UniformMembers, environment.UniformMembers, sizeof(UniformMember) },
+            Section{ ShaderManifestTable::SpecializationConstants, environment.SpecConstants, sizeof(SpecializationConstant) },
         };
 
         return ValidateSections(sections, extentSize);
@@ -1314,15 +1329,16 @@ namespace
     ErrorState ValidateSources(const EnvironmentContext& context) noexcept
     {
         const EnvironmentHeader& environment = context.Environment;
-        const std::span<const SourceRef> sourceSpan =
-            MakeTable<SourceRef>(context.Extent, environment.SourceTableOffset, environment.SourceCount);
-        for (uint32_t i = 0u; i < sourceSpan.size(); ++i)
+        const std::span<const SourceRef> sourceSpan = Map<SourceRef>(context.Extent, environment.Sources);
+        for (int32_t i = 0; std::cmp_less(i, sourceSpan.size()); ++i)
         {
             const SourceRef& reference = sourceSpan[i];
             if (reference.Length > environment.SourceBlobSize ||
                 reference.Offset > environment.SourceBlobSize - reference.Length)
             {
-                return { .Code = ErrorCode::SourceOutOfBounds, .Table = ShaderManifestTable::Sources, .RecordIndex = i };
+                return ErrorState{ .Code = ErrorCode::SourceOutOfBounds,
+                                   .Table = ShaderManifestTable::Sources,
+                                   .RecordIndex = static_cast<uint32_t>(i) };
             }
         }
 
@@ -1332,25 +1348,24 @@ namespace
     ErrorState ValidateBindings(const EnvironmentContext& context) noexcept
     {
         const EnvironmentHeader& environment = context.Environment;
-        const std::span<const Binding> bindingSpan =
-            MakeTable<Binding>(context.Extent, environment.BindingTableOffset, environment.BindingCount);
-        for (uint32_t i = 0u; i < bindingSpan.size(); ++i)
+        const std::span<const Binding> bindingSpan = Map<Binding>(context.Extent, environment.Bindings);
+        for (int32_t i = 0; std::cmp_less(i, bindingSpan.size()); ++i)
         {
             const Binding& binding = bindingSpan[i];
             if (binding.NameString >= context.StringCount || binding.ScopeString >= context.StringCount)
             {
                 return { .Code = ErrorCode::ManifestBindingInvalidName,
                          .Table = ShaderManifestTable::Bindings,
-                         .RecordIndex = i,
+                         .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = binding.NameString };
             }
 
-            if (binding.FirstUniformMember > environment.UniformMemberCount ||
-                binding.UniformMemberCount > environment.UniformMemberCount - binding.FirstUniformMember)
+            if (binding.FirstUniformMember > environment.UniformMembers.Count ||
+                binding.UniformMemberCount > environment.UniformMembers.Count - binding.FirstUniformMember)
             {
                 return { .Code = ErrorCode::ManifestBindingInvalidUniforms,
                          .Table = ShaderManifestTable::Bindings,
-                         .RecordIndex = i };
+                         .RecordIndex = static_cast<uint32_t>(i) };
             }
         }
 
@@ -1361,14 +1376,14 @@ namespace
     {
         const EnvironmentHeader& environment = context.Environment;
         const std::span<const uint32_t> resourceIndexList =
-            MakeTable<uint32_t>(context.Extent, environment.ResourceIndexTableOffset, environment.ResourceIndexCount);
-        for (uint32_t i = 0u; i < resourceIndexList.size(); ++i)
+            Map<uint32_t>(context.Extent, environment.ResourceIndices);
+        for (int32_t i = 0; std::cmp_less(i, resourceIndexList.size()); ++i)
         {
-            if (resourceIndexList[i] >= environment.BindingCount)
+            if (resourceIndexList[i] >= environment.Bindings.Count)
             {
                 return { .Code = ErrorCode::InvalidResourceBindingIndex,
                          .Table = ShaderManifestTable::ResourceIndices,
-                         .RecordIndex = i,
+                         .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = resourceIndexList[i] };
             }
         }
@@ -1382,40 +1397,39 @@ namespace
         {
             ShaderManifestTable Table;
             ErrorCode Code;
-            uint32_t Offset;
-            uint32_t Count;
+            TableRef Loc;
             uint32_t PayloadCount;
         };
 
         const EnvironmentHeader& environment = context.Environment;
-        const std::array<RunTable, 3u> runTables{
+        const std::array<RunTable, 3u> runTables
+        {
             RunTable{ ShaderManifestTable::ResourceLists,
-                      ErrorCode::InvalidResourceListRun,
-                      environment.ResourceListTableOffset,
-                      environment.ResourceListCount,
-                      environment.ResourceIndexCount },
+                          ErrorCode::InvalidResourceListRun,
+                          environment.ResourceLists,
+                          environment.ResourceIndices.Count },
             RunTable{ ShaderManifestTable::FootprintLists,
-                      ErrorCode::InvalidFootprintListRun,
-                      environment.FootprintListTableOffset,
-                      environment.FootprintListCount,
-                      environment.FootprintCount },
+                          ErrorCode::InvalidFootprintListRun,
+                          environment.FootprintLists,
+                          environment.Footprints.Count },
             RunTable{ ShaderManifestTable::VisibilityLists,
-                      ErrorCode::InvalidVisibilityListRun,
-                      environment.VisibilityListTableOffset,
-                      environment.VisibilityListCount,
-                      environment.VisibilityIndexCount },
+                          ErrorCode::InvalidVisibilityListRun,
+                          environment.VisibilityLists,
+                          environment.VisibilityIndices.Count },
         };
 
         for (const RunTable& runTable : runTables)
         {
-            const std::span<const Run> runSpan = MakeTable<Run>(context.Extent, runTable.Offset, runTable.Count);
-            for (uint32_t i = 0u; i < runSpan.size(); ++i)
+            const std::span<const Run> runSpan = Map<Run>(context.Extent, runTable.Loc);
+            for (int32_t i = 0; std::cmp_less(i, runSpan.size()); ++i)
             {
                 // <= on the sum for the edge case: an empty trailing list starts at the payload count
                 const Run& run = runSpan[i];
                 if (static_cast<uint64_t>(run.First) + static_cast<uint64_t>(run.Count) > runTable.PayloadCount)
                 {
-                    return { .Code = runTable.Code, .Table = runTable.Table, .RecordIndex = i };
+                    return ErrorState{ .Code = runTable.Code,
+                                       .Table = runTable.Table,
+                                       .RecordIndex = static_cast<uint32_t>(i) };
                 }
             }
         }
@@ -1426,34 +1440,34 @@ namespace
     ErrorState ValidateSlots(const EnvironmentContext& context) noexcept
     {
         const EnvironmentHeader& environment = context.Environment;
-        const std::span<const EntryPointInstance> slotSpan =
-            MakeTable<EntryPointInstance>(context.Extent,
-                                          environment.SlotTableOffset,
-                                          static_cast<uint64_t>(environment.VariantCount) * context.EntryPointCount);
-        for (uint32_t i = 0u; i < slotSpan.size(); ++i)
+        const uint64_t numSlots = context.EntryPointCount * environment.VariantCount;
+        const TableRef64 slotsLoc{ environment.SlotTableOffset, numSlots };
+        const std::span<const EntryPointInstance> slotSpan = Map<EntryPointInstance>(context.Extent,
+                                                                                     slotsLoc);
+        for (int32_t i = 0u; std::cmp_less(i, slotSpan.size()); ++i)
         {
             const EntryPointInstance& slot = slotSpan[i];
-            if (slot.SourceIndex >= environment.SourceCount)
+            if (slot.SourceIndex >= environment.Sources.Count)
             {
                 return { .Code = ErrorCode::InvalidSlotSourceIndex,
                          .Table = ShaderManifestTable::Slots,
-                         .RecordIndex = i,
+                         .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = slot.SourceIndex };
             }
 
-            if (slot.VisibilityIndex >= environment.VisibilityListCount)
+            if (slot.VisibilityIndex >= environment.VisibilityLists.Count)
             {
                 return { .Code = ErrorCode::InvalidSlotVisibilityIndex,
                          .Table = ShaderManifestTable::Slots,
-                         .RecordIndex = i,
+                         .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = slot.VisibilityIndex };
             }
 
-            if (slot.RasterIndex >= environment.RasterCount)
+            if (slot.RasterIndex >= environment.Rasters.Count)
             {
                 return { .Code = ErrorCode::InvalidSlotRasterIndex,
                          .Table = ShaderManifestTable::Slots,
-                         .RecordIndex = i,
+                         .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = slot.RasterIndex };
             }
         }
@@ -1464,8 +1478,8 @@ namespace
     ErrorState ValidateVariantKeys(const EnvironmentContext& context) noexcept
     {
         const EnvironmentHeader& environment = context.Environment;
-        const std::span<const VariantKey> variantKeySpan =
-            MakeTable<VariantKey>(context.Extent, environment.VariantKeyTableOffset, environment.VariantCount);
+        const TableRef varKeysLoc{ environment.VariantKeyTableOffset, environment.VariantCount };
+        const std::span<const VariantKey> variantKeySpan = Map<VariantKey>(context.Extent, varKeysLoc);
         // adjacent_find lets us combine is_sorted and the uniqueness check
         const auto outOfOrder = std::ranges::adjacent_find(variantKeySpan, std::greater_equal<VariantKey>{});
         if (outOfOrder != variantKeySpan.end())
@@ -1485,56 +1499,52 @@ namespace
         // so that all accessors can run unchecked
         const EnvironmentHeader& environment = context.Environment;
         const std::span<const std::byte> extent = context.Extent;
-        const std::span<const Variant> variantSpan =
-            MakeTable<Variant>(extent, environment.VariantTableOffset, environment.VariantCount);
-        const std::span<const Run> resourceLists =
-            MakeTable<Run>(extent, environment.ResourceListTableOffset, environment.ResourceListCount);
-        const std::span<const uint32_t> resourceIndexList =
-            MakeTable<uint32_t>(extent, environment.ResourceIndexTableOffset, environment.ResourceIndexCount);
-        const std::span<const Run> visibilityLists =
-            MakeTable<Run>(extent, environment.VisibilityListTableOffset, environment.VisibilityListCount);
-        const std::span<const uint32_t> visibilityIndices =
-            MakeTable<uint32_t>(extent, environment.VisibilityIndexTableOffset, environment.VisibilityIndexCount);
-        const std::span<const EntryPointInstance> slotSpan =
-            MakeTable<EntryPointInstance>(extent,
-                                          environment.SlotTableOffset,
-                                          static_cast<uint64_t>(environment.VariantCount) * context.EntryPointCount);
+        const TableRef variantsLoc{ environment.VariantTableOffset, environment.VariantCount };
+        const std::span<const Variant> variantSpan = Map<Variant>(extent, variantsLoc);
+        const std::span<const Run> resourceLists = Map<Run>(extent, environment.ResourceLists);
+        const std::span<const uint32_t> resourceIndexList = Map<uint32_t>(extent, environment.ResourceIndices);
+        const std::span<const Run> visibilityLists = Map<Run>(extent, environment.VisibilityLists);
+        const std::span<const uint32_t> visibilityIndices = Map<uint32_t>(extent, environment.VisibilityIndices);
+        
+        const uint64_t numSlots = context.EntryPointCount * environment.VariantCount;
+        const TableRef64 slotsLoc{ environment.SlotTableOffset, numSlots };
+        const std::span<const EntryPointInstance> slotSpan = Map<EntryPointInstance>(extent, slotsLoc);
         const size_t entryPointCount = static_cast<size_t>(context.EntryPointCount);
 
-        for (uint32_t vi = 0u; vi < variantSpan.size(); ++vi)
+        for (int32_t variantIdx = 0; std::cmp_less(variantIdx, variantSpan.size()); ++vi)
         {
-            const Variant& variant = variantSpan[vi];
+            const Variant& variant = variantSpan[variantIdx];
             if (variant.SuffixString >= context.StringCount)
             {
                 return { .Code = ErrorCode::InvalidVariantSuffixString,
                          .Table = ShaderManifestTable::Variants,
-                         .RecordIndex = vi,
+                         .RecordIndex = static_cast<uint32_t>(variantIdx),
                          .Detail = variant.SuffixString };
             }
 
-            if (variant.ResourceListIndex >= environment.ResourceListCount)
+            if (variant.ResourceListIndex >= environment.ResourceLists.Count)
             {
                 return { .Code = ErrorCode::InvalidResourceListRun,
                          .Table = ShaderManifestTable::Variants,
-                         .RecordIndex = vi,
+                         .RecordIndex = static_cast<uint32_t>(variantIdx),
                          .Detail = variant.ResourceListIndex };
             }
 
             // further open question for footprint lists: should we change it so that the null check
             // is no longer needed? We should have a sentinel value that indicates an empty or null
             // footprint for a resource, since that is still a valid case
-            if (variant.FootprintListIndex >= environment.FootprintListCount)
+            if (variant.FootprintListIndex >= environment.FootprintLists.Count)
             {
                 return { .Code = ErrorCode::InvalidVariantFootprintListIndex,
                          .Table = ShaderManifestTable::Variants,
-                         .RecordIndex = vi,
+                         .RecordIndex = static_cast<uint32_t>(variantIdx),
                          .Detail = variant.FootprintListIndex };
             }
 
             const std::span<const uint32_t> variantResourceIndices =
                 RunOf(resourceLists, resourceIndexList, variant.ResourceListIndex);
             const std::span<const EntryPointInstance> variantSlots =
-                slotSpan.subspan(static_cast<size_t>(vi) * entryPointCount, entryPointCount);
+                slotSpan.subspan(static_cast<size_t>(variantIdx) * entryPointCount, entryPointCount);
             for (const EntryPointInstance& slot : variantSlots)
             {
                 const std::span<const uint32_t> slotVisibilityIndices =
@@ -1542,7 +1552,7 @@ namespace
                 // absolute offset of this run into the visibility index table, so a bad entry names its row
                 const uint32_t runOffset = static_cast<uint32_t>(slotVisibilityIndices.data() - visibilityIndices.data());
 
-                for (uint32_t j = 0u; j < slotVisibilityIndices.size(); ++j)
+                for (int32_t j = 0; std::cmp_less(j, slotVisibilityIndices.size()); ++j)
                 {
                     // the entry indexes the variant's resource list, and the resource list was checked
                     // against the binding table already
@@ -1551,7 +1561,7 @@ namespace
                     {
                         return { .Code = ErrorCode::InvalidSlotVisibilityIndex,
                                  .Table = ShaderManifestTable::VisibilityIndices,
-                                 .RecordIndex = runOffset + j,
+                                 .RecordIndex = runOffset + static_cast<uint32_t>(j),
                                  .Detail = local };
                     }
                 }
