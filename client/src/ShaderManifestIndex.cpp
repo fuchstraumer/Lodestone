@@ -395,7 +395,7 @@ ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name
     return result;
 }
 
-ManifestIndex::ManifestIndex(ShaderManifestView view) : manifest(view)
+ManifestIndex::ManifestIndex(ManifestView view) : manifest(view)
 {
     std::span<const ManifestAxis> axes = manifest.Axes();
     radices.resize(axes.size());
@@ -418,7 +418,7 @@ ManifestIndex::ManifestIndex(ShaderManifestView view) : manifest(view)
     
 }
 
-const ShaderManifestView& ManifestIndex::View() const noexcept
+const ManifestView& ManifestIndex::View() const noexcept
 {
     return manifest;
 }

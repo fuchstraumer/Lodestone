@@ -13,24 +13,26 @@
 #include <vector>
 
 /**
- * @brief A read-only view over one cooked shader module, stored as a flat byte span.
+ * @brief A read-only view over one cook bundle, stored as a flat byte span.
  *
- * Every cross-reference in the file is a uint32 index, never a pointer. The reader is therefore a set
- * of spans over one byte span. It allocates nothing to open a file, and it relocates nothing.
+ * Every cross-reference in the file is an index or an offset, never a pointer. The header region uses
+ * absolute 64-bit offsets. An environment extent uses 32-bit offsets relative to its own start. The
+ * reader is therefore a set of spans over one byte span. It allocates nothing to open a file, and it
+ * relocates nothing.
  *
  * The byte span must outlive every view and every provider that reads it. Names and shader text point
  * into that span.
  */
-namespace lodestone
+namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 3u;
+inline constexpr uint32_t k_ShaderManifestVersion = 4u;
 
 // clang-tidy complains about enums being too big, but uint32_t means
 // the error struct is 16bytes, which is great alignment and still compact
 // NOLINTBEGIN(readability-enum-initial-value, performance-enum-size)
-enum class ShaderManifestErrorCode : uint32_t
+enum class ErrorCode : uint32_t
 {
     Invalid = 0,
     Success = 1,
@@ -55,22 +57,31 @@ enum class ShaderManifestErrorCode : uint32_t
     InvalidSlotVisibilityIndex = 20,
     InvalidSlotRasterIndex = 21,
     InvalidVariantKeyOrder = 22,
-    VariantKeyVariantCountMismatch = 23,
-    VariantSlotOutOfRange = 24,
-    InvalidRasterVertexInputRange = 25,
-    InvalidRasterColorTargetRange = 26,
-    InvalidVertexInput = 27,
-    InvalidVariantFootprintListIndex = 28,
-    InvalidUniformMember = 29,
-    InvalidAxisName = 30,
-    InvalidAxisValueRange = 31,
-    InvalidAxisTypeStrIndex = 32,
+    SlotGridSizeMismatch = 23,
+    InvalidRasterVertexInputRange = 24,
+    InvalidRasterColorTargetRange = 25,
+    InvalidVertexInput = 26,
+    InvalidVariantFootprintListIndex = 27,
+    InvalidUniformMember = 28,
+    InvalidAxisName = 29,
+    InvalidAxisValueRange = 30,
+    InvalidAxisTypeStrIndex = 31,
+    InvalidModuleNameString = 32,
+    InvalidProfileTargetName = 33,
+    EnvironmentExtentOutOfBounds = 34,
+    InvalidModuleAxisIndex = 35,
+    InvalidModuleAxisValueMask = 36,
+    InvalidSpecializationConstant = 37,
     Count
 };
 
 enum class ShaderManifestTable : uint32_t
 {
     Invalid,
+    Modules,
+    ModuleAxes,
+    Profiles,
+    Environments,
     Strings,
     Sources,
     Bindings,
@@ -84,12 +95,14 @@ enum class ShaderManifestTable : uint32_t
     Slots,
     Variants,
     VariantKeys,
+    AxisMasks,
     Axes,
     AxisValues,
     Rasters,
     VertexInputs,
     ColorTargets,
     UniformMembers,
+    SpecializationConstants,
     Count
 };
 //NOLINTEND(readability-enum-initial-value, performance-enum-size)
@@ -98,9 +111,9 @@ enum class ShaderManifestTable : uint32_t
  * the parsing or validation of a shader manifest. Using the record
  * index and the offset + the code, we can generate useful error
  * messages. */
-struct ShaderManifestError
+struct ErrorState
 {
-    ShaderManifestErrorCode Code{ ShaderManifestErrorCode::Invalid };
+    ErrorCode Code{ ErrorCode::Invalid };
     ShaderManifestTable Table{ ShaderManifestTable::Invalid };
     // index of the offending record within the table
     uint32_t RecordIndex{ 0u };
@@ -108,208 +121,95 @@ struct ShaderManifestError
     uint32_t Detail{ 0u };
     constexpr explicit operator bool() const noexcept
     {
-        return Code == ShaderManifestErrorCode::Success;
+        return Code == ErrorCode::Success;
     }
 
     constexpr bool operator!() const noexcept
     {
-        return Code != ShaderManifestErrorCode::Success;
+        return Code != ErrorCode::Success;
     }
 };
 
 template<typename T>
-using ManifestResult = std::expected<T, ShaderManifestError>;
+using ManifestResult = std::expected<T, ErrorState>;
 
-std::string_view ToString(ShaderManifestErrorCode error) noexcept;
+std::string_view ToString(ErrorCode error) noexcept;
 
 /** @brief A human-readable, one-line description of a manifest error, for a log or the console. It
  * folds in the table, record index, and `Detail` field, so the reader states where the file is bad */
-std::string DescribeShaderManifestError(const ShaderManifestError& error);
+std::string DescribeShaderManifestError(const ErrorState& error);
 
-/** @brief Fixed header at offset zero. Each section is an offset from the start of the file and a
- * count of records. All values are little-endian. */
-struct alignas(8) ShaderManifestHeader
+/** @brief The whole-cook header, at offset zero. Every offset in it is absolute.
+ *
+ * The file is ordered by profile, then by module. The header region (`HeaderSize` bytes) holds this
+ * record, the whole-cook tables, the module headers, and the environment directory. A reader loads the
+ * header region, then one contiguous run of environment extents. */
+struct alignas(8) Header
 {
     uint32_t Magic{ 0u };
     uint32_t Version{ 0u };
-    uint32_t FileSize{ 0u };
-    uint32_t ModuleNameString{ 0u };
+    // HeaderSize first, as we use that to just open and read *only* the header when applicable
+    uint64_t HeaderSize{ 0u };
+    // But whole file size is still important for validation
+    uint64_t FileSize{ 0u };
 
-    uint32_t StringTableOffset{ 0u };
-    uint32_t StringCount{ 0u };
-    uint32_t StringBlobOffset{ 0u };
-    uint32_t StringBlobSize{ 0u };
+    // module entries begin immediately after the end of this header:
+    // offset not needed because it's based on this objects size
+    uint64_t ModuleCount{ 0u };
+    uint64_t ProfileCount{ 0u };
+    uint64_t ProfileTableOffset{ 0u };
+    /** @brief A dense grid of `ProfileCount * ModuleCount` entries. The entry for (profile P, module M)
+     * is at `P * ModuleCount + M`. */
+    uint64_t EnvironmentDirectoryOffset{ 0u };
 
-    uint32_t SourceTableOffset{ 0u };
-    uint32_t SourceCount{ 0u };
-    uint32_t SourceBlobOffset{ 0u };
-    uint32_t SourceBlobSize{ 0u };
+    uint64_t StringCount{ 0u };
+    uint64_t StringTableOffset{ 0u };
+    uint64_t StringBlobSize{ 0u };
+    uint64_t StringBlobOffset{ 0u };
 
-    uint32_t BindingTableOffset{ 0u };
-    uint32_t BindingCount{ 0u };
-    uint32_t ResourceListTableOffset{ 0u };
-    uint32_t ResourceListCount{ 0u };
-
-    uint32_t ResourceIndexTableOffset{ 0u };
-    uint32_t ResourceIndexCount{ 0u };
-    uint32_t FootprintTableOffset{ 0u };
-    uint32_t FootprintCount{ 0u };
-
-    uint32_t FootprintListTableOffset{ 0u };
-    uint32_t FootprintListCount{ 0u };
-    uint32_t VisibilityListTableOffset{ 0u };
-    uint32_t VisibilityListCount{ 0u };
-
-    uint32_t VisibilityIndexTableOffset{ 0u };
-    uint32_t VisibilityIndexCount{ 0u };
-
-    uint32_t EntryPointTableOffset{ 0u };
-    uint32_t EntryPointCount{ 0u };
-    uint32_t SlotTableOffset{ 0u };
-    uint32_t SlotCount{ 0u };
-
-    uint32_t VariantTableOffset{ 0u };
-    uint32_t VariantCount{ 0u };
-    uint32_t VariantKeyTableOffset{ 0u };
-    uint32_t VariantKeyCount{ 0u };
-
-    uint32_t AxisTableOffset{ 0u };
-    uint32_t AxisCount{ 0u };
-    uint32_t AxisValueTableOffset{ 0u };
-    uint32_t AxisValueCount{ 0u };
-
-    uint32_t RasterTableOffset{ 0u };
-    uint32_t RasterCount{ 0u };
-    uint32_t VertexInputTableOffset{ 0u };
-    uint32_t VertexInputCount{ 0u };
-    uint32_t ColorTargetTableOffset{ 0u };
-    uint32_t ColorTargetCount{ 0u };
-    uint32_t UniformMemberTableOffset{ 0u };
-    uint32_t UniformMemberCount{ 0u };
+    uint64_t AxisCount{ 0u };
+    uint64_t AxisTableOffset{ 0u };
+    uint64_t AxisValueCount{ 0u };
+    uint64_t AxisValueTableOffset{ 0u };
 };
 
-struct alignas(8) ManifestStringRef
+/** @brief A string in the whole-cook string blob. */
+struct alignas(8) StringRef
 {
     uint32_t Offset{ 0u };
     uint32_t Length{ 0u };
 };
 
-/** @brief One resource binding. Field order puts the 8-byte members first, so the record needs no
- * padding on any target and its size stays the same on every compiler. */
-struct alignas(8) ManifestBinding
+/** @brief A source text in the source blob of one environment extent. `Offset` is relative to the
+ * start of that blob. */
+struct alignas(8) SourceRef
 {
-    uint64_t ByteSize{ 0u };
-    uint32_t NameString{ 0u };
-    uint32_t ScopeString{ 0u };
-    uint32_t Group{ 0u };
-    uint32_t Binding{ 0u };
-    uint32_t ElementStride{ 0u };
-    uint32_t ArrayCount{ 1u };
-    uint32_t StorageFormat{ 0u };
-    uint32_t FirstUniformMember{ 0u };
-    uint32_t UniformMemberCount{ 0u };
-    uint32_t Reserved2{ 0u };
-    uint8_t PlacementKind{ 0u };
-    uint8_t Kind{ 0u };
-    uint8_t Shape{ 0u };
-    uint8_t IsComparisonSampler{ 0u };
-    uint8_t Access{ 0u };
+    uint32_t Offset{ 0u };
+    uint32_t Length{ 0u };
+};
+
+/** @brief One cooked form: a target and an access model. The "capability floor" is currently 
+  * unused until we better identify how we want to define and leverage that. */
+struct alignas(8) Profile
+{
+    uint32_t TargetNameString{ 0u };
+    uint32_t CapabilityFloor{ 0u };
+    PlacementKind AccessModel{ PlacementKind::None };
     uint8_t Reserved0{ 0u };
     uint16_t Reserved1{ 0u };
+    uint32_t Reserved2{ 0u };
 };
 
-/**@brief "Footprint" refers to the memory footprint of a resource, insofar as we can declare it. `Kind`
- * specifies if this is a buffer, texture, or invalid. `ElementCount` is *only* valid fo buffers, and
- * `ExtentX/Y/Z` is only valid for a texture. The latter is NOT a byte size: it is pixel dims.*/
-// todo-ship: Union ExtentX w ElementCount, or just replace ElementCount with ExtentX. That's what a buffer
-// length is anyways. This gets us to a round 16 bytes, which is nice and aligned vs 24 now
-struct alignas(8) ManifestFootprint
+/** @brief Where one (profile, module) environment sits in the file. A size of zero means the module
+ * was not cooked for that profile. 
+ * @note Profile is considered first, as renderers will want all the modules for a given profile together.*/
+struct alignas(8) EnvironmentDirectoryEntry
 {
-    uint64_t ElementCount{ 0u };
-    uint32_t ExtentX{ 0u };
-    uint32_t ExtentY{ 0u };
-    uint32_t ExtentZ{ 0u };
-    uint32_t Kind{ 0u };
+    uint64_t ExtentOffset{ 0u };
+    uint64_t ExtentSize{ 0u };
 };
 
-/** @brief A run in an index table. Used for a resource list and for a visibility list. Variants can have
- *  different counts of resources, so this allows us to compact them efficiently in the binary schema. */
-struct alignas(8) ManifestRun
-{
-    uint32_t First{ 0u };
-    uint32_t Count{ 0u };
-};
-
-struct alignas(8) ManifestEntryPoint
-{
-    uint32_t NameString{ 0u };
-    uint32_t Stage{ 0u };
-};
-
-/** @brief What one entry point of one variant resolves to. */
-struct alignas(8) ManifestSlot
-{
-    uint32_t SourceIndex{ 0u };
-    /** @brief Index into visibility list table: which of the variant's resources this entry point reads.*/
-    uint32_t VisibilityIndex{ 0u };
-    uint32_t WorkgroupX{ 1u };
-    uint32_t WorkgroupY{ 1u };
-    uint32_t WorkgroupZ{ 1u };
-    uint32_t RasterIndex{ 0u };
-};
-
-struct alignas(8) ManifestVertexInput
-{
-    uint32_t SemanticNameString{ 0u };
-    uint32_t SemanticIndex{ 0u };
-    uint32_t Location{ 0u };
-    uint32_t ScalarType{ 0u };
-    uint32_t ComponentCount{ 0u };
-    uint32_t Reserved{ 0u };
-};
-
-struct alignas(8) ManifestUniformMember
-{
-    uint32_t NameString{ 0u };
-    uint32_t Offset{ 0u };
-    uint32_t Size{ 0u };
-    uint32_t ArrayCount{ 1u };
-    uint32_t ElementStride{ 0u };
-    uint32_t MatrixLayout{ 0u };
-};
-
-struct alignas(8) ManifestColorTarget
-{
-    uint32_t Location{ 0u };
-    uint32_t ScalarType{ 0u };
-    uint32_t ComponentCount{ 0u };
-    uint32_t Reserved{ 0u };
-};
-
-/** @brief Runs of vertex inputs and color targets. A compute entry point names a raster record whose
- * counts are both zero, so every slot can name one and no accessor needs a stage test. */
-struct alignas(8) ManifestRaster
-{
-    uint32_t FirstVertexInput{ 0u };
-    uint32_t VertexInputCount{ 0u };
-    uint32_t FirstColorTarget{ 0u };
-    uint32_t ColorTargetCount{ 0u };
-    uint32_t WritesFragDepth{ 0u };
-    uint32_t Reserved{ 0u };
-};
-
-struct alignas(8) ManifestVariant
-{
-    uint32_t Index{ 0u };
-    uint32_t FirstSlot{ 0u };
-    uint32_t SlotCount{ 0u };
-    uint32_t SuffixString{ 0u };
-    /** @brief What this variant declares, and how much of each. Both are per variant. */
-    uint32_t ResourceListIndex{ 0u };
-    uint32_t FootprintListIndex{ 0u };
-};
-
-struct alignas(8) ManifestAxis
+struct alignas(8) Axis
 {
     uint32_t NameString{ 0u };
     uint32_t FirstValue{ 0u };
@@ -320,104 +220,299 @@ struct alignas(8) ManifestAxis
     uint8_t Pad{ 0u };
 };
 
+/**@brief A run in an index table. Used for a resource list and for a visibility list. Variants can have
+*  different counts of resources, so this allows us to compact them efficiently in the binary schema. 
+*  This goes in the root Manifest scope since it's used by multiple tables. */
+struct alignas(8) Run
+{
+    uint32_t First{ 0u };
+    uint32_t Count{ 0u };
+};
+
+struct alignas(8) ModuleAxis
+{
+    uint32_t AxisIndex{ 0u };
+    // a bitmask of the indices of the values live for this axis in *this module*
+    uint32_t LiveValuesMask{ 0u };
+};
+
+// A module has *one* core module root header, which describes the data that is environment-agnostic
+// and doesn't change for different targets and profiles.
+struct alignas(8) ModuleRootHeader
+{
+    uint32_t ModuleNameString{ 0u };
+    uint32_t Reserved{ 0u };
+    uint64_t EntryPointCount{ 0u };
+    uint64_t EntryPointTableOffset{ 0u };
+    uint64_t ModuleAxisCount{ 0u };
+    uint64_t ModuleAxisTableOffset{ 0u };
+};
+
+struct alignas(8) EntryPoint
+{
+    uint32_t NameString{ 0u };
+    uint32_t Stage{ 0u };
+};
+
+/** @brief The first record of one environment extent: one module, cooked for one profile.
+ *
+ * Every offset is relative to the start of the extent, so an extent can load into its own buffer with
+ * no fixup. Three tables have no count, because the data already fixes their size:
+ * - Variant keys and variant records share a size
+ * - The axis mask table holds one bitmask per variant. The length of the individual records
+ *   is somewhat unique though: ceil(ModuleAxisCount / 64) words per variant, since it's a bitmask
+ * - The slot table (a slot being a distinct entrypoint instance) is `VariantCount * EntryPointCount` records.
+ *   Thus, the slot for (variant V, entry point E) is at `V * EntryPointCount + E`. */
+struct alignas(8) EnvironmentHeader
+{
+    uint32_t VariantCount{ 0u };
+    uint32_t VariantKeyTableOffset{ 0u };
+    uint32_t VariantTableOffset{ 0u };
+    uint32_t AxisMaskTableOffset{ 0u };
+    uint32_t SlotTableOffset{ 0u };
+    uint32_t Reserved{ 0u };
+
+    uint32_t SourceCount{ 0u };
+    uint32_t SourceTableOffset{ 0u };
+    uint32_t SourceBlobSize{ 0u };
+    uint32_t SourceBlobOffset{ 0u };
+
+    uint32_t BindingCount{ 0u };
+    uint32_t BindingTableOffset{ 0u };
+    uint32_t ResourceListCount{ 0u };
+    uint32_t ResourceListTableOffset{ 0u };
+    uint32_t ResourceIndexCount{ 0u };
+    uint32_t ResourceIndexTableOffset{ 0u };
+    uint32_t FootprintCount{ 0u };
+    uint32_t FootprintTableOffset{ 0u };
+    uint32_t FootprintListCount{ 0u };
+    uint32_t FootprintListTableOffset{ 0u };
+    uint32_t VisibilityListCount{ 0u };
+    uint32_t VisibilityListTableOffset{ 0u };
+    uint32_t VisibilityIndexCount{ 0u };
+    uint32_t VisibilityIndexTableOffset{ 0u };
+    uint32_t RasterCount{ 0u };
+    uint32_t RasterTableOffset{ 0u };
+    uint32_t VertexInputCount{ 0u };
+    uint32_t VertexInputTableOffset{ 0u };
+    uint32_t ColorTargetCount{ 0u };
+    uint32_t ColorTargetTableOffset{ 0u };
+    uint32_t UniformMemberCount{ 0u };
+    uint32_t UniformMemberTableOffset{ 0u };
+    // Currently unused, but reserved as we are trying to get it up asap
+    uint32_t SpecializationConstantCount{ 0u };
+    uint32_t SpecializationConstantTableOffset{ 0u };
+};
+
+/** @brief One variant of one environment. Its key is at the same position in the key table. The
+ * capability requirement is unused, as mentioned earlier, while we wait to specify and build that */
+struct alignas(8) Variant
+{
+    uint32_t SuffixString{ 0u };
+    uint32_t ResourceListIndex{ 0u };
+    uint32_t FootprintListIndex{ 0u };
+    uint32_t CapabilityRequirement{ 0u };
+};
+
+/** @brief Where a shader reaches one resource. `Binding::PlacementKind` selects how to read it:
+ * - Bound: `Word0` is the group, and `Word1` is the binding.
+ * - Indexed: `Word0` is the heap index. `Word1` is zero.
+ * - Pointer: `Word0` is the low half and `Word1` the high half of a byte offset.
+ */
+struct alignas(8) PlacementPayload
+{
+    uint32_t Word0{ 0u };
+    uint32_t Word1{ 0u };
+};
+
+/**@brief One resource binding. uint64_t/uint32_t members frontloaded so that we 
+ * don't get any sneaky padding inserted by the compiler. */
+struct alignas(8) Binding
+{
+    uint64_t ByteSize{ 0u };
+    PlacementPayload Placement{};
+    uint32_t NameString{ 0u };
+    uint32_t ScopeString{ 0u };
+    uint32_t ElementStride{ 0u };
+    uint32_t ArrayCount{ 1u };
+    uint32_t StorageFormat{ 0u };
+    uint32_t UniformMemberCount{ 0u };
+    uint32_t FirstUniformMember{ 0u };
+    uint8_t PlacementKind{ 0u };
+    uint8_t Kind{ 0u };
+    uint8_t Shape{ 0u };
+    uint8_t IsComparisonSampler{ 0u };
+    uint8_t Access{ 0u };
+    uint8_t Reserved0{ 0u };
+    uint16_t Reserved1{ 0u };
+    uint32_t Reserved2{ 0u };
+};
+
+/**@brief "Footprint" refers to the memory footprint of a resource, insofar as we can declare it. `Kind`
+* specifies if this is a buffer, texture, or invalid. `ElementCount` is *only* valid for buffers, and
+* `ExtentX/Y/Z` is only valid for a texture. The latter is NOT a byte size: it is pixel dims.*/
+// todo-ship: Union ExtentX w ElementCount, or just replace ElementCount with ExtentX. That's what a buffer
+// length is anyways. This gets us to a round 16 bytes, which is nice and aligned vs 24 now
+struct alignas(8) Footprint
+{
+    uint64_t ElementCount{ 0u };
+    uint32_t ExtentX{ 0u };
+    uint32_t ExtentY{ 0u };
+    uint32_t ExtentZ{ 0u };
+    uint32_t Kind{ 0u };
+};
+
+/** @brief What one entry point of one variant resolves to. */
+struct alignas(8) EntryPointInstance
+{
+    uint32_t SourceIndex{ 0u };
+    /** @brief Index into visibility list table: which of the variant's resources this entry point reads.*/
+    uint32_t VisibilityIndex{ 0u };
+    uint32_t WorkgroupX{ 1u };
+    uint32_t WorkgroupY{ 1u };
+    uint32_t WorkgroupZ{ 1u };
+    uint32_t RasterIndex{ 0u };
+};
+
+struct alignas(8) VertexInput
+{
+    uint32_t SemanticNameString{ 0u };
+    uint32_t SemanticIndex{ 0u };
+    uint32_t Location{ 0u };
+    uint32_t ScalarType{ 0u };
+    uint32_t ComponentCount{ 0u };
+    uint32_t Reserved{ 0u };
+};
+
+struct alignas(8) UniformMember
+{
+    uint32_t NameString{ 0u };
+    uint32_t Offset{ 0u };
+    uint32_t Size{ 0u };
+    uint32_t ArrayCount{ 1u };
+    uint32_t ElementStride{ 0u };
+    uint32_t MatrixLayout{ 0u };
+};
+
+/** @brief One specialization constant (a WGSL `override`). Reserved: the cooker does not write this
+ * table yet. `DefaultBits` holds the default value as raw bits of `ScalarType`. */
+struct alignas(8) SpecializationConstant
+{
+    uint64_t DefaultBits{ 0u };
+    uint32_t NameString{ 0u };
+    uint32_t ConstantId{ 0u };
+    uint32_t ScalarType{ 0u };
+    uint32_t Reserved{ 0u };
+};
+
+struct alignas(8) ColorTarget
+{
+    uint32_t Location{ 0u };
+    uint32_t ScalarType{ 0u };
+    uint32_t ComponentCount{ 0u };
+    uint32_t Reserved{ 0u };
+};
+
+/** @brief Runs of vertex inputs and color targets. A compute entry point names a raster record whose
+* counts are both zero, so every slot can name one and no accessor needs a stage test. */
+struct alignas(8) RasterState
+{
+    uint32_t FirstVertexInput{ 0u };
+    uint32_t VertexInputCount{ 0u };
+    uint32_t FirstColorTarget{ 0u };
+    uint32_t ColorTargetCount{ 0u };
+    uint32_t WritesFragDepth{ 0u };
+    uint32_t Reserved{ 0u };
+};
+
 /** The reader reinterprets manifest bytes as records, so a record must be a bag of bytes.
- *
- * A record that held a pointer, a `std::string`, or a virtual table would make the reader read a
- * pointer out of a file. Nothing else in this repository catches that.
- *
- * Record sizes and layouts are not pinned yet, as we're still building out this library.*/
+*
+* A record that held a pointer, a `std::string`, or a virtual table would make the reader read a
+* pointer out of a file. Nothing else in this repository catches that.
+*
+* Record sizes and layouts are not pinned yet, as we're still building out this library.*/
 // todo-ship: Better versioning system, graceful extension of fields, converters between versions
 template<typename RecordType>
 inline constexpr bool k_IsManifestRecord =
     std::is_trivially_copyable_v<RecordType> && alignof(RecordType) <= 8u;
 
-static_assert(k_IsManifestRecord<ShaderManifestHeader>);
-static_assert(k_IsManifestRecord<ManifestStringRef>);
-static_assert(k_IsManifestRecord<ManifestBinding>);
-static_assert(k_IsManifestRecord<ManifestRun>);
-static_assert(k_IsManifestRecord<ManifestFootprint>);
-static_assert(k_IsManifestRecord<ManifestEntryPoint>);
-static_assert(k_IsManifestRecord<ManifestSlot>);
-static_assert(k_IsManifestRecord<ManifestVertexInput>);
-static_assert(k_IsManifestRecord<ManifestUniformMember>);
-static_assert(k_IsManifestRecord<ManifestColorTarget>);
-static_assert(k_IsManifestRecord<ManifestRaster>);
-static_assert(k_IsManifestRecord<ManifestVariant>);
-static_assert(k_IsManifestRecord<ManifestAxis>);
-
 /**
- * @brief Spans over one manifest byte span, checked once when it opens.
- *
- * Open() checks the full structure of the data in the manifest, from verifying simple
- * things like the header magic and version, to performing a full cross-reference check
- * and validating all stored indices read within bounds. This means that after Open()
- * returns a view, all subsequent accessor calls are guaranteed to be safe and within bounds.
- * (effectively meaning it's branch-free)
- * @note This class does not provide any facilities for modifying the manifest; it is strictly read-only.
- * This also stays purely in the vocabulary of the manifest itself, for reading or accessing
- * data in the vocabulary of authorship use the `ShaderManifestIndex`
- */
-class ShaderManifestView
+* @brief Spans over one manifest byte span, checked once when it opens.
+*
+* Open() checks the full structure of the data in the manifest, from verifying simple
+* things like the header magic and version, to performing a full cross-reference check
+* and validating all stored indices read within bounds. This means that after Open()
+* returns a view, all subsequent accessor calls are guaranteed to be safe and within bounds.
+* (effectively meaning it's branch-free)
+* @note This class does not provide any facilities for modifying the manifest; it is strictly read-only.
+* This also stays purely in the vocabulary of the manifest itself, for reading or accessing
+* data in the vocabulary of authorship use the `ShaderManifestIndex`
+*/
+class ManifestView
 {
 public:
-    ShaderManifestView() noexcept;
+    ManifestView() noexcept;
 
     // Performs deep validation of the manifest data: cross reference checks, consistency verification,
     // effectively a full validation of the manifest. This means, however, that all the accessors
     // can run totally unchecked after Open() has successfully returned.
-    static ManifestResult<ShaderManifestView> Open(std::span<const std::byte> bytes) noexcept;
+    static ManifestResult<ManifestView> Open(std::span<const std::byte> bytes) noexcept;
 
     [[nodiscard]] std::string_view ModuleName() const noexcept;
     [[nodiscard]] std::string_view String(uint32_t string_index) const noexcept;
     [[nodiscard]] std::string_view Source(uint32_t source_index) const noexcept;
+    [[nodiscard]] std::span<const Axis> Axes() const noexcept;
+    [[nodiscard]] const Axis& AxisData(uint32_t axis_index) const noexcept;
+    [[nodiscard]] std::span<const AxisValueType> AllAxesValues() const noexcept;
+    [[nodiscard]] std::span<const AxisValueType> AxisValues(uint32_t axis_index) const noexcept;
 
-    [[nodiscard]] std::span<const ManifestBinding> Bindings() const noexcept;
+    [[nodiscard]] const ModuleRootHeader& ModuleHeader(uint32_t module_index) const noexcept;
+    [[nodiscard]] std::span<const ModuleRootHeader> LogicalHeaders() const noexcept;
+
+    [[nodiscard]] std::span<const Binding> Bindings() const noexcept;
     /** @brief The resources one variant declares. Indices into Bindings(). */
     [[nodiscard]] std::span<const uint32_t> ResourceList(uint32_t list_index) const noexcept;
     /** @brief How much of each resource, in the same order as the resource list. */
-    [[nodiscard]] std::span<const ManifestFootprint> FootprintList(uint32_t list_index) const noexcept;
+    [[nodiscard]] std::span<const Footprint> FootprintList(uint32_t list_index) const noexcept;
     /** @brief Which of a variant's resources one entry point reads. Indices into the resource list. */
     [[nodiscard]] std::span<const uint32_t> VisibilityList(uint32_t list_index) const noexcept;
-    [[nodiscard]] std::span<const ManifestEntryPoint> EntryPoints() const noexcept;
-    [[nodiscard]] std::span<const ManifestVariant> Variants() const noexcept;
+    [[nodiscard]] std::span<const EntryPoint> EntryPoints() const noexcept;
+    [[nodiscard]] std::span<const Variant> Variants() const noexcept;
     [[nodiscard]] std::span<const VariantKey> VariantKeys() const noexcept;
-    [[nodiscard]] std::span<const ManifestAxis> Axes() const noexcept;
-    [[nodiscard]] const ManifestAxis& Axis(uint32_t axis_index) const noexcept;
-    [[nodiscard]] std::span<const AxisValueType> AllAxesValues() const noexcept;
-    [[nodiscard]] std::span<const AxisValueType> AxisValues(uint32_t axis_index) const noexcept;
     [[nodiscard]] AxisValueType AxisValue(uint32_t axis_index, uint32_t value_index) const noexcept;
-    [[nodiscard]] std::span<const ManifestVertexInput> VertexInputs(uint32_t raster_index) const noexcept;
-    [[nodiscard]] std::span<const ManifestColorTarget> ColorTargets(uint32_t raster_index) const noexcept;
+    [[nodiscard]] std::span<const VertexInput> VertexInputs(uint32_t raster_index) const noexcept;
+    [[nodiscard]] std::span<const ColorTarget> ColorTargets(uint32_t raster_index) const noexcept;
     [[nodiscard]] bool WritesFragDepth(uint32_t raster_index) const noexcept;
-    [[nodiscard]] std::span<const ManifestUniformMember> UniformMembers(
-        const ManifestBinding& binding) const noexcept;
+    [[nodiscard]] std::span<const UniformMember> UniformMembers(const Binding& binding) const noexcept;
     /** @brief The entry-point specific information for one entry point of one variant. */
-    [[nodiscard]] const ManifestSlot* FindSlot(uint32_t entry_point, VariantKey variant) const noexcept;
+    [[nodiscard]] const EntryPointInstance* FindSlot(uint32_t entry_point, VariantKey variant) const noexcept;
     /** @brief One slot for each entry point of this variant, in entry point order. */
-    [[nodiscard]] std::span<const ManifestSlot> VariantSlots(const ManifestVariant& variant) const noexcept;
-    [[nodiscard]] std::span<const ManifestSlot> SlotTable() const noexcept;
+    [[nodiscard]] std::span<const EntryPointInstance> VariantSlots(const Variant& variant) const noexcept;
+    [[nodiscard]] std::span<const EntryPointInstance> SlotTable() const noexcept;
 private:
     std::span<const std::byte> bytes;
-    const ShaderManifestHeader* header{ nullptr };
-    std::span<const ManifestStringRef> strings;
-    std::span<const ManifestStringRef> sources;
-    std::span<const ManifestBinding> bindings;
-    std::span<const ManifestRun> resourceLists;
+    const Header* header{ nullptr };
+    std::span<const ModuleRootHeader> moduleHeaders;
+    std::span<const EnvironmentHeader> environmentHeaders;
+    std::span<const StringRef> strings;
+    std::span<const SourceRef> sources;
+    std::span<const Binding> bindings;
+    std::span<const Run> resourceLists;
     std::span<const uint32_t> resourceIndices;
-    std::span<const ManifestFootprint> footprints;
-    std::span<const ManifestRun> footprintLists;
-    std::span<const ManifestRun> visibilityLists;
+    std::span<const Footprint> footprints;
+    std::span<const Run> footprintLists;
+    std::span<const Run> visibilityLists;
     std::span<const uint32_t> visibilityIndices;
-    std::span<const ManifestEntryPoint> entryPoints;
-    std::span<const ManifestSlot> slots;
-    std::span<const ManifestVariant> variants;
+    std::span<const EntryPoint> entryPoints;
+    std::span<const EntryPointInstance> slots;
+    std::span<const Variant> variants;
     std::span<const VariantKey> variantKeys;
-    std::span<const ManifestAxis> axes;
+    std::span<const Axis> axes;
     std::span<const AxisValueType> axisValues;
-    std::span<const ManifestRaster> rasterStates;
-    std::span<const ManifestVertexInput> vertexInputs;
-    std::span<const ManifestColorTarget> colorTargets;
-    std::span<const ManifestUniformMember> uniformMembers;
+    std::span<const RasterState> rasterStates;
+    std::span<const VertexInput> vertexInputs;
+    std::span<const ColorTarget> colorTargets;
+    std::span<const UniformMember> uniformMembers;
 };
 
 /**
@@ -434,7 +529,7 @@ private:
 class ShaderSourceProvider
 {
 public:
-    ShaderSourceProvider(ShaderManifestView view, uint64_t generation) noexcept;
+    ShaderSourceProvider(ManifestView view, uint64_t generation) noexcept;
 
     [[nodiscard]] std::string_view Source(uint32_t entry_point,
                                           VariantKey variant) const noexcept;
@@ -444,10 +539,10 @@ public:
                                           VariantKey variant) const noexcept;
     [[nodiscard]] uint64_t Generation() const noexcept;
 
-    [[nodiscard]] const ShaderManifestView& View() const noexcept;
+    [[nodiscard]] const ManifestView& View() const noexcept;
 
 private:
-    ShaderManifestView view;
+    ManifestView view;
     /** Built before bindingInfos and reserved to its final size, so the spans below stay valid. */
     std::vector<UniformMemberInfo> memberInfos;
     /** One entry for each slot, gathered from the resource list and the footprint list of the slot's
@@ -458,13 +553,13 @@ private:
     std::vector<uint32_t> slotFirstBinding;
     std::vector<uint32_t> slotBindingCount;
 
-    void GatherVariantBindings(const ManifestVariant& variant, const std::vector<uint32_t>& member_offsets);
-    [[nodiscard]] BindingInfo MakeBindingInfo(const ManifestBinding& record,
-                                              const ManifestFootprint* footprint,
+    void GatherVariantBindings(const Variant& variant, const std::vector<uint32_t>& member_offsets);
+    [[nodiscard]] BindingInfo MakeBindingInfo(const Binding& record,
+                                              const Footprint* footprint,
                                               uint32_t member_offset) const noexcept;
     uint64_t generation{ 0u };
 };
 
-} // namespace lodestone
+} // namespace lodestone::manifest
 
 #endif // !LODESTONE_SHADER_MANIFEST_HPP

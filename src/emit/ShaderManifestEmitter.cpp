@@ -194,10 +194,10 @@ namespace
                record.Access == static_cast<uint8_t>(binding.Access);
     }
 
-    CookResult<ShaderManifestView> OpenManifestForCheck(const CookedModule& module,
+    CookResult<ManifestView> OpenManifestForCheck(const CookedModule& module,
                                                         std::span<const std::byte> raw)
     {
-        const ManifestResult<ShaderManifestView> opened = ShaderManifestView::Open(raw);
+        const ManifestResult<ManifestView> opened = ManifestView::Open(raw);
         if (!opened.has_value())
         {
             std::println(stderr,
@@ -263,7 +263,7 @@ namespace
         return CookError::ManifestVariantWorkgroupSizeMismatch;
     }
 
-    bool ManifestUniformMembersMatch(const ShaderManifestView& view,
+    bool ManifestUniformMembersMatch(const ManifestView& view,
                                      const ManifestBinding& read,
                                      const ReflectedBinding& expected)
     {
@@ -292,7 +292,7 @@ namespace
     }
 
     CookError CheckManifestLayout(const CookedModule& module,
-                                         const ShaderManifestView& view,
+                                         const ManifestView& view,
                                          const LibraryVariant& variant,
                                          size_t entry_point_index)
     {
@@ -384,7 +384,7 @@ namespace
 
     CookError CheckManifestVertexInputs(std::span<const ManifestVertexInput> read_inputs,
                                                const ReflectedRasterState& expected_raster,
-                                               const ShaderManifestView& view)
+                                               const ManifestView& view)
     {
         for (size_t inputIndex = 0u; inputIndex < read_inputs.size(); ++inputIndex)
         {
@@ -430,7 +430,7 @@ namespace
     }
 
     CookError CheckManifestRaster(const CookedModule& module,
-                                         const ShaderManifestView& view,
+                                         const ManifestView& view,
                                          const LibraryVariant& variant,
                                          size_t entry_point_index)
     {
@@ -462,7 +462,7 @@ namespace
 
     /** Every fact the manifest states about one entry point of one variant. */
     CookError CheckManifestSlot(const CookedModule& module,
-                                       const ShaderManifestView& view,
+                                       const ManifestView& view,
                                        const ShaderSourceProvider& provider,
                                        const LibraryVariant& variant,
                                        size_t entry_point_index)
@@ -887,13 +887,13 @@ CookError VerifyManifestRoundTrip(const CookedModule& module, const std::string&
     const std::span<const char> rawChars{ manifest_bytes.data(), manifest_bytes.size() };
     const std::span<const std::byte> raw = std::as_bytes(rawChars);
 
-    const CookResult<ShaderManifestView> opened = OpenManifestForCheck(module, raw);
+    const CookResult<ManifestView> opened = OpenManifestForCheck(module, raw);
     if (!opened)
     {
         return opened.error();
     }
 
-    const ShaderManifestView& view = opened.value();
+    const ManifestView& view = opened.value();
     const ShaderSourceProvider provider{ view, 0u };
     uint32_t checked = 0u;
 

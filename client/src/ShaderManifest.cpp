@@ -20,7 +20,7 @@
 #include <utility>
 #include <vector>
 
-namespace lodestone
+namespace lodestone::manifest
 {
 
 // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -32,14 +32,14 @@ namespace lodestone
 namespace
 {
 
-    constexpr ShaderManifestError k_ManifestOk{ .Code = ShaderManifestErrorCode::Success };
+    constexpr ErrorState k_ManifestOk{ .Code = ErrorCode::Success };
 
     // expanded descriptions for manifest error codes, since making these clear to users is important
     // static_assert will break compile if new code is added without updating the descriptions array
     // make sure ordering is respected, though
-    constexpr size_t k_ErrorDescriptionsCount = static_cast<size_t>(ShaderManifestErrorCode::Count);
-    constexpr std::array<std::string_view, k_ErrorDescriptionsCount> k_ErrorDescriptions
-    {
+    // std::to_array deduces the size from the list. A sized std::array would pad a short list with empty
+    // views, and the static_assert below could then never fire.
+    constexpr auto k_ErrorDescriptions = std::to_array<std::string_view>({
             "no error code was set",
             "no error",
             "the byte span is smaller than the manifest header",
@@ -63,8 +63,7 @@ namespace
             "a slot's visibility index points past the visibility list table",
             "a slot's raster index points past the raster table",
             "the variant keys are not strictly ascending",
-            "the variant key count does not match the variant count",
-            "a variant's slot range runs past the slot table",
+            "the slot table does not hold one slot for each variant and entry point",
             "a raster's vertex input range is out of range",
             "a raster's color target range is out of range",
             "a vertex input names a string past the string table",
@@ -72,10 +71,39 @@ namespace
             "a uniform member names a string past the string table",
             "an axis names a string past the string table",
             "an axis's value range runs past the axis value table",
-        };
+            "a type axis value names a string past the string table",
+            "a module header names a string past the string table",
+            "a profile names a target string past the string table",
+            "an environment extent runs past the end of the file",
+            "a module axis names an axis past the axis table",
+            "a module axis's value mask sets a bit at or past the axis value count",
+            "a specialization constant names a string past the string table",
+        });
 
-    static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ShaderManifestErrorCode::Count),
-                  "every ShaderManifestErrorCode needs a description; add a line when you add a code");
+    static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ErrorCode::Count),
+                  "every ErrorCode needs a description; add a line when you add a code");
+
+    static_assert(k_IsManifestRecord<Header>);
+    static_assert(k_IsManifestRecord<StringRef>);
+    static_assert(k_IsManifestRecord<SourceRef>);
+    static_assert(k_IsManifestRecord<Profile>);
+    static_assert(k_IsManifestRecord<EnvironmentDirectoryEntry>);
+    static_assert(k_IsManifestRecord<Axis>);
+    static_assert(k_IsManifestRecord<Run>);
+    static_assert(k_IsManifestRecord<ModuleAxis>);
+    static_assert(k_IsManifestRecord<ModuleRootHeader>);
+    static_assert(k_IsManifestRecord<EntryPoint>);
+    static_assert(k_IsManifestRecord<EnvironmentHeader>);
+    static_assert(k_IsManifestRecord<Variant>);
+    static_assert(k_IsManifestRecord<PlacementPayload>);
+    static_assert(k_IsManifestRecord<Binding>);
+    static_assert(k_IsManifestRecord<Footprint>);
+    static_assert(k_IsManifestRecord<EntryPointInstance>);
+    static_assert(k_IsManifestRecord<VertexInput>);
+    static_assert(k_IsManifestRecord<UniformMember>);
+    static_assert(k_IsManifestRecord<SpecializationConstant>);
+    static_assert(k_IsManifestRecord<ColorTarget>);
+    static_assert(k_IsManifestRecord<RasterState>);
 
     template<typename RecordType>
     std::span<const RecordType> MakeTable(std::span<const std::byte> bytes,
@@ -90,11 +118,11 @@ namespace
      * of payloads, which could be themselves simple indices or POD structs. This is just a more succinct
      * accessor for those cases  */
     template<typename PayloadType>
-    std::span<const PayloadType> RunOf(std::span<const ManifestRun> runs,
+    std::span<const PayloadType> RunOf(std::span<const Run> runs,
                                        std::span<const PayloadType> payloads,
                                        uint32_t run_index) noexcept
     {
-        const ManifestRun& run = runs[static_cast<size_t>(run_index)];
+        const Run& run = runs[static_cast<size_t>(run_index)];
         return payloads.subspan(run.First, run.Count);
     }
 
@@ -102,43 +130,43 @@ namespace
      * inside a file of `file_size` bytes. An empty table at any offset is in bounds. */
     bool TableIsInBounds(uint32_t offset, uint32_t count, size_t record_size, size_t file_size) noexcept;
 
-    ShaderManifestError ValidateManifestHeader(const ShaderManifestHeader& parsed,
-                                               const size_t file_size) noexcept;
-    ShaderManifestError ValidateTablesInRange(const ShaderManifestHeader& parsed,
-                                              std::span<const std::byte> bytes) noexcept;
-    ShaderManifestError ValidateStringBlobs(const ShaderManifestHeader& parsed,
-                                            std::span<const std::byte> bytes) noexcept;
-    ShaderManifestError ValidateBindingTables(const ShaderManifestHeader& parsed,
-                                              std::span<const std::byte> bytes) noexcept;
-    ShaderManifestError ValidateResourceIndices(const ShaderManifestHeader& parsed,
-                                                std::span<const std::byte> bytes) noexcept;
-    ShaderManifestError ValidateRunTables(const ShaderManifestHeader& parsed,
-                                          std::span<const std::byte> bytes) noexcept;
-    ShaderManifestError ValidateEntryPoints(const ShaderManifestHeader& parsed,
-                                            std::span<const std::byte> bytes) noexcept;
-    ShaderManifestError ValidateManifestSlots(const ShaderManifestHeader& parsed,
-                                              std::span<const std::byte> bytes) noexcept;
-    ShaderManifestError ValidateVariantKeys(const ShaderManifestHeader& parsed,
-                                            std::span<const std::byte> bytes) noexcept;
-    ShaderManifestError ValidateCrossReferences(const ShaderManifestHeader& parsed,
-                                                std::span<const std::byte> bytes) noexcept;
-    ShaderManifestError ValidateRasterStates(const ShaderManifestHeader& parsed,
-                                             std::span<const std::byte> bytes) noexcept;
-    ShaderManifestError ValidateVertexLayouts(const ShaderManifestHeader& parsed,
-                                              std::span<const std::byte> bytes) noexcept;
-    ShaderManifestError ValidateUniformMembers(const ShaderManifestHeader& parsed,
-                                               std::span<const std::byte> bytes) noexcept;
-    ShaderManifestError ValidateAxes(const ShaderManifestHeader& parsed,
+    ErrorState ValidateManifestHeader(const Header& parsed,
+                                      const size_t file_size) noexcept;
+    ErrorState ValidateTablesInRange(const Header& parsed,
                                      std::span<const std::byte> bytes) noexcept;
+    ErrorState ValidateStringBlobs(const Header& parsed,
+                                   std::span<const std::byte> bytes) noexcept;
+    ErrorState ValidateBindingTables(const Header& parsed,
+                                     std::span<const std::byte> bytes) noexcept;
+    ErrorState ValidateResourceIndices(const Header& parsed,
+                                       std::span<const std::byte> bytes) noexcept;
+    ErrorState ValidateRunTables(const Header& parsed,
+                                 std::span<const std::byte> bytes) noexcept;
+    ErrorState ValidateEntryPoints(const Header& parsed,
+                                   std::span<const std::byte> bytes) noexcept;
+    ErrorState ValidateManifestSlots(const Header& parsed,
+                                     std::span<const std::byte> bytes) noexcept;
+    ErrorState ValidateVariantKeys(const Header& parsed,
+                                   std::span<const std::byte> bytes) noexcept;
+    ErrorState ValidateCrossReferences(const Header& parsed,
+                                       std::span<const std::byte> bytes) noexcept;
+    ErrorState ValidateRasterStates(const Header& parsed,
+                                    std::span<const std::byte> bytes) noexcept;
+    ErrorState ValidateVertexLayouts(const Header& parsed,
+                                     std::span<const std::byte> bytes) noexcept;
+    ErrorState ValidateUniformMembers(const Header& parsed,
+                                      std::span<const std::byte> bytes) noexcept;
+    ErrorState ValidateAxes(const Header& parsed,
+                            std::span<const std::byte> bytes) noexcept;
 
 } // namespace
 
-std::string_view ToString(ShaderManifestErrorCode error) noexcept
+std::string_view ToString(ErrorCode error) noexcept
 {
     return magic_enum::enum_name(error);
 }
 
-std::string DescribeShaderManifestError(const ShaderManifestError& error)
+std::string DescribeShaderManifestError(const ErrorState& error)
 {
     const size_t codeIndex = static_cast<size_t>(error.Code);
     const std::string_view description = codeIndex < k_ErrorDescriptions.size()
@@ -155,16 +183,16 @@ std::string DescribeShaderManifestError(const ShaderManifestError& error)
     // `Detail` is only implemented for a few codes, so we only handle it for a few specific error codes
     switch (error.Code)
     {
-    case ShaderManifestErrorCode::VersionMismatch:
+    case ErrorCode::VersionMismatch:
         out += std::format(" (file is version {}, reader expects {})", error.Detail, k_ShaderManifestVersion);
         break;
-    case ShaderManifestErrorCode::SizeMismatch:
+    case ErrorCode::SizeMismatch:
         out += std::format(" (header claims {} bytes)", error.Detail);
         break;
-    case ShaderManifestErrorCode::TooSmall:
+    case ErrorCode::TooSmall:
         out += std::format(" (span is only {} bytes)", error.Detail);
         break;
-    case ShaderManifestErrorCode::VariantKeyVariantCountMismatch:
+    case ErrorCode::SlotGridSizeMismatch:
         out += std::format(" (variant count {})", error.Detail);
         break;
     default:
@@ -178,23 +206,23 @@ std::string DescribeShaderManifestError(const ShaderManifestError& error)
     return out;
 }
 
-ShaderManifestView::ShaderManifestView() noexcept = default;
+ManifestView::ManifestView() noexcept = default;
 
-ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std::byte> bytes) noexcept
+ManifestResult<ManifestView> ManifestView::Open(std::span<const std::byte> bytes) noexcept
 {
-    if (bytes.size() < sizeof(ShaderManifestHeader))
+    if (bytes.size() < sizeof(Header))
     {
-        return std::unexpected(ShaderManifestError{ .Code = ShaderManifestErrorCode::TooSmall,
-                                                    .Detail = static_cast<uint32_t>(bytes.size()) });
+        return std::unexpected(ErrorState{ .Code = ErrorCode::TooSmall,
+                                                 .Detail = static_cast<uint32_t>(bytes.size()) });
     }
 
     if ((reinterpret_cast<uintptr_t>(bytes.data()) % 8u) != 0u)
     {
-        return std::unexpected(ShaderManifestError{ .Code = ShaderManifestErrorCode::Misaligned });
+        return std::unexpected(ErrorState{ .Code = ErrorCode::Misaligned });
     }
 
-    ShaderManifestHeader parsed{};
-    std::memcpy(&parsed, bytes.data(), sizeof(ShaderManifestHeader));
+    Header parsed{};
+    std::memcpy(&parsed, bytes.data(), sizeof(Header));
 
     // Yes, I know how ugly this is. "It's so branchy and repeatable", you say: and you're right.
     // But we pay this once when opening the manifest and then there's no branches during actual queries,
@@ -205,19 +233,22 @@ ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std:
     // when trying to ship a game, and it messed me up so bad I'm willing to write this BS"
 
     const size_t fileSize = bytes.size();
-    const ShaderManifestError manifestHeaderValid = ValidateManifestHeader(parsed, fileSize);
+    const ErrorState manifestHeaderValid = ValidateManifestHeader(parsed, fileSize);
     if (!manifestHeaderValid)
     {
         return std::unexpected(manifestHeaderValid);
     }
 
-    const ShaderManifestError tablesInRange = ValidateTablesInRange(parsed, bytes);
+    if (options.Headers == ReadOnlyHeaders::Yes)
+    {
+    }
+    const ErrorState tablesInRange = ValidateTablesInRange(parsed, bytes);
     if (!tablesInRange)
     {
         return std::unexpected(tablesInRange);
     }
 
-    const ShaderManifestError stringBlobsValid = ValidateStringBlobs(parsed, bytes);
+    const ErrorState stringBlobsValid = ValidateStringBlobs(parsed, bytes);
     if (!stringBlobsValid)
     {
         return std::unexpected(stringBlobsValid);
@@ -226,74 +257,74 @@ ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std:
     // todo: in a future cleanup pass, we could make the manifest view here and then pass it down to
     // each of the validation functions, which might make them a little cleaner (especially the cross ref)
 
-    const ShaderManifestError bindingTablesValid = ValidateBindingTables(parsed, bytes);
+    const ErrorState bindingTablesValid = ValidateBindingTables(parsed, bytes);
     if (!bindingTablesValid)
     {
         return std::unexpected(bindingTablesValid);
     }
 
-    const ShaderManifestError resourceIndicesValid = ValidateResourceIndices(parsed, bytes);
+    const ErrorState resourceIndicesValid = ValidateResourceIndices(parsed, bytes);
     if (!resourceIndicesValid)
     {
         return std::unexpected(resourceIndicesValid);
     }
 
     // check all the tables of "runs", which are just ranges of indices into other lists
-    const ShaderManifestError runTablesValid = ValidateRunTables(parsed, bytes);
+    const ErrorState runTablesValid = ValidateRunTables(parsed, bytes);
     if (!runTablesValid)
     {
         return std::unexpected(runTablesValid);
     }
 
-    const ShaderManifestError entryPointsValid = ValidateEntryPoints(parsed, bytes);
+    const ErrorState entryPointsValid = ValidateEntryPoints(parsed, bytes);
     if (!entryPointsValid)
     {
         return std::unexpected(entryPointsValid);
     }
 
-    const ShaderManifestError slotTableValid = ValidateManifestSlots(parsed, bytes);
+    const ErrorState slotTableValid = ValidateManifestSlots(parsed, bytes);
     if (!slotTableValid)
     {
         return std::unexpected(slotTableValid);
     }
 
-    const ShaderManifestError variantKeysValid = ValidateVariantKeys(parsed, bytes);
+    const ErrorState variantKeysValid = ValidateVariantKeys(parsed, bytes);
     if (!variantKeysValid)
     {
         return std::unexpected(variantKeysValid);
     }
 
-    const ShaderManifestError crossReferencesValid = ValidateCrossReferences(parsed, bytes);
+    const ErrorState crossReferencesValid = ValidateCrossReferences(parsed, bytes);
     if (!crossReferencesValid)
     {
         return std::unexpected(crossReferencesValid);
     }
 
-    const ShaderManifestError rasterStatesValid = ValidateRasterStates(parsed, bytes);
+    const ErrorState rasterStatesValid = ValidateRasterStates(parsed, bytes);
     if (!rasterStatesValid)
     {
         return std::unexpected(rasterStatesValid);
     }
 
-    const ShaderManifestError vertexLayoutsValid = ValidateVertexLayouts(parsed, bytes);
+    const ErrorState vertexLayoutsValid = ValidateVertexLayouts(parsed, bytes);
     if (!vertexLayoutsValid)
     {
         return std::unexpected(vertexLayoutsValid);
     }
 
-    const ShaderManifestError uniformMembersValid = ValidateUniformMembers(parsed, bytes);
+    const ErrorState uniformMembersValid = ValidateUniformMembers(parsed, bytes);
     if (!uniformMembersValid)
     {
         return std::unexpected(uniformMembersValid);
     }
 
-    const ShaderManifestError axesValid = ValidateAxes(parsed, bytes);
+    const ErrorState axesValid = ValidateAxes(parsed, bytes);
     if (!axesValid)
     {
         return std::unexpected(axesValid);
     }
 
-    ShaderManifestView view;
+    ManifestView view;
     view.bytes = bytes;
     view.header = reinterpret_cast<const ShaderManifestHeader*>(bytes.data());
     view.strings = MakeTable<ManifestStringRef>(bytes, parsed.StringTableOffset, parsed.StringCount);
@@ -329,7 +360,7 @@ ManifestResult<ShaderManifestView> ShaderManifestView::Open(std::span<const std:
     return view;
 }
 
-std::string_view ShaderManifestView::String(uint32_t string_index) const noexcept
+std::string_view ManifestView::String(uint32_t string_index) const noexcept
 {
     assert(header != nullptr && string_index < strings.size());
     const ManifestStringRef& reference = strings[string_index];
@@ -337,13 +368,13 @@ std::string_view ShaderManifestView::String(uint32_t string_index) const noexcep
     return std::string_view{ base + reference.Offset, reference.Length };
 }
 
-std::string_view ShaderManifestView::ModuleName() const noexcept
+std::string_view ManifestView::ModuleName() const noexcept
 {
     assert(header != nullptr);
     return String(header->ModuleNameString);
 }
 
-std::string_view ShaderManifestView::Source(uint32_t source_index) const noexcept
+std::string_view ManifestView::Source(uint32_t source_index) const noexcept
 {
     // if this assert fires on source_index, caller provided invalid index
     assert(header != nullptr && source_index < sources.size());
@@ -352,105 +383,105 @@ std::string_view ShaderManifestView::Source(uint32_t source_index) const noexcep
     return std::string_view{ base + reference.Offset, reference.Length };
 }
 
-std::span<const ManifestBinding> ShaderManifestView::Bindings() const noexcept
+std::span<const ManifestBinding> ManifestView::Bindings() const noexcept
 {
     return bindings;
 }
 
-std::span<const ManifestSlot> ShaderManifestView::SlotTable() const noexcept
+std::span<const ManifestSlot> ManifestView::SlotTable() const noexcept
 {
     return slots;
 }
 
-std::span<const ManifestSlot> ShaderManifestView::VariantSlots(const ManifestVariant& variant) const noexcept
+std::span<const ManifestSlot> ManifestView::VariantSlots(const ManifestVariant& variant) const noexcept
 {
     return slots.subspan(variant.FirstSlot, variant.SlotCount);
 }
 
-std::span<const uint32_t> ShaderManifestView::ResourceList(uint32_t list_index) const noexcept
+std::span<const uint32_t> ManifestView::ResourceList(uint32_t list_index) const noexcept
 {
     return RunOf(resourceLists, resourceIndices, list_index);
 }
 
-std::span<const ManifestFootprint> ShaderManifestView::FootprintList(uint32_t list_index) const noexcept
+std::span<const ManifestFootprint> ManifestView::FootprintList(uint32_t list_index) const noexcept
 {
     return RunOf(footprintLists, footprints, list_index);
 }
 
-std::span<const uint32_t> ShaderManifestView::VisibilityList(uint32_t list_index) const noexcept
+std::span<const uint32_t> ManifestView::VisibilityList(uint32_t list_index) const noexcept
 {
     return RunOf(visibilityLists, visibilityIndices, list_index);
 }
 
-std::span<const ManifestEntryPoint> ShaderManifestView::EntryPoints() const noexcept
+std::span<const ManifestEntryPoint> ManifestView::EntryPoints() const noexcept
 {
     return entryPoints;
 }
 
-std::span<const ManifestVariant> ShaderManifestView::Variants() const noexcept
+std::span<const ManifestVariant> ManifestView::Variants() const noexcept
 {
     return variants;
 }
 
-std::span<const VariantKey> ShaderManifestView::VariantKeys() const noexcept
+std::span<const VariantKey> ManifestView::VariantKeys() const noexcept
 {
     return variantKeys;
 }
 
-std::span<const ManifestAxis> ShaderManifestView::Axes() const noexcept
+std::span<const ManifestAxis> ManifestView::Axes() const noexcept
 {
     return axes;
 }
 
-const ManifestAxis& ShaderManifestView::Axis(uint32_t axis_index) const noexcept
+const ManifestAxis& ManifestView::Axis(uint32_t axis_index) const noexcept
 {
     return axes[axis_index];
 }
 
-std::span<const AxisValueType> ShaderManifestView::AllAxesValues() const noexcept
+std::span<const AxisValueType> ManifestView::AllAxesValues() const noexcept
 {
     return axisValues;
 }
 
-std::span<const AxisValueType> ShaderManifestView::AxisValues(uint32_t axis_index) const noexcept
+std::span<const AxisValueType> ManifestView::AxisValues(uint32_t axis_index) const noexcept
 {
     const ManifestAxis& axis = axes[axis_index];
     return axisValues.subspan(axis.FirstValue, axis.ValueCount);
 }
 
-AxisValueType ShaderManifestView::AxisValue(uint32_t axis_index, uint32_t value_index) const noexcept
+AxisValueType ManifestView::AxisValue(uint32_t axis_index, uint32_t value_index) const noexcept
 {
     const ManifestAxis& axis = axes[axis_index];
     return axisValues[axis.FirstValue + value_index];
 }
 
-std::span<const ManifestVertexInput> ShaderManifestView::VertexInputs(uint32_t raster_index) const noexcept
+std::span<const ManifestVertexInput> ManifestView::VertexInputs(uint32_t raster_index) const noexcept
 {
     assert(raster_index < rasterStates.size());
     const ManifestRaster& raster = rasterStates[raster_index];
     return vertexInputs.subspan(raster.FirstVertexInput, raster.VertexInputCount);
 }
 
-std::span<const ManifestColorTarget> ShaderManifestView::ColorTargets(uint32_t raster_index) const noexcept
+std::span<const ManifestColorTarget> ManifestView::ColorTargets(uint32_t raster_index) const noexcept
 {
     assert(raster_index < rasterStates.size());
     const ManifestRaster& raster = rasterStates[raster_index];
     return colorTargets.subspan(raster.FirstColorTarget, raster.ColorTargetCount);
 }
 
-bool ShaderManifestView::WritesFragDepth(uint32_t raster_index) const noexcept
+bool ManifestView::WritesFragDepth(uint32_t raster_index) const noexcept
 {
     assert(raster_index < rasterStates.size());
     return rasterStates[raster_index].WritesFragDepth != 0u;
 }
 
-std::span<const ManifestUniformMember> ShaderManifestView::UniformMembers(
+std::span<const ManifestUniformMember> ManifestView::UniformMembers(
     const ManifestBinding& binding) const noexcept
 {
     return uniformMembers.subspan(binding.FirstUniformMember, binding.UniformMemberCount);
 }
 
-const ManifestSlot* ShaderManifestView::FindSlot(uint32_t entry_point, VariantKey variant_key) const noexcept
+const ManifestSlot* ManifestView::FindSlot(uint32_t entry_point, VariantKey variant_key) const noexcept
 {
     const auto keyIter = std::ranges::lower_bound(variantKeys, variant_key);
     if (keyIter == variantKeys.end() || *keyIter != variant_key) [[unlikely]]
@@ -464,7 +495,7 @@ const ManifestSlot* ShaderManifestView::FindSlot(uint32_t entry_point, VariantKe
     return &slots[variant.FirstSlot + entry_point];
 }
 
-ShaderSourceProvider::ShaderSourceProvider(ShaderManifestView _view,
+ShaderSourceProvider::ShaderSourceProvider(ManifestView _view,
                                            uint64_t _generation) noexcept
     : view{ _view },
       generation{ _generation }
@@ -603,7 +634,7 @@ uint64_t ShaderSourceProvider::Generation() const noexcept
     return generation;
 }
 
-const ShaderManifestView& ShaderSourceProvider::View() const noexcept
+const ManifestView& ShaderSourceProvider::View() const noexcept
 {
     return view;
 }

@@ -692,7 +692,7 @@ change **what**. Each one adds capability that no golden file covers.
 | E8 | Documents, and the measured numbers again | — | none |
 
 **E0c, E0, E1, E2, E3, E4, E5, and E6 are complete.** A diversion after E4, call it E4a, hardened the
-client trust boundary. `ShaderManifestView::Open` now validates the whole manifest graph once. The
+client trust boundary. `ManifestView::Open` now validates the whole manifest graph once. The
 error type is a `ShaderManifestError` struct that names the table and the record, and
 `DescribeShaderManifestError` prints it. The manifest format version is now 2.
 

@@ -54,7 +54,9 @@ enum class BindingKind : uint8_t
     InputRenderTarget,
     InlineUniform,
     RayTracingAccelerationStructure,
-    StorageTexture
+    StorageTexture,
+    /** Reserved: no reflection produces this yet. Its members use the uniform member table. */
+    PushConstant
 };
 
 enum class ShaderStageKind : uint8_t

@@ -83,9 +83,9 @@ int main()
     // that: every real kind must give its own name, and only Invalid may be "Invalid".
     runner.Check(ToString(BindingKind::Invalid) == "Invalid", "Invalid names itself");
     runner.Check(ToString(BindingKind::UniformBuffer) == "UniformBuffer", "a spot check on the spelling");
-    runner.Check(ToString(BindingKind::StorageTexture) == "StorageTexture", "the last kind has its own name");
+    runner.Check(ToString(BindingKind::PushConstant) == "PushConstant", "the last kind has its own name");
     for (uint8_t value = static_cast<uint8_t>(BindingKind::Sampler);
-         value <= static_cast<uint8_t>(BindingKind::StorageTexture);
+         value <= static_cast<uint8_t>(BindingKind::PushConstant);
          ++value)
     {
         runner.Check(ToString(static_cast<BindingKind>(value)) != "Invalid",

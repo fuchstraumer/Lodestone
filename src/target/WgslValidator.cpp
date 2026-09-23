@@ -159,7 +159,8 @@ namespace
             return tResourceType::kInputAttachment;
         case BindingKind::InlineUniform:
         case BindingKind::RayTracingAccelerationStructure:
-            return static_cast<tResourceType>(-1); // InlineUniform is not directly supported
+        case BindingKind::PushConstant:
+            return static_cast<tResourceType>(-1); // none of these exist in WGSL
         case BindingKind::StorageTexture:
             // separate function bc it's another switch (3 separate values, potentially)
             return ToTintStorageTextureType(access);

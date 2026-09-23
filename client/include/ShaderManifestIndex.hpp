@@ -157,9 +157,9 @@ private:
 class ManifestIndex
 {
 public:
-    explicit ManifestIndex(ShaderManifestView view);
+    explicit ManifestIndex(ManifestView view);
 
-    [[nodiscard]] const ShaderManifestView& View() const noexcept;
+    [[nodiscard]] const ManifestView& View() const noexcept;
     /** @brief Direct decode: "expand" a variant key into that values matching that key */
     [[nodiscard]] std::vector<QueryAxisValue> Decode(VariantKey key) const;
     /** @brief Returns every variant that exists, in (sorted) key order. Useful for total 
@@ -195,7 +195,7 @@ private:
     [[nodiscard]] std::vector<VariantKey> scan(std::span<const ScanConstraint> constraints) const;
 
     [[nodiscard]] std::vector<std::string_view> stringTableForAxis(uint32_t axis_index) const;
-    ShaderManifestView manifest;
+    ManifestView manifest;
     std::vector<uint32_t> radices;
     std::vector<uint64_t> placeValues;
     // todo: maybe a packed vector (sorted) that we use std::find on might be better for our use case? (test)

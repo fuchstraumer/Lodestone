@@ -40,6 +40,8 @@ std::string_view ToString(BindingKind kind) noexcept
         return "RayTracingAccelerationStructure";
     case BindingKind::StorageTexture:
         return "StorageTexture";
+    case BindingKind::PushConstant:
+        return "PushConstant";
     case BindingKind::Invalid:
         return "Invalid";
     }

@@ -796,6 +796,7 @@ CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* conta
     case BindingKind::InputRenderTarget:
     case BindingKind::InlineUniform:
     case BindingKind::RayTracingAccelerationStructure:
+    case BindingKind::PushConstant:
         return CookError::ReflectionUnsupportedBindingKind;
     case BindingKind::Invalid:
         std::unreachable(); // we should never encounter an invalid binding kind here

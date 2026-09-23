@@ -30,7 +30,7 @@
 using lodestone::CookedModule;
 using lodestone::EmitShaderManifest;
 using lodestone::ShaderManifestErrorCode;
-using lodestone::ShaderManifestView;
+using lodestone::ManifestView;
 using lodestone::VariantKey;
 
 namespace
@@ -104,7 +104,7 @@ void WriteUint32(std::vector<std::byte>& bytes, size_t offset, uint32_t value)
 
 ShaderManifestErrorCode ErrorFrom(std::span<const std::byte> bytes)
 {
-    const lodestone::ManifestResult<ShaderManifestView> opened = ShaderManifestView::Open(bytes);
+    const lodestone::ManifestResult<ManifestView> opened = ManifestView::Open(bytes);
     if (opened.has_value())
     {
         return ShaderManifestErrorCode::Success;
@@ -124,7 +124,7 @@ int main()
     const std::vector<std::byte> valid = ToBytes(manifest);
 
     runner.BeginSection("a manifest the cooker wrote opens");
-    const lodestone::ManifestResult<ShaderManifestView> opened = ShaderManifestView::Open(valid);
+    const lodestone::ManifestResult<ManifestView> opened = ManifestView::Open(valid);
     runner.Check(opened.has_value(), "the emitter produces a manifest the reader accepts");
     if (opened.has_value())
     {

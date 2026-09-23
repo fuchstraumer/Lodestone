@@ -116,3 +116,76 @@
   so the cook tests exercise the axis interactions the single-purpose assets cannot. It should carry a
   size expression that names an axis, so the resolve path is covered too. Do this when the query and
   cook code is otherwise finished; it is a test-asset consolidation, not a blocker.
+## Done 2026-09-22 (new binding schema tests)
+- `WgslBindingScannerTest` retired. The text scanner is gone, so the test is now `WgslValidatorTest`
+  (`tests/WgslValidatorTests.cpp`), which drives `WgslValidator` on Tint. It covers a match, a kind /
+  shape / access / name mismatch, a depth texture and a comparison sampler, storage-buffer shape
+  orthogonality, and a parse failure. The stale `WgslBindingScannerTest.exe` was deleted from the build
+  tree.
+- `ReflectionSchemaTest` added (`tests/ReflectionSchemaTests.cpp`), Slang-free: `GetBaseShape`, the
+  flag predicates, the `ToString` tables, and `ReflectedUniformMember` equality over matrix layout and
+  element stride.
+- Four more tests were stale against the reshaped schema and are fixed: `StageDumpTest`,
+  `DedupeInfluenceTest`, `ManifestIndexTest`, `ShaderManifestRejectTest`. Each used the removed
+  `ResourceShape::Buffer` (now `StructuredBuffer`); `StageDumpTest` also used the removed
+  `RawBinding::SamplerType` / `SamplerBindingType`, which is dropped (a plain sampler is the
+  `IsComparisonSampler = false` default).
+## Testing findings to resolve
+- `run-tests.bat` line 43 runs `CookTest.exe`, but no `CookTest` target exists in `tests/CMakeLists.txt`
+  (only the five named cook variants build from `CookTest.cpp`). So `[FAIL] CookTest` is stale
+  scaffolding, not a real failure: the base OceanFft `--verify-deterministic` cook is unbuilt. Decide
+  whether to restore the target or retire the script line. This is the end-to-end coverage the manifest
+  work will lean on.
+- `HashReflectedBinding` (`src/model/ShaderDataSchema.cpp`) hashes each member's `Offset`, `Size`, and
+  `ArrayCount`, but not `ElementStride` or `MatrixLayout`. Dedup stays correct, because
+  `ReflectedUniformMember::operator==` includes both and the interner decides equality by byte
+  comparison, not the hash. The cost is extra bucket collisions for structured buffers that differ only
+  in layout, plus a landmine if the hash is ever treated as equality. Close it or leave it, but know it.
+# Phase F: portable geometry (vertex/index pulling)
+Design explored 2026-09-22. This is Phase F lowering work, not scheduled yet. The goal is a shader
+that reads vertices and indices the same way whether the target binds a vertex buffer through the
+input assembler or pulls from a storage buffer, so one shader is truly portable across the fixed
+pipeline and a GPU-driven one.
+- Add `IVertexSource` and `IIndexSource` as library builtins, in a new `.slang` file beside
+  `LodestoneAttributes.slang`. The reflector reads them by name, the same way it reads the attributes.
+- Keep the interface stage-agnostic: `Vertex load(uint index)` and `uint load(uint i)`. The caller
+  supplies the index (the input assembler / `SV_VertexID` in a vertex shader, a thread-computed index
+  in compute). Do NOT bake `SV_VertexID` into the interface, or it cannot run in compute. This is the
+  factoring that lets the same mesh-decode code run in a vertex shader and a compute geometry pass, so
+  it is the enabler for a Nanite-like software-raster / meshlet system (the access floor, not the
+  system).
+- Realize the choice by selection, not transformation. Vertex sourcing is a technique axis backed by
+  link-time specialization (interface conformances), which Slang already composes for us
+  (`IComponentType::specialize` / `link`, `ITypeConformance`). Slang exposes composition, not AST
+  mutation: there is no public AST-rewrite API, so text substitution and AST surgery are both off the
+  table. This is the same mechanism the interface axes already use.
+- Add an attribute (e.g. `ls_vertex_attribute`) that marks the pullable fields. One declaration, two
+  consumers: the bound arm emits the input-assembler layout, the pulled arm synthesizes the buffer's
+  element layout. Both reflection substrates already exist (`ReflectedVertexInput`, and the
+  structured-buffer member walk with stride and matrix layout).
+- Derisk first: the bound (IA) arm needs the varying inputs on the entry point, because Slang ties
+  varyings to entry-point parameters, not to an interface implementation. So the bound arm needs either
+  a generated thin wrapper entry point (built from the marked struct) or a generic entry-point template
+  the body plugs into. Prototype this seam on a trivial mesh, both arms, before baking
+  `ls_vertex_attribute` into the manifest schema. Everything else here is cheap or proven; this is the
+  one unknown.
+- Do not require the interface globally. Make it an opt-in portability capability/tier. Inside the tier
+  the interface is mandatory and raw vertex access cannot be written down; outside it, raw varyings stay
+  legal. This keeps the escape hatch and does not tax simple raster shaders.
+- The enforcement is an ingestion-surface contract check ("does this pull-capable shader obey the
+  contract?"), not one of the four cross-check validators. It is checkable on the reflected entry-point
+  inputs: a pull-capable entry point must not declare a raw vertex-semantic varying that did not come
+  from the builtin. Slang gives the interface and the conformance; it does not enforce "no raw
+  varyings" — that policy is ours.
+- The bound source is vertex-stage-only (there is no input assembler in compute), so it is a natural
+  `ActiveWhen` gate (stage == vertex) that drops into the constraint engine. Compute geometry is always
+  pulled.
+- Index / EBO pulling is the same pattern one level up (`IIndexSource`). It interacts with indirect draw
+  arguments and with base-vertex / base-instance. Note Slang rebases `SV_VertexID` / `SV_InstanceID`
+  (`gl_VertexIndex - gl_BaseVertex`, needs the `DrawParameters` capability on SPIR-V), so the pulled
+  index keeps HLSL zero-based semantics across targets, but the base offset and that capability are a
+  per-profile concern.
+- This does not disturb the frozen client contract: the pulled arm is an ordinary structured-buffer
+  binding, the bound arm is vertex inputs, and both are already modeled.
+- The pulled buffer's layout (interleaved vs planar, AoS vs SoA) is device-sensitive, so by the phase F
+  rule it is a Lodestone tuning knob. Drive it from policy later, once the selection machinery exists.

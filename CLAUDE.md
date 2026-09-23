@@ -80,9 +80,9 @@ argument it exits 1 on `NoOutputSpecified`, which reads like a failure rather th
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
-Twenty-one test targets exist. Sixteen are unit tests, and each one proves a claim the repository
-makes. None of them needs Slang, a compiler, or an asset, and all sixteen together run in under one
-second.
+Twenty-two test targets exist. Seventeen are unit tests, and each one proves a claim the repository
+makes. None needs Slang or an asset. Only `WgslValidatorTest` needs a parser: it links Tint to read
+the emitted WGSL. All seventeen together run in under one second.
 
 | Target | Proves |
 |---|---|
@@ -90,7 +90,8 @@ second.
 | `ContentInternerTest` | A hash never decides equality. It supplies a hash that returns one constant, so only the byte comparison can separate the payloads. |
 | `PermutationIndexTest` | A variant index is unique, dense, and stable, and a partial assignment resolves to one variant. |
 | `ShaderManifestRejectTest` | The manifest reader rejects a short, misaligned, or damaged file, and opens a real one. |
-| `WgslBindingScannerTest` | The cross-check reads the emitted WGSL correctly, and fails on a real mismatch. It also proves that a scoped binding states the name the emitted text must declare. |
+| `WgslValidatorTest` | The WGSL cross-check on Tint. It parses fixed WGSL, reads the used bindings from Tint's inspector, and compares them against hand-written reflection. It proves a match, and a mismatch of kind, shape, access, or name. It also proves that a comparison sampler and a depth texture read back correctly, that a storage buffer's structured or raw shape does not change the WGSL kind, and that invalid WGSL is a parse error, not a mismatch. |
+| `ReflectionSchemaTest` | The pure data of the binding schema, with no Slang. The `ResourceShape` flag layout (a base shape in the low nibble plus array, multisample, shadow, and feedback flags, read with `GetBaseShape`), the `ToString` tables for `ResourceShape`, `BindingKind`, and `TextureSampleType`, and the `ReflectedUniformMember` equality that dedup rests on, which includes matrix layout and element stride. |
 | `StageDumpTest` | A stage dump holds the model and no target text, it names itself the way `--dump-stage` names it, and two dumps of one input agree byte for byte. |
 | `SymbolTableTest` | The tokenizer that powers axis-reachability pruning: it strips `extern static const` declarations and reserved keywords, and reports the axis names no reachable source uses. |
 | `PolicyDocumentTest` | The TOML policy reader, its query surface, and its validation of every axis name and value against the declared space. |
@@ -428,7 +429,7 @@ unordered container reached the output.
 | `ContentInterner<T>` | `model/ContentInterner.hpp` | Collapses equal payloads, keeps provenance, counts collisions. |
 | `InternedModule` | `model/CookedLibrary.hpp` | The stage 6 builder. It holds the six interners, and it is the only place the provenance of a collapse survives. |
 | `CookedModule`, `CookedLibrary` | `model/CookedLibrary.hpp` | The frozen model. Every emitter reads this and nothing earlier. |
-| `ShaderManifestView` | `client/include/ShaderManifest.hpp` | Read-only spans over the manifest bytes. Allocates nothing to open. |
+| `ManifestView` | `client/include/ShaderManifest.hpp` | Read-only spans over the manifest bytes. Allocates nothing to open. |
 | `ManifestIndex`, `ManifestQueryBuilder` | `client/include/ShaderManifestIndex.hpp` | The client query surface, frozen. `ManifestIndex` decodes and enumerates variants and hands out a value-semantic builder. The builder resolves axis names and values by name, and its terminals (`Keys`, `Variants`, `First`) return keys or an error. A malformed query is an error; a valid query with no variant is an empty set. |
 | `ShaderSourceProvider` | `client/include/ShaderLibraryTypes.hpp` | Where a renderer gets source, bindings, and workgroup size. `Generation()` is the hot-reload hook. |
 
@@ -539,7 +540,7 @@ set of spans and it relocates nothing. Sections start on 8-byte boundaries. A re
 copyable, and `k_IsManifestRecord` holds that line. Record **sizes** are not pinned, and
 `ShaderManifest.hpp` says so: the format has no version migration yet, so a record can still grow.
 
-A variant is found by its **key**, not by a dense index. `ShaderManifestView::FindSlot` takes a
+A variant is found by its **key**, not by a dense index. `ManifestView::FindSlot` takes a
 `VariantKey` and does a `lower_bound` on the sorted `VariantKeys` table; the position it finds is the
 dense index. The manifest also carries the axis schema (`ManifestAxis` records with name, value count,
 kind, and domain, plus an `AxisValues` table), so a consumer can enumerate the axes and decode a key

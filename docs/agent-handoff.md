@@ -42,7 +42,7 @@ This phase built the parts below, and each one is complete.
   `extern struct`), as an `ls_axis_*` attribute. The cook policy is a TOML file. Constraint expressions
   gate and prune the space. Interface axes and enum axes both work.
 - **The manifest.** The cook writes one binary manifest for each module. A consumer finds a variant by
-  key, not by index. The manifest carries the axis schema. `ShaderManifestView::Open` validates the
+  key, not by index. The manifest carries the axis schema. `ManifestView::Open` validates the
   whole graph once, so the runtime accessors trust the data.
 - **The client query surface.** See section 3.
 
@@ -391,3 +391,45 @@ WGSL OFF does not link. Finish those guards before relying on the switch.
    so rename the target and repoint it at `WgslValidator`, or retire it.
 2. **Build the multi-module manifest and the container-with-directory header** (section 9.6). This is the
    feature work that slipped this window.
+
+## 11. Update 2026-09-22 (later)
+
+### 11.1 Test step of 10.6 is done
+
+Step 1 of section 10.6 is complete. The unit tests now cover the reshaped schema.
+
+- `WgslBindingScannerTest` is retired. The test is now `WgslValidatorTest` (`tests/WgslValidatorTests.cpp`)
+  and it drives `WgslValidator` on Tint, not the old text scanner. It covers a match, a kind / shape /
+  access / name mismatch, a depth texture and a comparison sampler, storage-buffer shape orthogonality,
+  and a parse failure. The stale `WgslBindingScannerTest.exe` was removed from the build tree.
+- `ReflectionSchemaTest` is new (`tests/ReflectionSchemaTests.cpp`). It is Slang-free and proves the pure
+  data of the schema: `GetBaseShape`, the flag predicates, the three `ToString` tables, and
+  `ReflectedUniformMember` equality over matrix layout and element stride.
+- Four more tests were stale against the reshaped schema and are fixed: `StageDumpTest`,
+  `DedupeInfluenceTest`, `ManifestIndexTest`, and `ShaderManifestRejectTest`. Each used the removed
+  `ResourceShape::Buffer` (now `StructuredBuffer`). `StageDumpTest` also used the removed
+  `RawBinding::SamplerType` and `SamplerBindingType`, which are dropped.
+- Target count is now twenty-two: seventeen unit tests and five cook tests. Only `WgslValidatorTest`
+  links a parser (Tint).
+
+### 11.2 Two test findings, still open
+
+- `run-tests.bat` line 43 runs `CookTest.exe`, but no `CookTest` target exists in `tests/CMakeLists.txt`
+  (only the five named cook variants build from `CookTest.cpp`). So `[FAIL] CookTest` in a full run is
+  stale scaffolding, not a real failure. The base OceanFft `--verify-deterministic` cook is unbuilt.
+  Decide whether to restore the target or retire the script line. This predates this window.
+- `HashReflectedBinding` (`src/model/ShaderDataSchema.cpp`) omits each member's `ElementStride` and
+  `MatrixLayout` from the hash. Dedup stays correct, because `ReflectedUniformMember::operator==` includes
+  both and the interner decides equality by byte comparison. The cost is extra bucket collisions for
+  structured buffers that differ only in layout.
+
+### 11.3 New design note: portable geometry (vertex/index pulling)
+
+A design discussion this window explored portable vertex and index access: one shader that reads
+geometry the same way whether the target uses the input assembler or pulls from a storage buffer. The
+full notes are in `todo.md` under "Phase F: portable geometry". The shape: `IVertexSource` and
+`IIndexSource` as stage-agnostic library builtins (`load(uint index)`), a technique axis backed by
+link-time specialization (not source or AST transformation), an `ls_vertex_attribute` marker that both
+the bound and the pulled arm derive from, and an opt-in portability tier enforced at ingestion. The one
+unknown to prototype first is the bound arm's entry-point synthesis, because Slang ties varying inputs to
+entry-point parameters. This is not scheduled work.
