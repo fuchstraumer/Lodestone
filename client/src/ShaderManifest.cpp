@@ -26,7 +26,6 @@
 namespace lodestone::manifest
 {
 
-// NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
@@ -122,7 +121,8 @@ namespace
     static_assert(k_IsManifestRecord<RasterState>);
 
     constexpr size_t k_AxisMaskWordBits = std::numeric_limits<uint64_t>::digits;
-
+    
+// NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
     template<typename RecordType> requires(std::is_trivially_copyable_v<RecordType> && !std::is_pointer_v<RecordType>)
     std::span<const RecordType> Map(std::span<const std::byte> bytes, TableRef table_ref) noexcept
     {
@@ -136,6 +136,7 @@ namespace
         return std::span<const RecordType>{ reinterpret_cast<const RecordType*>(bytes.data() + table_ref.Offset),
                                             static_cast<size_t>(table_ref.Count) };
     }
+// NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
 
     /**@brief In multiple locations, we store ranges of data in "runs". Each run specifies a contiguous block
      * of payloads, which could be themselves simple indices or POD structs. This is just a more succinct
@@ -152,16 +153,16 @@ namespace
     /** One table to bounds-check: `Count` records of `RecordSize` bytes, starting at `Offset`. */
     struct Section64
     {
-        ShaderManifestTable Table;
-        TableRef64 Loc;
-        size_t RecordSize;
+        ShaderManifestTable Table{ ShaderManifestTable::Invalid };
+        TableRef64 Loc{ 0u, 0u };
+        size_t RecordSize{ 0u };
     };
 
     struct Section
     {
-        ShaderManifestTable Table;
-        TableRef Loc;
-        size_t RecordSize;
+        ShaderManifestTable Table{ ShaderManifestTable::Invalid };
+        TableRef Loc{ 0u, 0u };
+        size_t RecordSize{ 0u };
     };
 
     /** The facts one extent's validators need from the bundle, with the extent itself. */
@@ -170,10 +171,10 @@ namespace
         //NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
         const EnvironmentHeader& Environment;
         std::span<const std::byte> Extent;
-        uint64_t StringCount;
-        uint64_t EntryPointCount;
-        uint32_t AxisMaskWordCount;
-        uint32_t ModuleAxisCount;
+        uint64_t StringCount{ 0u };
+        uint64_t EntryPointCount{ 0u };
+        uint32_t AxisMaskWordCount{ 0u };
+        uint32_t ModuleAxisCount{ 0u };
     };
 
     using BundleValidator = ErrorState (*)(const Header&, std::span<const std::byte>) noexcept;
@@ -1581,17 +1582,18 @@ namespace
         }
 
         const EnvironmentHeader& environment = context.Environment;
-        const std::span<const uint64_t> maskSpan =
-            MakeTable<uint64_t>(context.Extent,
-                                environment.AxisMaskTableOffset,
-                                static_cast<uint64_t>(environment.VariantCount) * wordCount);
+        const TableRef axisMaskLoc{ environment.AxisMaskTableOffset,
+                                    environment.VariantCount * wordCount };
+        const std::span<const uint64_t> maskSpan = Map<uint64_t>(context.Extent, axisMaskLoc);
         // only the last word of each mask can hold a bit past the module's axes
-        for (uint32_t vi = 0u; vi < environment.VariantCount; ++vi)
+        for (int32_t i = 0; std::cmp_less(i, environment.VariantCount); ++i)
         {
-            const uint64_t lastWord = maskSpan[(static_cast<size_t>(vi) * wordCount) + wordCount - 1u];
+            const uint64_t lastWord = maskSpan[(static_cast<size_t>(i) * wordCount) + wordCount - 1u];
             if ((lastWord >> usedBitsInLastWord) != 0u)
             {
-                return { .Code = ErrorCode::InvalidVariantAxisMask, .Table = ShaderManifestTable::AxisMasks, .RecordIndex = vi };
+                return { .Code = ErrorCode::InvalidVariantAxisMask,
+                         .Table = ShaderManifestTable::AxisMasks,
+                         .RecordIndex = static_cast<uint32_t>(i) };
             }
         }
 
@@ -1601,23 +1603,22 @@ namespace
     ErrorState ValidateRasterStates(const EnvironmentContext& context) noexcept
     {
         const EnvironmentHeader& environment = context.Environment;
-        const std::span<const RasterState> rasterSpan =
-            MakeTable<RasterState>(context.Extent, environment.RasterTableOffset, environment.RasterCount);
-        for (uint32_t i = 0u; i < rasterSpan.size(); ++i)
+        const std::span<const RasterState> rasterSpan = Map<RasterState>(context.Extent, environment.Rasters);
+        for (int32_t i = 0; std::cmp_less(i, rasterSpan.size()); ++i)
         {
             const RasterState& raster = rasterSpan[i];
-            if (static_cast<uint64_t>(raster.FirstVertexInput) + raster.VertexInputCount > environment.VertexInputCount)
+            if (raster.FirstVertexInput + raster.VertexInputCount > environment.VertexInputs.Count)
             {
                 return { .Code = ErrorCode::InvalidRasterVertexInputRange,
                          .Table = ShaderManifestTable::Rasters,
-                         .RecordIndex = i };
+                         .RecordIndex = static_cast<uint32_t>(i) };
             }
 
-            if (static_cast<uint64_t>(raster.FirstColorTarget) + raster.ColorTargetCount > environment.ColorTargetCount)
+            if (raster.FirstColorTarget + raster.ColorTargetCount > environment.ColorTargets.Count)
             {
                 return { .Code = ErrorCode::InvalidRasterColorTargetRange,
                          .Table = ShaderManifestTable::Rasters,
-                         .RecordIndex = i };
+                         .RecordIndex = static_cast<uint32_t>(i) };
             }
         }
 
@@ -1627,15 +1628,14 @@ namespace
     ErrorState ValidateVertexInputs(const EnvironmentContext& context) noexcept
     {
         const EnvironmentHeader& environment = context.Environment;
-        const std::span<const VertexInput> vertexInputSpan =
-            MakeTable<VertexInput>(context.Extent, environment.VertexInputTableOffset, environment.VertexInputCount);
-        for (uint32_t i = 0u; i < vertexInputSpan.size(); ++i)
+        const std::span<const VertexInput> vertexInputSpan = Map<VertexInput>(context.Extent, environment.VertexInputs);
+        for (int32_t i = 0; std::cmp_less(i, vertexInputSpan.size()); ++i)
         {
             if (vertexInputSpan[i].SemanticNameString >= context.StringCount)
             {
                 return { .Code = ErrorCode::InvalidVertexInput,
                          .Table = ShaderManifestTable::VertexInputs,
-                         .RecordIndex = i,
+                         .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = vertexInputSpan[i].SemanticNameString };
             }
         }
@@ -1646,15 +1646,14 @@ namespace
     ErrorState ValidateUniformMembers(const EnvironmentContext& context) noexcept
     {
         const EnvironmentHeader& environment = context.Environment;
-        const std::span<const UniformMember> uniformMemberSpan = MakeTable<UniformMember>(
-            context.Extent, environment.UniformMemberTableOffset, environment.UniformMemberCount);
-        for (uint32_t i = 0u; i < uniformMemberSpan.size(); ++i)
+        const std::span<const UniformMember> uniformMemberSpan = Map<UniformMember>(context.Extent, environment.UniformMembers);
+        for (int32_t i = 0; std::cmp_less(i, uniformMemberSpan.size()); ++i)
         {
             if (uniformMemberSpan[i].NameString >= context.StringCount)
             {
                 return { .Code = ErrorCode::InvalidUniformMember,
                          .Table = ShaderManifestTable::UniformMembers,
-                         .RecordIndex = i,
+                         .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = uniformMemberSpan[i].NameString };
             }
         }
@@ -1666,16 +1665,14 @@ namespace
     {
         const EnvironmentHeader& environment = context.Environment;
         const std::span<const SpecializationConstant> constantSpan =
-            MakeTable<SpecializationConstant>(context.Extent,
-                                              environment.SpecializationConstantTableOffset,
-                                              environment.SpecializationConstantCount);
-        for (uint32_t i = 0u; i < constantSpan.size(); ++i)
+            Map<SpecializationConstant>(context.Extent, environment.SpecConstants);
+        for (int32_t i = 0; std::cmp_less(i, constantSpan.size()); ++i)
         {
             if (constantSpan[i].NameString >= context.StringCount)
             {
                 return { .Code = ErrorCode::InvalidSpecializationConstant,
                          .Table = ShaderManifestTable::SpecializationConstants,
-                         .RecordIndex = i,
+                         .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = constantSpan[i].NameString };
             }
         }
@@ -1684,10 +1681,5 @@ namespace
     }
 
 } // namespace
-
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
-// NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
 
 } // namespace lodestone::manifest
