@@ -728,6 +728,71 @@ std::span<const SpecializationConstant> EnvironmentView::SpecializationConstants
 
 static_assert(std::input_iterator<LayoutRange::Iterator>);
 static_assert(std::ranges::input_range<LayoutRange>);
+static_assert(std::input_iterator<UniformMemberRange::Iterator>);
+static_assert(std::ranges::input_range<UniformMemberRange>);
+
+UniformMemberView::UniformMemberView(const EnvironmentView* _environment, const UniformMember* _record) noexcept
+    : environment{ _environment },
+      record{ _record }
+{
+}
+
+std::string_view UniformMemberView::Name() const noexcept
+{
+    return environment->String(record->NameString);
+}
+
+uint32_t UniformMemberView::Offset() const noexcept
+{
+    return record->Offset;
+}
+
+uint32_t UniformMemberView::Size() const noexcept
+{
+    return record->Size;
+}
+
+uint32_t UniformMemberView::ArrayCount() const noexcept
+{
+    return record->ArrayCount;
+}
+
+uint32_t UniformMemberView::ElementStride() const noexcept
+{
+    return record->ElementStride;
+}
+
+MatrixLayout UniformMemberView::Layout() const noexcept
+{
+    return static_cast<MatrixLayout>(record->MatrixLayout);
+}
+
+const UniformMember& UniformMemberView::Record() const noexcept
+{
+    return *record;
+}
+
+UniformMemberRange::UniformMemberRange(const EnvironmentView* _environment,
+                                       std::span<const UniformMember> _members) noexcept
+    : environment{ _environment },
+      members{ _members }
+{
+}
+
+uint32_t UniformMemberRange::Size() const noexcept
+{
+    return static_cast<uint32_t>(members.size());
+}
+
+bool UniformMemberRange::Empty() const noexcept
+{
+    return members.empty();
+}
+
+UniformMemberView UniformMemberRange::operator[](uint32_t position) const noexcept
+{
+    return UniformMemberView{ environment, &members[position] };
+}
 
 ResolvedResource::ResolvedResource(const EnvironmentView* _environment,
                                    const Binding* _record,
@@ -773,14 +838,54 @@ ResourceAccess ResolvedResource::Access() const noexcept
     return static_cast<ResourceAccess>(record->Access);
 }
 
+TextureFormat ResolvedResource::StorageFormat() const noexcept
+{
+    return static_cast<TextureFormat>(record->StorageFormat);
+}
+
+bool ResolvedResource::IsComparisonSampler() const noexcept
+{
+    return record->IsComparisonSampler != 0u;
+}
+
+uint32_t ResolvedResource::ElementStride() const noexcept
+{
+    return record->ElementStride;
+}
+
+uint32_t ResolvedResource::ArrayCount() const noexcept
+{
+    return record->ArrayCount;
+}
+
+uint64_t ResolvedResource::ByteSize() const noexcept
+{
+    return record->ByteSize;
+}
+
 uint64_t ResolvedResource::ElementCount() const noexcept
 {
     return footprint != nullptr ? footprint->ElementCount : 0u;
 }
 
-std::span<const UniformMember> ResolvedResource::Members() const noexcept
+uint32_t ResolvedResource::ExtentX() const noexcept
 {
-    return environment->UniformMembers(*record);
+    return footprint != nullptr ? footprint->ExtentX : 0u;
+}
+
+uint32_t ResolvedResource::ExtentY() const noexcept
+{
+    return footprint != nullptr ? footprint->ExtentY : 0u;
+}
+
+uint32_t ResolvedResource::ExtentZ() const noexcept
+{
+    return footprint != nullptr ? footprint->ExtentZ : 0u;
+}
+
+UniformMemberRange ResolvedResource::Members() const noexcept
+{
+    return UniformMemberRange{ environment, environment->UniformMembers(*record) };
 }
 
 uint32_t ResolvedResource::Index() const noexcept
@@ -913,111 +1018,6 @@ ShaderSourceProvider::ShaderSourceProvider(EnvironmentView _view,
     : view{ _view },
       generation{ _generation }
 {
-    const std::span<const Binding> records = view.Bindings();
-    bindingInfos.reserve(records.size());
-
-    size_t totalMembers = 0u;
-    for (const Binding& record : records)
-    {
-        totalMembers += record.UniformMemberCount;
-    }
-
-    memberInfos.reserve(totalMembers);
-    for (const Binding& record : records)
-    {
-        for (const UniformMember& member : view.UniformMembers(record))
-        {
-            UniformMemberInfo info;
-            info.Name = view.String(member.NameString);
-            info.Offset = member.Offset;
-            info.Size = member.Size;
-            info.ArrayCount = member.ArrayCount;
-            info.ElementStride = static_cast<uint16_t>(member.ElementStride);
-            info.Layout = static_cast<MatrixLayout>(member.MatrixLayout);
-            memberInfos.push_back(info);
-        }
-    }
-
-    // Where each resource's members start, so a gathered binding can point at them.
-    std::vector<uint32_t> memberOffsets;
-    memberOffsets.reserve(records.size());
-    uint32_t memberCursor = 0u;
-    for (const Binding& record : records)
-    {
-        memberOffsets.push_back(memberCursor);
-        memberCursor += record.UniformMemberCount;
-    }
-
-    const std::span<const EntryPointInstance> allSlots = view.SlotTable();
-    slotFirstBinding.assign(allSlots.size(), 0u);
-    slotBindingCount.assign(allSlots.size(), 0u);
-
-    for (uint32_t variantIndex = 0u; variantIndex < view.Variants().size(); ++variantIndex)
-    {
-        GatherVariantBindings(view.VariantAt(variantIndex), memberOffsets);
-    }
-}
-
-void ShaderSourceProvider::GatherVariantBindings(VariantView variant, const std::vector<uint32_t>& member_offsets)
-{
-    // the slot grid puts this variant's slots in one row, so the row start is the first slot's table index
-    const size_t firstSlotIndex = static_cast<size_t>(variant.Index()) * variant.EntryPointCount();
-
-    for (uint32_t entryPointIndex = 0u; entryPointIndex < variant.EntryPointCount(); ++entryPointIndex)
-    {
-        const size_t slotIndex = firstSlotIndex + entryPointIndex;
-        const LayoutRange layout = variant.EntryPoint(entryPointIndex).Layout();
-
-        slotFirstBinding[slotIndex] = static_cast<uint32_t>(bindingInfos.size());
-        slotBindingCount[slotIndex] = layout.Size();
-
-        for (const ResolvedResource resource : layout)
-        {
-            bindingInfos.push_back(MakeBindingInfo(resource.Record(),
-                                                   resource.FootprintRecord(),
-                                                   member_offsets[resource.Index()]));
-        }
-    }
-}
-
-BindingInfo ShaderSourceProvider::MakeBindingInfo(const Binding& record,
-                                                  const Footprint* footprint,
-                                                  uint32_t member_offset) const noexcept
-{
-    BindingInfo info;
-    info.Name = view.String(record.NameString);
-    info.ScopeName = view.String(record.ScopeString);
-    // todo-ship: BindingInfo still carries a fixed group and binding. Give it the placement kind and the
-    // payload, so an Indexed or Pointer placement reaches a renderer.
-    if (record.PlacementKind == static_cast<uint8_t>(PlacementKind::Bound))
-    {
-        info.Group = record.Placement.Word0;
-        info.Binding = record.Placement.Word1;
-    }
-    info.Kind = static_cast<BindingKind>(record.Kind);
-    info.ElementStride = record.ElementStride;
-    info.ByteSize = record.ByteSize;
-    info.ArrayCount = record.ArrayCount;
-    info.Shape = static_cast<ResourceShape>(record.Shape);
-    info.IsComparisonSampler = static_cast<bool>(record.IsComparisonSampler);
-    info.StorageFormat = static_cast<TextureFormat>(record.StorageFormat);
-    info.Access = static_cast<ResourceAccess>(record.Access);
-
-    if (footprint != nullptr)
-    {
-        info.DerivedElementCount = footprint->ElementCount;
-        info.DerivedExtentX = footprint->ExtentX;
-        info.DerivedExtentY = footprint->ExtentY;
-        info.DerivedExtentZ = footprint->ExtentZ;
-    }
-
-    if (record.UniformMemberCount != 0u)
-    {
-        info.Members = std::span<const UniformMemberInfo>{ memberInfos.data() + member_offset,
-                                                           record.UniformMemberCount };
-    }
-
-    return info;
 }
 
 std::string_view ShaderSourceProvider::Source(uint32_t entry_point,
@@ -1028,14 +1028,11 @@ std::string_view ShaderSourceProvider::Source(uint32_t entry_point,
     return view.Source(slot->Source);
 }
 
-std::span<const BindingInfo> ShaderSourceProvider::Bindings(uint32_t entry_point,
-                                                            VariantKey variant) const noexcept
+LayoutRange ShaderSourceProvider::Bindings(uint32_t entry_point, VariantKey variant) const noexcept
 {
-    const EntryPointInstance* slot = view.FindSlot(entry_point, variant);
-    assert(slot != nullptr);
-    const size_t slotIndex = static_cast<size_t>(slot - view.SlotTable().data());
-    return std::span<const BindingInfo>{ bindingInfos.data() + slotFirstBinding[slotIndex],
-                                         slotBindingCount[slotIndex] };
+    const std::optional<VariantView> variantView = view.VariantByKey(variant);
+    assert(variantView.has_value());
+    return variantView->EntryPoint(entry_point).Layout();
 }
 
 WorkgroupSize ShaderSourceProvider::Workgroup(uint32_t entry_point,

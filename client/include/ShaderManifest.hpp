@@ -424,7 +424,94 @@ struct alignas(8) RasterState
 class ModuleView;
 class EnvironmentView;
 
-/** One resource as one entry point sees it: the binding record and its footprint. */
+/** One member of a uniform block. Use it to check that a CPU struct matches the shader layout. */
+class UniformMemberView
+{
+public:
+    [[nodiscard]] std::string_view Name() const noexcept;
+    [[nodiscard]] uint32_t Offset() const noexcept;
+    [[nodiscard]] uint32_t Size() const noexcept;
+    [[nodiscard]] uint32_t ArrayCount() const noexcept;
+    [[nodiscard]] uint32_t ElementStride() const noexcept;
+    [[nodiscard]] MatrixLayout Layout() const noexcept;
+    [[nodiscard]] const UniformMember& Record() const noexcept;
+
+private:
+    friend class UniformMemberRange;
+    UniformMemberView(const EnvironmentView* _environment, const UniformMember* _record) noexcept;
+    const EnvironmentView* environment{ nullptr };
+    const UniformMember* record{ nullptr };
+};
+
+/** The members of one uniform block, in declaration order. Empty for every other binding kind. */
+class UniformMemberRange
+{
+public:
+    class Iterator
+    {
+    public:
+        Iterator() noexcept = default;
+        explicit Iterator(const UniformMemberRange* _range, uint32_t _position) noexcept
+            : range(_range), position(_position) {}
+
+        using iterator_concept = std::input_iterator_tag;
+        using iterator_category = std::input_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = UniformMemberView;
+        using reference = UniformMemberView;
+        using pointer = void;
+
+        [[nodiscard]] UniformMemberView operator*() const noexcept
+        {
+            return range->operator[](position);
+        }
+
+        Iterator& operator++() noexcept
+        {
+            ++position;
+            return *this;
+        }
+
+        Iterator operator++(int) noexcept
+        {
+            Iterator previous = *this;
+            ++position;
+            return previous;
+        }
+
+        [[nodiscard]] bool operator==(const Iterator& other) const noexcept
+        {
+            return range == other.range && position == other.position;
+        }
+
+    private:
+        const UniformMemberRange* range{ nullptr };
+        uint32_t position{ 0u };
+    };
+
+    [[nodiscard]] Iterator begin() const noexcept
+    {
+        return Iterator{ this, 0u };
+    }
+
+    [[nodiscard]] Iterator end() const noexcept
+    {
+        return Iterator{ this, Size() };
+    }
+
+    [[nodiscard]] uint32_t Size() const noexcept;
+    [[nodiscard]] bool Empty() const noexcept;
+    [[nodiscard]] UniformMemberView operator[](uint32_t position) const noexcept;
+
+private:
+    friend class ResolvedResource;
+    UniformMemberRange(const EnvironmentView* _environment, std::span<const UniformMember> _members) noexcept;
+    const EnvironmentView* environment{ nullptr };
+    std::span<const UniformMember> members;
+};
+
+/** One resource as one entry point sees it: the binding record and its footprint.
+ * @note A view points at its `EnvironmentView`. Keep that environment alive, and do not move it. */
 class ResolvedResource
 {
 public:
@@ -435,10 +522,22 @@ public:
     [[nodiscard]] BindingKind Kind() const noexcept;
     [[nodiscard]] ResourceShape Shape() const noexcept;
     [[nodiscard]] ResourceAccess Access() const noexcept;
-    /** @brief Zero when the resource has no footprint. */
+    [[nodiscard]] TextureFormat StorageFormat() const noexcept;
+    [[nodiscard]] bool IsComparisonSampler() const noexcept;
+    /** @brief The size of one structured buffer element, in bytes. Zero for a texture or a sampler. */
+    [[nodiscard]] uint32_t ElementStride() const noexcept;
+    [[nodiscard]] uint32_t ArrayCount() const noexcept;
+    /** @brief The size of a uniform block, in bytes. Zero for every other binding kind. */
+    [[nodiscard]] uint64_t ByteSize() const noexcept;
+    /** @brief The element count from `[ls_element_count]`, for this variant. Zero when the shader does not
+     * give one, or when the resource has no footprint. Then the caller must give the size. */
     [[nodiscard]] uint64_t ElementCount() const noexcept;
-    //[[nodiscard]] UniformMemberRange Members() const noexcept;
-    [[nodiscard]] std::span<const UniformMember> Members() const noexcept;
+    /** @brief The texture extent from `[ls_extent_2d]` or `[ls_extent_3d]`. Zero when the shader does not
+     * give one, or when the resource has no footprint. Then the caller must give the size. */
+    [[nodiscard]] uint32_t ExtentX() const noexcept;
+    [[nodiscard]] uint32_t ExtentY() const noexcept;
+    [[nodiscard]] uint32_t ExtentZ() const noexcept;
+    [[nodiscard]] UniformMemberRange Members() const noexcept;
     /** @brief The position of the binding record in `EnvironmentView::Bindings()`. */
     [[nodiscard]] uint32_t Index() const noexcept;
     [[nodiscard]] const Binding& Record() const noexcept;
@@ -502,19 +601,6 @@ public:
             return previous;
         }
 
-        Iterator& operator--() noexcept
-        {
-            --position;
-            return *this;
-        }
-
-        Iterator operator--(int) noexcept
-        {
-            Iterator previous = *this;
-            --position;
-            return previous;
-        }
-
         Iterator operator+(difference_type n) const noexcept
         {
             return Iterator{ range, position + static_cast<uint32_t>(n) };
@@ -526,30 +612,14 @@ public:
             return *this;
         }
 
-        Iterator operator-(difference_type n) const noexcept
+        [[nodiscard]] bool operator==(const Iterator& other) const noexcept
         {
-            return Iterator{ range, position - static_cast<uint32_t>(n) };
-        }
-
-        Iterator& operator-=(difference_type n) noexcept
-        {
-            position -= static_cast<uint32_t>(n);
-            return *this;
-        }
-
-        difference_type operator-(const Iterator& other) const noexcept
-        {
-            return static_cast<difference_type>(position) - static_cast<difference_type>(other.position);
+            return range == other.range && position == other.position;
         }
 
         [[nodiscard]] bool operator!=(const Iterator& other) const noexcept
         {
             return !(*this == other);
-        }
-
-        [[nodiscard]] bool operator==(const Iterator& other) const noexcept
-        {
-            return range == other.range && position == other.position;
         }
 
     private:
@@ -794,9 +864,9 @@ private:
 /**
  * @brief Serves shader sources out of one environment of a manifest.
  *
- * This is now the only implementation of ShaderSourceProvider, after removal of the old header path.
- * The constructor converts the manifest binding records into BindingInfo once. That is the only
- * allocation, and it is needed because BindingInfo holds string views while the file holds indices.
+ * The provider allocates nothing. Each accessor reads the environment when you call it.
+ * `Bindings()` returns a range that points into this provider, so do not move the provider while you
+ * hold a range from it.
  *
  * `Generation()` is the future hot-reload hook. A provider for baked data will always return the same value,
  * but a live provider can increment the value when any source changes - allowing users to reload
@@ -809,8 +879,7 @@ public:
 
     [[nodiscard]] std::string_view Source(uint32_t entry_point,
                                           VariantKey variant) const noexcept;
-    [[nodiscard]] std::span<const BindingInfo> Bindings(uint32_t entry_point,
-                                                        VariantKey variant) const noexcept;
+    [[nodiscard]] LayoutRange Bindings(uint32_t entry_point, VariantKey variant) const noexcept;
     [[nodiscard]] WorkgroupSize Workgroup(uint32_t entry_point,
                                           VariantKey variant) const noexcept;
     [[nodiscard]] uint64_t Generation() const noexcept;
@@ -818,20 +887,6 @@ public:
 
 private:
     EnvironmentView view;
-    /** Built before bindingInfos and reserved to its final size, so the spans below stay valid. */
-    std::vector<UniformMemberInfo> memberInfos;
-    /** One entry for each slot, gathered from the resource list and the footprint list of the slot's
-     * variant. A layout is a subset of what the variant declares, so it is not a run of the resource
-     * table and has to be materialized. */
-    std::vector<BindingInfo> bindingInfos;
-    /** Where each slot's bindings begin in bindingInfos, and how many there are. */
-    std::vector<uint32_t> slotFirstBinding;
-    std::vector<uint32_t> slotBindingCount;
-
-    void GatherVariantBindings(VariantView variant, const std::vector<uint32_t>& member_offsets);
-    [[nodiscard]] BindingInfo MakeBindingInfo(const Binding& record,
-                                              const Footprint* footprint,
-                                              uint32_t member_offset) const noexcept;
     uint64_t generation{ 0u };
 };
 
