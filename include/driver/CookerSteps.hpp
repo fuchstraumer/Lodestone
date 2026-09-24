@@ -105,6 +105,7 @@ struct BuiltModule
     std::vector<CompiledVariant> CompiledVariants;
     std::optional<std::string> RawModuleDump;
     std::optional<std::string> ResolvedModuleDump;
+    std::optional<std::string> InternedModuleDump;
     CookStatistics Statistics;
 };
 

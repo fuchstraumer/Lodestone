@@ -177,6 +177,16 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                     return std::unexpected(writeError);
                 }
             }
+
+            if (builtModule.InternedModuleDump)
+            {
+                const std::string fileName = BuildDumpFileName(moduleName, targetName, StageDumpKind::Interned);
+                CookError writeError = sink.WriteArtifact(fileName, std::move(*builtModule.InternedModuleDump));
+                if (!writeError)
+                {
+                    return std::unexpected(writeError);
+                }
+            }
             
             // operator+= uses atomic_ref to safely update the statistics in a potentially multithreaded context
             // we can improve this in the future, but for now that works just fine
