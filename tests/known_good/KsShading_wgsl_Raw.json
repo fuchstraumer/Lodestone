@@ -1,0 +1,17 @@
+{
+    "stage": "raw",
+    "module": "KsShading",
+    "variantCount": 1,
+    "entryPointNames": [],
+    "externDefaults": [],
+    "variants": [
+        {
+            "index": 0,
+            "suffix": "",
+            "description": "",
+            "bindings": [],
+            "sizeAttributes": [],
+            "entryPoints": []
+        }
+    ]
+}

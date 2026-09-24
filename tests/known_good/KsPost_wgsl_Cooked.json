@@ -1,0 +1,1526 @@
+{
+    "stage": "cooked",
+    "module": "KsPost",
+    "spaceSize": 32,
+    "sourceCount": 25,
+    "resourceCount": 3,
+    "resourceListCount": 1,
+    "footprintListCount": 1,
+    "visibilityListCount": 3,
+    "rasterStateCount": 2,
+    "variantCount": 24,
+    "entryPoints": [
+        {
+            "name": "FullscreenVS",
+            "stage": "Vertex"
+        },
+        {
+            "name": "ResolveFS",
+            "stage": "Fragment"
+        }
+    ],
+    "sources": [
+        {
+            "index": 0,
+            "byteLength": 502,
+            "contentHash": 6523290502480444409
+        },
+        {
+            "index": 1,
+            "byteLength": 867,
+            "contentHash": 7889932759731407806
+        },
+        {
+            "index": 2,
+            "byteLength": 924,
+            "contentHash": 14734412086050460477
+        },
+        {
+            "index": 3,
+            "byteLength": 1392,
+            "contentHash": 2082849218585963750
+        },
+        {
+            "index": 4,
+            "byteLength": 1472,
+            "contentHash": 13603541594579613377
+        },
+        {
+            "index": 5,
+            "byteLength": 1482,
+            "contentHash": 5556639249673764907
+        },
+        {
+            "index": 6,
+            "byteLength": 1562,
+            "contentHash": 441994296042105821
+        },
+        {
+            "index": 7,
+            "byteLength": 897,
+            "contentHash": 17780794576789063992
+        },
+        {
+            "index": 8,
+            "byteLength": 954,
+            "contentHash": 11761010718127299942
+        },
+        {
+            "index": 9,
+            "byteLength": 1422,
+            "contentHash": 13177494658115628895
+        },
+        {
+            "index": 10,
+            "byteLength": 1502,
+            "contentHash": 12414264343770217581
+        },
+        {
+            "index": 11,
+            "byteLength": 1551,
+            "contentHash": 16023364807659645466
+        },
+        {
+            "index": 12,
+            "byteLength": 1631,
+            "contentHash": 14141447012417666351
+        },
+        {
+            "index": 13,
+            "byteLength": 911,
+            "contentHash": 15043633609257742046
+        },
+        {
+            "index": 14,
+            "byteLength": 968,
+            "contentHash": 8734005589427910245
+        },
+        {
+            "index": 15,
+            "byteLength": 1436,
+            "contentHash": 3365423835243853250
+        },
+        {
+            "index": 16,
+            "byteLength": 1516,
+            "contentHash": 6715923328484001903
+        },
+        {
+            "index": 17,
+            "byteLength": 1526,
+            "contentHash": 5478393681003286788
+        },
+        {
+            "index": 18,
+            "byteLength": 1606,
+            "contentHash": 248415614206807563
+        },
+        {
+            "index": 19,
+            "byteLength": 873,
+            "contentHash": 1746113869809759340
+        },
+        {
+            "index": 20,
+            "byteLength": 930,
+            "contentHash": 10402187346152227788
+        },
+        {
+            "index": 21,
+            "byteLength": 1398,
+            "contentHash": 5706847156769675879
+        },
+        {
+            "index": 22,
+            "byteLength": 1478,
+            "contentHash": 3844559619547801180
+        },
+        {
+            "index": 23,
+            "byteLength": 1488,
+            "contentHash": 10893771709586588591
+        },
+        {
+            "index": 24,
+            "byteLength": 1568,
+            "contentHash": 4004693287494209321
+        }
+    ],
+    "resources": [
+        {
+            "index": 0,
+            "contentHash": 6969220317231583764,
+            "resource": {
+                "name": "SceneColor",
+                "scope": "",
+                "placementKind": "bound",
+                "group": 0,
+                "binding": 0,
+                "kind": "Texture",
+                "elementStride": 0,
+                "byteSize": 0,
+                "arrayCount": 1,
+                "shape": "Texture2D",
+                "sampleType": "Float",
+                "storageFormat": "Invalid",
+                "storageAccess": "ReadOnly",
+                "isComparisonSampler": false,
+                "uniformMembers": []
+            }
+        },
+        {
+            "index": 1,
+            "contentHash": 11008137680117175333,
+            "resource": {
+                "name": "BloomChain",
+                "scope": "",
+                "placementKind": "bound",
+                "group": 0,
+                "binding": 1,
+                "kind": "Texture",
+                "elementStride": 0,
+                "byteSize": 0,
+                "arrayCount": 1,
+                "shape": "",
+                "sampleType": "Float",
+                "storageFormat": "Invalid",
+                "storageAccess": "ReadOnly",
+                "isComparisonSampler": false,
+                "uniformMembers": []
+            }
+        },
+        {
+            "index": 2,
+            "contentHash": 1389697799311910281,
+            "resource": {
+                "name": "LinearSampler",
+                "scope": "",
+                "placementKind": "bound",
+                "group": 0,
+                "binding": 2,
+                "kind": "Sampler",
+                "elementStride": 0,
+                "byteSize": 0,
+                "arrayCount": 1,
+                "shape": "Invalid",
+                "sampleType": "Invalid",
+                "storageFormat": "Invalid",
+                "storageAccess": "Invalid",
+                "isComparisonSampler": false,
+                "uniformMembers": []
+            }
+        }
+    ],
+    "resourceLists": [
+        {
+            "index": 0,
+            "contentHash": 17856881380917102865,
+            "indices": [
+                0,
+                1,
+                2
+            ]
+        }
+    ],
+    "footprintLists": [
+        {
+            "index": 0,
+            "contentHash": 3746301729353902884,
+            "footprints": [
+                {
+                    "footprint": {
+                        "kind": "none"
+                    }
+                },
+                {
+                    "footprint": {
+                        "kind": "texture",
+                        "extentX": 1024,
+                        "extentY": 1024,
+                        "extentZ": 5,
+                        "expression": "1024"
+                    }
+                },
+                {
+                    "footprint": {
+                        "kind": "none"
+                    }
+                }
+            ]
+        }
+    ],
+    "visibilityLists": [
+        {
+            "index": 0,
+            "contentHash": 3244421341483603138,
+            "indices": []
+        },
+        {
+            "index": 1,
+            "contentHash": 17028722565691633600,
+            "indices": [
+                0,
+                2
+            ]
+        },
+        {
+            "index": 2,
+            "contentHash": 17856881380917102865,
+            "indices": [
+                0,
+                1,
+                2
+            ]
+        }
+    ],
+    "rasterStates": [
+        {
+            "index": 0,
+            "contentHash": 3244421341483603138,
+            "vertexInputs": [],
+            "colorTargets": [],
+            "writesFragDepth": false
+        },
+        {
+            "index": 1,
+            "contentHash": 7886726465762270693,
+            "vertexInputs": [],
+            "colorTargets": [
+                {
+                    "location": 0,
+                    "scalarType": "Float32",
+                    "componentCount": 4
+                }
+            ],
+            "writesFragDepth": false
+        }
+    ],
+    "variants": [
+        {
+            "index": 0,
+            "suffix": "_ToneMapOperator::Linear_false_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                1
+            ],
+            "visibilityIndices": [
+                0,
+                1
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 1,
+            "suffix": "_ToneMapOperator::Linear_false_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                2
+            ],
+            "visibilityIndices": [
+                0,
+                1
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 2,
+            "suffix": "_ToneMapOperator::Linear_true_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                3
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 3,
+            "suffix": "_ToneMapOperator::Linear_true_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                4
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 4,
+            "suffix": "_ToneMapOperator::Linear_true_true_1",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                5
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 5,
+            "suffix": "_ToneMapOperator::Linear_true_true_2",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                6
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 6,
+            "suffix": "_ToneMapOperator::Reinhard_false_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                7
+            ],
+            "visibilityIndices": [
+                0,
+                1
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 7,
+            "suffix": "_ToneMapOperator::Reinhard_false_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                8
+            ],
+            "visibilityIndices": [
+                0,
+                1
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 8,
+            "suffix": "_ToneMapOperator::Reinhard_true_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                9
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 9,
+            "suffix": "_ToneMapOperator::Reinhard_true_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                10
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 10,
+            "suffix": "_ToneMapOperator::Reinhard_true_true_1",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                11
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 11,
+            "suffix": "_ToneMapOperator::Reinhard_true_true_2",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                12
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 12,
+            "suffix": "_ToneMapOperator::Aces_false_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                13
+            ],
+            "visibilityIndices": [
+                0,
+                1
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 13,
+            "suffix": "_ToneMapOperator::Aces_false_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                14
+            ],
+            "visibilityIndices": [
+                0,
+                1
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 14,
+            "suffix": "_ToneMapOperator::Aces_true_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                15
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 15,
+            "suffix": "_ToneMapOperator::Aces_true_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                16
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 16,
+            "suffix": "_ToneMapOperator::Aces_true_true_1",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                17
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 17,
+            "suffix": "_ToneMapOperator::Aces_true_true_2",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                18
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 18,
+            "suffix": "_ToneMapOperator::Filmic_false_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                19
+            ],
+            "visibilityIndices": [
+                0,
+                1
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 19,
+            "suffix": "_ToneMapOperator::Filmic_false_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                20
+            ],
+            "visibilityIndices": [
+                0,
+                1
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 20,
+            "suffix": "_ToneMapOperator::Filmic_true_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                21
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 21,
+            "suffix": "_ToneMapOperator::Filmic_true_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                22
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 22,
+            "suffix": "_ToneMapOperator::Filmic_true_true_1",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                23
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        },
+        {
+            "index": 23,
+            "suffix": "_ToneMapOperator::Filmic_true_true_2",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [
+                0,
+                24
+            ],
+            "visibilityIndices": [
+                0,
+                2
+            ],
+            "rasterIndices": [
+                0,
+                1
+            ],
+            "workgroups": [
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                }
+            ]
+        }
+    ],
+    "interners": {
+        "sources": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 48,
+            "uniqueEntries": 25,
+            "hashCollisions": 0,
+            "byteComparisons": 23
+        },
+        "resources": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 72,
+            "uniqueEntries": 3,
+            "hashCollisions": 0,
+            "byteComparisons": 69
+        },
+        "resourceLists": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 24,
+            "uniqueEntries": 1,
+            "hashCollisions": 0,
+            "byteComparisons": 23
+        },
+        "footprintLists": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 24,
+            "uniqueEntries": 1,
+            "hashCollisions": 0,
+            "byteComparisons": 23
+        },
+        "visibility": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 48,
+            "uniqueEntries": 3,
+            "hashCollisions": 0,
+            "byteComparisons": 45
+        },
+        "rasterStates": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 48,
+            "uniqueEntries": 2,
+            "hashCollisions": 0,
+            "byteComparisons": 46
+        }
+    }
+}

@@ -1,0 +1,960 @@
+{
+    "stage": "variants",
+    "module": "KsPost",
+    "variantCount": 24,
+    "spaceSize": 32,
+    "variants": [
+        {
+            "index": 0,
+            "suffix": "_ToneMapOperator::Linear_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ]
+        },
+        {
+            "index": 1,
+            "suffix": "_ToneMapOperator::Linear_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ]
+        },
+        {
+            "index": 2,
+            "suffix": "_ToneMapOperator::Linear_true_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ]
+        },
+        {
+            "index": 3,
+            "suffix": "_ToneMapOperator::Linear_true_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ]
+        },
+        {
+            "index": 4,
+            "suffix": "_ToneMapOperator::Linear_true_true_1",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ]
+        },
+        {
+            "index": 5,
+            "suffix": "_ToneMapOperator::Linear_true_true_2",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ]
+        },
+        {
+            "index": 6,
+            "suffix": "_ToneMapOperator::Reinhard_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ]
+        },
+        {
+            "index": 7,
+            "suffix": "_ToneMapOperator::Reinhard_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ]
+        },
+        {
+            "index": 8,
+            "suffix": "_ToneMapOperator::Reinhard_true_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ]
+        },
+        {
+            "index": 9,
+            "suffix": "_ToneMapOperator::Reinhard_true_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ]
+        },
+        {
+            "index": 10,
+            "suffix": "_ToneMapOperator::Reinhard_true_true_1",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ]
+        },
+        {
+            "index": 11,
+            "suffix": "_ToneMapOperator::Reinhard_true_true_2",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ]
+        },
+        {
+            "index": 12,
+            "suffix": "_ToneMapOperator::Aces_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ]
+        },
+        {
+            "index": 13,
+            "suffix": "_ToneMapOperator::Aces_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ]
+        },
+        {
+            "index": 14,
+            "suffix": "_ToneMapOperator::Aces_true_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ]
+        },
+        {
+            "index": 15,
+            "suffix": "_ToneMapOperator::Aces_true_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ]
+        },
+        {
+            "index": 16,
+            "suffix": "_ToneMapOperator::Aces_true_true_1",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ]
+        },
+        {
+            "index": 17,
+            "suffix": "_ToneMapOperator::Aces_true_true_2",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ]
+        },
+        {
+            "index": 18,
+            "suffix": "_ToneMapOperator::Filmic_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ]
+        },
+        {
+            "index": 19,
+            "suffix": "_ToneMapOperator::Filmic_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "false"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ]
+        },
+        {
+            "index": 20,
+            "suffix": "_ToneMapOperator::Filmic_true_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ]
+        },
+        {
+            "index": 21,
+            "suffix": "_ToneMapOperator::Filmic_true_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "false"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ]
+        },
+        {
+            "index": 22,
+            "suffix": "_ToneMapOperator::Filmic_true_true_1",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "1"
+                }
+            ]
+        },
+        {
+            "index": 23,
+            "suffix": "_ToneMapOperator::Filmic_true_true_2",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "APPLY_BLOOM",
+                    "value": "true"
+                },
+                {
+                    "axis": "APPLY_VIGNETTE",
+                    "value": "true"
+                },
+                {
+                    "axis": "SAMPLE_COUNT",
+                    "value": "2"
+                }
+            ]
+        }
+    ]
+}

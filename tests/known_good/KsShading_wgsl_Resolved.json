@@ -1,0 +1,14 @@
+{
+    "stage": "resolved",
+    "module": "KsShading",
+    "variantCount": 1,
+    "variants": [
+        {
+            "index": 0,
+            "suffix": "",
+            "description": "",
+            "bindings": [],
+            "entryPoints": []
+        }
+    ]
+}

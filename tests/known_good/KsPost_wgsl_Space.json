@@ -1,0 +1,61 @@
+{
+    "stage": "space",
+    "module": "KsPost",
+    "axisCount": 4,
+    "spaceSize": 32,
+    "axes": [
+        {
+            "name": "TONE_MAP",
+            "kind": "None",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Enum",
+            "values": [
+                "ToneMapOperator::Linear",
+                "ToneMapOperator::Reinhard",
+                "ToneMapOperator::Aces",
+                "ToneMapOperator::Filmic"
+            ],
+            "enumCaseValues": [
+                10,
+                40,
+                20,
+                30
+            ],
+            "activeWhen": null
+        },
+        {
+            "name": "APPLY_BLOOM",
+            "kind": "Technique",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Boolean",
+            "values": [
+                "false",
+                "true"
+            ],
+            "activeWhen": null
+        },
+        {
+            "name": "APPLY_VIGNETTE",
+            "kind": "Technique",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Boolean",
+            "values": [
+                "false",
+                "true"
+            ],
+            "activeWhen": "APPLY_BLOOM == 1"
+        },
+        {
+            "name": "SAMPLE_COUNT",
+            "kind": "Tuning",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Integral",
+            "values": [
+                "1",
+                "2"
+            ],
+            "activeWhen": null
+        }
+    ],
+    "require": []
+}

@@ -1,0 +1,15 @@
+{
+    "stage": "variants",
+    "module": "KsShading",
+    "variantCount": 1,
+    "spaceSize": 1,
+    "variants": [
+        {
+            "index": 0,
+            "suffix": "",
+            "description": "",
+            "active": [],
+            "canonical": []
+        }
+    ]
+}

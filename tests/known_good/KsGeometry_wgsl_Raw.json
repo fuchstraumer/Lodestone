@@ -1,0 +1,3084 @@
+{
+    "stage": "raw",
+    "module": "KsGeometry",
+    "variantCount": 16,
+    "entryPointNames": [
+        "MainVS",
+        "MainFS"
+    ],
+    "externDefaults": [],
+    "variants": [
+        {
+            "index": 0,
+            "suffix": "_ToneMapOperator::Linear_false_false",
+            "description": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=false, VERTEX_COLOR=false",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1920,
+                    "targetTextHash": 6376623470312090756,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1351,
+                    "targetTextHash": 523615609834328574,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 1,
+            "suffix": "_ToneMapOperator::Linear_false_true",
+            "description": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=false, VERTEX_COLOR=true",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1898,
+                    "targetTextHash": 17925485705236498938,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1351,
+                    "targetTextHash": 523615609834328574,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 2,
+            "suffix": "_ToneMapOperator::Linear_true_false",
+            "description": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=true, VERTEX_COLOR=false",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1926,
+                    "targetTextHash": 16089787959731712719,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1351,
+                    "targetTextHash": 523615609834328574,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 3,
+            "suffix": "_ToneMapOperator::Linear_true_true",
+            "description": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=true, VERTEX_COLOR=true",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1904,
+                    "targetTextHash": 465859602882011526,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1351,
+                    "targetTextHash": 523615609834328574,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 4,
+            "suffix": "_ToneMapOperator::Reinhard_false_false",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=false, VERTEX_COLOR=false",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1920,
+                    "targetTextHash": 6376623470312090756,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1408,
+                    "targetTextHash": 15741226210758640380,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 5,
+            "suffix": "_ToneMapOperator::Reinhard_false_true",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=false, VERTEX_COLOR=true",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1898,
+                    "targetTextHash": 17925485705236498938,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1408,
+                    "targetTextHash": 15741226210758640380,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 6,
+            "suffix": "_ToneMapOperator::Reinhard_true_false",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=true, VERTEX_COLOR=false",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1926,
+                    "targetTextHash": 16089787959731712719,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1408,
+                    "targetTextHash": 15741226210758640380,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 7,
+            "suffix": "_ToneMapOperator::Reinhard_true_true",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=true, VERTEX_COLOR=true",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1904,
+                    "targetTextHash": 465859602882011526,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1408,
+                    "targetTextHash": 15741226210758640380,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 8,
+            "suffix": "_ToneMapOperator::Aces_false_false",
+            "description": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=false, VERTEX_COLOR=false",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1920,
+                    "targetTextHash": 6376623470312090756,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1385,
+                    "targetTextHash": 7737204166640356348,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 9,
+            "suffix": "_ToneMapOperator::Aces_false_true",
+            "description": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=false, VERTEX_COLOR=true",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1898,
+                    "targetTextHash": 17925485705236498938,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1385,
+                    "targetTextHash": 7737204166640356348,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 10,
+            "suffix": "_ToneMapOperator::Aces_true_false",
+            "description": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=true, VERTEX_COLOR=false",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1926,
+                    "targetTextHash": 16089787959731712719,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1385,
+                    "targetTextHash": 7737204166640356348,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 11,
+            "suffix": "_ToneMapOperator::Aces_true_true",
+            "description": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=true, VERTEX_COLOR=true",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1904,
+                    "targetTextHash": 465859602882011526,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1385,
+                    "targetTextHash": 7737204166640356348,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 12,
+            "suffix": "_ToneMapOperator::Filmic_false_false",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=false, VERTEX_COLOR=false",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1920,
+                    "targetTextHash": 6376623470312090756,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1357,
+                    "targetTextHash": 9768686873388477803,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 13,
+            "suffix": "_ToneMapOperator::Filmic_false_true",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=false, VERTEX_COLOR=true",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1898,
+                    "targetTextHash": 17925485705236498938,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1357,
+                    "targetTextHash": 9768686873388477803,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 14,
+            "suffix": "_ToneMapOperator::Filmic_true_false",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=true, VERTEX_COLOR=false",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1926,
+                    "targetTextHash": 16089787959731712719,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1357,
+                    "targetTextHash": 9768686873388477803,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        },
+        {
+            "index": 15,
+            "suffix": "_ToneMapOperator::Filmic_true_true",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=true, VERTEX_COLOR=true",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "Scene",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "UniformBuffer",
+                    "elementStride": 0,
+                    "byteSize": 96,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": [
+                        {
+                            "name": "ViewProjection",
+                            "offset": 0,
+                            "size": 64,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "RowMajor"
+                        },
+                        {
+                            "name": "CameraPosition",
+                            "offset": 64,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        },
+                        {
+                            "name": "ToneMapParams",
+                            "offset": 80,
+                            "size": 16,
+                            "arrayCount": 1,
+                            "elementStride": 0,
+                            "matrixLayout": "Invalid"
+                        }
+                    ]
+                },
+                {
+                    "index": 1,
+                    "name": "BaseColorTexture",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "BaseColorSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_2d",
+                    "arguments": [
+                        "2048",
+                        "2048"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "MainVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1904,
+                    "targetTextHash": 465859602882011526,
+                    "usedBindingIndices": [
+                        0
+                    ],
+                    "vertexInputs": [
+                        {
+                            "semanticName": "POSITION",
+                            "semanticIndex": 0,
+                            "location": 0,
+                            "scalarType": "Float16",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "NORMAL",
+                            "semanticIndex": 0,
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 3
+                        },
+                        {
+                            "semanticName": "TANGENT",
+                            "semanticIndex": 0,
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "semanticName": "TEXCOORD",
+                            "semanticIndex": 0,
+                            "location": 3,
+                            "scalarType": "Float32",
+                            "componentCount": 2
+                        },
+                        {
+                            "semanticName": "COLOR",
+                            "semanticIndex": 0,
+                            "location": 4,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "MainFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1357,
+                    "targetTextHash": 9768686873388477803,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 1,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        },
+                        {
+                            "location": 2,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": true
+                }
+            ]
+        }
+    ]
+}

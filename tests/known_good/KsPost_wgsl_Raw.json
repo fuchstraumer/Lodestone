@@ -1,0 +1,2884 @@
+{
+    "stage": "raw",
+    "module": "KsPost",
+    "variantCount": 24,
+    "entryPointNames": [
+        "FullscreenVS",
+        "ResolveFS"
+    ],
+    "externDefaults": [],
+    "variants": [
+        {
+            "index": 0,
+            "suffix": "_ToneMapOperator::Linear_false_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 867,
+                    "targetTextHash": 7889932759731407806,
+                    "usedBindingIndices": [
+                        0,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 1,
+            "suffix": "_ToneMapOperator::Linear_false_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 924,
+                    "targetTextHash": 14734412086050460477,
+                    "usedBindingIndices": [
+                        0,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 2,
+            "suffix": "_ToneMapOperator::Linear_true_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1392,
+                    "targetTextHash": 2082849218585963750,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 3,
+            "suffix": "_ToneMapOperator::Linear_true_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1472,
+                    "targetTextHash": 13603541594579613377,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 4,
+            "suffix": "_ToneMapOperator::Linear_true_true_1",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1482,
+                    "targetTextHash": 5556639249673764907,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 5,
+            "suffix": "_ToneMapOperator::Linear_true_true_2",
+            "description": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1562,
+                    "targetTextHash": 441994296042105821,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 6,
+            "suffix": "_ToneMapOperator::Reinhard_false_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 897,
+                    "targetTextHash": 17780794576789063992,
+                    "usedBindingIndices": [
+                        0,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 7,
+            "suffix": "_ToneMapOperator::Reinhard_false_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 954,
+                    "targetTextHash": 11761010718127299942,
+                    "usedBindingIndices": [
+                        0,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 8,
+            "suffix": "_ToneMapOperator::Reinhard_true_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1422,
+                    "targetTextHash": 13177494658115628895,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 9,
+            "suffix": "_ToneMapOperator::Reinhard_true_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1502,
+                    "targetTextHash": 12414264343770217581,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 10,
+            "suffix": "_ToneMapOperator::Reinhard_true_true_1",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1551,
+                    "targetTextHash": 16023364807659645466,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 11,
+            "suffix": "_ToneMapOperator::Reinhard_true_true_2",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1631,
+                    "targetTextHash": 14141447012417666351,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 12,
+            "suffix": "_ToneMapOperator::Aces_false_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 911,
+                    "targetTextHash": 15043633609257742046,
+                    "usedBindingIndices": [
+                        0,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 13,
+            "suffix": "_ToneMapOperator::Aces_false_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 968,
+                    "targetTextHash": 8734005589427910245,
+                    "usedBindingIndices": [
+                        0,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 14,
+            "suffix": "_ToneMapOperator::Aces_true_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1436,
+                    "targetTextHash": 3365423835243853250,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 15,
+            "suffix": "_ToneMapOperator::Aces_true_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1516,
+                    "targetTextHash": 6715923328484001903,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 16,
+            "suffix": "_ToneMapOperator::Aces_true_true_1",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1526,
+                    "targetTextHash": 5478393681003286788,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 17,
+            "suffix": "_ToneMapOperator::Aces_true_true_2",
+            "description": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1606,
+                    "targetTextHash": 248415614206807563,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 18,
+            "suffix": "_ToneMapOperator::Filmic_false_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 873,
+                    "targetTextHash": 1746113869809759340,
+                    "usedBindingIndices": [
+                        0,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 19,
+            "suffix": "_ToneMapOperator::Filmic_false_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 930,
+                    "targetTextHash": 10402187346152227788,
+                    "usedBindingIndices": [
+                        0,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 20,
+            "suffix": "_ToneMapOperator::Filmic_true_false_1",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1398,
+                    "targetTextHash": 5706847156769675879,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 21,
+            "suffix": "_ToneMapOperator::Filmic_true_false_2",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1478,
+                    "targetTextHash": 3844559619547801180,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 22,
+            "suffix": "_ToneMapOperator::Filmic_true_true_1",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1488,
+                    "targetTextHash": 10893771709586588591,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        },
+        {
+            "index": 23,
+            "suffix": "_ToneMapOperator::Filmic_true_true_2",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+            "bindings": [
+                {
+                    "index": 0,
+                    "name": "SceneColor",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 0
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Texture2D",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 1,
+                    "name": "BloomChain",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 1
+                    },
+                    "kind": "Texture",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "",
+                    "sampleType": "Float",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "ReadOnly",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                },
+                {
+                    "index": 2,
+                    "name": "LinearSampler",
+                    "scope": "",
+                    "placement": {
+                        "model": "Bound",
+                        "group": 0,
+                        "binding": 2
+                    },
+                    "kind": "Sampler",
+                    "elementStride": 0,
+                    "byteSize": 0,
+                    "arrayCount": 1,
+                    "shape": "Invalid",
+                    "sampleType": "Invalid",
+                    "storageFormat": "Invalid",
+                    "storageAccess": "Invalid",
+                    "isComparisonSampler": false,
+                    "uniformMembers": []
+                }
+            ],
+            "sizeAttributes": [
+                {
+                    "bindingIndex": 1,
+                    "attribute": "ls_extent_3d",
+                    "arguments": [
+                        "1024",
+                        "1024",
+                        "5"
+                    ]
+                }
+            ],
+            "entryPoints": [
+                {
+                    "name": "FullscreenVS",
+                    "stage": "Vertex",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 502,
+                    "targetTextHash": 6523290502480444409,
+                    "usedBindingIndices": [],
+                    "vertexInputs": [],
+                    "colorTargets": [],
+                    "writesFragDepth": false
+                },
+                {
+                    "name": "ResolveFS",
+                    "stage": "Fragment",
+                    "workgroup": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "targetTextByteLength": 1568,
+                    "targetTextHash": 4004693287494209321,
+                    "usedBindingIndices": [
+                        0,
+                        1,
+                        2
+                    ],
+                    "vertexInputs": [],
+                    "colorTargets": [
+                        {
+                            "location": 0,
+                            "scalarType": "Float32",
+                            "componentCount": 4
+                        }
+                    ],
+                    "writesFragDepth": false
+                }
+            ]
+        }
+    ]
+}

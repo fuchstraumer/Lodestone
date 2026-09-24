@@ -1,6 +1,7 @@
 """Compares the stage dumps of a module against the known good files.
 
-The cooker writes six stage dumps. `tests/known_good/` holds one accepted copy of each. This script
+The cooker writes six stage dumps for each module and target. `tests/known_good/` holds one accepted
+copy of each. This script
 cooks the module, compares each dump against its accepted copy, and prints one line for each stage.
 
 A diff does not always mean a bug, of course. We could have updated the schema by adding, removing,
@@ -34,7 +35,9 @@ import subprocess
 import sys
 import tempfile
 
-STAGES = ("space", "variants", "raw", "resolved", "interned", "cooked")
+STAGES = ("Space", "Variants", "Raw", "Resolved", "Interned", "Cooked")
+# The cooker names a dump `<module>_<target>_<Stage>.json`. The known good copy has the same name.
+TARGET = "wgsl"
 # The default regime cooks each KitchenSink module on its own, against the KitchenSink policy, and
 # compares its six dumps. Each module's dumps are named by its stem, so the sets never collide.
 DEFAULT_MODULES = (
@@ -84,7 +87,7 @@ def cook(cooker: pathlib.Path, module: pathlib.Path, out_directory: pathlib.Path
             str(cooker),
             "-o",
             str(out_directory),
-            "--target=wgsl",
+            f"--target={TARGET}",
             "--dump-stage=all",
             str(module),
             "--policy-file",
@@ -111,7 +114,7 @@ def check_module(cooker: pathlib.Path, module: pathlib.Path, known_good: pathlib
         cook(cooker, module, out_directory)
 
         for stage in STAGES:
-            name = f"{stem}.stage-{stage}.json"
+            name = f"{stem}_{TARGET}_{stage}.json"
             produced = out_directory / name
             accepted = known_good / name
 
