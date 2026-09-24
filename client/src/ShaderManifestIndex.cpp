@@ -446,6 +446,11 @@ std::vector<QueryAxisValue> ManifestIndex::Decode(VariantKey key) const
         result[axisIndex] = decodeAxis(static_cast<uint32_t>(axisIndex), valueIndex);
     }
 
+    if (const std::optional<uint32_t> variantIndex = environment.FindVariant(key); variantIndex.has_value())
+    {
+        markInactiveAxes(variantIndex.value(), result);
+    }
+
     return result;
 }
 
@@ -471,6 +476,8 @@ std::vector<DecodedVariant> ManifestIndex::Enumerate() const
                                std::views::enumerate |
                                std::views::transform(decodeAxisFn) |
                                std::ranges::to<std::vector<QueryAxisValue>>();
+        // the key table is parallel to the variant table, so the key position is the variant index
+        markInactiveAxes(static_cast<uint32_t>(index), result[index].Values);
     }
 
     return result;
@@ -595,6 +602,7 @@ std::vector<uint32_t> ManifestIndex::integralValueIndices(const uint32_t axis_in
         const uint32_t valueIndex = static_cast<uint32_t>(std::distance(localValues.begin(), iter));
         constraintValueIndices[index] = valueIndex;
     }
+    
     return constraintValueIndices;
 }
 
@@ -670,17 +678,11 @@ VariantKey ManifestIndex::first(std::span<const ScanConstraint> constraints) con
         return INVALID_VARIANT; // or some sentinel value indicating no match
     }
 
-    for (const VariantKey key : candidates)
+    // candidates is a subspan of the key table, so its offset is the variant index of its first key
+    const uint32_t firstIndex = static_cast<uint32_t>(candidates.data() - environment.VariantKeys().data());
+    for (const auto&& [offset, key] : std::views::enumerate(candidates))
     {
-        const uint64_t keyValue = std::to_underlying(key);
-        auto matchFn = [&](const ScanConstraint& constraint) -> bool
-        {
-            const uint32_t digit =
-                static_cast<uint32_t>((keyValue / placeValues[constraint.AxisIndex]) % radices[constraint.AxisIndex]);
-            return std::ranges::contains(constraint.AllowedValueIndices, digit);
-        };
-
-        if (std::ranges::all_of(constraints, matchFn))
+        if (matches(firstIndex + static_cast<uint32_t>(offset), key, constraints))
         {
             return key;
         }
@@ -695,27 +697,41 @@ std::vector<VariantKey> ManifestIndex::scan(std::span<const ScanConstraint> cons
     // now that we have our narrowed band of candidates, we can filter them according to the constraints
     std::vector<VariantKey> result;
 
-    for (const VariantKey key : candidates)
+    const uint32_t firstIndex = static_cast<uint32_t>(candidates.data() - environment.VariantKeys().data());
+    for (const auto&& [offset, key] : std::views::enumerate(candidates))
     {
-        const uint64_t keyValue = std::to_underlying(key);
-        
-        auto matchFn = [&](const ScanConstraint& constraint) -> bool
-        {
-            // for each constraint, extract the digit (at the current radix/axis)
-            // (aka, just it's value in that mixed radix space)
-            const uint32_t digit =
-                static_cast<uint32_t>((keyValue / placeValues[constraint.AxisIndex]) % radices[constraint.AxisIndex]);
-            // now check if digit is in range of the current constraint
-            return std::ranges::contains(constraint.AllowedValueIndices, digit);
-        };
-
-        if (std::ranges::all_of(constraints, matchFn))
+        if (matches(firstIndex + static_cast<uint32_t>(offset), key, constraints))
         {
             result.emplace_back(key);
         }
     }
 
     return result;
+}
+
+bool ManifestIndex::matches(uint32_t variant_index,
+                            VariantKey key,
+                            std::span<const ScanConstraint> constraints) const noexcept
+{
+    const uint64_t keyValue = std::to_underlying(key);
+    auto matchFn = [&](const ScanConstraint& constraint) -> bool
+    {
+        // the digit of this axis, in the mixed radix of the key
+        const uint32_t digit =
+            static_cast<uint32_t>((keyValue / placeValues[constraint.AxisIndex]) % radices[constraint.AxisIndex]);
+        return std::ranges::contains(constraint.AllowedValueIndices, digit) &&
+               environment.IsAxisActive(variant_index, constraint.AxisIndex);
+    };
+
+    return std::ranges::all_of(constraints, matchFn);
+}
+
+void ManifestIndex::markInactiveAxes(uint32_t variant_index, std::span<QueryAxisValue> values) const noexcept
+{
+    for (const auto&& [axisIndex, value] : std::views::enumerate(values))
+    {
+        value.Active = environment.IsAxisActive(variant_index, static_cast<uint32_t>(axisIndex));
+    }
 }
 
 std::vector<std::string_view> ManifestIndex::stringTableForAxis(uint32_t axis_index) const

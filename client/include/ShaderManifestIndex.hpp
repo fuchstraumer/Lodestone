@@ -27,6 +27,9 @@ struct QueryAxisValue
     // for Interface axes, the name of the specific implementation
     // for Enum axes, the name of the specific case
     std::string_view Name;
+    /** @brief Decode output only. False when the variant does not use this axis. The value is then the
+     * canonical default, which the key packs but the shader never reads. `==` ignores this field. */
+    bool Active{ true };
 
     constexpr bool operator==(const QueryAxisValue& other) const noexcept
     {
@@ -162,7 +165,8 @@ public:
     explicit ManifestIndex(manifest::EnvironmentView view);
 
     [[nodiscard]] const manifest::EnvironmentView& View() const noexcept;
-    /** @brief Direct decode: "expand" a variant key into that values matching that key */
+    /** @brief Direct decode: "expand" a variant key into the values matching that key. `Active` is
+      * read from the variant when this environment cooked the key, and is true otherwise. */
     [[nodiscard]] std::vector<QueryAxisValue> Decode(VariantKey key) const;
     /** @brief Returns every variant that exists, in (sorted) key order. Useful for total 
       * precaching of everything a manifest could generate as shader state */
@@ -197,6 +201,12 @@ private:
     /** @brief Filters the keys based on the provided scan constraints - returns a view into manifest
       * that's better bounded based on the input constraints, to reduce iteration complexity. */
     [[nodiscard]] std::span<const VariantKey> filterKeys(std::span<const ScanConstraint> constraints) const;
+    /** @brief True when every constraint allows the key's digit, and its axis is active in the variant.
+      * An inactive axis holds its canonical default digit, so the digit test alone over-returns. */
+    [[nodiscard]] bool matches(uint32_t variant_index,
+                               VariantKey key,
+                               std::span<const ScanConstraint> constraints) const noexcept;
+    void markInactiveAxes(uint32_t variant_index, std::span<QueryAxisValue> values) const noexcept;
     /** @brief Returns the first key that matches the given constraints. */
     [[nodiscard]] VariantKey first(std::span<const ScanConstraint> constraints) const;
     [[nodiscard]] std::vector<VariantKey> scan(std::span<const ScanConstraint> constraints) const;
