@@ -35,10 +35,8 @@ import sys
 import tempfile
 
 STAGES = ("space", "variants", "raw", "resolved", "interned", "cooked")
-# The default regime cooks each module and compares its six dumps. OceanFft is the reference module.
-# EnumAxisTest pins the enum reflection read: its space dump carries the case tags (5, 1, 10), so a
-# sign or width bug in the tag read fails here even though the manifest stores only the case names.
-# Each module's dumps are named by its stem, so the two sets never collide.
+# The default regime cooks each KitchenSink module on its own, against the KitchenSink policy, and
+# compares its six dumps. Each module's dumps are named by its stem, so the sets never collide.
 DEFAULT_MODULES = (
     "tests/assets/KitchenSink/KsGeometry.slang",
     "tests/assets/KitchenSink/KsMaterial.slang",
@@ -86,6 +84,7 @@ def cook(cooker: pathlib.Path, module: pathlib.Path, out_directory: pathlib.Path
             str(cooker),
             "-o",
             str(out_directory),
+            "--target=wgsl",
             "--dump-stage=all",
             str(module),
             "--policy-file",
@@ -154,7 +153,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--module", default=None,
                         help="cook only this module, instead of the default set")
-    parser.add_argument("--preset", default="ninja-clang-cl", help="build preset directory")
+    parser.add_argument("--preset", default="ninja-msvc", help="build preset directory")
     parser.add_argument("--config", default="RelWithDebInfo", help="Debug or RelWithDebInfo")
     parser.add_argument(
         "--accept",

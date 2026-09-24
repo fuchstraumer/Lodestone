@@ -210,7 +210,7 @@ void CheckCommandLine(lodestone::tests::TestRunner& runner)
 {
     runner.BeginSection("command line");
 
-    const std::array<std::string_view, 4u> accepted{ "-o", "out.hpp", "--dump-stage=cooked", "a.slang" };
+    const std::array<std::string_view, 5u> accepted{ "-o", "out", "--target=wgsl", "--dump-stage=cooked", "a.slang" };
     const CookResult<CookerOptions> parsed = ParseCommandLine(accepted);
     runner.Check(parsed.has_value(), "--dump-stage=cooked parses");
     if (parsed)
@@ -221,8 +221,8 @@ void CheckCommandLine(lodestone::tests::TestRunner& runner)
                      "--dump-stage=cooked requests nothing else");
     }
 
-    const std::array<std::string_view, 5u> repeated{
-        "-o", "out.hpp", "--dump-stage=space", "--dump-stage=variants", "a.slang"
+    const std::array<std::string_view, 6u> repeated{
+        "-o", "out", "--target=wgsl", "--dump-stage=space", "--dump-stage=variants", "a.slang"
     };
     const CookResult<CookerOptions> twice = ParseCommandLine(repeated);
     runner.Check(twice.has_value(), "the flag repeats");
@@ -233,15 +233,20 @@ void CheckCommandLine(lodestone::tests::TestRunner& runner)
                      "a repeated flag adds to the mask instead of replacing it");
     }
 
-    const std::array<std::string_view, 4u> everything{ "-o", "out.hpp", "--dump-stage=all", "a.slang" };
+    const std::array<std::string_view, 5u> everything{ "-o", "out", "--target=wgsl", "--dump-stage=all", "a.slang" };
     const CookResult<CookerOptions> all = ParseCommandLine(everything);
     runner.Check(all.has_value() && all.value().DumpStageMask == AllStageDumpBits(),
                  "--dump-stage=all sets every bit");
 
-    const std::array<std::string_view, 4u> bogus{ "-o", "out.hpp", "--dump-stage=nonsense", "a.slang" };
+    const std::array<std::string_view, 5u> bogus{ "-o", "out", "--target=wgsl", "--dump-stage=nonsense", "a.slang" };
     const CookResult<CookerOptions> rejected = ParseCommandLine(bogus);
     runner.Check(!rejected.has_value() && rejected.error() == CookError::MalformedArgument,
                  "an unknown stage name fails the command line");
+
+    const std::array<std::string_view, 3u> noTarget{ "-o", "out", "a.slang" };
+    const CookResult<CookerOptions> untargeted = ParseCommandLine(noTarget);
+    runner.Check(!untargeted.has_value() && untargeted.error() == CookError::NoTargetSpecified,
+                 "a command line with no target fails");
 }
 
 /** The one golden literal in this file. It pins the JSON shape, the key names, the key order, and the

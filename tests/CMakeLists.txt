@@ -32,6 +32,7 @@ endfunction()
 # header and one shared dedupe report, so every OceanFft artifact would stop being byte identical.
 add_lodestone_unit_test(EntryPointParamsCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/entry_point_params_output"
+              --target=wgsl
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/EntryPointParams.slang")
 # The same driver, on the probe module that phase E step E0b needed. `ParameterBlocks.slang` declares
@@ -40,6 +41,7 @@ add_lodestone_unit_test(EntryPointParamsCookTest CookTest.cpp
 # binding ranges gives every content of every block no binding at all.
 add_lodestone_unit_test(ParameterBlocksCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/parameter_blocks_output"
+              --target=wgsl
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/ParameterBlocks.slang")
 # The same driver, on the module that phase E step E7 needed. `InterfaceAxisTest.slang` declares an
@@ -50,6 +52,7 @@ add_lodestone_unit_test(ParameterBlocksCookTest CookTest.cpp
 # that every variant linked, the cross-check agreed, both round trips read back, and two cooks matched.
 add_lodestone_unit_test(InterfaceAxisCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/interface_axis_output"
+              --target=wgsl
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/InterfaceAxis/InterfaceAxisTest.slang")
 # The same driver, on an enum-axis module. `EnumAxisTest.slang` declares an `[ls_axis_enum]` extern
@@ -59,17 +62,17 @@ add_lodestone_unit_test(InterfaceAxisCookTest CookTest.cpp
 # boolean axis it is a product of six variants.
 add_lodestone_unit_test(EnumAxisCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/enum_axis_output"
+              --target=wgsl
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/EnumAxis/EnumAxisTest.slang")
 # The same driver, on the multi-module KitchenSink set. This is the stress and coverage asset: four
 # consumer modules cook together against one policy, and KsTypes and KsShading are imported for their
 # enum and interface declarations. It crosses every axis kind, groups resources into nested parameter
 # blocks, and reaches 2D, 3D, cube, and array textures, a comparison sampler, and raster targets with a
-# depth write. It shares axis names across modules with different value subsets. It is known to break
-# today, because the axis over an imported type needs the declaring module, not the module where the
-# axis constant was found.
+# depth write. It shares axis names across modules with different value subsets.
 add_lodestone_unit_test(KitchenSinkCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/kitchen_sink_output"
+              --target=wgsl
               --verify-deterministic
               --policy-file "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KitchenSink.toml"
               "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KsGeometry.slang"
