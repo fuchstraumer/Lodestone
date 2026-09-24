@@ -105,18 +105,24 @@ CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& share
         return std::unexpected(compileVariantsResult.error());
     }
 
-    // Raw module dump can't actually happen until after the variants have all been built, weirdly enough
+    // The raw dump comes after the compile, because the compile keeps the raw variants in rawModule.
+    // Dump rawModule, not rawModuleResult: the move above empties rawModuleResult.
     std::optional<std::string> rawModuleDump = std::nullopt;
     if (IsStageDumpRequested(shared_state.Options, StageDumpKind::Raw))
     {
-        rawModuleDump = DumpRawModule(rawModuleResult.value());
+        rawModuleDump = DumpRawModule(rawModule);
     }
 
     std::optional<std::string> resolvedModuleDump = std::nullopt;
     if (IsStageDumpRequested(shared_state.Options, StageDumpKind::Resolved))
     {
-        // this should probably be renamed, since it's a bit confusing now
-        resolvedModuleDump = DumpInternedModule(internedModule);
+        resolvedModuleDump = DumpResolvedModule(module_name, compiledVariants);
+    }
+
+    std::optional<std::string> internedModuleDump = std::nullopt;
+    if (IsStageDumpRequested(shared_state.Options, StageDumpKind::Interned))
+    {
+        internedModuleDump = DumpInternedModule(internedModule);
     }
 
     return BuiltModule{
@@ -124,6 +130,7 @@ CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& share
         .CompiledVariants = std::move(compiledVariants),
         .RawModuleDump = std::move(rawModuleDump),
         .ResolvedModuleDump = std::move(resolvedModuleDump),
+        .InternedModuleDump = std::move(internedModuleDump),
         .Statistics = *compileVariantsResult
     };
 }
