@@ -240,62 +240,6 @@ struct WorkgroupSize
     uint32_t Z{ 1u };
 };
 
-/** @brief One member of a uniform block, with the offset and the size the shader gave it.
- *  Use this to validate that CPU-size structs match the layout expected by the shader. */
-struct UniformMemberInfo
-{
-    std::string_view Name;
-    uint32_t Offset{ 0u };
-    uint32_t Size{ 0u };
-    uint32_t ArrayCount{ 1u };
-    uint16_t ElementStride{ 0u };
-    MatrixLayout Layout{ MatrixLayout::Invalid };
-    uint8_t Padding{ 0u }; // added by compiler, placing here manually for explicit visibility
-};
-
-/** @brief One resource a shader binds, as the generated library states it. This is the optimized and
- * compact form of the cooker's `ReflectedBinding`. Strings are stored in the cooked data, so views
- * are used here instead of owning strings. It is critical to use the group and binding indices
- * declared here to avoid errors and crashes.
- */
-//NOLINTBEGIN(misc-non-private-member-variables-in-classes)
-// todo-ship: maybe we strip out string_view and span, and just use C-style strings and arrays
-// to avoid the standard library includes in an interface header
-// todo-ship: this is already 104 bytes, we should find a way to pack it better. i was only able
-// to cut 8 bytes by changing ordering to get rid of the hidden padding
-struct BindingInfo
-{
-    std::string_view Name;
-    std::string_view ScopeName;
-    uint32_t Group{ static_cast<uint32_t>(-1) };
-    uint32_t Binding{ static_cast<uint32_t>(-1) };
-    BindingKind Kind{ BindingKind::Invalid };
-    /** @brief Shape is Buffer/Texture[N]/Sampler, etc */
-    ResourceShape Shape{ ResourceShape::Invalid };
-    TextureSampleType SampleType{ TextureSampleType::Invalid };
-    TextureFormat StorageFormat{ TextureFormat::Invalid };
-    /** @note Unlike a `Buffer`, `StorageTexture` access type is not part of the Shape value */
-    ResourceAccess Access{ ResourceAccess::Invalid };
-    bool IsComparisonSampler{ false };
-    /** @brief Size of one structured buffer element, in bytes. Zero for a texture or a sampler. */
-    uint32_t ElementStride{ 0u };
-    uint32_t ArrayCount{ 1u };
-    /** @brief Total size of a uniform block, in bytes. Zero for every other binding kind. */
-    uint64_t ByteSize{ 0u };
-    /** @brief Element count from a `[ls_element_count]` annotation, already evaluated for this
-     * variant. Zero means the shader did not annotate the resource, so the caller must give a size. */
-    uint64_t DerivedElementCount{ 0u };
-    /** @brief Texture extent from a `[ls_extent_2d]` or `[ls_extent_3d]` annotation. Zero width means
-     * the shader did not annotate the resource. This means the caller must drive and set the sizing.*/
-    uint32_t DerivedExtentX{ 0u };
-    uint32_t DerivedExtentY{ 0u };
-    uint32_t DerivedExtentZ{ 0u };
-
-    /** @brief The members of a uniform block. Empty for every other binding kind. */
-    std::span<const UniformMemberInfo> Members;
-};
-//NOLINTEND(misc-non-private-member-variables-in-classes)
-
 } // namespace lodestone
 
 #endif // !LODESTONE_SHADER_LIBRARY_TYPES_HPP
