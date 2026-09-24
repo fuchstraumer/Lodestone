@@ -29,7 +29,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 5u;
+inline constexpr uint32_t k_ShaderManifestVersion = 6u;
 
 // clang-tidy complains about enums being too big, but uint32_t means
 // the error struct is 16bytes, which is great alignment and still compact
@@ -339,7 +339,7 @@ struct alignas(8) Binding
     uint8_t Shape{ 0u };
     uint8_t IsComparisonSampler{ 0u };
     uint8_t Access{ 0u };
-    uint8_t Reserved0{ 0u };
+    uint8_t SampleType{ 0u };
     uint16_t Reserved1{ 0u };
     uint32_t Reserved2{ 0u };
 };
@@ -523,6 +523,8 @@ public:
     [[nodiscard]] ResourceShape Shape() const noexcept;
     [[nodiscard]] ResourceAccess Access() const noexcept;
     [[nodiscard]] TextureFormat StorageFormat() const noexcept;
+    /** @brief How a shader reads a sampled texture. Invalid for every other resource. */
+    [[nodiscard]] TextureSampleType SampleType() const noexcept;
     [[nodiscard]] bool IsComparisonSampler() const noexcept;
     /** @brief The size of one structured buffer element, in bytes. Zero for a texture or a sampler. */
     [[nodiscard]] uint32_t ElementStride() const noexcept;

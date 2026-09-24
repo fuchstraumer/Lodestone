@@ -567,6 +567,7 @@ namespace
         record.Shape = static_cast<uint8_t>(binding.Shape);
         record.IsComparisonSampler = static_cast<uint8_t>(binding.IsComparisonSampler);
         record.Access = static_cast<uint8_t>(binding.Access);
+        record.SampleType = static_cast<uint8_t>(binding.SampleType);
 
         record.FirstUniformMember = static_cast<uint32_t>(member_records.size());
         record.UniformMemberCount = static_cast<uint32_t>(binding.UniformMembers.size());
@@ -1238,7 +1239,8 @@ namespace
                record.Kind == static_cast<uint8_t>(binding.Kind) &&
                record.Shape == static_cast<uint8_t>(binding.Shape) &&
                record.IsComparisonSampler == static_cast<uint8_t>(binding.IsComparisonSampler) &&
-               record.Access == static_cast<uint8_t>(binding.Access);
+               record.Access == static_cast<uint8_t>(binding.Access) &&
+               record.SampleType == static_cast<uint8_t>(binding.SampleType);
     }
 
     bool ManifestUniformMembersMatch(const manifest::EnvironmentView& view,

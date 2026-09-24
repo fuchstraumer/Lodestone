@@ -843,6 +843,11 @@ TextureFormat ResolvedResource::StorageFormat() const noexcept
     return static_cast<TextureFormat>(record->StorageFormat);
 }
 
+TextureSampleType ResolvedResource::SampleType() const noexcept
+{
+    return static_cast<TextureSampleType>(record->SampleType);
+}
+
 bool ResolvedResource::IsComparisonSampler() const noexcept
 {
     return record->IsComparisonSampler != 0u;
