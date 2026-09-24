@@ -5,6 +5,7 @@
 #include "model/CookedLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
+#include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "permute/PermutationTypes.hpp"
@@ -122,9 +123,10 @@ PermutationSpace MakeSpace()
 // Builds the four-axis module, keeping only the variants `keep` accepts. A subset models a cook that
 // did not emit every combination: a policy allow-list, or an ActiveWhen gate that pins a child axis when
 // its parent is off. The axis schema stays whole either way, because the space is unchanged; only the key
-// set shrinks. The module points into `space`, so the space must outlive the emit.
-template<typename Keep>
-lodestone::CookedModule BuildModule(const PermutationSpace& space, Keep keep)
+// set shrinks. `active` tells which axes each kept variant uses, and that fills the axis-active mask.
+// The module points into `space`, so the space must outlive the emit.
+template<typename Keep, typename Active>
+lodestone::CookedModule BuildModule(const PermutationSpace& space, Keep keep, Active active)
 {
     lodestone::CookedModule module;
     module.Name = "QueryTestModule";
@@ -167,6 +169,15 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space, Keep keep)
 
                     lodestone::LibraryVariant variant;
                     variant.Index = index;
+                    for (uint32_t axisIndex = 0u; axisIndex < digits.size(); ++axisIndex)
+                    {
+                        if (active(digits, axisIndex))
+                        {
+                            const PermutationAxis& axis = space.Axes()[axisIndex];
+                            variant.Active.push_back(lodestone::PermutationBinding{
+                                .Axis = &axis, .Value = axis.GetValues()[digits[axisIndex]] });
+                        }
+                    }
                     variant.ResourceListIndex = 0u;
                     variant.FootprintListIndex = 0u;
                     variant.SourceIndices.push_back(0u);
@@ -194,6 +205,17 @@ bool KeepSmallTiles(const std::array<uint32_t, 4>& digits)
     return digits[k_TileAxis] != 2u;
 }
 
+bool AllActive(const std::array<uint32_t, 4>&, uint32_t)
+{
+    return true;
+}
+
+// The ActiveWhen gate of the gated test: SHADE is active only when DITHER is true.
+bool ShadeActiveWhenDither(const std::array<uint32_t, 4>& digits, uint32_t axis_index)
+{
+    return axis_index != k_ShadeAxis || digits[k_DitherAxis] != 0u;
+}
+
 // Emits a library and returns its bytes. The bytes are self-contained, so the modules and their spaces
 // can go once this returns. An emit failure returns no bytes, and the open that follows reports it.
 std::vector<std::byte> EmitBytes(const lodestone::CookedLibrary& library)
@@ -216,21 +238,21 @@ lodestone::CookedProfile MakeProfile(std::string target_name)
 }
 
 // One module, cooked for one profile.
-template<typename Keep>
-std::vector<std::byte> BuildManifest(Keep keep)
+template<typename Keep, typename Active>
+std::vector<std::byte> BuildManifest(Keep keep, Active active)
 {
     const PermutationSpace space = MakeSpace();
     lodestone::CookedLibrary library;
     library.ModuleNames = { "QueryTestModule" };
     library.Profiles = { MakeProfile("wgsl") };
-    library.Environments.emplace_back(BuildModule(space, keep));
+    library.Environments.emplace_back(BuildModule(space, keep, active));
     return EmitBytes(library);
 }
 
-// The full cross product: every combination is a cooked variant.
+// The full cross product: every combination is a cooked variant, and every axis is active.
 std::vector<std::byte> BuildManifestBytes()
 {
-    return BuildManifest(&KeepAll);
+    return BuildManifest(&KeepAll, &AllActive);
 }
 
 // Opens one environment of a bundle. The views hold spans into `bytes`, so the bytes must outlive them.
@@ -276,6 +298,8 @@ lodestone::CookedModule BuildTileModule(std::string name, const PermutationSpace
         module.VariantKeys.push_back(VariantKey{ digit });
         lodestone::LibraryVariant variant;
         variant.Index = digit;
+        const PermutationAxis& axis = space.Axes()[0];
+        variant.Active.push_back(lodestone::PermutationBinding{ .Axis = &axis, .Value = axis.GetValues()[digit] });
         variant.SourceIndices.push_back(0u);
         variant.VisibilityIndices.push_back(0u);
         variant.RasterIndices.push_back(0u);
@@ -329,6 +353,24 @@ int main()
                      decoded[k_TileAxis].IntegralValue == 16u, "the integral axis decodes to its value");
         runner.Check(decoded[k_ShadeAxis].Type == AxisValueDomain::Type &&
                      decoded[k_ShadeAxis].Name == "Lambert", "the type axis decodes to the impl name");
+    }
+
+    runner.BeginSection("the index names its axes and their values");
+    {
+        const std::vector<std::string_view> names = index.AxisNames();
+        runner.Check(names.size() == 4u && names[k_DitherAxis] == "DITHER" && names[k_QualityAxis] == "QUALITY" &&
+                         names[k_TileAxis] == "TILE" && names[k_ShadeAxis] == "SHADE",
+                     "AxisNames lists every axis in axis order");
+        const lodestone::QueryResult<std::vector<lodestone::QueryAxisValue>> quality = index.AxisValues("QUALITY");
+        runner.Check(quality.has_value() && quality->size() == 3u && (*quality)[0].Name == "Low" &&
+                         (*quality)[1].Name == "High" && (*quality)[2].Name == "Medium",
+                     "AxisValues lists an enum axis by case name, in digit order");
+        const lodestone::QueryResult<std::vector<lodestone::QueryAxisValue>> tile = index.AxisValues("TILE");
+        runner.Check(tile.has_value() && tile->size() == 3u && (*tile)[2].IntegralValue == 32u,
+                     "AxisValues lists an integral axis by value");
+        runner.Check(!index.AxisValues("TIEL").has_value() &&
+                         index.AxisValues("TIEL").error() == QueryErrorCode::UnknownAxis,
+                     "AxisValues reports an unknown axis");
     }
 
     runner.BeginSection("an empty query matches every variant");
@@ -475,7 +517,7 @@ int main()
     // manifest where one axis value was left out: queries are still valid, because it is an axis value,
     // but it was not cooked into any variant so the query resolves to an empty span
     runner.BeginSection("a valid value with no cooked variant returns an empty result");
-    const std::vector<std::byte> sparseBytes = BuildManifest(&KeepSmallTiles);
+    const std::vector<std::byte> sparseBytes = BuildManifest(&KeepSmallTiles, &AllActive);
     const ManifestResult<EnvironmentView> sparseOpened = OpenEnvironment(sparseBytes, 0u, 0u);
     runner.Check(sparseOpened.has_value(), "the sparse manifest opens");
     if (sparseOpened.has_value())
@@ -501,7 +543,8 @@ int main()
     runner.BeginSection("an ActiveWhen-gated axis is a hole in the key set, not a schema change");
     const std::vector<std::byte> gatedBytes =
         BuildManifest([](const std::array<uint32_t, 4>& digits)
-                      { return digits[k_DitherAxis] != 0u || digits[k_ShadeAxis] == 0u; });
+                      { return digits[k_DitherAxis] != 0u || digits[k_ShadeAxis] == 0u; },
+                      &ShadeActiveWhenDither);
     const ManifestResult<EnvironmentView> gatedOpened = OpenEnvironment(gatedBytes, 0u, 0u);
     runner.Check(gatedOpened.has_value(), "the gated manifest opens");
     if (gatedOpened.has_value())
@@ -523,6 +566,28 @@ int main()
         runner.Check(!gatedOff.First().has_value() &&
                      gatedOff.First().error() == QueryErrorCode::NoVariantForConstraints,
                      "First reports no variant for the gated-off combination");
+
+        // The gated-off variants hold SHADE at its default digit (Lambert), but SHADE is inactive there.
+        // A digit test alone returns them for a Lambert query. The axis-active mask removes them.
+        runner.Check(KeyCount(gated.Query().Where("SHADE", AxisValueDomain::Type, "Lambert")) == 9u,
+                     "a gated axis at its default value matches only where the axis is active");
+        const std::array<std::string_view, 1> phong{ "Phong" };
+        runner.Check(KeyCount(gated.Query().WhereNoneOf("SHADE", AxisValueDomain::Type, phong)) == 9u,
+                     "WhereNoneOf on a gated axis also selects only where the axis is active");
+        runner.Check(KeyCount(gated.Query().Where("DITHER", false)) == 9u,
+                     "a query that does not name the gated axis still returns the gated-off variants");
+
+        const VariantKey gatedOffKey = PackVariantKey(std::array<uint32_t, 4>{ 0u, 0u, 0u, 0u }, k_Radices);
+        const std::vector<lodestone::QueryAxisValue> decoded = gated.Decode(gatedOffKey);
+        runner.Check(!decoded[k_ShadeAxis].Active && decoded[k_DitherAxis].Active,
+                     "Decode marks the gated axis inactive, and the others active");
+        bool enumerateAgrees = true;
+        for (const DecodedVariant& variant : gated.Enumerate())
+        {
+            const bool ditherOn = variant.Values[k_DitherAxis].IntegralValue != 0u;
+            enumerateAgrees = enumerateAgrees && variant.Values[k_ShadeAxis].Active == ditherOn;
+        }
+        runner.Check(enumerateAgrees, "Enumerate marks SHADE active exactly where DITHER is on");
     }
 
     // Keys are per module, and each profile applies its own policy, so two profiles of one module can cook
@@ -533,8 +598,8 @@ int main()
         lodestone::CookedLibrary library;
         library.ModuleNames = { "QueryTestModule" };
         library.Profiles = { MakeProfile("wgsl"), MakeProfile("mobile") };
-        library.Environments.emplace_back(BuildModule(space, &KeepAll));
-        library.Environments.emplace_back(BuildModule(space, &KeepSmallTiles));
+        library.Environments.emplace_back(BuildModule(space, &KeepAll, &AllActive));
+        library.Environments.emplace_back(BuildModule(space, &KeepSmallTiles, &AllActive));
         const std::vector<std::byte> twoProfileBytes = EmitBytes(library);
 
         const ManifestResult<EnvironmentView> full = OpenEnvironment(twoProfileBytes, 0u, 0u);

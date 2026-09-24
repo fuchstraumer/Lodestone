@@ -74,15 +74,16 @@ until the command ends. The run then prints nothing for minutes, and it looks li
 that stops with an assertion also loses its buffered output.
 
 Each test target is also a standalone executable. Run it directly to debug it:
-`build/ninja-msvc/tests/Debug/CookTest.exe`. `CookTest` is the one that needs a command line. With no
-argument it exits 1 on `NoOutputSpecified`, which reads like a failure rather than a usage error.
+`build/ninja-msvc/tests/Debug/ManifestIndexTest.exe`. A cook test needs a command line. With no argument
+it exits 1 on `NoOutputSpecified`, which reads like a failure rather than a usage error.
 
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
 Twenty-two test targets exist. Seventeen are unit tests, and each one proves a claim the repository
-makes. None needs Slang or an asset. Only `WgslValidatorTest` needs a parser: it links Tint to read
-the emitted WGSL. All seventeen together run in under one second.
+makes. Sixteen need no Slang and no asset, and together they run in about half a second.
+`WgslValidatorTest` links Tint to read WGSL. `AccessModelRejectTest` cooks two small modules through
+Slang, and it takes about one second.
 
 | Target | Proves |
 |---|---|
@@ -102,26 +103,28 @@ the emitted WGSL. All seventeen together run in under one second.
 | `PermutationConstraintTest` | The axis constraint engine. `ActiveWhen` gates an axis the way the old parent link did, `Require` prunes a forbidden combination, and the load check rejects a forward reference, an unknown symbol, and a malformed expression. |
 | `SuggestTest` | The nearest-name suggestion. It measures the edit distance between a mistyped name and the accepted names, and returns the closest one. The cooker and the client both use it for a name rejection. |
 | `EnumTagDecodeTest` | The enum tag-blob decode (`compile/EnumTagDecode`). It reads each integer width, sign-extends a signed tag, zero-extends an unsigned tag, and accepts the `UInt64` wrap above 2^63. It names no Slang type, so the reflection read of an enum case value has a proof that needs no compiler. |
-| `ManifestIndexTest` | The client query surface, end to end. It builds a bundle inline through the emitter, with one axis of each domain, then drives `ManifestQueryBuilder` through every valid construction and every error path, plus a sparse manifest and an `ActiveWhen`-gated one. It proves that two profiles of one module each key their own subset, and that two modules share a root axis only when their values agree in order. It needs no Slang. |
+| `ManifestIndexTest` | The client query surface, end to end. It builds a bundle inline through the emitter, with one axis of each domain, then drives `ManifestQueryBuilder` through every valid construction and every error path, plus a sparse manifest and an `ActiveWhen`-gated one. On the gated manifest, a constraint on the gated axis selects only the variants where that axis is active, and `Decode` marks the inactive axis. It proves that two profiles of one module each key their own subset, and that two modules share a root axis only when their values agree in order. It also covers `AxisNames` and `AxisValues`. It needs no Slang. |
 
 An error check prints a diagnostic to `stderr` on purpose. Read the last line for the result.
 
 The last five are different. Each one is the cooker driver, and not an assertion suite.
 `tests/CMakeLists.txt` gives each a command line through `TEST_ARGS`, and all five build from
-`CookTest.cpp`. Exit code 0 there is a real statement: every variant compiled, every reflection agreed
-with the emitted WGSL, all three round trips read back the same bytes, and two cooks agreed byte for
-byte.
+`CookTest.cpp`. Each one passes `--target=wgsl` and `--verify-deterministic`. Exit code 0 there is a
+real statement: every variant compiled, every reflection agreed with the emitted WGSL, all three round
+trips read back the same bytes, and two cooks agreed byte for byte.
 
-- `CookTest` cooks `OceanFft.slang` with `--verify-deterministic`. It takes about 18 seconds, and it
-  is the end-to-end coverage of the permutation path.
+- `KitchenSinkCookTest` cooks the four KitchenSink modules together against
+  `tests/assets/KitchenSink/KitchenSink.toml`. It is the end-to-end coverage of the permutation path:
+  616 variants, every axis domain, nested parameter blocks, and raster state. One cook takes about
+  3.4 seconds in RelWithDebInfo, so the test takes about 7 seconds.
 - `EntryPointParamsCookTest` cooks `tests/assets/EntryPointParams.slang`. Three of its four entry
   points declare a `uniform` parameter, and one of those takes a struct with an annotated field.
   Phase E step E0a needed it, and it is the acceptance test for the entry point scope walk. It cooks
-  one variant in about one second.
+  one variant in about half a second.
 
 - `ParameterBlocksCookTest` cooks `tests/assets/ParameterBlocks.slang`. It holds a block of
   resources, a block of ordinary data, a block inside a block, and a block on each of two entry
-  points. Phase E step E0b needed it. It cooks one variant in about one second.
+  points. Phase E step E0b needed it. It cooks one variant in about half a second.
 
 - `InterfaceAxisCookTest` cooks `tests/assets/InterfaceAxis/InterfaceAxisTest.slang`. It declares an
   interface axis (`extern struct SHADE_MODE : IShadeMode`) whose three implementations reach the module
@@ -133,8 +136,8 @@ byte.
   explicit, non-ascending values, crossed with a boolean axis for six variants. The manifest stores the
   case names, and the digit stays the declaration order. Phase E needed it.
 
-Each cook writes into its own output directory, so each module cooks on its own. One cook of several
-modules would leave no artifact of `OceanFft` byte identical.
+Each cook test writes into its own output directory. The bundle and the dedup report hold every module
+of one cook, so a module added to a cook changes those files.
 
 Add a test with `add_lodestone_unit_test(<Name> <Name>.cpp)`. Add `TEST_ARGS <args>` after the sources
 when the test needs a command line. A cook test also needs a line in `scripts\run-tests.bat`: the
@@ -156,8 +159,10 @@ beside a `SourceTable.json` that names each variant by its axis description and 
 
 A value flag is a row in `k_ValueFlags`, beside `k_SwitchFlags`. Add a row, not a branch.
 
-`--target` is rejected at the command line and never in the driver, so a name that reaches
-`CookerOptions` is a name `FindTargetProfile` accepts. `wgsl` is the only name this build has.
+`--target` is required, like `-o` and a module path. A cook with no target cooks nothing, so
+`ParseCommandLine` fails with `NoTargetSpecified`. Repeat the flag for more than one target. An unknown
+name is rejected at the command line and never in the driver, so a name that reaches `CookerOptions` is
+a name `FindTargetProfile` accepts. `wgsl` is the only name this build has.
 
 `lodestone` must stay `STATIC`. No header marks a symbol `dllexport`, so a DLL build of this target
 exports nothing and every consumer fails to link. A `SHARED` build is for instrumented performance
@@ -167,8 +172,9 @@ analysis only, and it needs `WINDOWS_EXPORT_ALL_SYMBOLS` to link at all.
 links only `lodestone::client_internal`, never the cooker or Slang. That link line is the proof that
 the client half stays free of the compiler.
 
-Test shaders live in `tests/assets/`. `tests/assets/compute/Ocean/OceanFft.slang` is the reference
-module, because it is the only module with a registered permutation space.
+Test shaders live in `tests/assets/`. The KitchenSink set in `tests/assets/KitchenSink/` is the
+reference. `scripts/check-known-good.py` cooks each KitchenSink module on its own and compares its six
+stage dumps against `tests/known_good/`. A dump is named `<module>_<target>_<Stage>.json`.
 
 ## Where the code lives
 
@@ -449,7 +455,8 @@ unordered container reached the output.
 | `CookedModule`, `CookedLibrary` | `model/CookedLibrary.hpp` | The frozen model. Every emitter reads this and nothing earlier. |
 | `BundleView`, `ModuleView`, `EnvironmentView` | `client/include/ShaderManifest.hpp` | Read-only spans over the bundle bytes, one type for each scope: the whole cook, one module, and one module cooked for one profile. Each `Open` validates its scope once and allocates nothing. |
 | `ManifestIndex`, `ManifestQueryBuilder` | `client/include/ShaderManifestIndex.hpp` | The client query surface, frozen. `ManifestIndex` decodes and enumerates variants and hands out a value-semantic builder. The builder resolves axis names and values by name, and its terminals (`Keys`, `Variants`, `First`) return keys or an error. A malformed query is an error; a valid query with no variant is an empty set. |
-| `ShaderSourceProvider` | `client/include/ShaderLibraryTypes.hpp` | Where a renderer gets source, bindings, and workgroup size. `Generation()` is the hot-reload hook. |
+| `ShaderSourceProvider` | `client/include/ShaderManifest.hpp` | Where a renderer gets source, bindings, and workgroup size. `Bindings()` returns a `LayoutRange` of `ResolvedResource` views, built on demand, so the provider allocates nothing. `Generation()` is the hot-reload hook. |
+| `LayoutRange`, `ResolvedResource`, `VariantView`, `EntryPointInstanceView` | `client/include/ShaderManifest.hpp` | Views over one environment. `LayoutRange::operator[]` is the one place that resolves `resources[visible[i]]`. A view points at its `EnvironmentView`, so keep that environment alive and do not move it. |
 
 `ContentHashValue` is xxHash3, 64 bit. `model/ContentHash.hpp` holds the streaming form as well, which the
 composite keys use. The hash name reaches the output, so a new hash needs a new name, and
@@ -539,7 +546,7 @@ The cook policy is data, not code. A `PolicyDocument` reads a TOML file through 
 in `src/permute/PolicyDocument.cpp` (no toml++ type leaves that file). Each module names an
 `InertAxesForEntryPoints` table and one section for each target profile, and a target section carries
 `MaxVariants`, a `CookValues` allow-list, and a `CookIf` predicate. The `--policy-file` option names the
-file. `tests/assets/compute/Ocean/OceanFftPolicy.toml` is the reference.
+file. `tests/assets/KitchenSink/KitchenSink.toml` is the reference.
 
 A `PermutationSpace` owns its axes by value, so a copy would leave every `PermutationBinding` of the
 original aimed at a different object, and a gated axis would then read as absent and quietly reduce the
@@ -632,13 +639,13 @@ beside them.
   **Complete.** Read it for the reasoning behind the shape of the pipeline, and for §4b, which states
   why a binding record is four tables and not one.
 - `docs/phase-e-data-driven-permutations.md` — axis declarations in the shader, policy in a data file,
-  constraint expressions, and a ranking index in place of mixed radix. **This is the current work.**
-  The compiler split it waited on is complete. Steps E0a and E0b are done. §1e holds step E0c, which
-  is a defect rather than a missing capability, and it comes first. `docs/agent-handoff.md` §8 gives
-  the order.
+  constraint expressions, and a sorted key table in place of mixed radix. **Complete** (E8 closed it on
+  2026-09-24). Read it for the reasoning behind the axis model and the policy file.
 - `docs/phase-f-vocabulary.md` — **read this before proposing anything about targets or bindings.**
   It defines axis kind, binding time, and access model, and it divides the work between Slang's
-  capability system and this repository. It is a vocabulary, not a plan.
+  capability system and this repository. It is a vocabulary, not a plan. **Phase F is the next work.**
+  Its §9 open questions come first, and each one needs a written answer before phase F becomes a plan.
+  `docs/agent-handoff.md` gives the current order.
 
 Two terms from phase F are worth carrying into any discussion of variants:
 

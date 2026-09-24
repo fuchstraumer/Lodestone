@@ -7,16 +7,11 @@
     - a load of persisted variants will then need to first decode it's `Values` vector, to compute
       the key, and see if it matches. The `Key` field is somewhat redundant, I suppose, at least in
       persisted data
-- The index hands out a profile-scoped builder (QueryFor(profile)) for the runtime path. Scope the
-  profile on the builder, not the whole index, so one index serves tooling, precache-all, and a renderer
-  that mixes access models across passes.
-- Add client introspection accessors: AxisNames() and AxisValueNames(axis) on the index. Building a
-  query UI or a preset needs the names, and today that means reaching into the view by hand.
-- The tiering touches validators. VerifyManifestRoundTrip, CheckManifestLayout, and DedupeInfluenceTest
-  all assume the current table shape. Re-prove each per tier, and the cross-tier references too. Round
-  trips are never optional.
-- The cook is the distribution bundle, not the module. Strings and source live in the whole-cook scope,
-  so a module is no longer self-contained. The module is a logical view inside the bundle.
+- Decide the persisted form of a variant. `DecodedVariant` holds string views into one manifest and
+  no axis names, so it cannot outlive that manifest. A persisted form needs (axis name, value) pairs
+  with owned strings, and a load that re-keys them through a query.
+- Done 2026-09-24: `AxisNames()` and `AxisValues(axis)` on the index. `QueryFor(profile)` is obsolete,
+  because an index now reads one environment (one module, one profile).
 # SlangCompiler
 - Right now, we map to a super small subset of formats and features. We should support the full range, and extract them untouched
     - Then, during output format mapping we collapse to what that platform
@@ -44,7 +39,8 @@
   through them. Then each state and it's functionality could go in a file, and it would help make control
   flow more clear.
 - Add a guard that fails loudly if a cook emits no manifest, so this validator cannot be orphaned again
-  without a test going red.
+  without a test going red. (2026-09-24: `--target` is now required, which closes the zero-target
+  case. A guard in the emit path is still open.)
 - Verify that the cook actually wrote the files it claims. Part of a bug hid behind stale artifacts
   on disk, not missing ones: a reader saw an old file and thought the cook succeeded. After a cook,
   check with `std::filesystem::last_write_time` that each expected artifact is newer than the cook's
@@ -59,6 +55,8 @@
 # Found in review
 - SlangCompiler.cpp, Line 1234: We extract the raw global bindings not once, but individually for each variant. We should be able to do this at a higher level, even if this specific variant doesn't actually use all of the entrypoints. We will need to identify further axes for data reuse like this to scale to much higher variant counts without terrible performance.
 # Testing
+- Done: the KitchenSink set (`tests/assets/KitchenSink/`) replaced OceanFft, and it is the known-good
+  reference. The original item follows.
 - Build a purpose-made "kitchen-sink" test shader that exercises the whole capability space in one
   module, and retire the borrowed content shaders (`OceanFft`, `Vtf`) from the test tree. Those are
   real content meant for other projects, and each capability now needs its own asset (a separate shader
@@ -68,11 +66,10 @@
   size expression that names an axis, so the resolve path is covered too. Do this when the query and
   cook code is otherwise finished; it is a test-asset consolidation, not a blocker.
 ## Testing findings to resolve
-- `run-tests.bat` line 43 runs `CookTest.exe`, but no `CookTest` target exists in `tests/CMakeLists.txt`
-  (only the five named cook variants build from `CookTest.cpp`). So `[FAIL] CookTest` is stale
-  scaffolding, not a real failure: the base OceanFft `--verify-deterministic` cook is unbuilt. Decide
-  whether to restore the target or retire the script line. This is the end-to-end coverage the manifest
-  work will lean on.
+- Done 2026-09-24: the stale `CookTest` script line is retired. `OceanFft.slang` is gone, and
+  `KitchenSinkCookTest` is the end-to-end coverage.
+- Done (verified 2026-09-24): `HashReflectedBinding` now hashes each member's whole `Data`, so the item
+  below is closed.
 - `HashReflectedBinding` (`src/model/ShaderDataSchema.cpp`) hashes each member's `Offset`, `Size`, and
   `ArrayCount`, but not `ElementStride` or `MatrixLayout`. Dedup stays correct, because
   `ReflectedUniformMember::operator==` includes both and the interner decides equality by byte

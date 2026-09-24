@@ -3,7 +3,8 @@
 Phase E removes the compiled-in permutation registry. An axis declaration moves into the shader
 source. Policy moves into a data file.
 
-Phase D is complete, and so is the compiler split. Phase E is the current work.
+**Phase E is complete.** E8 closed it on 2026-09-24. Section 11a holds the final measurements. Phase F
+is the next work (`docs/phase-f-vocabulary.md`).
 
 Text in this file follows ASD-STE100. Condensed on 2026-08-28. Updated on 2026-09-01, after steps
 E0a, E0b, E0c, and E0 completed and the C++ emitter was removed.
@@ -689,7 +690,7 @@ change **what**. Each one adds capability that no golden file covers.
 | E6 | Axis attributes read at the bootstrap compile, and `k_ModuleSpaces` deleted whole. **Done 2026-09-11**: `ReadDeclaredAxes` recurses through `__include` fragment nodes, `BuildPermutationSpace` builds the space, the `SymbolTable` prunes unused axes | `OceanFft` cooks 35 variants with no registry, the six dumps match, and `SymbolTableTest` | **high** |
 | E7 | Interface axes. E0 removed the enum fallback. **Done 2026-09-14**: `ls_axis_interface` on an `extern struct`, `ls_axis_interface_impl` on each conforming type, staged and matched by `isSubType`, cooked by a per-variant `export struct`, with a `Type` `PermutationValue` holding the impl ordinal | `InterfaceAxisCookTest` | medium |
 | E7b | Enum axes. **Done 2026-09-16**: `[ls_axis_enum]` on an `extern static const` of a `public` Slang enum, cases read from reflection (names and values), the manifest stores the names, and a per-variant `export static const` with a qualified case makes it concrete | `EnumAxisCookTest` | medium |
-| E8 | Documents, and the measured numbers again | — | none |
+| E8 | Documents, and the measured numbers again. **Done 2026-09-24**: see §11a | — | none |
 
 **E0c, E0, E1, E2, E3, E4, E5, and E6 are complete.** A diversion after E4, call it E4a, hardened the
 client trust boundary. `ManifestView::Open` now validates the whole manifest graph once. The
@@ -730,11 +731,30 @@ the case value stays a cook-time fact. `EnumAxisCookTest` proves it. The enum ty
 the axis variable's module must declare the enum, so a wider module resolution is a follow-up (see
 `todo.md`).
 
-**Phase E is nearly out the door.** The axis and policy engine is complete. Two tracks remain:
-- **The manifest variant-key retrieval path** (the client query surface, `ManifestIndex`). See
-  `docs/agent-handoff.md` §14 and §14a for its state and the leftover items (builder terminals, the
-  enum test pieces).
-- **E8**, the documentation pass and a fresh measurement of the numbers.
+**Phase E is complete.** The axis and policy engine is complete. The client query surface
+(`ManifestIndex`) is complete, and it reads the per-variant axis-active mask, so a constraint on a gated
+axis selects only the variants where that axis is active.
+
+### 11a. Final measurements (E8, 2026-09-24)
+
+RelWithDebInfo, `ninja-msvc`, 16 hardware threads, `k_UseSlangWorkaround = true`, `--target=wgsl`, no
+`--verify-deterministic`. Each figure is the middle of three runs. The time is the cook time the cooker
+reports.
+
+| Cook | Modules | Variants | Entry point variants | WGSL | Time |
+|---|---|---|---|---|---|
+| `EntryPointParams.slang` | 1 | 1 | 4 | 1 KiB | 437 ms |
+| `ParameterBlocks.slang` | 1 | 1 | 4 | 2 KiB | 404 ms |
+| `InterfaceAxisTest.slang` | 1 | 6 | 6 | 2 KiB | 425 ms |
+| `EnumAxisTest.slang` | 1 | 6 | 6 | 1 KiB | 417 ms |
+| KitchenSink (four modules, one policy) | 4 | 616 | 1232 | 1364 KiB | 3391 ms |
+
+The KitchenSink bundle is 619,680 bytes. Source dedup for each module: KsGeometry 32 to 8 (4.00:1),
+KsMaterial 576 to 145 (3.97:1), KsVolume 576 to 147 (3.92:1), KsPost 48 to 25 (1.92:1). The dedup found
+no hash collision.
+
+A one-variant cook costs about 0.4 s, so session and module startup dominate a small cook. The sixteen
+unit tests that need no Slang run in about 0.5 s together.
 
 **The empty space holds.** A module with no declared axis once reached `space.front()` on an empty
 vector and aborted the cook, until 2026-08-20. The walk (`expandFrom`, since E3) handles the empty space
