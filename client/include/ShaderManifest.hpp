@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <iterator>
 #include <optional>
 #include <span>
 #include <string>
@@ -82,7 +83,7 @@ enum class ErrorCode : uint32_t
 
 enum class ShaderManifestTable : uint32_t
 {
-    Invalid,
+    Invalid = 0,
     Modules,
     ModuleAxes,
     Profiles,
@@ -463,10 +464,22 @@ public:
     public:
         // std::ranges::range needs a default constructor: end() must be semiregular.
         Iterator() noexcept = default;
-        Iterator(const LayoutRange* _range, uint32_t _position) noexcept
+        explicit Iterator(const LayoutRange* _range, uint32_t _position) noexcept
             : range(_range), position(_position) {}
+
+        // contiguous iterator is not a valid tag, because this is a 
+        // a proxy iterator that returns ResolvedResource by value, not by reference.
+        using iterator_concept = std::input_iterator_tag;
+        using iterator_category = std::input_iterator_tag;
         using difference_type = std::ptrdiff_t;
         using value_type = ResolvedResource;
+        using pointer = value_type*;
+        using reference = value_type&;
+
+        // because ResolvedResource is always returned by value, operator-> is strictly invalid
+        // and we need to make sure it's not possible to make this iterator return an address
+        // of a temporary ResolvedResource
+        void* operator->() const noexcept = delete;
 
         // these are all defined in the header to aid with inlining/lto across 
         // translation units, since they're more likely to be hot
@@ -487,6 +500,51 @@ public:
             Iterator previous = *this;
             ++position;
             return previous;
+        }
+
+        Iterator& operator--() noexcept
+        {
+            --position;
+            return *this;
+        }
+
+        Iterator operator--(int) noexcept
+        {
+            Iterator previous = *this;
+            --position;
+            return previous;
+        }
+
+        Iterator operator+(difference_type n) const noexcept
+        {
+            return Iterator{ range, position + static_cast<uint32_t>(n) };
+        }
+
+        Iterator& operator+=(difference_type n) noexcept
+        {
+            position += static_cast<uint32_t>(n);
+            return *this;
+        }
+
+        Iterator operator-(difference_type n) const noexcept
+        {
+            return Iterator{ range, position - static_cast<uint32_t>(n) };
+        }
+
+        Iterator& operator-=(difference_type n) noexcept
+        {
+            position -= static_cast<uint32_t>(n);
+            return *this;
+        }
+
+        difference_type operator-(const Iterator& other) const noexcept
+        {
+            return static_cast<difference_type>(position) - static_cast<difference_type>(other.position);
+        }
+
+        [[nodiscard]] bool operator!=(const Iterator& other) const noexcept
+        {
+            return !(*this == other);
         }
 
         [[nodiscard]] bool operator==(const Iterator& other) const noexcept
@@ -756,7 +814,6 @@ public:
     [[nodiscard]] WorkgroupSize Workgroup(uint32_t entry_point,
                                           VariantKey variant) const noexcept;
     [[nodiscard]] uint64_t Generation() const noexcept;
-
     [[nodiscard]] const EnvironmentView& View() const noexcept;
 
 private:
