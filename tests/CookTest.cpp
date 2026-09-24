@@ -30,12 +30,6 @@ int main(int argc, char** argv)
     }
 
     lodestone::CookerOptions options{ std::move(*optionsResult) };
-    if (options.TargetNames.empty())
-    {
-        // default case for testing, for now.
-        options.TargetNames.emplace_back("wgsl");
-    }
-    
     lodestone::FileOutputSink sink{ options.OutputPath };
     const lodestone::CookResult<lodestone::CookStatistics> statistics =
         lodestone::RunCook(std::move(options), sink);

@@ -25,13 +25,13 @@ namespace
 {
 
     constexpr std::string_view k_UsageText =
-        "Usage: lodestone --output <header.hpp> [--O<level>] [--no-validate] [--quiet]\n"
+        "Usage: lodestone --output <directory> --target=<name> [--O<level>] [--no-validate] [--quiet]\n"
         "                 [--cache-dir <path>] [--single-threaded] [--no-dedupe]\n"
-        "                 [--target=<name>] [--verify-deterministic] [--dump-stage=<name>]\n"
+        "                 [--verify-deterministic] [--dump-stage=<name>]\n"
         "                 [--policy-file <path>] <module.slang>...\n"
-        "  --output, -o    destination header path (required)\n"
+        "  --output, -o    output directory (required)\n"
+        "  --target=<name> output target profile (required). Repeat it for more than one. Names: wgsl\n"
         "  --O<level>      slang optimization level: 0-3, defaults to 0\n"
-        "  --target=<name> output target profile, defaults to wgsl. Names: wgsl\n"
         "  --no-validate   skip cross-checking reflection against the emitted text\n"
         "  --quiet         suppress the per-variant reflection report\n"
         "  --cache-dir     directory for precompiled slang modules\n"
@@ -436,6 +436,12 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
     if (options.ModulePaths.empty())
     {
         return std::unexpected(CookError::NoModulesSpecified);
+    }
+
+    // A cook with no target cooks nothing, so a target is required like the output path.
+    if (options.TargetNames.empty())
+    {
+        return std::unexpected(CookError::NoTargetSpecified);
     }
 
     return options;

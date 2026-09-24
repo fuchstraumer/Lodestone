@@ -43,6 +43,7 @@ enum class CookError : uint16_t
     UnknownArgument = 62,
     MalformedArgument = 63,
     UnknownTargetProfile = 64,
+    NoTargetSpecified = 65,
 
     PermutationSpaceNotFound = 80,
     PermutationValueNotInAxis = 81,
