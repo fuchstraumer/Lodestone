@@ -292,9 +292,8 @@ void WriteFootprint(lodestone::JsonWriter& writer, const manifest::Footprint& fo
 
 void WriteSlot(lodestone::JsonWriter& writer,
                const manifest::EnvironmentView& view,
-               const manifest::Variant& variant,
                const manifest::EntryPoint& entry_point,
-               const manifest::EntryPointInstance& slot,
+               const manifest::EntryPointInstanceView& instance,
                bool with_sources) noexcept
 {
     writer.BeginObject();
@@ -303,39 +302,36 @@ void WriteSlot(lodestone::JsonWriter& writer,
                      magic_enum::enum_name(static_cast<lodestone::ShaderStageKind>(entry_point.Stage)));
 
     writer.Key("workgroup");
+    const lodestone::WorkgroupSize workgroup = instance.Workgroup();
     writer.BeginObject();
-    writer.KeyUInt("x", slot.WorkgroupX);
-    writer.KeyUInt("y", slot.WorkgroupY);
-    writer.KeyUInt("z", slot.WorkgroupZ);
+    writer.KeyUInt("x", workgroup.X);
+    writer.KeyUInt("y", workgroup.Y);
+    writer.KeyUInt("z", workgroup.Z);
     writer.EndObject();
 
-    // Resolved the way a consumer resolves it: visibility names a resource of the variant, and the
-    // footprint list of that variant says how much of it.
-    const std::span<const uint32_t> resources = view.ResourceList(variant.ResourceListIndex);
-    const std::span<const manifest::Footprint> footprints = view.FootprintList(variant.FootprintListIndex);
-
+    // Resolved the way a consumer resolves it, through the layout range.
     writer.Key("layout");
     writer.BeginArray();
-    for (const uint32_t local : view.VisibilityList(slot.VisibilityIndex))
+    for (const manifest::ResolvedResource resource : instance.Layout())
     {
         writer.BeginObject();
         writer.Key("resource");
-        WriteBinding(writer, view, view.Bindings()[resources[local]]);
+        WriteBinding(writer, view, resource.Record());
 
-        if (local < footprints.size())
+        if (const manifest::Footprint* footprint = resource.FootprintRecord(); footprint != nullptr)
         {
-            WriteFootprint(writer, footprints[local]);
+            WriteFootprint(writer, *footprint);
         }
 
         writer.EndObject();
     }
     writer.EndArray();
 
-    WriteRaster(writer, view, slot.RasterIndex);
+    WriteRaster(writer, view, instance.Raster());
 
     if (with_sources)
     {
-        writer.KeyString("source", view.Source(slot.SourceIndex));
+        writer.KeyString("source", instance.Source());
     }
 
     writer.EndObject();
@@ -345,22 +341,21 @@ void WriteVariants(lodestone::JsonWriter& writer,
                    const manifest::EnvironmentView& view,
                    bool with_sources) noexcept
 {
-    const std::span<const lodestone::VariantKey> keys = view.VariantKeys();
     const std::span<const manifest::EntryPoint> entryPoints = view.Module().EntryPoints();
     writer.Key("variants");
     writer.BeginArray();
     for (uint32_t variantIndex = 0u; variantIndex < view.Variants().size(); variantIndex++)
     {
-        const manifest::Variant& variant = view.Variants()[variantIndex];
+        const manifest::VariantView variant = view.VariantAt(variantIndex);
         writer.BeginObject();
-        writer.KeyUInt("key", std::to_underlying(keys[variantIndex]));
-        writer.KeyString("suffix", view.String(variant.SuffixString));
+        writer.KeyUInt("key", std::to_underlying(variant.Key()));
+        writer.KeyString("suffix", variant.Suffix());
 
         writer.Key("activeAxes");
         writer.BeginArray();
         for (uint32_t axisIndex = 0u; axisIndex < view.Module().AxisCount(); axisIndex++)
         {
-            if (view.IsAxisActive(variantIndex, axisIndex))
+            if (variant.IsAxisActive(axisIndex))
             {
                 writer.String(view.String(view.Module().AxisData(axisIndex).NameString));
             }
@@ -369,10 +364,9 @@ void WriteVariants(lodestone::JsonWriter& writer,
 
         writer.Key("slots");
         writer.BeginArray();
-        const std::span<const manifest::EntryPointInstance> slots = view.VariantSlots(variantIndex);
-        for (size_t entryPointIndex = 0u; entryPointIndex < entryPoints.size(); entryPointIndex++)
+        for (uint32_t entryPointIndex = 0u; entryPointIndex < entryPoints.size(); entryPointIndex++)
         {
-            WriteSlot(writer, view, variant, entryPoints[entryPointIndex], slots[entryPointIndex], with_sources);
+            WriteSlot(writer, view, entryPoints[entryPointIndex], variant.EntryPoint(entryPointIndex), with_sources);
         }
         writer.EndArray();
 

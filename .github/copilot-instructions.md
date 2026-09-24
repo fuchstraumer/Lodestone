@@ -97,6 +97,9 @@ Examples of well formatted code in this codebase: `Future.hpp`, `InputManager.hp
   indices
 - Use `std::ssize` rather than `.size()` where a signed length is wanted. Cast a `size_t` from the
   standard library at the boundary, once, rather than letting it spread inward
+- **Plain indices in a public API.** Name the field or the parameter for the table it indexes. Do not
+  wrap an index in a type only to stop a wrong index, because each caller must then convert it. Use a
+  wrapper type only when a mix-up fails in silence and the wrapper costs the caller nothing
 
 #### C++ Language Preferences
 - **Functions**: No implementations in headers; mark `constexpr` and `noexcept` when possible

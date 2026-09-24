@@ -255,6 +255,21 @@ cannot reach a Slang type. Phase E moves axis declarations into the shader so th
 drift from the constant it drives. Given a choice between a check and a structure that needs no check,
 take the structure.
 
+**A guardrail must pay for itself at the call site.** The rule above applies to a mistake that fails in
+silence. `Active` and `Canonical` hold the same kind of data, and only the bound values differ. Code that
+uses one cannot see that difference, so a mix-up gives wrong output and no error. The wrapper is also
+cheap: it is more than an integer, so a convenient constructor loses nothing. A strong type for a plain
+table index is different. A wrong index into a validated table gives data that is visibly wrong, and each
+call site must convert the value. Strong index types were tried in the manifest reader and removed
+(2026-09) for this reason. Before you propose a type-level guardrail, answer two questions:
+
+1. Does the mistake fail in silence?
+2. Does each call site pay a cost for the guard?
+
+Add the guard only when the answer to 1 is yes and the answer to 2 is no. The manifest reader validates
+every index once, at `Open`. That validation is the guard for the client API. A caller who passes the
+wrong valid index owns that mistake.
+
 **Two independent implementations that agree beat one implementation trusted twice.** The WGSL scanner
 is not a better reflection API. It is a second opinion, and the asymmetry rule states which opinion
 wins on which question. Look for that shape when adding a verification.
@@ -568,16 +583,10 @@ Each table has a `TableRef` (32-bit, inside an extent) or a `TableRef64` (header
 count together. The reader maps a table with `Map<T>(region, ref)`. Four extent tables keep an offset only,
 because the variant count sets their size: keys, variants, axis masks, and slots.
 
-Each table index has its own type: `StringIndex`, `SourceIndex`, `BindingIndex`, `ResourceListIndex`,
-`FootprintListIndex`, `VisibilityListIndex`, and `RasterIndex`. An index for one table does not compile
-against a different table. Zero is a valid index, so these types have no `Invalid` value. Use
-`std::to_underlying` only at a boundary: a validator that compares an index with a count, or the emitter
-that converts a cooker `uint32_t`. A type or enum axis value is a string index by domain only. Convert it
-with `StringIndex{ value }` at the point of use.
-
-A field that holds a typed index does not repeat the type name. `EntryPointInstance` has `Source`,
-`Visibility`, and `Raster`. `Variant` has `ResourceList` and `FootprintList`. A member with the same name
-as its type changes the meaning of that name in the class, and clang and GCC reject it.
+A table index is a plain `uint32_t`. The field name tells which table it indexes, for example
+`NameString` or `ResourceList`. Do not give a member function or a field the same name as a type that the
+class already uses, such as `Variant` in `EnvironmentView`. That changes the meaning of the name in the
+class, and clang and GCC reject it.
 
 A variant is found by its **key**, not by a dense index. `EnvironmentView::FindVariant` does a
 `lower_bound` on the sorted key table, and the position it finds is the variant index. The slot for
