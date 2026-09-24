@@ -207,6 +207,8 @@ void WriteBinding(lodestone::JsonWriter& writer,
     writer.KeyUInt("placementWord1", binding.Placement.Word1);
     writer.KeyString("kind", magic_enum::enum_name(static_cast<lodestone::BindingKind>(binding.Kind)));
     writer.KeyString("shape", magic_enum::enum_name(static_cast<lodestone::ResourceShape>(binding.Shape)));
+    writer.KeyString("sampleType",
+                     magic_enum::enum_name(static_cast<lodestone::TextureSampleType>(binding.SampleType)));
     writer.KeyBool("isComparisonSampler", binding.IsComparisonSampler);
     writer.KeyString("storageFormat",
                      magic_enum::enum_name(static_cast<lodestone::TextureFormat>(binding.StorageFormat)));
