@@ -481,6 +481,36 @@ ManifestQueryBuilder ManifestIndex::Query() const noexcept
     return ManifestQueryBuilder{ *this };
 }
 
+std::vector<std::string_view> ManifestIndex::AxisNames() const
+{
+    const manifest::ModuleView& module = environment.Module();
+    std::vector<std::string_view> names;
+    names.reserve(module.AxisCount());
+    for (uint32_t axisIndex = 0u; axisIndex < module.AxisCount(); ++axisIndex)
+    {
+        names.push_back(environment.String(module.AxisData(axisIndex).NameString));
+    }
+    return names;
+}
+
+QueryResult<std::vector<QueryAxisValue>> ManifestIndex::AxisValues(std::string_view axis_name) const
+{
+    const auto indexIter = axisNameToIndex.find(axis_name);
+    if (indexIter == axisNameToIndex.end())
+    {
+        return std::unexpected(QueryErrorCode::UnknownAxis);
+    }
+
+    const uint32_t axisIndex = indexIter->second;
+    std::vector<QueryAxisValue> values;
+    values.reserve(radices[axisIndex]);
+    for (uint32_t digit = 0u; digit < radices[axisIndex]; ++digit)
+    {
+        values.push_back(decodeAxis(axisIndex, digit));
+    }
+    return values;
+}
+
 std::vector<ManifestIndex::ScanConstraint> ManifestIndex::convertToScanConstraints(std::span<const QueryAxisRange> query) const
 {
     std::vector<ScanConstraint> scanConstraints;

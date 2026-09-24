@@ -169,6 +169,11 @@ public:
     [[nodiscard]] std::vector<DecodedVariant> Enumerate() const;
     /** @brief Opens a new query, used to retrieve specific variants for actual runtime rendering or use */
     [[nodiscard]] ManifestQueryBuilder Query() const noexcept;
+    /** @brief The axis names of this module, in axis order. Use them to build a query UI or a preset. */
+    [[nodiscard]] std::vector<std::string_view> AxisNames() const;
+    /** @brief Every value one axis declares, in digit order, or `UnknownAxis`. A value is declared even when
+      * this environment cooked no variant that uses it. */
+    [[nodiscard]] QueryResult<std::vector<QueryAxisValue>> AxisValues(std::string_view axis_name) const;
 
 private:
 
