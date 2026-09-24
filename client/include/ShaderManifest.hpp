@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -303,8 +304,8 @@ struct alignas(8) EnvironmentHeader
 struct alignas(8) Variant
 {
     uint32_t SuffixString{ 0u };
-    uint32_t ResourceListIndex{ 0u };
-    uint32_t FootprintListIndex{ 0u };
+    uint32_t ResourceList{ 0u };
+    uint32_t FootprintList{ 0u };
     uint32_t CapabilityRequirement{ 0u };
 };
 
@@ -359,13 +360,13 @@ struct alignas(8) Footprint
 /** @brief What one entry point of one variant resolves to. */
 struct alignas(8) EntryPointInstance
 {
-    uint32_t SourceIndex{ 0u };
-    /** @brief Index into visibility list table: which of the variant's resources this entry point reads.*/
-    uint32_t VisibilityIndex{ 0u };
+    uint32_t Source{ 0u };
+    /** @brief Which of the variant's resources this entry point reads. */
+    uint32_t Visibility{ 0u };
     uint32_t WorkgroupX{ 1u };
     uint32_t WorkgroupY{ 1u };
     uint32_t WorkgroupZ{ 1u };
-    uint32_t RasterIndex{ 0u };
+    uint32_t Raster{ 0u };
 };
 
 struct alignas(8) VertexInput
@@ -421,6 +422,151 @@ struct alignas(8) RasterState
 
 class ModuleView;
 class EnvironmentView;
+
+/** One resource as one entry point sees it: the binding record and its footprint. */
+class ResolvedResource
+{
+public:
+    [[nodiscard]] std::string_view Name() const noexcept;
+    [[nodiscard]] std::string_view ScopeName() const noexcept;
+    [[nodiscard]] PlacementKind Placement() const noexcept;
+    [[nodiscard]] PlacementPayload PlacementValue() const noexcept;
+    [[nodiscard]] BindingKind Kind() const noexcept;
+    [[nodiscard]] ResourceShape Shape() const noexcept;
+    [[nodiscard]] ResourceAccess Access() const noexcept;
+    /** @brief Zero when the resource has no footprint. */
+    [[nodiscard]] uint64_t ElementCount() const noexcept;
+    //[[nodiscard]] UniformMemberRange Members() const noexcept;
+    [[nodiscard]] std::span<const UniformMember> Members() const noexcept;
+    /** @brief The position of the binding record in `EnvironmentView::Bindings()`. */
+    [[nodiscard]] uint32_t Index() const noexcept;
+    [[nodiscard]] const Binding& Record() const noexcept;
+    /** @brief Null when the footprint list is shorter than the resource list. */
+    [[nodiscard]] const Footprint* FootprintRecord() const noexcept;
+
+private:
+    friend class LayoutRange;
+    ResolvedResource(const EnvironmentView* _environment,
+                     const Binding* _record,
+                     const Footprint* _footprint) noexcept;
+    const EnvironmentView* environment{ nullptr };
+    const Binding* record{ nullptr };
+    const Footprint* footprint{ nullptr };
+};
+
+/** The resources one entry point of one variant reads, in binding order. */
+class LayoutRange
+{
+public:
+    class Iterator
+    {
+    public:
+        // std::ranges::range needs a default constructor: end() must be semiregular.
+        Iterator() noexcept = default;
+        Iterator(const LayoutRange* _range, uint32_t _position) noexcept
+            : range(_range), position(_position) {}
+        using difference_type = std::ptrdiff_t;
+        using value_type = ResolvedResource;
+
+        // these are all defined in the header to aid with inlining/lto across 
+        // translation units, since they're more likely to be hot
+
+        [[nodiscard]] ResolvedResource operator*() const noexcept
+        {
+            return range->operator[](position);
+        }
+
+        Iterator& operator++() noexcept
+        {
+            ++position;
+            return *this;
+        }
+
+        Iterator operator++(int) noexcept
+        {
+            Iterator previous = *this;
+            ++position;
+            return previous;
+        }
+
+        [[nodiscard]] bool operator==(const Iterator& other) const noexcept
+        {
+            return range == other.range && position == other.position;
+        }
+
+    private:
+        friend class LayoutRange;
+        const LayoutRange* range{ nullptr };
+        uint32_t position{ 0u };
+    };
+
+    [[nodiscard]] Iterator begin() const noexcept
+    {
+        return Iterator{ this, 0u };
+    }
+
+    [[nodiscard]] Iterator end() const noexcept
+    {
+        return Iterator{ this, Size() };
+    }
+
+    [[nodiscard]] uint32_t Size() const noexcept;
+    [[nodiscard]] bool Empty() const noexcept;
+    [[nodiscard]] ResolvedResource operator[](uint32_t position) const noexcept;
+
+private:
+    friend class EntryPointInstanceView;
+    LayoutRange(const EnvironmentView* _environment,
+                std::span<const uint32_t> _visible,
+                std::span<const uint32_t> _resources,
+                std::span<const Footprint> _footprints) noexcept;
+    const EnvironmentView* environment{ nullptr };
+    std::span<const uint32_t> visible;
+    std::span<const uint32_t> resources;
+    std::span<const Footprint> footprints;
+};
+
+/** One entry point of one variant.
+ * @note An iterator points at its range. Keep the range from `Layout()` alive while you iterate it. */
+class EntryPointInstanceView
+{
+public:
+    [[nodiscard]] std::string_view Source() const noexcept;
+    [[nodiscard]] WorkgroupSize Workgroup() const noexcept;
+    [[nodiscard]] LayoutRange Layout() const noexcept;
+    //[[nodiscard]] RasterView Raster() const noexcept;
+    [[nodiscard]] uint32_t Raster() const noexcept;
+    [[nodiscard]] const EntryPointInstance& Record() const noexcept;
+
+private:
+    friend class VariantView;
+    EntryPointInstanceView(const EnvironmentView* _environment,
+                           const EntryPointInstance* _slot,
+                           const Variant* _variant) noexcept;
+    const EnvironmentView* environment{ nullptr };
+    const EntryPointInstance* slot{ nullptr };
+    const Variant* variant{ nullptr };
+};
+
+/** One variant of one environment. */
+class VariantView
+{
+public:
+    [[nodiscard]] uint32_t Index() const noexcept;
+    [[nodiscard]] VariantKey Key() const noexcept;
+    [[nodiscard]] std::string_view Suffix() const noexcept;
+    [[nodiscard]] bool IsAxisActive(uint32_t local_axis) const noexcept;
+    [[nodiscard]] uint32_t EntryPointCount() const noexcept;
+    [[nodiscard]] EntryPointInstanceView EntryPoint(uint32_t entry_point) const noexcept;
+    [[nodiscard]] const Variant& Record() const noexcept;
+
+private:
+    friend class EnvironmentView;
+    VariantView(const EnvironmentView* _environment, uint32_t _index) noexcept;
+    const EnvironmentView* environment{ nullptr };
+    uint32_t index{};
+};
+
 
 /**
 * @brief Spans over the header region of one cook bundle, checked once when it opens.
@@ -534,8 +680,11 @@ public:
 
     [[nodiscard]] std::span<const VariantKey> VariantKeys() const noexcept;
     [[nodiscard]] std::span<const Variant> Variants() const noexcept;
-    /** @brief The index of the variant with this key, or -1 when this environment did not cook it. */
-    [[nodiscard]] int32_t FindVariant(VariantKey key) const noexcept;
+    /** @brief The index of the variant with this key, or no value when this environment did not cook it. */
+    [[nodiscard]] std::optional<uint32_t> FindVariant(VariantKey key) const noexcept;
+    /** @brief The variant with this key, or no value when this environment did not cook it. */
+    [[nodiscard]] std::optional<VariantView> VariantByKey(VariantKey key) const noexcept;
+    [[nodiscard]] VariantView VariantAt(uint32_t variant_index) const noexcept;
     [[nodiscard]] std::span<const uint64_t> AxisMask(uint32_t variant_index) const noexcept;
     [[nodiscard]] bool IsAxisActive(uint32_t variant_index, uint32_t local_axis) const noexcept;
 
@@ -547,6 +696,7 @@ public:
     [[nodiscard]] const EntryPointInstance* FindSlot(uint32_t entry_point, VariantKey variant) const noexcept;
 
     [[nodiscard]] std::span<const Binding> Bindings() const noexcept;
+    [[nodiscard]] const Binding& BindingRecord(uint32_t binding_index) const noexcept;
     /** @brief The resources one variant declares. Indices into Bindings(). */
     [[nodiscard]] std::span<const uint32_t> ResourceList(uint32_t list_index) const noexcept;
     /** @brief How much of each resource, in the same order as the resource list. */
@@ -621,7 +771,7 @@ private:
     std::vector<uint32_t> slotFirstBinding;
     std::vector<uint32_t> slotBindingCount;
 
-    void GatherVariantBindings(uint32_t variant_index, const std::vector<uint32_t>& member_offsets);
+    void GatherVariantBindings(VariantView variant, const std::vector<uint32_t>& member_offsets);
     [[nodiscard]] BindingInfo MakeBindingInfo(const Binding& record,
                                               const Footprint* footprint,
                                               uint32_t member_offset) const noexcept;

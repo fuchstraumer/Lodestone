@@ -484,3 +484,70 @@ tree passes every unit test, and fails `KitchenSinkCookTest` on a Slang assert (
 2. `BindingInfo` still carries a fixed `Group` and `Binding`. Give it the placement kind and the payload.
 3. The per-variant axis-active mask is stored and verified, but the query layer does not read it yet.
    It is the fix for the over-return in section 4.
+
+## 13. Update 2026-09-23
+
+### 13.1 State
+
+The RelWithDebInfo tree is green. Every unit test and every cook test passes, except the stale `CookTest`
+script line (section 11.2). The Debug tree fails `KitchenSinkCookTest` on the Slang assert in section
+12.3. The KitchenSink bundle hash did not change through Phase 2, so Phase 2 changed types only.
+
+The manifest format is version 5.
+
+### 13.2 What this window built
+
+- **Phase 1, `TableRef`.** Each header table is a `TableRef` or a `TableRef64`: an offset and a count
+  together. The reader maps a table with `Map<T>`. The emitter gets a ref back from `AppendTable` or
+  `AppendTable64`. Four extent tables keep an offset only: keys, variants, axis masks, and slots.
+- **Phase 2, strong index types.** Seven index types replace bare `uint32_t` indices. `CLAUDE.md`
+  ("One output form") gives the list and the boundary rules. Five fields got new names, because a member
+  cannot have the same name as its type: `EntryPointInstance::Source`, `Visibility`, `Raster`, and
+  `Variant::ResourceList`, `FootprintList`. `EnvironmentView::BindingRecord(BindingIndex)` is new.
+- **Raw indices that stay.** A visibility-list entry is a position in the variant's resource list, not a
+  table index. `Axis::FirstValue`, `ModuleAxis::AxisIndex`, module-local axis numbers, and digits are not
+  typed yet. `FindVariant` returns `int32_t`, with -1 for "not found".
+
+### 13.3 Next: Phase 3, the view types
+
+This is the first task after compaction. The author approved this design. Put a trivial iterator
+function (`++`, `==`, `*`) in the header, because the author accepts that for LTO and inlining. Put every
+other function in the source file. No library type in the public API is a template.
+
+1. Add `enum class VariantIndex : uint32_t {}`. Change `FindVariant` to return
+   `std::optional<VariantIndex>`, or keep it and add the new accessor in step 5. Ask the author first.
+2. Add `ResolvedResource`. It holds `const EnvironmentView*`, `const Binding*`, and `const Footprint*`.
+   The footprint pointer is null when the footprint list is shorter than the resource list. Accessors:
+   `Name`, `ScopeName`, `Placement`, `PlacementValue`, `Kind`, `Shape`, `Access`, `ElementCount`,
+   `Members` (a `std::span<const UniformMember>` for now).
+3. Add `LayoutRange` and `LayoutRange::Iterator`. The range holds the environment pointer and three
+   spans: visible, resources, and footprints. The iterator holds a range pointer and a `uint32_t`
+   position. `operator*` resolves `resources[visible[position]]` and is the one place that chain exists.
+   Give the iterator `difference_type`, `value_type`, and a post-increment. Add
+   `static_assert(std::input_iterator<LayoutRange::Iterator>)` in the source file.
+4. Add `EntryPointInstanceView` (environment pointer, slot pointer, variant pointer): `Source`,
+   `Workgroup`, `Layout`, `Raster`. Add `VariantView` (environment pointer, `VariantIndex`): `Key`,
+   `Suffix`, `IsAxisActive`, `EntryPoint(uint32_t)`.
+5. Add `EnvironmentView::Variant(VariantKey)`, which returns `std::optional<VariantView>`. Keep
+   `FindSlot`, because `ShaderSourceProvider` uses it.
+6. Port the callers. This step is the proof:
+   - `CheckManifestLayout` in `src/emit/ShaderManifestEmitter.cpp` walks `Layout()` beside the expected
+     layout. The KitchenSink round trip then tests the range.
+   - `WriteSlot` in `tools/manifest_dump/main.cpp` iterates `Layout()`.
+   - `ShaderSourceProvider::GatherVariantBindings` iterates `Layout()`. Do not change its caching yet.
+7. Verify. Run `scripts\build.bat`, then `scripts\build.bat RelWithDebInfo`, then
+   `scripts\run-tests.bat RelWithDebInfo`. Cook KitchenSink and compare the bundle hash with the hash
+   before the change. Compare a `manifest_dump` JSON of that bundle before and after step 6. Both must be
+   identical.
+
+Phase 5 comes after this. Count the unique (resource list, visibility list) pairs for each environment in
+the dedup report. Then decide whether `ShaderSourceProvider` builds one `BindingInfo` row for each unique
+pair, or builds rows on demand. Give `BindingInfo` the placement kind and payload in that change
+(section 12.4 item 2).
+
+### 13.4 Open items from before
+
+- A cook with no `--target` cooks zero modules and exits 0. `check-known-good.py` compares nothing
+  (section 12.3). A task chip for this exists.
+- The query layer does not read the axis-active mask yet (section 12.4 item 3).
+- Remove `build/ninja-msvc/tests/Debug/WgslBindingScannerTest.exe`. No target builds it.

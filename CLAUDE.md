@@ -564,6 +564,21 @@ relocates nothing. Sections start on 8-byte boundaries. A record must be trivial
 `k_IsManifestRecord` asserts in `client/src/ShaderManifest.cpp` hold that line. Record **sizes** are not
 pinned: the format has no version migration yet, so a record can still grow.
 
+Each table has a `TableRef` (32-bit, inside an extent) or a `TableRef64` (header region): an offset and a
+count together. The reader maps a table with `Map<T>(region, ref)`. Four extent tables keep an offset only,
+because the variant count sets their size: keys, variants, axis masks, and slots.
+
+Each table index has its own type: `StringIndex`, `SourceIndex`, `BindingIndex`, `ResourceListIndex`,
+`FootprintListIndex`, `VisibilityListIndex`, and `RasterIndex`. An index for one table does not compile
+against a different table. Zero is a valid index, so these types have no `Invalid` value. Use
+`std::to_underlying` only at a boundary: a validator that compares an index with a count, or the emitter
+that converts a cooker `uint32_t`. A type or enum axis value is a string index by domain only. Convert it
+with `StringIndex{ value }` at the point of use.
+
+A field that holds a typed index does not repeat the type name. `EntryPointInstance` has `Source`,
+`Visibility`, and `Raster`. `Variant` has `ResourceList` and `FootprintList`. A member with the same name
+as its type changes the meaning of that name in the class, and clang and GCC reject it.
+
 A variant is found by its **key**, not by a dense index. `EnvironmentView::FindVariant` does a
 `lower_bound` on the sorted key table, and the position it finds is the variant index. The slot for
 (variant V, entry point E) is at `V * EntryPointCount + E`, so a variant stores no slot range.

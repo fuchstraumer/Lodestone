@@ -64,7 +64,7 @@ namespace
      * string index here, so two modules that name the same case hold the same value. */
     struct EncodedAxis
     {
-        uint32_t NameString{ 0u };
+        uint32_t NameString{};
         AxisKind Kind{ AxisKind::None };
         AxisValueDomain Domain{ AxisValueDomain::None };
         EarliestBindingTime BindingTime{ EarliestBindingTime::None };
@@ -155,10 +155,10 @@ namespace
     }
 
     template<typename PayloadType, typename RecordType, typename MakeRecordFn>
-    void AppendRuns(const std::vector<std::vector<PayloadType>>& lists,
-                    std::vector<RecordType>& out_payloads,
-                    std::vector<manifest::Run>& out_runs,
-                    MakeRecordFn make_record)
+    constexpr void AppendRuns(const std::vector<std::vector<PayloadType>>& lists,
+                              std::vector<RecordType>& out_payloads,
+                              std::vector<manifest::Run>& out_runs,
+                              MakeRecordFn make_record)
     {
         uint32_t currentOffset = static_cast<uint32_t>(out_payloads.size());
         for (const std::vector<PayloadType>& list : lists)
@@ -175,7 +175,10 @@ namespace
                             std::make_move_iterator(flattenedRecords.end()));
     }
 
-    uint32_t PassThroughIndex(uint32_t index) noexcept;
+    constexpr uint32_t PassThroughIndex(uint32_t index) noexcept
+    {
+        return index;
+    }
     manifest::Binding MakeBindingRecord(const ReflectedBinding& binding,
                                         StringTableBuilder& strings,
                                         std::vector<manifest::UniformMember>& member_records);
@@ -219,9 +222,8 @@ namespace
                                     const LibraryVariant& variant,
                                     VariantKey key);
     CookError CheckVariantAxisMask(const CookedModule& module,
-                                   const manifest::EnvironmentView& view,
                                    const LibraryVariant& variant,
-                                   uint32_t variant_index);
+                                   manifest::VariantView read_variant);
     CookError CheckManifestSource(const CookedModule& module,
                                   const manifest::ShaderSourceProvider& provider,
                                   const LibraryVariant& variant,
@@ -238,7 +240,7 @@ namespace
     CookError CheckManifestLayout(const CookedModule& module,
                                   const manifest::EnvironmentView& view,
                                   const LibraryVariant& variant,
-                                  uint32_t variant_index,
+                                  manifest::VariantView read_variant,
                                   size_t entry_point_index);
     CookError CheckManifestVertexInputs(std::span<const manifest::VertexInput> read_inputs,
                                         const ReflectedRasterState& expected_raster,
@@ -254,7 +256,7 @@ namespace
                                 const manifest::EnvironmentView& view,
                                 const manifest::ShaderSourceProvider& provider,
                                 const LibraryVariant& variant,
-                                uint32_t variant_index,
+                                manifest::VariantView read_variant,
                                 size_t entry_point_index);
 
 } // namespace
@@ -505,7 +507,7 @@ namespace
             return found->second;
         }
 
-        const auto index = static_cast<uint32_t>(references.size());
+        const uint32_t index{ static_cast<uint32_t>(references.size()) };
         references.emplace_back(static_cast<uint32_t>(blob.size()), static_cast<uint32_t>(text.size()));
         blob.append(text);
         lookup.emplace(std::string{ text }, index);
@@ -544,11 +546,6 @@ namespace
         {
             out.push_back('\0');
         }
-    }
-
-    uint32_t PassThroughIndex(uint32_t index) noexcept
-    {
-        return index;
     }
 
     manifest::Binding MakeBindingRecord(const ReflectedBinding& binding,
@@ -612,12 +609,12 @@ namespace
     manifest::EntryPointInstance MakeSlotRecord(const LibraryVariant& variant, size_t entry_point_index) noexcept
     {
         manifest::EntryPointInstance slot;
-        slot.SourceIndex = variant.SourceIndices[entry_point_index];
-        slot.VisibilityIndex = variant.VisibilityIndices[entry_point_index];
+        slot.Source = variant.SourceIndices[entry_point_index];
+        slot.Visibility = variant.VisibilityIndices[entry_point_index];
         slot.WorkgroupX = variant.Workgroups[entry_point_index].X;
         slot.WorkgroupY = variant.Workgroups[entry_point_index].Y;
         slot.WorkgroupZ = variant.Workgroups[entry_point_index].Z;
-        slot.RasterIndex = variant.RasterIndices[entry_point_index];
+        slot.Raster = variant.RasterIndices[entry_point_index];
         return slot;
     }
 
@@ -885,9 +882,10 @@ namespace
         {
             const LibraryVariant& variant = module.Variants[position];
             tables.Keys.push_back(keyOf(position));
-            tables.Variants.push_back(manifest::Variant{ .SuffixString = strings.Add(variant.Suffix),
-                                                         .ResourceListIndex = variant.ResourceListIndex,
-                                                         .FootprintListIndex = variant.FootprintListIndex });
+            tables.Variants.push_back(
+                manifest::Variant{ .SuffixString = strings.Add(variant.Suffix),
+                                       .ResourceList = variant.ResourceListIndex,
+                                       .FootprintList = variant.FootprintListIndex });
 
             // an active binding points into the space's axis vector, so its offset there is the axis position
             for (const PermutationBinding& binding : variant.Active)
@@ -1047,8 +1045,8 @@ namespace
         for (const LibraryVariant& variant : module.Variants)
         {
             const VariantKey key = module.VariantKeys[variant.Index];
-            const int32_t variantIndex = view.FindVariant(key);
-            if (variantIndex < 0)
+            const std::optional<manifest::VariantView> readVariant = view.VariantByKey(key);
+            if (!readVariant.has_value())
             {
                 std::println(stderr, "[lodestone] manifest holds no variant {} [{}]", variant.Index, variant.Description);
                 return CookError::ManifestMissingVariant;
@@ -1060,7 +1058,7 @@ namespace
                 return keyError;
             }
 
-            const CookError maskError = CheckVariantAxisMask(module, view, variant, static_cast<uint32_t>(variantIndex));
+            const CookError maskError = CheckVariantAxisMask(module, variant, readVariant.value());
             if (maskError != CookError::Success)
             {
                 return maskError;
@@ -1068,8 +1066,8 @@ namespace
 
             for (size_t entryPointIndex = 0u; entryPointIndex < module.EntryPoints.size(); ++entryPointIndex)
             {
-                const CookError slotError = CheckManifestSlot(
-                    module, view, provider, variant, static_cast<uint32_t>(variantIndex), entryPointIndex);
+                const CookError slotError =
+                    CheckManifestSlot(module, view, provider, variant, readVariant.value(), entryPointIndex);
                 if (slotError != CookError::Success)
                 {
                     return slotError;
@@ -1150,9 +1148,8 @@ namespace
     }
 
     CookError CheckVariantAxisMask(const CookedModule& module,
-                                   const manifest::EnvironmentView& view,
                                    const LibraryVariant& variant,
-                                   uint32_t variant_index)
+                                   manifest::VariantView read_variant)
     {
         if (module.Space == nullptr)
         {
@@ -1164,7 +1161,7 @@ namespace
         {
             const PermutationAxis* axis = &axes[axisIndex];
             const bool expected = std::ranges::contains(variant.Active, axis, &PermutationBinding::Axis);
-            if (view.IsAxisActive(variant_index, axisIndex) != expected)
+            if (read_variant.IsAxisActive(axisIndex) != expected)
             {
                 std::println(stderr,
                              "[lodestone] manifest marks axis '{}' {} in variant [{}], the cook did not",
@@ -1277,10 +1274,9 @@ namespace
     CookError CheckManifestLayout(const CookedModule& module,
                                   const manifest::EnvironmentView& view,
                                   const LibraryVariant& variant,
-                                  uint32_t variant_index,
+                                  manifest::VariantView read_variant,
                                   size_t entry_point_index)
     {
-        const manifest::Variant& readVariant = view.Variants()[variant_index];
         const CookResult<ShaderLayoutView> expectedLayoutResult = ResolveLayoutView(module, variant, entry_point_index);
         if (!expectedLayoutResult)
         {
@@ -1288,11 +1284,7 @@ namespace
         }
         const ShaderLayoutView& expectedLayout = *expectedLayoutResult;
 
-        const std::span<const uint32_t> resources = view.ResourceList(readVariant.ResourceListIndex);
-        const std::span<const manifest::Footprint> footprints = view.FootprintList(readVariant.FootprintListIndex);
-        const std::span<const manifest::EntryPointInstance> slots = view.VariantSlots(variant_index);
-
-        if (entry_point_index >= slots.size())
+        if (entry_point_index >= read_variant.EntryPointCount())
         {
             std::println(stderr,
                          "[lodestone] manifest variant {} holds no slot {}",
@@ -1301,40 +1293,42 @@ namespace
             return CookError::ManifestVariantMissingEntryPoint;
         }
 
-        const std::span<const uint32_t> visible = view.VisibilityList(slots[entry_point_index].VisibilityIndex);
+        const manifest::LayoutRange layout =
+            read_variant.EntryPoint(static_cast<uint32_t>(entry_point_index)).Layout();
 
-        if (visible.size() != expectedLayout.size())
+        if (layout.Size() != expectedLayout.size())
         {
             std::println(stderr,
                          "[lodestone] manifest variant {} entry point {} sees {} resources, the cook "
                          "produced {}",
                          variant.Index,
                          entry_point_index,
-                         visible.size(),
+                         layout.Size(),
                          expectedLayout.size());
             return CookError::ManifestVariantResourceVisibilityMismatch;
         }
 
-        for (size_t i = 0u; i < expectedLayout.size(); ++i)
+        size_t position = 0u;
+        for (const manifest::ResolvedResource resource : layout)
         {
-            const ResolvedBindingView expected = expectedLayout[i];
-            const uint32_t local = visible[i];
+            const ResolvedBindingView expected = expectedLayout[position];
+            const manifest::Footprint* footprint = resource.FootprintRecord();
 
-            if (local >= footprints.size())
+            if (footprint == nullptr)
             {
                 std::println(stderr,
                              "[lodestone] manifest variant {} resolves resource {} out of range",
                              variant.Index,
-                             local);
+                             position);
                 return CookError::ManifestVariantResourceResolveOutOfRange;
             }
 
-            const manifest::Binding& read = view.Bindings()[resources[local]];
+            const manifest::Binding& read = resource.Record();
 
-            if (view.String(read.NameString) != expected.Resource->Name ||
-                view.String(read.ScopeString) != expected.Resource->ScopeName ||
+            if (resource.Name() != expected.Resource->Name ||
+                resource.ScopeName() != expected.Resource->ScopeName ||
                 !RecordMatchesBinding(read, *expected.Resource) ||
-                !RecordMatchesFootprint(footprints[local], *expected.Footprint) ||
+                !RecordMatchesFootprint(*footprint, *expected.Footprint) ||
                 !ManifestUniformMembersMatch(view, read, *expected.Resource))
             {
                 std::println(stderr,
@@ -1343,6 +1337,8 @@ namespace
                              variant.Index);
                 return CookError::ManifestVariantResourceBindingMismatch;
             }
+
+            ++position;
         }
 
         return CookError::Success;
@@ -1430,7 +1426,7 @@ namespace
                                 const manifest::EnvironmentView& view,
                                 const manifest::ShaderSourceProvider& provider,
                                 const LibraryVariant& variant,
-                                uint32_t variant_index,
+                                manifest::VariantView read_variant,
                                 size_t entry_point_index)
     {
         const CookError sourceError = CheckManifestSource(module, provider, variant, entry_point_index);
@@ -1445,7 +1441,7 @@ namespace
             return workgroupError;
         }
 
-        const CookError layoutError = CheckManifestLayout(module, view, variant, variant_index, entry_point_index);
+        const CookError layoutError = CheckManifestLayout(module, view, variant, read_variant, entry_point_index);
         if (layoutError != CookError::Success)
         {
             return layoutError;

@@ -16,6 +16,7 @@
 #include <iterator>
 #include <limits>
 #include <magic_enum/magic_enum.hpp>
+#include <optional>
 #include <ranges>
 #include <span>
 #include <string>
@@ -141,10 +142,10 @@ namespace
     /**@brief In multiple locations, we store ranges of data in "runs". Each run specifies a contiguous block
      * of payloads, which could be themselves simple indices or POD structs. This is just a more succinct
      * accessor for those cases  */
-    template<typename PayloadType>
+    template<typename PayloadType, typename RunIndexType>
     std::span<const PayloadType> RunOf(std::span<const Run> runs,
                                        std::span<const PayloadType> payloads,
-                                       uint32_t run_index) noexcept
+                                       RunIndexType run_index) noexcept
     {
         const Run& run = runs[static_cast<size_t>(run_index)];
         return payloads.subspan(run.First, run.Count);
@@ -337,7 +338,6 @@ ManifestResult<BundleView> BundleView::Open(std::span<const std::byte> bytes) no
 
 std::string_view BundleView::String(uint32_t string_index) const noexcept
 {
-    assert(header != nullptr && string_index < strings.size());
     const StringRef& reference = strings[string_index];
     const char* base = reinterpret_cast<const char*>(bytes.data() + header->StringBlobs.Offset);
     return std::string_view{ base + reference.Offset, reference.Length };
@@ -609,17 +609,34 @@ std::span<const Variant> EnvironmentView::Variants() const noexcept
     return variants;
 }
 
-int32_t EnvironmentView::FindVariant(VariantKey key) const noexcept
+std::optional<uint32_t> EnvironmentView::FindVariant(VariantKey key) const noexcept
 {
     // the key table is sorted and parallel to the variant table, so the position of a key *is* the index of
     // its variant
     const auto keyIter = std::ranges::lower_bound(variantKeys, key);
     if (keyIter == variantKeys.end() || *keyIter != key) [[unlikely]]
     {
-        return -1;
+        return std::nullopt;
     }
 
-    return static_cast<int32_t>(std::distance(variantKeys.begin(), keyIter));
+    return static_cast<uint32_t>(std::distance(variantKeys.begin(), keyIter));
+}
+
+std::optional<VariantView> EnvironmentView::VariantByKey(VariantKey key) const noexcept
+{
+    const std::optional<uint32_t> variantIndex = FindVariant(key);
+    if (!variantIndex.has_value()) [[unlikely]]
+    {
+        return std::nullopt;
+    }
+
+    return VariantView{ this, variantIndex.value() };
+}
+
+VariantView EnvironmentView::VariantAt(uint32_t variant_index) const noexcept
+{
+    assert(variant_index < variants.size());
+    return VariantView{ this, variant_index };
 }
 
 std::span<const uint64_t> EnvironmentView::AxisMask(uint32_t variant_index) const noexcept
@@ -648,18 +665,23 @@ std::span<const EntryPointInstance> EnvironmentView::VariantSlots(uint32_t varia
 
 const EntryPointInstance* EnvironmentView::FindSlot(uint32_t entry_point, VariantKey variant_key) const noexcept
 {
-    const int32_t variantIndex = FindVariant(variant_key);
-    if (variantIndex < 0) [[unlikely]]
+    const std::optional<uint32_t> variantIndex = FindVariant(variant_key);
+    if (!variantIndex.has_value()) [[unlikely]]
     {
         return nullptr;
     }
 
-    return &VariantSlots(static_cast<uint32_t>(variantIndex))[entry_point];
+    return &VariantSlots(variantIndex.value())[entry_point];
 }
 
 std::span<const Binding> EnvironmentView::Bindings() const noexcept
 {
     return bindings;
+}
+
+const Binding& EnvironmentView::BindingRecord(uint32_t binding_index) const noexcept
+{
+    return bindings[binding_index];
 }
 
 std::span<const uint32_t> EnvironmentView::ResourceList(uint32_t list_index) const noexcept
@@ -684,27 +706,206 @@ std::span<const UniformMember> EnvironmentView::UniformMembers(const Binding& bi
 
 std::span<const VertexInput> EnvironmentView::VertexInputs(uint32_t raster_index) const noexcept
 {
-    assert(raster_index < rasterStates.size());
     const RasterState& raster = rasterStates[raster_index];
     return vertexInputs.subspan(raster.FirstVertexInput, raster.VertexInputCount);
 }
 
 std::span<const ColorTarget> EnvironmentView::ColorTargets(uint32_t raster_index) const noexcept
 {
-    assert(raster_index < rasterStates.size());
     const RasterState& raster = rasterStates[raster_index];
     return colorTargets.subspan(raster.FirstColorTarget, raster.ColorTargetCount);
 }
 
 bool EnvironmentView::WritesFragDepth(uint32_t raster_index) const noexcept
 {
-    assert(raster_index < rasterStates.size());
     return rasterStates[raster_index].WritesFragDepth != 0u;
 }
 
 std::span<const SpecializationConstant> EnvironmentView::SpecializationConstants() const noexcept
 {
     return specializationConstants;
+}
+
+static_assert(std::input_iterator<LayoutRange::Iterator>);
+static_assert(std::ranges::input_range<LayoutRange>);
+
+ResolvedResource::ResolvedResource(const EnvironmentView* _environment,
+                                   const Binding* _record,
+                                   const Footprint* _footprint) noexcept
+    : environment{ _environment },
+      record{ _record },
+      footprint{ _footprint }
+{
+}
+
+std::string_view ResolvedResource::Name() const noexcept
+{
+    return environment->String(record->NameString);
+}
+
+std::string_view ResolvedResource::ScopeName() const noexcept
+{
+    return environment->String(record->ScopeString);
+}
+
+PlacementKind ResolvedResource::Placement() const noexcept
+{
+    return static_cast<PlacementKind>(record->PlacementKind);
+}
+
+PlacementPayload ResolvedResource::PlacementValue() const noexcept
+{
+    return record->Placement;
+}
+
+BindingKind ResolvedResource::Kind() const noexcept
+{
+    return static_cast<BindingKind>(record->Kind);
+}
+
+ResourceShape ResolvedResource::Shape() const noexcept
+{
+    return static_cast<ResourceShape>(record->Shape);
+}
+
+ResourceAccess ResolvedResource::Access() const noexcept
+{
+    return static_cast<ResourceAccess>(record->Access);
+}
+
+uint64_t ResolvedResource::ElementCount() const noexcept
+{
+    return footprint != nullptr ? footprint->ElementCount : 0u;
+}
+
+std::span<const UniformMember> ResolvedResource::Members() const noexcept
+{
+    return environment->UniformMembers(*record);
+}
+
+uint32_t ResolvedResource::Index() const noexcept
+{
+    // the record points into the binding table, so its distance from the table start is its index
+
+    return static_cast<uint32_t>(record - environment->Bindings().data());
+}
+
+const Binding& ResolvedResource::Record() const noexcept
+{
+    return *record;
+}
+
+const Footprint* ResolvedResource::FootprintRecord() const noexcept
+{
+    return footprint;
+}
+
+LayoutRange::LayoutRange(const EnvironmentView* _environment,
+                         std::span<const uint32_t> _visible,
+                         std::span<const uint32_t> _resources,
+                         std::span<const Footprint> _footprints) noexcept
+    : environment{ _environment },
+      visible{ _visible },
+      resources{ _resources },
+      footprints{ _footprints }
+{
+}
+
+uint32_t LayoutRange::Size() const noexcept
+{
+    return static_cast<uint32_t>(visible.size());
+}
+
+bool LayoutRange::Empty() const noexcept
+{
+    return visible.empty();
+}
+
+ResolvedResource LayoutRange::operator[](uint32_t position) const noexcept
+{
+    // A visibility entry is a position in the resource list of the variant, and the footprint list has
+    // the same order. This is the one place that resolves that chain.
+    const uint32_t local = visible[position];
+    const Footprint* footprint = local < footprints.size() ? &footprints[local] : nullptr;
+    return ResolvedResource{ environment, &environment->BindingRecord(resources[local]), footprint };
+}
+
+EntryPointInstanceView::EntryPointInstanceView(const EnvironmentView* _environment,
+                                               const EntryPointInstance* _slot,
+                                               const Variant* _variant) noexcept
+    : environment{ _environment },
+      slot{ _slot },
+      variant{ _variant }
+{
+}
+
+std::string_view EntryPointInstanceView::Source() const noexcept
+{
+    return environment->Source(slot->Source);
+}
+
+WorkgroupSize EntryPointInstanceView::Workgroup() const noexcept
+{
+    return WorkgroupSize{ .X = slot->WorkgroupX, .Y = slot->WorkgroupY, .Z = slot->WorkgroupZ };
+}
+
+LayoutRange EntryPointInstanceView::Layout() const noexcept
+{
+    return LayoutRange{ environment,
+                        environment->VisibilityList(slot->Visibility),
+                        environment->ResourceList(variant->ResourceList),
+                        environment->FootprintList(variant->FootprintList) };
+}
+
+uint32_t EntryPointInstanceView::Raster() const noexcept
+{
+    return slot->Raster;
+}
+
+const EntryPointInstance& EntryPointInstanceView::Record() const noexcept
+{
+    return *slot;
+}
+
+VariantView::VariantView(const EnvironmentView* _environment, uint32_t _index) noexcept
+    : environment{ _environment },
+      index{ _index }
+{
+}
+
+uint32_t VariantView::Index() const noexcept
+{
+    return index;
+}
+
+VariantKey VariantView::Key() const noexcept
+{
+    return environment->VariantKeys()[index];
+}
+
+std::string_view VariantView::Suffix() const noexcept
+{
+    return environment->String(Record().SuffixString);
+}
+
+bool VariantView::IsAxisActive(uint32_t local_axis) const noexcept
+{
+    return environment->IsAxisActive(index, local_axis);
+}
+
+uint32_t VariantView::EntryPointCount() const noexcept
+{
+    return static_cast<uint32_t>(environment->Module().EntryPoints().size());
+}
+
+EntryPointInstanceView VariantView::EntryPoint(uint32_t entry_point) const noexcept
+{
+    return EntryPointInstanceView{ environment, &environment->VariantSlots(index)[entry_point], &Record() };
+}
+
+const Variant& VariantView::Record() const noexcept
+{
+    return environment->Variants()[index];
 }
 
 ShaderSourceProvider::ShaderSourceProvider(EnvironmentView _view,
@@ -753,34 +954,28 @@ ShaderSourceProvider::ShaderSourceProvider(EnvironmentView _view,
 
     for (uint32_t variantIndex = 0u; variantIndex < view.Variants().size(); ++variantIndex)
     {
-        GatherVariantBindings(variantIndex, memberOffsets);
+        GatherVariantBindings(view.VariantAt(variantIndex), memberOffsets);
     }
 }
 
-void ShaderSourceProvider::GatherVariantBindings(uint32_t variant_index,
-                                                 const std::vector<uint32_t>& member_offsets)
+void ShaderSourceProvider::GatherVariantBindings(VariantView variant, const std::vector<uint32_t>& member_offsets)
 {
-    const Variant& variant = view.Variants()[variant_index];
-    const std::span<const Binding> records = view.Bindings();
-    const std::span<const uint32_t> resources = view.ResourceList(variant.ResourceListIndex);
-    const std::span<const Footprint> footprints = view.FootprintList(variant.FootprintListIndex);
-    const std::span<const EntryPointInstance> variantSlots = view.VariantSlots(variant_index);
     // the slot grid puts this variant's slots in one row, so the row start is the first slot's table index
-    const size_t firstSlotIndex = static_cast<size_t>(variantSlots.data() - view.SlotTable().data());
+    const size_t firstSlotIndex = static_cast<size_t>(variant.Index()) * variant.EntryPointCount();
 
-    for (const auto&& [entryPointIndex, slot] : std::views::enumerate(variantSlots))
+    for (uint32_t entryPointIndex = 0u; entryPointIndex < variant.EntryPointCount(); ++entryPointIndex)
     {
-        const size_t slotIndex = firstSlotIndex + static_cast<size_t>(entryPointIndex);
-        const std::span<const uint32_t> visible = view.VisibilityList(slot.VisibilityIndex);
+        const size_t slotIndex = firstSlotIndex + entryPointIndex;
+        const LayoutRange layout = variant.EntryPoint(entryPointIndex).Layout();
 
         slotFirstBinding[slotIndex] = static_cast<uint32_t>(bindingInfos.size());
-        slotBindingCount[slotIndex] = static_cast<uint32_t>(visible.size());
+        slotBindingCount[slotIndex] = layout.Size();
 
-        for (const uint32_t local : visible)
+        for (const ResolvedResource resource : layout)
         {
-            bindingInfos.push_back(MakeBindingInfo(records[resources[local]],
-                                                   local < footprints.size() ? &footprints[local] : nullptr,
-                                                   member_offsets[resources[local]]));
+            bindingInfos.push_back(MakeBindingInfo(resource.Record(),
+                                                   resource.FootprintRecord(),
+                                                   member_offsets[resource.Index()]));
         }
     }
 }
@@ -830,7 +1025,7 @@ std::string_view ShaderSourceProvider::Source(uint32_t entry_point,
 {
     const EntryPointInstance* slot = view.FindSlot(entry_point, variant);
     assert(slot != nullptr);
-    return view.Source(slot->SourceIndex);
+    return view.Source(slot->Source);
 }
 
 std::span<const BindingInfo> ShaderSourceProvider::Bindings(uint32_t entry_point,
@@ -1449,28 +1644,28 @@ namespace
         for (int32_t i = 0u; std::cmp_less(i, slotSpan.size()); ++i)
         {
             const EntryPointInstance& slot = slotSpan[i];
-            if (slot.SourceIndex >= environment.Sources.Count)
+            if (slot.Source >= environment.Sources.Count)
             {
                 return { .Code = ErrorCode::InvalidSlotSourceIndex,
                          .Table = ShaderManifestTable::Slots,
                          .RecordIndex = static_cast<uint32_t>(i),
-                         .Detail = slot.SourceIndex };
+                         .Detail = slot.Source };
             }
 
-            if (slot.VisibilityIndex >= environment.VisibilityLists.Count)
+            if (slot.Visibility >= environment.VisibilityLists.Count)
             {
                 return { .Code = ErrorCode::InvalidSlotVisibilityIndex,
                          .Table = ShaderManifestTable::Slots,
                          .RecordIndex = static_cast<uint32_t>(i),
-                         .Detail = slot.VisibilityIndex };
+                         .Detail = slot.Visibility };
             }
 
-            if (slot.RasterIndex >= environment.Rasters.Count)
+            if (slot.Raster >= environment.Rasters.Count)
             {
                 return { .Code = ErrorCode::InvalidSlotRasterIndex,
                          .Table = ShaderManifestTable::Slots,
                          .RecordIndex = static_cast<uint32_t>(i),
-                         .Detail = slot.RasterIndex };
+                         .Detail = slot.Raster };
             }
         }
 
@@ -1524,33 +1719,33 @@ namespace
                          .Detail = variant.SuffixString };
             }
 
-            if (variant.ResourceListIndex >= environment.ResourceLists.Count)
+            if (variant.ResourceList >= environment.ResourceLists.Count)
             {
                 return { .Code = ErrorCode::InvalidResourceListRun,
                          .Table = ShaderManifestTable::Variants,
                          .RecordIndex = static_cast<uint32_t>(variantIdx),
-                         .Detail = variant.ResourceListIndex };
+                         .Detail = variant.ResourceList };
             }
 
             // further open question for footprint lists: should we change it so that the null check
             // is no longer needed? We should have a sentinel value that indicates an empty or null
             // footprint for a resource, since that is still a valid case
-            if (variant.FootprintListIndex >= environment.FootprintLists.Count)
+            if (variant.FootprintList >= environment.FootprintLists.Count)
             {
                 return { .Code = ErrorCode::InvalidVariantFootprintListIndex,
                          .Table = ShaderManifestTable::Variants,
                          .RecordIndex = static_cast<uint32_t>(variantIdx),
-                         .Detail = variant.FootprintListIndex };
+                         .Detail = variant.FootprintList };
             }
 
             const std::span<const uint32_t> variantResourceIndices =
-                RunOf(resourceLists, resourceIndexList, variant.ResourceListIndex);
+                RunOf(resourceLists, resourceIndexList, variant.ResourceList);
             const std::span<const EntryPointInstance> variantSlots =
                 slotSpan.subspan(static_cast<size_t>(variantIdx) * entryPointCount, entryPointCount);
             for (const EntryPointInstance& slot : variantSlots)
             {
                 const std::span<const uint32_t> slotVisibilityIndices =
-                    RunOf(visibilityLists, visibilityIndices, slot.VisibilityIndex);
+                    RunOf(visibilityLists, visibilityIndices, slot.Visibility);
                 // absolute offset of this run into the visibility index table, so a bad entry names its row
                 const uint32_t runOffset = static_cast<uint32_t>(slotVisibilityIndices.data() - visibilityIndices.data());
 
