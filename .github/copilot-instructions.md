@@ -57,6 +57,16 @@ meaning, and don't always reach for highly abstract verbiage. As a reminder some
   it is a silent killer when they don't, and the prefix is free. Multi-word parameters stay snake_case
   and need no prefix (`create_info`, `module_path`)
 - **Member prefixes**: `m_` must NEVER be used as prefix for member variables
+- **Array and aggregate initializers**: The opening brace goes on its own line, as every other brace
+  does. One element per line when the list does not fit on one line:
+```cpp
+const std::array<const char*, 3> searchPaths
+{
+    sourceDirectory.c_str(),
+    sharedDirectory.c_str(),
+    cacheDirectory.c_str(),
+};
+```
 - **Constructor initializers**: Colon on same line as declaration, each initializer on new line with trailing comma:
 ```cpp
 Struct::Struct(int _val0, int _val1, int _val2) :
@@ -107,6 +117,9 @@ Examples of well formatted code in this codebase: `Future.hpp`, `InputManager.hp
 - **Move/copy operators**: Define `noexcept` versions when beneficial
 - **Auto usage**: Minimize except for iterators/complex nested types (e.g., `auto iter = map.find(key)` OK, `auto value = vector.front()` not OK)
 - **Virtual classes**: Use `final` when possible to collapse vtables and improve performance
+- **Moving the value out of `std::expected`**: write `std::move(*result)`, not `std::move(result.value())`.
+  Both select the rvalue overload. The dereference is the house style, and `value()` also carries a
+  throwing path that a checked result never needs
 - **Error handling**: Use `Result` types for function return status within RHI code; avoid exceptions. A result type is just `std::expected` with an error code enum as the unexpected value. When working outside the RHI, declare an error code for that subsystem and use that as appropriate. Don't leak error codes
 - **Subsystem error pattern**: a subsystem outside the core RHI declares its own enum plus its own alias,
   and never borrows `RhiError`. `tools/shader_cooker` is the reference: `CookError` +

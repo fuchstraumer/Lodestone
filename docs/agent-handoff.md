@@ -263,6 +263,9 @@ One line for each update. Git history holds the full text.
   built and wired into the driver. The round trip gained key-decode and axis-mask checks.
 - **2026-09-23.** `TableRef` and format version 5. Strong index types were tried and removed. The view
   types were added.
+- **2026-09-25.** F0 reviewed. Two style rules added to `.github/copilot-instructions.md`: an array
+  initializer opens its brace on a new line, and a value leaves `std::expected` through
+  `std::move(*result)`. `CLAUDE.md` ("Builtin modules") records what `EmbeddedFileSystem` covers.
 - **2026-09-24, F0.** A reflection mismatch and a codegen error fail the cook again. `ThreadPool`
   passes the real compile error. The builtins are compiled in and served by `EmbeddedFileSystem`. The
   WGSL switch builds OFF. `run-tests.bat` catches a crash. Every `CookError` has a printed name.

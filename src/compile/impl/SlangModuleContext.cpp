@@ -211,18 +211,28 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
     // embedded file system serves it from memory.
     const std::string sharedDirectory = canonicalModulePath.parent_path().parent_path().string();
     cacheDirectory = create_info.ModuleCacheDirectory.string();
-    const std::array<const char*, 4> searchPaths{
-        sourceDirectory.c_str(), sharedDirectory.c_str(), cacheDirectory.c_str(),
-        EmbeddedFileSystem::k_BuiltinSearchPath.data()
+    const std::array<const char*, 4> searchPaths
+    {
+        sourceDirectory.c_str(),
+        sharedDirectory.c_str(),
+        cacheDirectory.c_str(),
+        EmbeddedFileSystem::k_BuiltinSearchPath.data(),
     };
 
+    // One session compiles for one target, so every later call uses target index 0.
     slang::TargetDesc target{};
-    // todo-ship: target output format needs to from compile options, and should be
-    // able to be made into multiple targets. this will require changes to reflection
-    // though, so it's a larger job than just the profile opt below
-    target.format = SLANG_WGSL;
-    // todo-ship: profile should also be a selectable option
-    target.profile = globalSession->findProfile("spirv_1_4");
+    target.format = ToSlangCompileTarget(create_info.Language);
+    if (!create_info.SlangProfileName.empty())
+    {
+        const std::string profileName(create_info.SlangProfileName);
+        target.profile = globalSession->findProfile(profileName.c_str());
+        if (target.profile == SLANG_PROFILE_UNKNOWN)
+        {
+            return ReportError(sink,
+                               CookError::SessionCreationFailed,
+                               std::format("Slang has no profile named '{}'", create_info.SlangProfileName));
+        }
+    }
     // each job will create their own session: but, global session will be shared
     slang::SessionDesc sessionDesc{};
     sessionDesc.targets = &target;

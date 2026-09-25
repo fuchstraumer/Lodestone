@@ -44,8 +44,16 @@ namespace
     const ResolvedLibraryValidator* const k_WgslProfileValidator = nullptr;
 #endif
 
-    const std::array<TargetProfile, 1u> k_TargetProfiles{ TargetProfile{
-        .Name = k_WgslName, .Access = AccessModel::Bound, .Validator = k_WgslProfileValidator } };
+    // Slang has no WGSL profile. It ignores a profile that does not imply the target, so the old
+    // `spirv_1_4` changed nothing (measured on KitchenSink, 2026-09-25).
+    const std::array<TargetProfile, 1u> k_TargetProfiles
+    {
+        TargetProfile{ .Name = k_WgslName,
+                           .Language = TargetLanguage::Wgsl,
+                           .SlangProfileName = "",
+                           .Access = AccessModel::Bound,
+                           .Validator = k_WgslProfileValidator },
+    };
 
     constexpr std::array<std::string_view, 1u> k_TargetProfileNames{ k_WgslName };
 

@@ -36,7 +36,8 @@ struct RejectionCase
     std::string_view Claim;
 };
 
-constexpr std::array<RejectionCase, 4u> k_Cases{
+constexpr std::array<RejectionCase, 4u> k_Cases
+{
     RejectionCase{ .ModuleFile = "PointerMember.slang",
                    .TargetName = "wgsl",
                    .Expected = CookError::PointerTypeNotSupported,

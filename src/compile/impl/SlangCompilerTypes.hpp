@@ -6,6 +6,7 @@
 #include "permute/PermutationValue.hpp"
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "target/TargetProfile.hpp"
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -61,6 +62,21 @@ constexpr ShaderStageKind FromSlangStage(SlangStage stage) noexcept
         return ShaderStageKind::Node;
     default:
         return ShaderStageKind::Invalid;
+    }
+}
+
+constexpr SlangCompileTarget ToSlangCompileTarget(TargetLanguage language) noexcept
+{
+    switch (language)
+    {
+    case TargetLanguage::Wgsl:
+        return SLANG_WGSL;
+    case TargetLanguage::Spirv:
+        return SLANG_SPIRV;
+    case TargetLanguage::Invalid:
+        [[fallthrough]];
+    default:
+        return SLANG_TARGET_UNKNOWN;
     }
 }
 

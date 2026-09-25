@@ -24,7 +24,8 @@ namespace
 // will fix this, but for now bring everything from lodestone into scope
 using namespace lodestone;
 
-constexpr SlangInt k_WgslTargetIndex = 0;
+// Each session holds one target (SlangModuleContext::Initialize), so its index is always 0.
+constexpr SlangInt k_TargetIndex = 0;
 
 /** What one entry point's codegen produced. The diagnostic text travels with the code so that a
  * worker thread never touches a sink. coalesced after threads join */
@@ -40,7 +41,7 @@ GeneratedEntryPoint GenerateOneEntryPoint(slang::IComponentType* linked_program,
     Slang::ComPtr<slang::IBlob> code;
     Slang::ComPtr<slang::IBlob> diagnostics;
     const bool failed = SLANG_FAILED(linked_program->getEntryPointCode(
-        static_cast<SlangInt>(index), k_WgslTargetIndex, code.writeRef(), diagnostics.writeRef()));
+        static_cast<SlangInt>(index), k_TargetIndex, code.writeRef(), diagnostics.writeRef()));
 
     return GeneratedEntryPoint{ .Code = failed ? std::string{} : BlobToString(code.get()),
                                 .Diagnostics = BlobToString(diagnostics.get()),
@@ -150,8 +151,7 @@ CookResult<LinkedVariant> SlangVariantCompiler::CompileVariant(SlangModuleContex
 
     Slang::ComPtr<slang::IComponentType> linkedProgram = linkResult.value();
     result.LinkedProgram = linkedProgram;
-    // todo-ship: another location we'll need to update to support further output target formats
-    slang::ProgramLayout* programLayout = linkedProgram->getLayout(k_WgslTargetIndex);
+    slang::ProgramLayout* programLayout = linkedProgram->getLayout(k_TargetIndex);
     if (programLayout == nullptr)
     {
         return std::unexpected(CookError::ReflectionUnavailable);
@@ -170,7 +170,7 @@ CookResult<LinkedVariant> SlangVariantCompiler::CompileVariant(SlangModuleContex
     {
         const auto castIndex = static_cast<int64_t>(i);
         Slang::ComPtr<slang::IMetadata> metadata;
-        linkedProgram->getEntryPointMetadata(castIndex, k_WgslTargetIndex, metadata.writeRef());
+        linkedProgram->getEntryPointMetadata(castIndex, k_TargetIndex, metadata.writeRef());
         result.EntryPointMetadata.push_back(metadata);
     }
 

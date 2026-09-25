@@ -146,15 +146,16 @@ A second Handle form on `VK_EXT_descriptor_heap`. A new profile row, and the Sla
 
 ## 4. Open decisions
 
-Each is the author's. Ask before the step that needs it. Each row holds a recommendation.
+Each is the author's. Ask before the step that needs it. An open row holds a recommendation. A decided
+row holds the decision and its date.
 
-| # | Needed by | Question | Recommendation |
+| # | Needed by | Question | Decision or recommendation |
 |---|---|---|---|
-| O1 | F1.3 | How is the SPIR-V payload stored? | Binary words, aligned to 4 bytes. `--dump-sources` writes `.spv`. The validator API then takes bytes, not a `string_view` of text. |
-| O2 | F1.4 | What is the SPIR-V second opinion? | Read `DescriptorSet`, `Binding`, and variable types with SPIRV-Tools `spvBinaryParse`, and run `spirv-val` for legality. SPIRV-Tools is in the tree through Slang. Put it behind a facade in `target/`. |
-| O3 | F1.1 | One Slang session with two targets, or one session for each profile? | One for each profile first. It fits the step chain. Measure the duplicated front end on KitchenSink, then decide. |
-| O4 | F1.5 | A module has no policy section for a requested target. | Reject the cook, as a missing `--target` is rejected. |
-| O5 | F1.2 | Which Vulkan environment does the `spirv` profile target? | Vulkan 1.2. Buffer device address and descriptor indexing are core there, and F4 needs both. |
+| O1 | F1.3 | How is the SPIR-V payload stored? | **Decided 2026-09-25.** Binary words, aligned to 4 bytes. `--dump-sources` writes `.spv`. The validator takes bytes. The client gets a byte accessor beside `Source()`. The two renderers fork, so a function for each language is correct. |
+| O2 | F1.4 | What is the SPIR-V second opinion? | **Decided 2026-09-25.** SPIRV-Tools `spvBinaryParse` reads `DescriptorSet`, `Binding`, and variable types. `spirv-val` checks legality. A facade in `target/`. Keep the walk linear, as the WGSL validator does. The first validator was O(n^2). |
+| O3 | F1.1 | One Slang session with two targets, or one session for each profile? | **Decided 2026-09-25.** One session for each profile. Shared work needs the same access model and capability floor on two targets. That case is rare: a build seldom holds two languages. |
+| O4 | F1.5 | A module has no policy section for a requested target. | **Decided 2026-09-25.** The cook fails. Inheritance from another section is in `todo.md`. |
+| O5 | F1.2 | Which Vulkan environment does the `spirv` profile target? | **Decided 2026-09-25.** Vulkan 1.2 (SPIR-V 1.5) for now. At the end of phase F, measure the device coverage and decide the range again, from 1.0 up to 1.4. |
 | O6 | F3.3 | Where does a variant's capability requirement come from? | Decide after F3.1. Measure what Slang metadata gives first. |
 
 ## 5. Upstream Slang issues to file
@@ -204,3 +205,12 @@ commit.
   - Found on the way: `run-tests.bat` reported a crash as a pass (`if errorlevel 1` misses a negative
     code). Every `CookError` from 128 up printed as an empty name (magic_enum range). Both fixed.
   - Next: F1.1.
+- 2026-09-25. O1 to O5 decided (section 4).
+- 2026-09-25. **F1.1 done**, not committed. The profile row supplies `TargetLanguage` and the Slang
+  profile name. `SlangCompilerCreateInfo` carries both. `k_WgslTargetIndex` is `k_TargetIndex`: one
+  session holds one target. The KitchenSink bundle and the `--with-sources` JSON are byte-identical to
+  the baseline (`2dfbe8ce...`). 22 of 22 tests, 30 of 30 known-good dumps.
+  - The WGSL row sets no Slang profile. Slang has no WGSL profile, and it ignores a profile that does not
+    imply the target (`TargetRequest::getTargetCaps`). The old `spirv_1_4` changed no byte.
+  - An unknown Slang profile name fails the session with `SessionCreationFailed`.
+  - Next: F1.2.

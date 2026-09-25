@@ -633,6 +633,25 @@ The files in `builtins/` are compiled into the library. A cook needs no path to 
   then fail to load the serialized root module, and Slang reports nothing. An import through the file
   system works.
 
+What the file system covers, read from `Linkage::setFileSystem` in the Slang submodule:
+
+- **It replaces Slang's default completely.** With no file system, Slang uses
+  `CacheFileSystem(OSFileSystem)`. An `ISlangFileSystemExt` is used directly, with no cache around it. So
+  every source read, every `import` and `#include` search, and every probe for a `.slang-module` in the
+  cache directory goes through `EmbeddedFileSystem`.
+- **Some loads do not use it.** `loadModuleFromIRBlob` (the worker priming) takes a blob. The core module
+  is built into the Slang library. `writeToFile` (the module cache write) opens a `FileStream` directly.
+- **Two methods are partial on purpose.** `enumeratePathContents` returns `SLANG_E_NOT_IMPLEMENTED`, which
+  the interface permits: Slang needs it for no normal compile. `clearCache` does nothing, because the
+  object caches nothing.
+- **The default cache layer is gone.** `CacheFileSystem` kept file contents and identities for each
+  session. Slang's source manager still keeps each loaded file by its identity, so a file is not read
+  twice for one module. No cost is measured. The KitchenSink cook time did not change visibly.
+- **Paths are UTF-8, and a combined path uses the Windows separator.** The identity of a disk file is its
+  canonical path. `FindEmbeddedBuiltin` accepts both separators.
+- **Not implemented: `ISlangMutableFileSystem`.** Slang writes nothing through the session file system in
+  this cooker, so no write method is needed.
+
 ## Documents
 
 **`docs/` is in `.gitignore`.** A document survives only when somebody force-adds it with

@@ -6,6 +6,7 @@
 #include "compile/SymbolTable.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "target/TargetProfile.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -37,6 +38,9 @@ struct SlangCompilerCreateInfo
     size_t ExpectedBatchSize{ 0u };
     /**@brief Optional symbol table to inherit from for multi-module builds. */
     std::optional<SymbolTable> InheritedSymbolTable;
+    /** The `TargetProfile` supplies these two. One session compiles for one language. */
+    TargetLanguage Language{ TargetLanguage::Invalid };
+    std::string_view SlangProfileName;
     PlacementKind AccessModel;
 };
 

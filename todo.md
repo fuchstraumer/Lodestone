@@ -26,6 +26,8 @@
   - Approach: capture each module-scope `const` name together with its defining *expression string* (not a folded value) during the same source scan that reads the extern defaults. The `SymbolTable` already tokenizes every source line (it absorbed the old `ExternConstantScanner`), so it is the natural place to grab these too.
   - Add them to the evaluator as derived symbols. When a name resolves to a derived symbol, evaluate its stored expression recursively against the same context, so the leaves bottom out at axes and extern defaults and the value tracks the per-variant axis values. A folded value captured from reflection would be wrong: it freezes at the declaration defaults and ignores the axes.
   - Guard against a cycle in the derived-symbol graph (a derived const that names another), and cache a name's evaluated result per variant so a diamond is not recomputed.
+- Let a module policy section inherit another target section, for example `inherit = "wgsl"`. Phase F
+  step F1.5 makes a missing section fail the cook.
 # Cook driver and manifest
 - Resolve a synthetic module's required import statements for type and enum axes as the declaring
   module for the type being used. Currently `RawAxisDeclaration::RootModule` holds that, but it's

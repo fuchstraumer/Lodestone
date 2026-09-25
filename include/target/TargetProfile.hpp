@@ -29,6 +29,14 @@ enum class AccessModel : uint8_t
 
 std::string_view ToString(AccessModel model) noexcept;
 
+/** @brief The language the compiler emits for a profile. Two profiles can share one language. */
+enum class TargetLanguage : uint8_t
+{
+    Invalid = 0,
+    Wgsl,
+    Spirv,
+};
+
 /** @brief The answer a validator gives about one entry point. `Matches` being `true` means the bindings and
  * specializations match the expected value. If `Matches` is `false`, `Report` specifies how/where it is
  * false.
@@ -69,6 +77,9 @@ struct TargetProfile
 {
     /** @brief Friendly name for target, e.g, `wgsl` or `spirv` or `dxil` etc */
     std::string_view Name;
+    TargetLanguage Language{ TargetLanguage::Invalid };
+    /** @brief The Slang profile name, such as `spirv_1_5`. Empty sets no profile. */
+    std::string_view SlangProfileName;
     AccessModel Access{ AccessModel::Invalid };
     /** @brief Null when this target cannot check its own output. This shoudln't happen,
      *  but will during the intermediate stages of us deploying new target backends */
