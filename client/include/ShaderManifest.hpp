@@ -11,8 +11,6 @@
 #include <span>
 #include <string>
 #include <string_view>
-#include <type_traits>
-#include <vector>
 
 /**
  * @brief A read-only view over one cook bundle, stored as a flat byte span.
