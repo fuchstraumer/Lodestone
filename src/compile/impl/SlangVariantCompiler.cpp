@@ -31,7 +31,7 @@ constexpr uint32_t k_SpirvMagicNumber = 0x07230203u;
 constexpr size_t k_SpirvHeaderBytes = 5u * sizeof(uint32_t);
 
 /** The manifest reads SPIR-V as words, so a payload that is not whole words cannot reach it. */
-bool IsSpirvModule(std::string_view code) noexcept
+bool IsSpirvModule(const std::vector<std::byte>& code) noexcept
 {
     if (code.size() < k_SpirvHeaderBytes || (code.size() % sizeof(uint32_t)) != 0u)
     {
@@ -47,7 +47,7 @@ bool IsSpirvModule(std::string_view code) noexcept
  * worker thread never touches a sink. coalesced after threads join */
 struct GeneratedEntryPoint
 {
-    std::string Code;
+    std::vector<std::byte> Code;
     std::string Diagnostics;
     bool CallFailed{ false };
 };
@@ -59,20 +59,20 @@ GeneratedEntryPoint GenerateOneEntryPoint(slang::IComponentType* linked_program,
     const bool failed = SLANG_FAILED(linked_program->getEntryPointCode(
         static_cast<SlangInt>(index), k_TargetIndex, code.writeRef(), diagnostics.writeRef()));
 
-    return GeneratedEntryPoint{ .Code = failed ? std::string{} : BlobToString(code.get()),
+    return GeneratedEntryPoint{ .Code = failed ? std::vector<std::byte>{} : BlobToBytes(code.get()),
                                 .Diagnostics = BlobToString(diagnostics.get()),
                                 .CallFailed = failed };
 }
 
-CookResult<std::vector<std::string>> GenerateEntryPointCode(SlangModuleContext& context,
-                                                            Slang::ComPtr<slang::IComponentType> linked_program,
-                                                            DiagnosticSink& sink)
+CookResult<std::vector<LinkedVariant::EpCode>> GenerateEntryPointCode(SlangModuleContext& context,
+                                                                      Slang::ComPtr<slang::IComponentType> linked_program,
+                                                                      DiagnosticSink& sink)
 {
     // Slang can report an error and still return a success code with code text. Measured with a
     // specialization constant in `numthreads` for WGSL: error E55205, a success code, and a wrong
     // `@workgroup_size(1, 1, 1)`. So an error record fails the entry point as a failed call does.
     const size_t entryPointCount = context.EntryPointCount();
-    std::vector<std::string> generated(entryPointCount);
+    std::vector<LinkedVariant::EpCode> generated(entryPointCount);
     bool anyEntryPointFailed = false;
 
     for (size_t i = 0; i < entryPointCount; ++i)
@@ -176,12 +176,12 @@ CookResult<LinkedVariant> SlangVariantCompiler::CompileVariant(SlangModuleContex
 
     result.ProgramLayout = programLayout;
 
-    CookResult<std::vector<std::string>> generatedCode = GenerateEntryPointCode(context, linkedProgram, sink);
+    CookResult<std::vector<LinkedVariant::EpCode>> generatedCode = GenerateEntryPointCode(context, linkedProgram, sink);
     if (!generatedCode)
     {
         return std::unexpected(generatedCode.error());
     }
-    std::vector<std::string> entryPointCode = std::move(*generatedCode);
+    std::vector<LinkedVariant::EpCode> entryPointCode = std::move(*generatedCode);
 
     for (size_t i = 0; i < entryPointCode.size(); ++i)
     {
@@ -191,7 +191,7 @@ CookResult<LinkedVariant> SlangVariantCompiler::CompileVariant(SlangModuleContex
         result.EntryPointMetadata.push_back(metadata);
     }
 
-    result.EntryPointStrings = std::move(entryPointCode);
+    result.EntryPointCode = std::move(entryPointCode);
 
     return result;
 }

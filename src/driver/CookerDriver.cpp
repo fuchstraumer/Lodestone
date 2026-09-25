@@ -357,7 +357,7 @@ namespace
 
     CookError EmitLibraryArtifacts(const CookedLibrary& library, OutputSink& sink)
     {
-        CookResult<std::string> manifest = EmitShaderManifest(library);
+        CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library);
         if (!manifest)
         {
             return manifest.error();

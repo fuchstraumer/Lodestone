@@ -2,11 +2,12 @@
 #ifndef LODESTONE_OUTPUT_SINK_HPP
 #define LODESTONE_OUTPUT_SINK_HPP
 #include "CookerErrors.hpp"
+#include <cstddef>
 #include <filesystem>
 #include <map>
 #include <string>
 #include <string_view>
-#include <mutex>
+#include <span>
 
 /** Where cooked output goes. Kept behind an interface so a future watch-and-serve process can hand
  * sources to a running engine without going through the filesystem. */
@@ -27,6 +28,8 @@ public:
      * multiple named artifacts. */
     [[nodiscard]] virtual CookError WriteArtifact(std::string_view artifact_name,
                                     std::string_view content) = 0;
+    [[nodiscard]] virtual CookError WriteArtifact(std::string_view artifact_name,
+                                    std::span<const std::byte> content) = 0;
     [[nodiscard]] std::string_view Describe() const noexcept;
 protected:
     std::string name;
@@ -41,6 +44,7 @@ public:
     FileOutputSink& operator=(FileOutputSink&&) noexcept = default;
 
     [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::string_view content) override;
+    [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::span<const std::byte> content) override;
 
 private:
     std::filesystem::path path;
@@ -54,6 +58,7 @@ public:
     ~MemoryOutputSink() override;
 
     [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::string_view content) override;
+    [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::span<const std::byte> content) override;
     /** Every companion artifact, keyed by name. The determinism check compares two cooks with it. */
     [[nodiscard]] const std::map<std::string, std::string>& GetArtifacts() const noexcept;
 

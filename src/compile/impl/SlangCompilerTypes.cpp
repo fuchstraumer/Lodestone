@@ -2,6 +2,7 @@
 #include "Diagnostics.hpp"
 #include "compile/SlangDiagnosticParser.hpp"
 #include "slang.h"
+#include <cstddef>
 #include <cstdint>
 #include <ranges>
 #include <string_view>
@@ -32,6 +33,18 @@ std::vector<slang::CompilerOptionEntry> MakeCompilerOptions(uint32_t optimizatio
                            .IntValue = static_cast<int32_t>(ToSlangOptimizationLevel(optimization_level)) }));
 
     return options;
+}
+
+std::vector<std::byte> BlobToBytes(slang::IBlob* blob)
+{
+    if (blob == nullptr || blob->getBufferSize() == 0u)
+    {
+        return {};
+    }
+
+    const size_t size = blob->getBufferSize();
+    const std::byte* ptr = static_cast<const std::byte*>(blob->getBufferPointer());
+    return std::vector<std::byte>{ ptr, ptr + size };
 }
 
 std::string BlobToString(slang::IBlob* blob)

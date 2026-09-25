@@ -3,13 +3,13 @@
 #define LODESTONE_SHADER_COMPILER_SLANG_COMPILER_TYPES_HPP
 #include "compile/RawLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
-#include "permute/PermutationValue.hpp"
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "target/TargetProfile.hpp"
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -384,6 +384,7 @@ slang::CompilerOptionEntry ToOptionEntry(const CompilerOptionRow& row) noexcept;
  * row the table cannot hold. */
 std::vector<slang::CompilerOptionEntry> MakeCompilerOptions(uint32_t optimization_level);
 
+std::vector<std::byte> BlobToBytes(slang::IBlob* blob);
 std::string BlobToString(slang::IBlob* blob);
 
 void ReportDiagnostics(class DiagnosticSink& sink, std::string_view context, slang::IBlob* blob);

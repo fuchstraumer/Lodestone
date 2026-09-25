@@ -564,7 +564,7 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
     }
 
     const size_t globalBindingCount = rawVariant.Bindings.size();
-    for (int64_t i = 0; i < std::ssize(linked_variant.EntryPointStrings); ++i)
+    for (int64_t i = 0; i < std::ssize(linked_variant.EntryPointCode); ++i)
     {
         std::vector<RawBindingDraft> entryPointDrafts;
         const std::span<const RawBinding> globalBindings =
@@ -589,7 +589,7 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
 
         // set suffix, and copy over the target text
         rawEntryPoint.VariantSuffix = rawVariant.VariantSuffix;
-        rawEntryPoint.TargetText = std::move(linked_variant.EntryPointStrings[static_cast<size_t>(i)]);
+        rawEntryPoint.TargetCode = std::move(linked_variant.EntryPointCode[static_cast<size_t>(i)]);
         // weird quirk: dereferencing a std::expected with * directly returns an rvalue. otherwise
         // we would have to do std::move(entryPointResult).value() lol
         rawVariant.EntryPoints.emplace_back(std::move(*entryPointResult));

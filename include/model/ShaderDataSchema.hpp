@@ -3,6 +3,7 @@
 #define LODESTONE_DATA_SCHEMA_HPP
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <string>
@@ -248,7 +249,7 @@ struct CompiledEntryPoint
 {
     std::string Name;
     std::string VariantSuffix;
-    std::string Code;
+    std::vector<std::byte> Code;
     EntryPointReflection Reflection;
 };
 

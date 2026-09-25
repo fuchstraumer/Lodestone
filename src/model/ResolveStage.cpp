@@ -225,7 +225,7 @@ namespace
         CompiledEntryPoint entryPoint;
         entryPoint.Name = raw_entry_point.Name;
         entryPoint.VariantSuffix = raw_entry_point.VariantSuffix;
-        entryPoint.Code = raw_entry_point.TargetText;
+        entryPoint.Code = raw_entry_point.TargetCode;
         entryPoint.Reflection.Name = raw_entry_point.Name;
         entryPoint.Reflection.Stage = raw_entry_point.Stage;
         entryPoint.Reflection.Workgroup = raw_entry_point.Workgroup;

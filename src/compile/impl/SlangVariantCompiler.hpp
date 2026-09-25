@@ -7,7 +7,7 @@
 #include <slang-com-helper.h>
 #include <slang-com-ptr.h>
 #include <slang.h>
-#include <string>
+#include <cstddef>
 #include <vector>
 
 namespace lodestone
@@ -21,7 +21,8 @@ struct LinkedVariant
 {
     Slang::ComPtr<slang::IComponentType> LinkedProgram;
     slang::ProgramLayout* ProgramLayout{ nullptr };
-    std::vector<std::string> EntryPointStrings;
+    using EpCode = std::vector<std::byte>;
+    std::vector<EpCode> EntryPointCode;
     std::vector<Slang::ComPtr<slang::IMetadata>> EntryPointMetadata;
 };
 

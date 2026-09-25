@@ -68,6 +68,13 @@ CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::str
     return CookError::Success;
 }
 
+CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::span<const std::byte> content)
+{
+    // be evil: just cast the span of bytes to a string view and call the other overload
+    const std::string_view contentAsStringView{ reinterpret_cast<const char*>(content.data()), content.size() };
+    return WriteArtifact(artifact_name, contentAsStringView);
+}
+
 MemoryOutputSink::MemoryOutputSink() : MemoryOutputSink{ "memory_output_sink" }
 {
 }
@@ -82,6 +89,12 @@ CookError MemoryOutputSink::WriteArtifact(std::string_view artifact_name, std::s
 {
     auto [iter, inserted] = artifacts.try_emplace(std::string{ artifact_name }, std::string{ _content });
     return inserted ? CookError::Success : CookError::ArtifactAlreadyWritten;
+}
+
+CookError MemoryOutputSink::WriteArtifact(std::string_view artifact_name, std::span<const std::byte> content)
+{
+    const std::string_view contentAsStringView{ reinterpret_cast<const char*>(content.data()), content.size() };
+    return WriteArtifact(artifact_name, contentAsStringView);
 }
 
 const std::map<std::string, std::string>& MemoryOutputSink::GetArtifacts() const noexcept

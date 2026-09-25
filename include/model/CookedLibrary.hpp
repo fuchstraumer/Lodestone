@@ -8,9 +8,11 @@
 #include "ShaderLibraryTypes.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
+#include "VariantKey.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -65,7 +67,7 @@ using ShaderLayout = std::vector<ResolvedBinding>;
 using ShaderLayoutView = std::vector<ResolvedBindingView>;
 
 ContentHashValue HashIndexList(const std::vector<uint32_t>& indices) noexcept;
-ContentHashValue HashSourceString(const std::string& source) noexcept;
+ContentHashValue HashSourceCode(const std::vector<std::byte>& source) noexcept;
 ContentHashValue HashResourceList(const ResourceList& resources) noexcept;
 ContentHashValue HashVisibilityList(const VisibilityList& visibility) noexcept;
 ContentHashValue HashFootprintList(const FootprintList& footprints) noexcept;
@@ -98,7 +100,7 @@ struct InternedModule
     // Every interner takes the name from `k_HashName`, because the name reaches the output and a new
     // hash needs a new name. A literal here is a second place to change, and the two spellings drifted
     // apart once already.
-    ContentInterner<std::string> SourceInterner{ &HashSourceString, k_HashName };
+    ContentInterner<std::vector<std::byte>> SourceInterner{ &HashSourceCode, k_HashName };
     ContentInterner<ReflectedBinding> ResourceInterner{ &HashReflectedBinding, k_HashName };
     ContentInterner<ResourceList> ResourceListInterner{ &HashResourceList, k_HashName };
     ContentInterner<FootprintList> FootprintListInterner{ &HashFootprintList, k_HashName };
@@ -126,7 +128,7 @@ struct CookedModule
     /** @brief Size of the dense index range, holes included. */
     uint64_t SpaceSize{ 0u };
     std::vector<LibraryEntryPoint> EntryPoints;
-    std::vector<std::string> Sources;
+    std::vector<std::vector<std::byte>> Sources;
     std::vector<ReflectedBinding> Resources;
     std::vector<ResourceList> ResourceLists;
     std::vector<FootprintList> FootprintLists;
@@ -176,9 +178,9 @@ CookedModule FreezeModuleTables(InternedModule&& interned);
 
 /**@brief Resolves what a caller would get back for one entry point of one variant. The round-trip check
  * compares this against the text the compiler produced. */
-std::string_view ResolveSource(const CookedModule& module,
-                               const LibraryVariant& variant,
-                               size_t entry_point_index) noexcept;
+std::span<const std::byte> ResolveSource(const CookedModule& module,
+                                         const LibraryVariant& variant,
+                                         size_t entry_point_index) noexcept;
 
 /**@brief Retrieve the final shader layout built for one entry point of one variant
  * within a module.*/

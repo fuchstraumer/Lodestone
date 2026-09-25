@@ -6,6 +6,7 @@
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include <cstdint>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -108,7 +109,7 @@ struct RawEntryPoint
     ShaderStageKind Stage{ ShaderStageKind::Invalid };
     WorkgroupSize Workgroup;
     /** The text the target backend generated. Stage 3 does not read it. */
-    std::string TargetText;
+    std::vector<std::byte> TargetCode;
     /** Indices into `RawVariant::Bindings`, ascending. This is visibility. */
     std::vector<uint32_t> UsedBindingIndices;
     ReflectedRasterState Raster;

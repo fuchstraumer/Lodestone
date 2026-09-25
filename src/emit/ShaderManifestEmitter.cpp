@@ -30,9 +30,6 @@
 #include <variant>
 #include <vector>
 
-// todo-ship: in almost all places we are using std::string, we could just use std::vector<std::byte> and
-// avoid the string encoding issues. the manifest is a binary file, so we don't need to treat it as text
-// anywhere
 namespace lodestone
 {
 
@@ -51,13 +48,13 @@ namespace
         uint32_t Add(std::string_view text);
         [[nodiscard]] std::string_view Text(uint32_t string_index) const noexcept;
         [[nodiscard]] const std::vector<manifest::StringRef>& References() const noexcept;
-        [[nodiscard]] const std::string& Blob() const noexcept;
-        [[nodiscard]] std::string&& TakeBlob() noexcept;
+        [[nodiscard]] const std::vector<std::byte>& Blob() const noexcept;
+        [[nodiscard]] std::vector<std::byte>&& TakeBlob() noexcept;
 
     private:
         std::unordered_map<std::string, uint32_t, TransparentStringHash, std::equal_to<>> lookup;
         std::vector<manifest::StringRef> references;
-        std::string blob;
+        std::vector<std::byte> blob;
     };
 
     /** One axis in the vocabulary of the manifest. A named value (a type or an enum case) is already a
@@ -112,7 +109,7 @@ namespace
 
     struct SourceTables
     {
-        std::string Blob;
+        std::vector<std::byte> Blob;
         std::vector<manifest::SourceRef> Refs;
     };
 
@@ -120,16 +117,16 @@ namespace
     constexpr size_t k_AxisMaskWordBits = 64u;
 
     /** @brief Writes the actual bytes to the given `out` string. */
-    void AppendBytes(std::string& out, const void* data, size_t size);
+    void AppendBytes(std::vector<std::byte>& out, const void* data, size_t size);
 
     /** Pads to the next 8-byte boundary. Binding records and axis values hold 64-bit fields, and the
      * reader maps them in place, so every section must start aligned. */
-    void AlignTo8(std::string& out);
+    void AlignTo8(std::vector<std::byte>& out);
 
     /** @brief Appends a table of records to the output string, aligned to 8 bytes. Returns the offset
      *  of the first record in the output string where the new records are now located */
     template<typename RecordType>
-    manifest::TableRef AppendTable(std::string& out, const std::vector<RecordType>& records)
+    manifest::TableRef AppendTable(std::vector<std::byte>& out, const std::vector<RecordType>& records)
     {
         AlignTo8(out);
         const uint32_t offset = static_cast<uint32_t>(out.size());
@@ -142,7 +139,7 @@ namespace
     }
 
     template<typename RecordType>
-    manifest::TableRef64 AppendTable64(std::string& out, const std::vector<RecordType>& records)
+    manifest::TableRef64 AppendTable64(std::vector<std::byte>& out, const std::vector<RecordType>& records)
     {
         AlignTo8(out);
         const uint64_t offset = out.size();
@@ -209,7 +206,7 @@ namespace
     CookResult<VariantTables> BuildVariantTables(const CookedModule& module, StringTableBuilder& strings);
     SourceTables BuildSourceTables(const CookedModule& module);
     /** One environment extent: an `EnvironmentHeader`, then every table of one (profile, module) pair. */
-    CookResult<std::string> BuildExtent(const CookedModule& module, StringTableBuilder& strings);
+    CookResult<std::vector<std::byte>> BuildExtent(const CookedModule& module, StringTableBuilder& strings);
 
     /** The first profile that cooked the module, or null when no profile did. */
     const CookedModule* FirstCookedEnvironment(const CookedLibrary& library, size_t module_index) noexcept;
@@ -261,7 +258,7 @@ namespace
 
 } // namespace
 
-CookResult<std::string> EmitShaderManifest(const CookedLibrary& library)
+CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& library)
 {
     const size_t moduleCount = library.ModuleNames.size();
     const size_t profileCount = library.Profiles.size();
@@ -328,7 +325,7 @@ CookResult<std::string> EmitShaderManifest(const CookedLibrary& library)
 
     // Build every extent before the header region, because an extent adds binding names and suffixes to
     // the string table, and the header region holds that table.
-    std::vector<std::string> extents(library.Environments.size());
+    std::vector<std::vector<std::byte>> extents(library.Environments.size());
     for (size_t environmentIndex = 0u; environmentIndex < library.Environments.size(); ++environmentIndex)
     {
         const std::optional<CookedModule>& environment = library.Environments[environmentIndex];
@@ -337,7 +334,7 @@ CookResult<std::string> EmitShaderManifest(const CookedLibrary& library)
             continue;
         }
 
-        CookResult<std::string> extent = BuildExtent(*environment, strings);
+        CookResult<std::vector<std::byte>> extent = BuildExtent(*environment, strings);
         if (!extent)
         {
             return std::unexpected(extent.error());
@@ -355,8 +352,8 @@ CookResult<std::string> EmitShaderManifest(const CookedLibrary& library)
     header.ModuleCount = moduleCount;
 
     // The module headers sit right after the header, so the reader finds them with no offset.
-    std::string bytes;
-    bytes.resize(sizeof(manifest::Header) + (moduleCount * sizeof(manifest::ModuleRootHeader)), '\0');
+    std::vector<std::byte> bytes;
+    bytes.resize(sizeof(manifest::Header) + (moduleCount * sizeof(manifest::ModuleRootHeader)), std::byte{ 0 });
     header.Profiles = AppendTable64(bytes, profiles);
     header.Axes = AppendTable64(bytes, rootAxisRecords);
     header.AxesValues = AppendTable64(bytes, rootAxisValues);
@@ -389,10 +386,11 @@ CookResult<std::string> EmitShaderManifest(const CookedLibrary& library)
         }
 
         AlignTo8(bytes);
-        directory[environmentIndex] = manifest::EnvironmentDirectoryEntry{
+        directory[environmentIndex] = manifest::EnvironmentDirectoryEntry
+        {
             .ExtentOffset = bytes.size(), .ExtentSize = extents[environmentIndex].size()
         };
-        bytes.append(extents[environmentIndex]);
+        bytes.append_range(std::move(extents[environmentIndex]));
     }
 
     AlignTo8(bytes);
@@ -415,10 +413,9 @@ CookResult<std::string> EmitShaderManifest(const CookedLibrary& library)
     return bytes;
 }
 
-CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::string& manifest_bytes)
+CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::vector<std::byte>& manifest_bytes)
 {
-    const std::span<const char> rawChars{ manifest_bytes.data(), manifest_bytes.size() };
-    const std::span<const std::byte> raw = std::as_bytes(rawChars);
+    const std::span<const std::byte> raw{ manifest_bytes.data(), manifest_bytes.size() };
 
     const manifest::ManifestResult<manifest::BundleView> opened = manifest::BundleView::Open(raw);
     if (!opened)
@@ -510,7 +507,8 @@ namespace
 
         const uint32_t index{ static_cast<uint32_t>(references.size()) };
         references.emplace_back(static_cast<uint32_t>(blob.size()), static_cast<uint32_t>(text.size()));
-        blob.append(text);
+        std::span<const std::byte> bytes{ reinterpret_cast<const std::byte*>(text.data()), text.size() };
+        blob.append_range(bytes);
         lookup.emplace(std::string{ text }, index);
         return index;
     }
@@ -518,7 +516,9 @@ namespace
     std::string_view StringTableBuilder::Text(uint32_t string_index) const noexcept
     {
         const manifest::StringRef& reference = references[string_index];
-        return std::string_view{ blob }.substr(reference.Offset, reference.Length);
+        // jut casts all the way down....
+        std::span<const char> asChars{ reinterpret_cast<const char*>(blob.data()), blob.size() };
+        return std::string_view{ asChars }.substr(reference.Offset, reference.Length);
     }
 
     const std::vector<manifest::StringRef>& StringTableBuilder::References() const noexcept
@@ -526,27 +526,28 @@ namespace
         return references;
     }
 
-    const std::string& StringTableBuilder::Blob() const noexcept
+    const std::vector<std::byte>& StringTableBuilder::Blob() const noexcept
     {
         return blob;
     }
 
-    std::string&& StringTableBuilder::TakeBlob() noexcept
+    std::vector<std::byte>&& StringTableBuilder::TakeBlob() noexcept
     {
         return std::move(blob);
     }
 
-    void AppendBytes(std::string& out, const void* data, size_t size)
+    void AppendBytes(std::vector<std::byte>& out, const void* data, size_t size)
     {
-        out.append(static_cast<const char*>(data), size);
+        const size_t oldTail = out.size();
+        out.resize(out.size() + size);
+        std::memcpy(out.data() + oldTail, data, size);
     }
 
-    void AlignTo8(std::string& out)
+    void AlignTo8(std::vector<std::byte>& out)
     {
-        while ((out.size() % 8u) != 0u)
-        {
-            out.push_back('\0');
-        }
+        // use size_t{} to make sure it is for sure 64 bits on x64
+        const size_t alignedSize = (out.size() + 7u) & ~size_t{ 7u };
+        out.resize(alignedSize, static_cast<std::byte>(0));
     }
 
     manifest::Binding MakeBindingRecord(const ReflectedBinding& binding,
@@ -911,16 +912,16 @@ namespace
         SourceTables tables;
         tables.Refs.reserve(module.Sources.size());
 
-        for (const std::string& source : module.Sources)
+        for (const std::vector<std::byte>& source : module.Sources)
         {
             tables.Refs.emplace_back(static_cast<uint32_t>(tables.Blob.size()), static_cast<uint32_t>(source.size()));
-            tables.Blob.append(source);
+            tables.Blob.append_range(source);
         }
 
         return tables;
     }
 
-    CookResult<std::string> BuildExtent(const CookedModule& module, StringTableBuilder& strings)
+    CookResult<std::vector<std::byte>> BuildExtent(const CookedModule& module, StringTableBuilder& strings)
     {
         CookResult<VariantTables> variantsResult = BuildVariantTables(module, strings);
         if (!variantsResult)
@@ -931,11 +932,11 @@ namespace
         const VariantTables& variants = *variantsResult;
         const LayoutTables layouts = BuildLayoutTables(module, strings);
         const RasterTables rasters = BuildRasterTables(module, strings);
-        const SourceTables sources = BuildSourceTables(module);
+        SourceTables sources = BuildSourceTables(module);
 
         manifest::EnvironmentHeader environment;
-        std::string extent;
-        extent.resize(sizeof(manifest::EnvironmentHeader), '\0');
+        std::vector<std::byte> extent;
+        extent.resize(sizeof(manifest::EnvironmentHeader), std::byte{ 0 });
 
         // The variant count sizes these four tables, so each keeps its offset only.
         environment.VariantCount = static_cast<uint32_t>(variants.Variants.size());
@@ -949,7 +950,7 @@ namespace
         AlignTo8(extent);
         environment.SourceBlob = manifest::TableRef{ static_cast<uint32_t>(extent.size()),
                                                      static_cast<uint32_t>(sources.Blob.size()) };
-        extent.append(sources.Blob);
+        extent.append_range(std::move(sources.Blob));
 
         environment.Bindings = AppendTable(extent, layouts.Bindings);
         environment.ResourceLists = AppendTable(extent, layouts.ResourceLists);
@@ -1183,15 +1184,14 @@ namespace
                                   size_t entry_point_index)
     {
         // Read back through the accessor a consumer of this format uses, and compare bytes.
-        const std::string_view expectedSource = ResolveSource(module, variant, entry_point_index);
+        const std::span<const std::byte> expectedSource = ResolveSource(module, variant, entry_point_index);
         const VariantKey variantKey = module.VariantKeys[variant.Index];
         const uint32_t entryPoint = static_cast<uint32_t>(entry_point_index);
-        const std::span<const std::byte> expectedBytes = std::as_bytes(std::span{ expectedSource });
         const std::span<const std::byte> providerBytes =
             (provider.View().CodeFormat() == ShaderCodeFormat::Spirv)
                 ? std::as_bytes(provider.SpirvWords(entryPoint, variantKey))
                 : std::as_bytes(std::span{ provider.Source(entryPoint, variantKey) });
-        if (std::ranges::equal(providerBytes, expectedBytes))
+        if (std::ranges::equal(providerBytes, expectedSource))
         {
             return CookError::Success;
         }

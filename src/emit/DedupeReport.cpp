@@ -330,9 +330,8 @@ namespace
         {
             for (size_t i = 0; i < module.EntryPoints.size(); ++i)
             {
-                const std::string_view sourceStr = ResolveSource(module, variant, i);
-                const ContentHashValue hash =
-                    HashBytes(std::as_bytes(std::span{ sourceStr.data(), sourceStr.size() }));
+                const std::span<const std::byte> sourceBytes = ResolveSource(module, variant, i);
+                const ContentHashValue hash = HashBytes(sourceBytes);
                 table.Add(hash);
             }
         }
@@ -381,16 +380,18 @@ namespace
             }
         }
         // as with the rest of our library: equal hashes don't prove anything. now we will fallback
-        // to actual string comparisons. with xxhash3 though, our chance of a collision is miniscule.
+        // to actual comparisons. with xxhash3 though, our chance of a collision is miniscule.
         // like something on the order of 1 in 2^128 for xxhash3.
         // (again, we shouldn't hit this, and this is for a statistical tool, but it's still important to be
         // thorough)
-        const std::string_view text = ResolveSource(module, module.Variants[group.front()], entry_point);
+        const std::span<const std::byte> code = ResolveSource(module, module.Variants[group.front()], entry_point);
         return std::ranges::all_of(
             group.subspan(1u),
-            [&module, &entry_point, &text](uint32_t variant_index)
+            [&module, &entry_point, &code](uint32_t variant_index)
             {
-                return ResolveSource(module, module.Variants[variant_index], entry_point) == text;
+                const std::span<const std::byte> epSrc =
+                    ResolveSource(module, module.Variants[variant_index], entry_point);
+                return std::ranges::equal(epSrc, code);
             });
     }
 

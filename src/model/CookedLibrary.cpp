@@ -34,11 +34,9 @@ ContentHashValue HashIndexList(const std::vector<uint32_t>& indices) noexcept
     return HashBytes(indicesBytesSpan);
 }
 
-ContentHashValue HashSourceString(const std::string& source) noexcept
+ContentHashValue HashSourceCode(const std::vector<std::byte>& source) noexcept
 {
-    // make string_view from source first, then cast to std::span<const std::byte> for hashing
-    const std::span<const char> sourceSpan{ source.data(), source.length() };
-    const std::span<const std::byte> bytesSpan = std::as_bytes(sourceSpan);
+    const std::span<const std::byte> bytesSpan{ source.data(), source.size() };
     return HashBytes(bytesSpan);
 }
 
@@ -209,9 +207,9 @@ CookedModule FreezeModuleTables(InternedModule&& interned)
     return module;
 }
 
-std::string_view ResolveSource(const CookedModule& module,
-                               const LibraryVariant& variant,
-                               size_t entry_point_index) noexcept
+std::span<const std::byte> ResolveSource(const CookedModule& module,
+                                         const LibraryVariant& variant,
+                                         size_t entry_point_index) noexcept
 {
     if (entry_point_index >= variant.SourceIndices.size())
     {

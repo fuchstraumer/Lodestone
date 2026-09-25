@@ -3,8 +3,9 @@
 #define LODESTONE_MANIFEST_EMITTER_HPP
 #include "model/CookedLibrary.hpp"
 #include "CookerErrors.hpp"
-#include <string>
+#include <cstddef>
 #include <string_view>
+#include <vector>
 
 /**
  * Writes one CookedLibrary as the binary manifest bundle that `client/include/ShaderManifest.hpp` reads.
@@ -29,7 +30,7 @@ inline constexpr std::string_view k_ManifestFileName = "ShaderLibrary.ldmanifest
  *
  * The emit fails when a module axis holds more than 32 values, when two profiles of one module disagree on
  * its entry points or its axes, or when two variants of one environment share a key. */
-[[nodiscard]] CookResult<std::string> EmitShaderManifest(const CookedLibrary& library);
+[[nodiscard]] CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& library);
 
 /** Reads the bundle back and compares every environment against the module it came from. For each entry
  * point of each variant it checks the source bytes, the workgroup size, each binding field, and the raster
@@ -37,7 +38,7 @@ inline constexpr std::string_view k_ManifestFileName = "ShaderLibrary.ldmanifest
  * the canonical assignment, and compares the axis-active mask with the active assignment.
  *
  * This runs on every cook. The check is not optional. */
-[[nodiscard]] CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::string& manifest_bytes);
+[[nodiscard]] CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::vector<std::byte>& manifest_bytes);
 
 } // namespace lodestone
 

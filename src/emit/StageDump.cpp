@@ -244,7 +244,7 @@ namespace
             writer.BeginObject();
             writer.KeyUInt("index", i);
             writer.KeyUInt("byteLength", module.Sources[i].size());
-            writer.KeyUInt("contentHash", HashSourceString(module.Sources[i]));
+            writer.KeyUInt("contentHash", HashSourceCode(module.Sources[i]));
             writer.EndObject();
         }
         writer.EndArray();
@@ -510,8 +510,8 @@ namespace
             writer.KeyUInt("y", entryPoint.Workgroup.Y);
             writer.KeyUInt("z", entryPoint.Workgroup.Z);
             writer.EndObject();
-            writer.KeyUInt("targetTextByteLength", entryPoint.TargetText.size());
-            writer.KeyUInt("targetTextHash", HashSourceString(entryPoint.TargetText));
+            writer.KeyUInt("targetTextByteLength", entryPoint.TargetCode.size());
+            writer.KeyUInt("targetTextHash", HashSourceCode(entryPoint.TargetCode));
             WriteIndexArray(writer, "usedBindingIndices", entryPoint.UsedBindingIndices);
             WriteVertexInputs(writer, entryPoint.Raster);
             WriteColorTargets(writer, entryPoint.Raster);
@@ -682,7 +682,7 @@ std::string DumpResolvedModule(std::string_view module_name, std::span<const Com
             writer.KeyUInt("z", entryPoint.Reflection.Workgroup.Z);
             writer.EndObject();
             writer.KeyUInt("targetTextByteLength", entryPoint.Code.size());
-            writer.KeyUInt("targetTextHash", HashSourceString(entryPoint.Code));
+            writer.KeyUInt("targetTextHash", HashSourceCode(entryPoint.Code));
             WriteIndexArray(writer, "usedBindingIndices", entryPoint.Reflection.UsedBindingIndices);
             WriteVertexInputs(writer, entryPoint.Reflection.Raster);
             WriteColorTargets(writer, entryPoint.Reflection.Raster);
@@ -890,36 +890,14 @@ CookError DumpShaderSources(const CookedModule& module,
 
     for (const auto& [sourceIdx, usage] : std::views::enumerate(module.Sources))
     {
-        const ContentHashValue hashedSource = HashSourceString(module.Sources[sourceIdx]);
-        std::string source = module.Sources[sourceIdx];
+        const ContentHashValue hashedSource = HashSourceCode(module.Sources[sourceIdx]);
+        const std::span<const std::byte> source = module.Sources[sourceIdx];
         const bool isSpirv = code_format == ShaderCodeFormat::Spirv;
         std::string filename =
             std::format("{}_{:016X}.{}", module.Name, hashedSource, isSpirv ? "spv" : "wgsl");
         sourceIdxToFilename[sourceIdx] = filename;
         std::string outputName = std::format("{}/{}", subdir, filename);
-        if (isSpirv)
-        {
-            // SourceTable.json names the variants. A comment would make the file invalid SPIR-V.
-            CookError writeResult = sink.WriteArtifact(outputName, source);
-            if (!writeResult)
-            {
-                return writeResult;
-            }
-            continue;
-        }
-
-        std::string usageComment = "/*\n    Used by variant(s):\n";
-        for (const auto& variant : module.Variants)
-        {
-            auto iter = std::ranges::find(variant.SourceIndices, sourceIdx);
-            if (iter != variant.SourceIndices.end())
-            {
-                usageComment += "        " + std::string(variant.Suffix) + " - " + std::string(variant.Description) + "\n";
-            }
-        }
-        usageComment += "*/\n";
-        source.insert_range(source.begin(), usageComment);
-
+        // we used to write a header, but we have a source table that does that cleaner now
         CookError writeResult = sink.WriteArtifact(outputName, source);
         if (!writeResult)
         {

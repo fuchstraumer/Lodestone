@@ -171,7 +171,9 @@ namespace
 
             for (size_t i = 0u; i < origin->EntryPoints.size(); ++i)
             {
-                if (ResolveSource(module, variant, i) != origin->EntryPoints[i].Code)
+                std::span<const std::byte> resolvedSource{ ResolveSource(module, variant, i) };
+                std::span<const std::byte> epSourceSpan{ origin->EntryPoints[i].Code };
+                if (!std::ranges::equal(resolvedSource, epSourceSpan))
                 {
                     const std::string errStr = std::format("ROUND TRIP FAILED for {} [{}]: the table returns "
                                                            "different text than the compiler produced",
