@@ -130,7 +130,7 @@ SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDe
             CookResult<LinkedVariant> variantBuildResult = variantCompiler.CompileVariant(moduleContext, currBatch.Variants[jobIndexU], currBatch.DiagnosticSinks[jobIndexU]);
             SlangReflector variantReflector(moduleContext.EntryPointNames(), &currBatch.DiagnosticSinks[jobIndexU], moduleContext.GlobalSession(), moduleContext.PlacementKindForTarget());
 
-            currBatch.Results[jobIndexU] = variantBuildResult ? variantReflector.Reflect(*variantBuildResult, currBatch.Variants[jobIndexU]) : std::unexpected(CookError::VariantModuleCreationFailed);
+            currBatch.Results[jobIndexU] = variantBuildResult ? variantReflector.Reflect(*variantBuildResult, currBatch.Variants[jobIndexU]) : std::unexpected(variantBuildResult.error());
         }
     }
 
@@ -217,7 +217,7 @@ void ThreadPool::workerFunction(const std::stop_token& stop_token,
             CookResult<LinkedVariant> variantBuildResult = variantCompiler.CompileVariant(moduleContext, batch->Variants[jobIndexU], batch->DiagnosticSinks[jobIndexU]);
             SlangReflector variantReflector(moduleContext.EntryPointNames(), &batch->DiagnosticSinks[jobIndexU], moduleContext.GlobalSession(), moduleContext.PlacementKindForTarget());
 
-            batch->Results[jobIndexU] = variantBuildResult ? variantReflector.Reflect(*variantBuildResult, batch->Variants[jobIndexU]) : std::unexpected(CookError::VariantModuleCreationFailed);
+            batch->Results[jobIndexU] = variantBuildResult ? variantReflector.Reflect(*variantBuildResult, batch->Variants[jobIndexU]) : std::unexpected(variantBuildResult.error());
         }
 
         const CookError writeCacheError = moduleContext.WriteModuleCache();

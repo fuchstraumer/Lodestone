@@ -234,6 +234,13 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
         cookStatistics.ModulesCooked += 1;
     }
 
+    if (cookStatistics.ReflectionMismatches != 0u)
+    {
+        const std::string errStr = std::format("{} entry point variants disagree with the emitted target text",
+                                               cookStatistics.ReflectionMismatches);
+        return std::unexpected(ReportError(diagnostics, CookError::ReflectionMismatch, errStr));
+    }
+
     const CookError emitError = EmitLibraryArtifacts(library, sink);
     if (!emitError)
     {

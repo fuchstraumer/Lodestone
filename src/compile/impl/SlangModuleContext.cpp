@@ -3,6 +3,8 @@
 #include "SlangCompilerTypes.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
+#include "EmbeddedFileSystem.hpp"
+#include "compile/EmbeddedBuiltinModules.hpp"
 #include "compile/EnumTagDecode.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
@@ -202,18 +204,16 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
     const std::vector<slang::CompilerOptionEntry> compileOptions =
         MakeCompilerOptions(create_info.OptimizationLevel);
 
-    // todo-asap: I am inserting the tests/assets/ rootdir here for the attributes file. This needs to be
-    // optionalized and standardized
-    const std::filesystem::path attributesPath = std::filesystem::canonical("C:/SoftwareDev/Lodestone/builtins/");
-    const std::string attributesPathStr = attributesPath.string();
     const std::filesystem::path canonicalModulePath = std::filesystem::canonical(create_info.ModulePath);
     const std::string sourceDirectory = canonicalModulePath.parent_path().string();
-    // The shared modules a shader imports -- VeloxAttributes among them -- sit one level above the
-    // per-stage directory, so the asset root resolves without a command-line switch.
+    // The shared modules a shader imports sit one level above the per-stage directory, so the asset root
+    // resolves without a command-line switch. The builtin search path names no directory on disk: the
+    // embedded file system serves it from memory.
     const std::string sharedDirectory = canonicalModulePath.parent_path().parent_path().string();
     cacheDirectory = create_info.ModuleCacheDirectory.string();
     const std::array<const char*, 4> searchPaths{
-        sourceDirectory.c_str(), sharedDirectory.c_str(), cacheDirectory.c_str(), attributesPathStr.c_str()
+        sourceDirectory.c_str(), sharedDirectory.c_str(), cacheDirectory.c_str(),
+        EmbeddedFileSystem::k_BuiltinSearchPath.data()
     };
 
     slang::TargetDesc target{};
@@ -229,6 +229,7 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
     sessionDesc.targetCount = 1;
     sessionDesc.searchPaths = searchPaths.data();
     sessionDesc.searchPathCount = static_cast<SlangInt>(searchPaths.size());
+    sessionDesc.fileSystem = &GetEmbeddedFileSystem();
     sessionDesc.compilerOptionEntries = compileOptions.data();
     sessionDesc.compilerOptionEntryCount = static_cast<uint32_t>(compileOptions.size());
     
@@ -520,10 +521,22 @@ CookError SlangModuleContext::readDependencySourceStrings()
             continue;
         }
 
+        const EmbeddedBuiltinModule* builtin = FindEmbeddedBuiltin(dependencyPath);
+        if (builtin != nullptr)
+        {
+            //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+            moduleSourceStrings.emplace_back(reinterpret_cast<const char*>(builtin->Source), builtin->SourceSize);
+            continue;
+        }
+
         std::ifstream file(dependencyPath, std::ios::binary);
         if (!file)
         {
-            return CookError::FailedToLoadModuleDependencySource;
+            return ReportError(*diagnosticSink,
+                               CookError::FailedToLoadModuleDependencySource,
+                               std::format("module {} depends on '{}', and that file cannot be read",
+                                           moduleName,
+                                           dependencyPath));
         }
 
         moduleSourceStrings.emplace_back(std::istreambuf_iterator<char>(file),

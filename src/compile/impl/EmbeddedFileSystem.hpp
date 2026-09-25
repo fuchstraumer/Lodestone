@@ -1,8 +1,8 @@
 #pragma once
 #ifndef LODESTONE_EMBEDDED_FILE_SYSTEM_HPP
 #define LODESTONE_EMBEDDED_FILE_SYSTEM_HPP
+#include <cstdint>
 #include "slang.h"
-
 #include <string_view>
 
 namespace lodestone

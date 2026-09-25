@@ -10,7 +10,6 @@
 #include "slang-com-ptr.h"
 #include "slang.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -33,6 +32,7 @@ struct GeneratedEntryPoint
 {
     std::string Code;
     std::string Diagnostics;
+    bool CallFailed{ false };
 };
 
 GeneratedEntryPoint GenerateOneEntryPoint(slang::IComponentType* linked_program, size_t index)
@@ -43,24 +43,37 @@ GeneratedEntryPoint GenerateOneEntryPoint(slang::IComponentType* linked_program,
         static_cast<SlangInt>(index), k_WgslTargetIndex, code.writeRef(), diagnostics.writeRef()));
 
     return GeneratedEntryPoint{ .Code = failed ? std::string{} : BlobToString(code.get()),
-                                .Diagnostics = BlobToString(diagnostics.get()) };
+                                .Diagnostics = BlobToString(diagnostics.get()),
+                                .CallFailed = failed };
 }
 
-std::vector<std::string> GenerateEntryPointCode(SlangModuleContext& context,
-                                                Slang::ComPtr<slang::IComponentType> linked_program,
-                                                DiagnosticSink& sink)
+CookResult<std::vector<std::string>> GenerateEntryPointCode(SlangModuleContext& context,
+                                                            Slang::ComPtr<slang::IComponentType> linked_program,
+                                                            DiagnosticSink& sink)
 {
+    // Slang can report an error and still return a success code with code text. Measured with a
+    // specialization constant in `numthreads` for WGSL: error E55205, a success code, and a wrong
+    // `@workgroup_size(1, 1, 1)`. So an error record fails the entry point as a failed call does.
     const size_t entryPointCount = context.EntryPointCount();
     std::vector<std::string> generated(entryPointCount);
+    bool anyEntryPointFailed = false;
 
     for (size_t i = 0; i < entryPointCount; ++i)
     {
         GeneratedEntryPoint result = GenerateOneEntryPoint(linked_program, i);
-        if (!result.Diagnostics.empty())
+        const int32_t failureCount = result.Diagnostics.empty()
+                                         ? 0
+                                         : ParseSlangDiagnostics(result.Diagnostics, "getEntryPointCode", sink);
+        if (result.CallFailed || (failureCount > 0) || result.Code.empty())
         {
-            ParseSlangDiagnostics(result.Diagnostics, "getEntryPointCode", sink);
+            anyEntryPointFailed = true;
         }
         generated[i] = std::move(result.Code);
+    }
+
+    if (anyEntryPointFailed)
+    {
+        return std::unexpected(CookError::CodeGenerationFailed);
     }
 
     return generated;
@@ -146,11 +159,12 @@ CookResult<LinkedVariant> SlangVariantCompiler::CompileVariant(SlangModuleContex
 
     result.ProgramLayout = programLayout;
 
-    std::vector<std::string> entryPointCode = GenerateEntryPointCode(context, linkedProgram, sink);
-    if (std::ranges::any_of(entryPointCode, [](const std::string& code) { return code.empty(); }))
+    CookResult<std::vector<std::string>> generatedCode = GenerateEntryPointCode(context, linkedProgram, sink);
+    if (!generatedCode)
     {
-        return std::unexpected(CookError::CodeGenerationFailed);
+        return std::unexpected(generatedCode.error());
     }
+    std::vector<std::string> entryPointCode = std::move(*generatedCode);
 
     for (size_t i = 0; i < entryPointCode.size(); ++i)
     {

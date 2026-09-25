@@ -1,5 +1,6 @@
 #include "target/TargetProfile.hpp"
 #include "CookerErrors.hpp"
+#include "LodestoneConfig.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include <array>
@@ -8,7 +9,9 @@
 #include <span>
 #include <string_view>
 #include <vector>
+#if LODESTONE_ENABLE_WGSL
 #include "target/WgslValidator.hpp"
+#endif
 
 namespace lodestone
 {
@@ -33,10 +36,16 @@ namespace
 
     constexpr std::string_view k_WgslName = "wgsl";
 
+#if LODESTONE_ENABLE_WGSL
     static WgslValidator k_WgslValidator;
+    const ResolvedLibraryValidator* const k_WgslProfileValidator = &k_WgslValidator;
+#else
+    // No Tint, so no second opinion. A wgsl cook in this build fails unless it passes --no-validate.
+    const ResolvedLibraryValidator* const k_WgslProfileValidator = nullptr;
+#endif
 
     const std::array<TargetProfile, 1u> k_TargetProfiles{ TargetProfile{
-        .Name = k_WgslName, .Access = AccessModel::Bound, .Validator = &k_WgslValidator } };
+        .Name = k_WgslName, .Access = AccessModel::Bound, .Validator = k_WgslProfileValidator } };
 
     constexpr std::array<std::string_view, 1u> k_TargetProfileNames{ k_WgslName };
 
