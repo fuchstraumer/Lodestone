@@ -4,6 +4,8 @@
 #include <array>
 #include <charconv>
 #include <cstddef>
+#include <cstdint>
+#include <cstdio>
 #include <optional>
 #include <print>
 #include <string>
@@ -20,14 +22,14 @@ namespace
     /**@brief Slang emits this in front of the message that ended the compile. The record after it repeats
      * the fatal message already reported, so the reader sees the problem twice. That seems on purpose,
      * to avoid having a recognizer be able to miss an abort message? */
-    constexpr static std::string_view k_AbortPrefix = "abort compilation: ";
+    constexpr std::string_view k_AbortPrefix = "abort compilation: ";
 
-    constexpr static int32_t k_FieldCount = 8;
-    constexpr static int32_t k_CodeField = 0;
-    constexpr static int32_t k_SeverityField = 1;
-    constexpr static int32_t k_FileField = 2;
-    constexpr static int32_t k_StartLineField = 3;
-    constexpr static int32_t k_MessageField = 7;
+    constexpr int32_t k_FieldCount = 8;
+    constexpr int32_t k_CodeField = 0;
+    constexpr int32_t k_SeverityField = 1;
+    constexpr int32_t k_FileField = 2;
+    constexpr int32_t k_StartLineField = 3;
+    constexpr int32_t k_MessageField = 7;
     using FieldStrArray = std::array<std::string_view, k_FieldCount>;
 
     /** Splits into exactly `k_FieldCount` fields, so a tab inside the message cannot shift the
@@ -194,7 +196,7 @@ namespace
 
 } // namespace
 
-void ParseSlangDiagnostics(std::string_view text, std::string_view context, DiagnosticSink& sink)
+int32_t ParseSlangDiagnostics(std::string_view text, std::string_view context, DiagnosticSink& sink)
 {
     RecordBuilder builder{ context };
 
@@ -212,10 +214,17 @@ void ParseSlangDiagnostics(std::string_view text, std::string_view context, Diag
         builder.AddLine(line.starts_with(k_AbortPrefix) ? line.substr(k_AbortPrefix.size()) : line);
     }
 
+    int32_t failureCount = 0;
     for (const Diagnostic& record : builder.Take())
     {
+        if (IsFailure(record.Severity))
+        {
+            ++failureCount;
+        }
         sink.Report(record);
     }
+
+    return failureCount;
 }
 
 } // namespace lodestone
