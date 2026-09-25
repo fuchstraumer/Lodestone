@@ -95,7 +95,9 @@ add_lodestone_unit_test(AttributeExpressionTest AttributeExpressionTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)
 add_lodestone_unit_test(PermutationIndexTest PermutationIndexTests.cpp)
 add_lodestone_unit_test(ShaderManifestRejectTest ShaderManifestRejectTests.cpp)
-add_lodestone_unit_test(WgslValidatorTest WgslValidatorTests.cpp)
+if (LODESTONE_ENABLE_WGSL)
+    add_lodestone_unit_test(WgslValidatorTest WgslValidatorTests.cpp)
+endif()
 add_lodestone_unit_test(ReflectionSchemaTest ReflectionSchemaTests.cpp)
 add_lodestone_unit_test(DiagnosticParserTest DiagnosticParserTests.cpp)
 add_lodestone_unit_test(ResolveStageTest ResolveStageTests.cpp)
@@ -117,3 +119,12 @@ set_target_properties(DeclKindProbe PROPERTIES FOLDER "Tests" CXX_STANDARD 23 CX
 target_include_directories(DeclKindProbe PRIVATE "${CMAKE_SOURCE_DIR}/third_party/slang/include")
 target_link_libraries(DeclKindProbe PRIVATE slang)
 copy_slang_dlls_to_target(DeclKindProbe)
+
+# Standalone Slang-only probe (not a unit test). It reproduces the Debug-only Slang assert
+# "duplicate global instruction" on the modules in tests/assets/SlangPrelinkRepro. Run it after a
+# Slang update: exit code 0 means the fault is gone. Build it directly: --target SlangPrelinkRepro
+add_executable(SlangPrelinkRepro SlangPrelinkRepro.cpp)
+set_target_properties(SlangPrelinkRepro PROPERTIES FOLDER "Tests" CXX_STANDARD 23 CXX_STANDARD_REQUIRED YES)
+target_include_directories(SlangPrelinkRepro PRIVATE "${CMAKE_SOURCE_DIR}/third_party/slang/include")
+target_link_libraries(SlangPrelinkRepro PRIVATE slang)
+copy_slang_dlls_to_target(SlangPrelinkRepro)

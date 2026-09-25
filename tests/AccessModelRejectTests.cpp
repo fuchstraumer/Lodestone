@@ -36,11 +36,19 @@ struct RejectionCase
     std::string_view Claim;
 };
 
-constexpr std::array<RejectionCase, 2u> k_Cases{
+constexpr std::array<RejectionCase, 4u> k_Cases{
     RejectionCase{ .ModuleFile = "PointerMember.slang",
                    .TargetName = "wgsl",
                    .Expected = CookError::PointerTypeNotSupported,
                    .Claim = "a pointer member under a bound access model fails the cook" },
+    RejectionCase{ .ModuleFile = "EntryPointResourceStruct.slang",
+                   .TargetName = "wgsl",
+                   .Expected = CookError::ReflectionMismatch,
+                   .Claim = "a reflection mismatch fails the cook, and is not only a warning" },
+    RejectionCase{ .ModuleFile = "SpecConstantWorkgroupSize.slang",
+                   .TargetName = "wgsl",
+                   .Expected = CookError::CodeGenerationFailed,
+                   .Claim = "a codegen error fails the cook, even when Slang returns a success code" },
     // The control arm. Without it, a check that rejects every module would pass this suite.
     RejectionCase{ .ModuleFile = "EntryPointParams.slang",
                    .TargetName = "wgsl",

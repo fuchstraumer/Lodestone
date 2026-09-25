@@ -20,7 +20,7 @@ earlier update. Git history holds the full text.
 
 - Phases D and E are complete. E8 closed Phase E. Its final measurements are in
   `docs/phase-e-data-driven-permutations.md` §11a.
-- The manifest is one bundle for each cook, format version 5. `CLAUDE.md` ("One output form") holds the
+- The manifest is one bundle for each cook, format version 6. Version 6 added `Binding::SampleType`. `CLAUDE.md` ("One output form") holds the
   layout.
 - The client reads the bundle through `BundleView`, `ModuleView`, `EnvironmentView`, and the view types
   (`VariantView`, `EntryPointInstanceView`, `LayoutRange`, `ResolvedResource`, `UniformMemberRange`).
@@ -35,21 +35,14 @@ earlier update. Git history holds the full text.
 
 ## 2. Next work, in order
 
-1. **Answer the open Phase F questions** in `docs/phase-f-vocabulary.md` §9. Q1 has an answer (§9a).
-   Write each answer into that file.
-   - Q2: does `DescriptorHandle` cover textures on WGSL and on SPIR-V? If yes, the Indexed access model
-     is portable. Use the Slang submodule and a `slangc` probe.
-   - Q3: what can a WGSL `override` size? This decides whether pipeline binding time is real on WebGPU.
-     Use a `slangc` probe and Tint.
-   - Q4: the exact Vulkan extension names for descriptor heaps and buffer device addresses. This needs
-     the current Vulkan registry. It also fills the capability name table (section 3, item 4).
-2. **Write the Phase F plan** from those answers.
-3. **Add a second target: SPIR-V, Bound access model only.** Today `wgsl` is the only profile, so the
-   profile grid, the per-profile policy, and the capability field have never held two real profiles.
-   The target needs its own validator, a second opinion on SPIR-V bindings. SPIRV-Tools is already in
-   the tree through Slang.
-4. Then the runtime features: bindless (Indexed and Pointer placements), binding-time lowering, and the
-   capability requirement that a client matches against its adapter.
+1. **Answer the open Phase F questions.** Done on 2026-09-24. `docs/phase-f-vocabulary.md` §9a to §9e
+   hold the answers. §9e corrects §9a: an interface axis selects the access model at link time.
+   WebGPU stays Bound (`DescriptorHandle` gives invalid WGSL). Through Slang, a WGSL `override` sizes
+   nothing. The Vulkan names and feature bits are in §9d. They also fill the
+   capability name table (section 3, item 4).
+2. **The Phase F plan is written.** `docs/phase-f-plan.md` holds the decisions (D1 to D11), the slices
+   (F0 to F6), the open decisions (O1 to O6), and the progress. Read its section 7 first. F0 is done.
+   The next step is F1.1.
 
 Two client decisions are open. Ask the author before you build either.
 
@@ -63,27 +56,26 @@ Two client decisions are open. Ask the author before you build either.
 
 Ordered by what can write wrong output first.
 
-1. **A compiled-in absolute path.** `src/compile/impl/SlangModuleContext.cpp:208` calls
-   `std::filesystem::canonical("C:/SoftwareDev/Lodestone/tests/assets/")`. `canonical` throws on a path
-   that does not exist, so a cook on another machine stops. Give this search path the treatment the
-   other search paths get, or add a field to `SlangCompilerCreateInfo`.
-2. **The manifest drops the sample type.** `ReflectedBinding::SampleType` exists in the cooker, but
-   `manifest::Binding` has no field for it. A renderer cannot read the sample type of a texture. Add a
-   record field and an emitter write, and compare it in `CheckManifestLayout`.
-3. **The Debug Slang build asserts on `KsMaterial`, and the test then hangs.** Section 5 has the
-   detail. The assert opens a modal dialog, and `scripts\run-tests.bat` sends the output to `nul`, so
-   `run-tests.bat Debug` stops with no message and waits for a click. On 2026-09-24 it waited for 15
-   minutes. Do not run `run-tests.bat Debug` unattended. Run the Debug tests one at a time, with a
-   timeout, and skip `KitchenSinkCookTest`. Two fixes are possible: find the duplicate symbol, or make
-   a Debug assert in the cook tests print and exit, not open a dialog.
+1. **Only codegen reads an error that Slang returns with a success code.** `ParseSlangDiagnostics` now
+   returns the count of failure records, and codegen fails on it. `link`, `loadModule`, and
+   `createCompositeComponentType` still read the return code alone. No case is measured for them yet.
+2. **A worker setup failure crashes the cook, and its cause never prints.** In
+   `src/compile/impl/ThreadPool.cpp`, the helper on the calling thread throws `std::runtime_error` when
+   `RunWorkerSetup` fails. Nothing catches it, so the process ends with 0xC0000409. A worker thread
+   returns instead, but its thread sink is not merged, so the Slang diagnostic is lost. Measured on
+   2026-09-24 during step F0.3. Return a `CookError`, and merge the thread sinks on every path.
+3. **The Debug Slang build asserts on `KsMaterial`.** This is a Slang fault, not ours. Section 5 has
+   the cause and a two-file reproduction. A Debug run can also hang: the full Debug test script once
+   waited 15 minutes with no output. Do not run `run-tests.bat Debug` unattended. Run the Debug tests
+   one at a time, with a timeout, and skip `KitchenSinkCookTest`.
 4. **The capability requirement is always zero.** `Profile::CapabilityFloor` and
    `Variant::CapabilityRequirement` wait for a capability set: a bitmask over a string table of
    capability names, such as Vulkan extension names. The author agreed to that shape.
 5. **Push constants and specialization constants are reserved, not cooked.** `BindingKind::PushConstant`
    exists, and nothing produces it. The specialization-constant table is always empty. Section 7 holds
    the plan.
-6. **A build with `LODESTONE_ENABLE_WGSL` OFF does not link.** `include/LodestoneConfig.hpp.in` defines
-   the switch, but no source reads it. Guard `WgslValidator` and the wgsl profile.
+6. **`--dump-sources` wrote no source file** for the one-variant cook of the Q3 workgroup probe on
+   2026-09-24. Not investigated. Check it before you rely on the flag.
 7. **No guard fails a cook that emits no manifest.** The required `--target` closes the zero-target
    case. A guard in the emit path is still open.
 8. **The thread count is not tuned.** `ThreadPool::Initialize` uses `hardware_concurrency` and ignores
@@ -113,6 +105,8 @@ Review points from the view-type work, not faults:
   `ShaderManifest.cpp.obj`. A clean recompile of that file fixed it on 2026-09-24. If it comes back on a
   clean tree, it is a real fault.
 - Run `scripts\run-tests.bat RelWithDebInfo` after each change. A green build proves less than it looks.
+- **Before 2026-09-24, `run-tests.bat` reported a crash as a pass.** It checked `if errorlevel 1`, and a
+  crash exits with a negative code. Do not trust a green run of the script from before that date.
 - Run `python scripts\check-known-good.py` after a change to reflection, resolve, intern, or freeze. It
   cooks each KitchenSink module and compares every stage dump. It once found a defect that no validator
   saw. Accept a changed dump only after you read the diff.
@@ -151,8 +145,52 @@ facts. `src/compile/impl/SlangReflector.cpp` holds the scope, block, and binding
 
 - `loadRootModule` on `KsMaterial` raises `unexpected: duplicate global instruction`. The check is
   `checkIRDuplicate` in `third_party/slang/source/slang/slang-ir-link.cpp`, inside `#ifdef _DEBUG`, so a
-  release Slang does not run it. It started with the Slang update in commit `557ea09`. The cook code does
-  not run before this call.
+  release Slang does not run it. It fires inside `prelinkIR`.
+- **The cause is Slang PR #12574** ("Let prelink supply imported interfaces instead of re-deriving
+  them", Slang commit `4cf253d0c`). Our commit `557ea09` moved Slang from `28c755b09` to `ac945e536`,
+  and #12574 is in that range. It lowers an interface that another module owns as a bare declaration,
+  and `prelinkIR` clones the owner's definition in at load time.
+- **The probe target `SlangPrelinkRepro`** (`tests/SlangPrelinkRepro.cpp`) links only Slang and loads
+  the reproduction. Build it with `--target SlangPrelinkRepro` in Debug. Run it after each Slang update:
+  exit code 0 means the fault is gone. The `ninja-msvc` cache now has `SLANG_ENABLE_SLANGC=ON`, so a
+  Debug `slangc` is at `build/ninja-msvc/third_party/slang/Debug/bin/slangc.exe`. The repository default
+  in `cmake/ConfigureSlang.cmake` is still OFF.
+- **Upstream state on 2026-09-24.** Our Slang commit `6eb89786c` was the head of `master`, and the fault
+  reproduces there. Release `v2026.18.2` contains #12574. The first release that contains it is
+  `v2026.17`. Only `6eb89786c` was run.
+- **A two-file reproduction** is in `tests/assets/SlangPrelinkRepro/`. It uses no Lodestone attribute
+  and no axis. Measured on 2026-09-24 with the Debug Slang at `6eb89786c`, a fresh cache each time:
+
+  | Case | Result |
+  |---|---|
+  | An imported struct implements an imported interface and calls `max`/`dot`. The consumer holds a local of that struct and calls `normalize`. | asserts |
+  | The same, but the consumer calls no intrinsic | passes |
+  | The same, but the implementation calls no intrinsic | passes |
+  | The same, but no interface anywhere | passes |
+  | An `extern struct` or a `typealias` to the concrete struct | asserts either way |
+
+  In KsMaterial, `normalize` and `saturate` in `shadeOne` supply the consumer intrinsic, and KsShading
+  supplies the rest. KsVolume passes only because it calls no core intrinsic of that kind.
+- **The module cache is not the cause.** A fresh `--cache-dir` still asserts.
+- **The module cache is shared by every build.** The default is `%TEMP%\LodestoneShaderCooker`, for
+  Debug and RelWithDebInfo and for every Slang version. A stale Debug binary that reads modules a newer
+  Slang wrote aborts with exit code 3 and prints nothing. Rebuild both configurations after a Slang
+  update, or give each run its own `--cache-dir`.
+- **An edited source reaches the cook through the shared cache.** Measured on 2026-09-24: an in-place
+  edit of an imported module showed up in the next cook. The mechanism that skips the stale
+  `.slang-module` is not known. Slang tries a binary before a source, and we do not set
+  `UseUpToDateBinaryModule`.
+
+**Slang behaviour found in phase F step F0.**
+
+- **Slang can report an error and return a success code.** For WGSL, a specialization constant in
+  `numthreads` gives error E55205, a success code from `getEntryPointCode`, and
+  `@workgroup_size(1, 1, 1)`. Tint accepts that text. Codegen now fails on any failure record.
+- **`loadModuleFromSourceString` for a builtin breaks the worker sessions.** The bootstrap loads, but each
+  worker then fails to load the serialized root module from its IR blob, and Slang writes no diagnostic.
+  An import through the file system works. `EmbeddedFileSystem` serves the builtins for that reason.
+- **A plain `ISlangFileSystem` hides the paths.** Slang wraps it in a cache that uses a content hash as
+  the identity, so `getDependencyFilePath` gives `name.slang:<hash>`. Implement `ISlangFileSystemExt`.
 
 **Cook cost.** `docs/phase-e-data-driven-permutations.md` §11a. A one-variant cook takes about 0.4 s,
 so startup dominates a small cook. KitchenSink takes about 3.4 s for 616 variants.
@@ -175,6 +213,10 @@ so startup dominates a small cook. KitchenSink takes about 3.4 s for 616 variant
   provider caches nothing, because a client reads the bindings once to build a pipeline.
 - **The iterators are input iterators.** A proxy iterator returns its value by value, so it cannot meet
   the legacy forward or random-access requirements.
+- **Phase F decisions.** `docs/phase-f-plan.md` section 2 holds them. In short: WebGPU stays Bound. The
+  access model lives on the profile and adds no axis. Shim interfaces (`IReadBuffer<T>` and others)
+  carry it, and two tables in code map each interface and profile to one impl. Link-time
+  specialization selects the impl.
 
 ## 7. Deferred capability areas (do not lose)
 
@@ -221,7 +263,12 @@ One line for each update. Git history holds the full text.
   built and wired into the driver. The round trip gained key-decode and axis-mask checks.
 - **2026-09-23.** `TableRef` and format version 5. Strong index types were tried and removed. The view
   types were added.
+- **2026-09-24, F0.** A reflection mismatch and a codegen error fail the cook again. `ThreadPool`
+  passes the real compile error. The builtins are compiled in and served by `EmbeddedFileSystem`. The
+  WGSL switch builds OFF. `run-tests.bat` catches a crash. Every `CookError` has a printed name.
+- **2026-09-24, later.** Phase F §9 answered. §9a corrected: link-time specialization selects the
+  access model. Two validator faults found, and F0 fixed both. `docs/phase-f-plan.md` written.
 - **2026-09-24.** On-demand bindings, and `BindingInfo` removed. `--target` became required. The query
   layer reads the axis-active mask. `AxisNames` and `AxisValues` were added. The stage dumps were fixed
   and the KitchenSink known-good baseline was accepted. The stale `CookTest` line was retired. E8 closed
-  Phase E.
+  Phase E. Format version 6 added `Binding::SampleType`, read through `ResolvedResource::SampleType()`.

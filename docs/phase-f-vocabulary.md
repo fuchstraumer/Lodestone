@@ -332,12 +332,18 @@ Answer these before phase F becomes a plan. Each is a spike with a written resul
 2. **How far does `DescriptorHandle` reach?** `descriptor_handle` includes `wgsl` (capdef:1474). If
    that type covers textures on both targets, the indexed access model is portable and the access
    model question shrinks to buffers alone.
+
+   **Answered on 2026-09-24. SPIR-V only. The WGSL output is not valid.** See §9b.
 3. **What can a WGSL `override` legally size?** Workgroup size, workgroup array extents? This decides
    whether bind time is a real third binding time on WebGPU, and several current cook-time axes
    may move.
+
+   **Answered on 2026-09-24. Through Slang, a WGSL `override` sizes nothing.** See §9c.
 4. **Confirm the exact Vulkan extension names and driver coverage** for the address-command and
    descriptor-heap features. That set moves quickly, and no phase should rest on a half-remembered
    name.
+
+   **Answered on 2026-09-24.** See §9d.
 
 ---
 
@@ -358,6 +364,9 @@ No compiler option changes this result. Slang states the same rule in
 The bound form gives the same shape that WGSL gives for one source. The block takes a space of its
 own. The two members take binding 0 and binding 1. **One module therefore serves both targets with no
 change, while both targets use the bound access model.**
+
+> **Correction, 2026-09-24.** The two subsections below are wrong. Link time specialization *can*
+> select the access model. §9e holds the measurement. Keep the text below as the record of the error.
 
 ### Link time specialization cannot select the access model
 
@@ -403,6 +412,236 @@ correct offsets, so the cooker can own the table that section 5 asks for.
 
 The bound form reflects the same block with different offsets. **An offset is a property of the
 target, and not a property of the structure.** Section 5 states this too.
+
+---
+
+## 9b. The answer to question 2
+
+Measured on 2026-09-24. Slang at `6eb89786c`. Tint ran through `ls_cooker_console --target=wgsl`.
+`spirv-val` ran with `--target-env vulkan1.3`.
+
+The probe is one compute entry point. A `ConstantBuffer` holds four handles:
+`Texture2D<float4>.Handle`, `SamplerState.Handle`, `StructuredBuffer<float4>.Handle`, and
+`RWTexture2D<float4>.Handle`. The shader samples, loads, and stores through them.
+
+| Target | Slang | Validator | Result |
+|---|---|---|---|
+| WGSL | compiles | Tint rejects | invalid for each kind |
+| SPIR-V, default | compiles | `spirv-val` passes | a mutable descriptor heap in set 1 |
+| SPIR-V, `-capability spvDescriptorHeapEXT` | compiles | `spirv-val` passes | `SPV_EXT_descriptor_heap`, no heap set |
+
+Tint rejects each kind on its own. A probe with one handle kind gave each error below.
+
+| Handle | Tint error |
+|---|---|
+| sampled texture | `texture_2d<f32> cannot be used as an element type of an array` |
+| storage texture | `texture_storage_2d<...> cannot be used as an element type of an array` |
+| sampler | `sampler cannot be used as an element type of an array` |
+| structured buffer | `an array element type cannot contain a runtime-sized array` |
+
+The WGSL has two more faults. The uniform struct holds the texture type and the sampler type as
+members, not a `vec2<u32>`. Four heap variables share `@group(1) @binding(0)`.
+
+The cause is in `hlsl.meta.slang`, `defaultGetDescriptorFromHandle`. The `wgsl` case reads
+`__getDynamicResourceHeap<T>()[handle.x]`. That is a runtime-sized array of a resource type. Core
+WGSL has no binding array, so no emitter change can make this valid today.
+
+**The capability atom states what Slang accepts, not what the target validates.** `descriptor_handle`
+includes `wgsl`, and the WGSL output is still invalid.
+
+Consequences:
+
+- **The Indexed access model is not portable to WebGPU.** WebGPU stays Bound. Section 4 does not change.
+- **On SPIR-V, the Indexed model has two lowerings.** The default uses `VK_EXT_mutable_descriptor_type`
+  (the `VkMutable` bindless option). The heap form uses `VK_EXT_descriptor_heap` and
+  `SPV_KHR_untyped_pointers`. These are two device capabilities inside one target, so the section 6
+  rule makes them a Lodestone dimension.
+- **Reflection names the heap.** `getBindlessSpaceIndex()` gave 1 for the default form.
+  `IBindlessResourceMetadata` on the target metadata states whether a heap path survived codegen. The
+  handle members reflect as ordinary data in the constant buffer. A SPIR-V validator must accept the
+  heap set, which no reflected parameter names.
+
+## 9c. The answer to question 3
+
+Measured on 2026-09-24. Slang at `6eb89786c`. Each probe declares
+`[SpecializationConstant] const uint N`, and uses it in one place.
+
+| Use of `N` | WGSL | SPIR-V |
+|---|---|---|
+| A value in code | `@id(0) override`. Tint accepts it. | `OpSpecConstant`. `spirv-val` passes. |
+| `[numthreads(N, 1, 1)]` | Slang error E55205 | `LocalSizeId`. `spirv-val` passes. |
+| `groupshared float Tile[N]` | Slang internal error E99999 during emit | `OpSpecConstantOp` extent. `spirv-val` passes. |
+| A function-local array `float a[N]` | Slang internal error E99999 during emit | not measured |
+
+The WGSL language accepts an override expression in `@workgroup_size` and in the extent of a
+`workgroup` array. Tint states both rules in `third_party/dawn/src/tint/lang/wgsl/resolver/resolver.cc`,
+lines 3913 and 4801. The limit is in Slang. The WGSL emitter calls the two-argument
+`getComputeThreadGroupSize` in `slang-emit-c-like.cpp:293`, and that function raises E55205 for each
+specialization constant. A function-local array needs a constant extent in WGSL, so that row is a
+language limit too.
+
+Consequences:
+
+- **Bind time on WebGPU is real only for a value that sizes nothing.** A tuning axis that sizes a
+  workgroup or a `groupshared` array stays cook time on WGSL.
+- **On SPIR-V, bind time covers all three uses.** The lowering pass must therefore decide per target.
+  One axis can be bind time on SPIR-V and cook time on WGSL. Section 3 predicted this.
+- **Upstream issues to file:** E55205 on WGSL, and the internal error for a `groupshared` extent. The
+  second is a crash, not a diagnostic.
+
+## 9d. The answer to question 4
+
+Read on 2026-09-24 from `third_party/dawn/third_party/vulkan-headers/src/registry/vk.xml`, header
+version 363. That is `v1.4.363`, the newest Vulkan-Headers tag (2026-09-18). Slang's copy is at 347,
+and it agrees on every name below.
+
+| Mechanism | Vulkan extension | Feature bit | SPIR-V |
+|---|---|---|---|
+| Pointer (buffer device address) | `VK_KHR_buffer_device_address`, core in 1.2 | `VkPhysicalDeviceVulkan12Features::bufferDeviceAddress` | `SPV_KHR_physical_storage_buffer`, capability `PhysicalStorageBufferAddresses` |
+| Descriptor heap | `VK_EXT_descriptor_heap` (number 136) | `VkPhysicalDeviceDescriptorHeapFeaturesEXT::descriptorHeap` | `SPV_EXT_descriptor_heap`, capability `DescriptorHeapEXT` |
+| Untyped pointers, which the heap form needs | `VK_KHR_shader_untyped_pointers` | `VkPhysicalDeviceShaderUntypedPointersFeaturesKHR::shaderUntypedPointers` | `SPV_KHR_untyped_pointers`, capability `UntypedPointersKHR` |
+| Mutable descriptors, the default Indexed form | `VK_EXT_mutable_descriptor_type` | `VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT::mutableDescriptorType` | none |
+| Runtime descriptor arrays | `VK_EXT_descriptor_indexing`, core in 1.2 | `VkPhysicalDeviceVulkan12Features::runtimeDescriptorArray` | capability `RuntimeDescriptorArray` |
+| Address commands | `VK_KHR_device_address_commands` (number 319) | — | — |
+
+Registry facts:
+
+- `VK_EXT_descriptor_heap` depends on (`VK_KHR_extended_flags` or `VK_KHR_maintenance5`) and buffer
+  device address, or on Vulkan 1.4. It deprecates `VK_EXT_descriptor_buffer`.
+- `VK_EXT_buffer_device_address` is deprecated by the KHR form. Do not name it.
+- The address-command extension is `VK_KHR_device_address_commands`. No `EXT` form exists.
+
+Driver coverage, from the gpuinfo.org extension list on 2026-09-24. These are shares of submitted
+reports, not of devices in use. Treat them as a snapshot.
+
+| Extension | Reports |
+|---|---|
+| `VK_KHR_buffer_device_address` | 91% (low, because a 1.2 driver can omit the extension name) |
+| `VK_EXT_descriptor_indexing` | 83% |
+| `VK_EXT_mutable_descriptor_type` | 36% |
+| `VK_EXT_descriptor_heap` | 9% |
+| `VK_KHR_device_address_commands` | 8% |
+
+`VK_EXT_descriptor_heap` first appeared in Vulkan 1.4.340 (January 2026). NVIDIA ships it from driver
+610 on RTX 30 and later. AMD ships it in Windows Adrenalin 25.30.17.02 but not on by default, and in
+Mesa RADV from 26.1.
+
+Consequences:
+
+- **The Pointer model is broadly available.** Buffer device address is core in 1.2.
+- **The descriptor heap is too new to be the only Indexed form.** Mutable descriptors reach about four
+  times as many reports. Slang's default lowering targets them.
+- **These names fill the capability string table** (handoff section 3, item 3). Name the feature bit a
+  client checks, not only the extension. A 1.2 driver has the feature without the extension name.
+
+Sources: `vk.xml` above; <https://github.com/KhronosGroup/Vulkan-Headers/tags>;
+<https://docs.vulkan.org/refpages/latest/refpages/source/VK_EXT_descriptor_heap.html>;
+<https://vulkan.gpuinfo.org/listextensions.php>;
+<https://developer.nvidia.com/blog/streamlining-resource-binding-with-end-to-end-support-for-vulkan-descriptor-heaps/>;
+<https://www.phoronix.com/news/RADV-Merges-Descriptor-Heap>;
+<https://www.amd.com/en/resources/support-articles/release-notes/RN-RAD-WIN-25-30-17-02-EXPANDED-VLK-SUPPORT.html>.
+
+## 9e. Correction to §9a: link time specialization selects the access model
+
+The decisions that follow from this section are in `docs/phase-f-plan.md` section 2.
+
+Measured on 2026-09-24. Slang at `6eb89786c`. `spirv-val` ran with `--target-env vulkan1.2`.
+
+**Slang sets the SPIR-V addressing model at emit time, for the linked program.**
+`requirePhysicalStorageAddressing()` in `slang-emit-spirv.cpp:2151` switches the model when the emitter
+writes a physical storage pointer. The switch does not look at the source module. §9a measured a module
+that used its pointer, and it then assumed that a declared pointer was enough.
+
+The probe: a shim module holds `IReadBuffer<T>` and two generic implementations.
+`BoundReadBuffer<T>` holds a `StructuredBuffer<T>`. `PointerReadBuffer<T>` holds a
+`Ptr<T, Access.Read>`. The shading module declares `extern struct PointBuffer : IReadBuffer<PointLight>`
+and `extern struct TintBuffer : IReadBuffer<float4>`, and puts both in a `ParameterBlock`. A second
+module, compiled to a `.slang-module`, supplies the `export struct` lines.
+
+| Linked form | `OpMemoryModel` | `spirv-val` | Block layout |
+|---|---|---|---|
+| Bound | `Logical` | passes | `Points.Data` slot 0, `Tints.Data` slot 1, `Count` at offset 0 |
+| Pointer | `PhysicalStorageBuffer64` | passes | `Points` at 0, `Tints` at 16, `Count` at 32. Each pointer is 8 bytes. |
+
+The shim module defines the pointer type in both runs. The Bound run still gives `Logical`. The Bound
+form also cooks for WGSL, and it passes Tint and the reflection cross-check.
+
+Consequences:
+
+- **The access model is an interface axis.** The existing `extern struct` mechanism selects it, and it
+  needs no generated source. The cooker writes one `export struct` line for each access-model extern,
+  as it does for an interface axis today.
+- **The shading source holds no pointer.** The pointer lives only in the shim module, so the §7 rule
+  holds: the author writes `extern struct X : IReadBuffer<T>` and calls `Load`.
+- **One extern for each element type.** A generic associated type (`associatedtype ReadBuffer<T>`)
+  does not parse (E20001), so one model type cannot map every element type. A module declares one
+  extern for each buffer, and the cooker selects every one of them from the profile.
+- **The wrapper costs padding in a uniform buffer.** In a `ParameterBlock` each pointer wrapper takes
+  16 bytes, not 8, because a struct member in a uniform buffer aligns to 16. In push constants (std430)
+  it takes 8. See below. The offset table must come from
+  reflection, per target, as §5 states.
+- **The Pointer form is not valid WGSL, and Slang does not report it.** Slang emits `ptr<, T>` in a
+  uniform struct with no diagnostic. The policy must keep the Pointer form off `wgsl`. Tint is the net.
+### Texture and sampler shims, and a mixed block
+
+The shim module adds `ITexture2DRef` and `ISamplerRef`. Each has a Bound implementation (a
+`Texture2D<float4>` or a `SamplerState`) and a Handle implementation (a `.Handle`). Each exposes
+`Get()`, which returns the resource. One `Material` block holds a buffer, a texture, a sampler, and a
+count. Three link modules select the forms.
+
+| Form | Memory model | Extensions | `Material` layout |
+|---|---|---|---|
+| Bound | `Logical` | — | three descriptor slots, `LightCount` at 0 |
+| Pointer buffer, handle texture and sampler | `PhysicalStorageBuffer64` | `SPV_KHR_physical_storage_buffer` | pointer at 0, texture handle at 16, sampler handle at 32, count at 48. A mutable heap takes its own set. |
+| The same, `-capability spvDescriptorHeapEXT` | `PhysicalStorageBuffer64` | adds `SPV_KHR_untyped_pointers`, `SPV_EXT_descriptor_heap` | the same layout, and no heap set |
+
+`spirv-val --target-env vulkan1.3` passes all three. **One source gives the heterogeneous block of
+§4**: pointer fields for buffers and handle fields for textures.
+
+### Push constants
+
+`[vk::push_constant] ConstantBuffer<Material>` with the pointer form uses std430. Each wrapper is 8
+bytes: 0, 8, 16, and the count at 24. The block is 28 bytes. With the Bound form, Slang moves the three
+resources to set 0, bindings 0 to 2, and keeps only the count in the push range. `spirv-val` passes
+both.
+
+On WGSL, `[vk::push_constant]` with resources fails. Slang raises E31106 and E31107, and the cook
+stops. Core WebGPU has no push constants.
+
+**An entry point `uniform` parameter is the portable seam.** `void main(uniform Material m, ...)`
+gives one `PushConstant` variable on SPIR-V. On WGSL it gives a `var<uniform> entryPointParams` plus
+the resources, and Tint accepts it. The author writes no `vk::` attribute.
+
+### Measurement notes
+
+- **`slangc` with separate inputs doubles the global layout** when the export module imports the
+  shading module. Every global moved down one set. A separate types module removes the shift. The
+  cooker's interface-axis cook does not show it: `InterfaceAxisCookTest` puts `gPixels` at group 0,
+  binding 0. Check it again when the shim cooks through the real path.
+- **The entry point `uniform` form gave a reflection mismatch** on WGSL: the cross-check expects an
+  empty name for `entryPointParams`. The cook still exited 0. Handoff section 3, item 1 holds that
+  fault.
+
+### What the interface-axis cook path needs
+
+1. **Allow a resource member when the extern sits in a shader parameter.** `rejectResourceMembers`
+   rejects every impl that holds a resource. The Phase E spike measured an extern used as a local, where
+   a resource has no binding. Inside a `ParameterBlock` or a `uniform` parameter, the resource becomes
+   a parameter. Keep the rejection for a technique axis.
+2. **Couple the access-model externs to the profile, not to the variant key.** One interface axis for
+   each extern multiplies the space (2^N forms, most of them mixed). The access model belongs to the
+   profile, and each (module, profile) environment already has its own extent. So an access-model
+   extern needs no key digit. The cooker writes its `export` line from the profile.
+3. **Build the implementation name from the extern.** An impl is generic (`BoundReadBuffer<T>`). The
+   cooker reads the type argument from the extern's interface (`IReadBuffer<PointLight>`) and writes
+   `BoundReadBuffer<PointLight>`. Tagging each instantiation by hand does not scale.
+4. **Import what the export line names.** `MakeExportedConstantSource` imports only the impl module.
+   The export line also names the element type, so it must import the module that declares it.
+5. **Reflect the pointer and handle members.** A pointer field reflects as kind `pointer`, and a handle
+   reflects as a `uint2` vector. The manifest needs a placement for each: a byte offset in a block.
+6. **A SPIR-V target**, because the Pointer and Handle forms exist only there.
+
+Items 1 to 4 can be proved on WGSL now, with the Bound form alone.
 
 ---
 

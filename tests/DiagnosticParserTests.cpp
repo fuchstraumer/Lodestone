@@ -103,6 +103,27 @@ void TestSeverities(TestRunner& runner)
                  "a severity name this parser does not know becomes an error, never a note");
 }
 
+void TestFailureCount(TestRunner& runner)
+{
+    runner.BeginSection("the failure count");
+
+    // Codegen fails on this count, because Slang can report an error and still return a success code.
+    RecordingDiagnosticSink sink;
+    const int32_t failures = ParseSlangDiagnostics("E1\twarning\tf\t1\t1\t1\t2\tw\n"
+                                                   "E2\tnote\tf\t1\t1\t1\t2\tn\n"
+                                                   "E3\tinternal error\tf\t1\t1\t1\t2\ti\n"
+                                                   "E4\terror\tf\t1\t1\t1\t2\te\n",
+                                                   "test",
+                                                   sink);
+
+    runner.Check(failures == 2, "the count holds the fatal record and the error record, and no other");
+    runner.Check(sink.Records().size() == 4u, "the count changes nothing that reaches the sink");
+
+    RecordingDiagnosticSink quietSink;
+    runner.Check(ParseSlangDiagnostics("E1\twarning\tf\t1\t1\t1\t2\tw\n", "test", quietSink) == 0,
+                 "a warning alone gives a count of zero");
+}
+
 void TestNothingIsLost(TestRunner& runner)
 {
     runner.BeginSection("nothing is lost");
@@ -179,6 +200,7 @@ int main()
 
     TestRealCapture(runner);
     TestSeverities(runner);
+    TestFailureCount(runner);
     TestNothingIsLost(runner);
     TestLineHandling(runner);
     TestCodes(runner);

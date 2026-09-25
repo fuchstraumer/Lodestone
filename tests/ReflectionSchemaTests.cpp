@@ -1,4 +1,5 @@
 #include "model/ShaderDataSchema.hpp"
+#include "CookerErrors.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "TestHarness.hpp"
 
@@ -16,6 +17,7 @@
 // not `Texture2D`. These tests are what keep that discipline honest.
 
 using lodestone::BindingKind;
+using lodestone::CookError;
 using lodestone::GetBaseShape;
 using lodestone::MatrixLayout;
 using lodestone::ReflectedBinding;
@@ -102,6 +104,18 @@ int main()
         runner.Check(ToString(static_cast<TextureSampleType>(value)) != "Invalid",
                      "a valid sample type has a name of its own");
     }
+
+    runner.BeginSection("ToString(CookError) names an error above 127");
+    // magic_enum reads names only up to 127 by default. Each error in the bands below printed as an
+    // empty string until the range was widened.
+    runner.Check(ToString(CookError::ReflectionMismatch) == "ReflectionMismatch", "a low error names itself");
+    runner.Check(ToString(CookError::PolicyAxisNotDeclared) == "PolicyAxisNotDeclared", "the policy band has names");
+    runner.Check(ToString(CookError::FileNotFound) == "FileNotFound", "the system band has names");
+    runner.Check(ToString(CookError::SlangCachedModuleWriteFailed) == "SlangCachedModuleWriteFailed",
+                 "the Slang band has names");
+    runner.Check(ToString(CookError::TargetValidationEntryPointParseFailed) ==
+                     "TargetValidationEntryPointParseFailed",
+                 "the highest error has a name");
 
     runner.BeginSection("a uniform member's layout and stride take part in equality");
     // A CPU packer that transposes a matrix or misindexes an array produces wrong pixels, not a

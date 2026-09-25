@@ -45,9 +45,10 @@ Clang-CL with the MSVC frontend variant is a hard configure error.
 configured by `cmake/ConfigureTint.cmake`. The WGSL validator parses the emitted text with Tint, so a
 standalone configure needs Python and network access: `DAWN_FETCH_DEPENDENCIES` is ON, and Dawn fetches
 its own dependencies at configure time. A parent project that already builds Dawn (defines `tint_api`)
-shares that target rather than adding it twice. The compile-out for a non-WGSL build is only partial
-today: `WgslValidator` and the wgsl profile are not yet guarded behind the option, so a build with WGSL
-OFF does not link. Finish those guards before relying on the switch.
+shares that target rather than adding it twice. With the option OFF, Tint and `WgslValidator` leave the
+build, and the `wgsl` profile has no validator. A wgsl cook in that build then fails with
+`TargetValidatorUnavailable` unless the command line passes `--no-validate`. No WGSL leaves a cook
+without a second opinion unless somebody asked for that.
 
 No build turns on a sanitizer. AddressSanitizer on Windows does not support the debug CRT. ASan
 intercepts `malloc` and `free`, `ucrtbased.dll` allocates through `_malloc_dbg`, and ASan then reports
@@ -65,7 +66,8 @@ scripts\run-tests.bat
 ```
 
 It runs each executable directly and prints one line for each. A failing target is run a second time
-with its output shown.
+with its output shown. The script compares each exit code with 0. A crash exits with a negative code
+(0xC0000409 from `std::terminate`), and the old check `if errorlevel 1` reported such a crash as a pass.
 
 `ctest --test-dir build/ninja-msvc -C Debug -R AttributeExpressionTest --output-on-failure` runs one test.
 
@@ -92,14 +94,14 @@ Slang, and it takes about one second.
 | `PermutationIndexTest` | A variant index is unique, dense, and stable, and a partial assignment resolves to one variant. |
 | `ShaderManifestRejectTest` | The bundle reader rejects a short, misaligned, or damaged file, and opens a real one. It also proves that the header region opens alone, that an extent read on its own opens against that bundle, that an environment the cook skipped reads as absent, and that a damaged directory entry or variant key table is rejected by name. |
 | `WgslValidatorTest` | The WGSL cross-check on Tint. It parses fixed WGSL, reads the used bindings from Tint's inspector, and compares them against hand-written reflection. It proves a match, and a mismatch of kind, shape, access, or name. It also proves that a comparison sampler and a depth texture read back correctly, that a storage buffer's structured or raw shape does not change the WGSL kind, and that invalid WGSL is a parse error, not a mismatch. |
-| `ReflectionSchemaTest` | The pure data of the binding schema, with no Slang. The `ResourceShape` flag layout (a base shape in the low nibble plus array, multisample, shadow, and feedback flags, read with `GetBaseShape`), the `ToString` tables for `ResourceShape`, `BindingKind`, and `TextureSampleType`, and the `ReflectedUniformMember` equality that dedup rests on, which includes matrix layout and element stride. |
+| `ReflectionSchemaTest` | The pure data of the binding schema, with no Slang. The `ResourceShape` flag layout (a base shape in the low nibble plus array, multisample, shadow, and feedback flags, read with `GetBaseShape`), the `ToString` tables for `ResourceShape`, `BindingKind`, and `TextureSampleType`, and the `ReflectedUniformMember` equality that dedup rests on, which includes matrix layout and element stride. It also proves that every `CookError` band has names, above the 127 limit of magic_enum's default range. |
 | `StageDumpTest` | A stage dump holds the model and no target text, it names itself the way `--dump-stage` names it, and two dumps of one input agree byte for byte. |
 | `SymbolTableTest` | The tokenizer that powers axis-reachability pruning: it strips `extern static const` declarations and reserved keywords, and reports the axis names no reachable source uses. |
 | `PolicyDocumentTest` | The TOML policy reader, its query surface, and its validation of every axis name and value against the declared space. |
 | `DedupeInfluenceTest` | Dedup changes what the tables cost and never what the cook measures. It builds one module in both arms and checks that the axis influence agrees, and that the measurement reads every group of variants. |
-| `DiagnosticParserTest` | The parser reads Slang's machine-readable diagnostic form into a record. It names no Slang type, so it needs no compiler. |
+| `DiagnosticParserTest` | The parser reads Slang's machine-readable diagnostic form into a record, and counts the records whose severity is a failure. Codegen reads that count. It names no Slang type, so it needs no compiler. |
 | `ResolveStageTest` | Stage 4 resolves a hand-built `RawVariant` with no Slang present. This test is the proof that the stage 3 and stage 4 split worked, and before phase D step D5 it could not be written at all. |
-| `AccessModelRejectTest` | The target's access model rejects a resource it cannot express. A pointer member under a bound access model fails the cook and names the resource, and a control module still cooks. |
+| `AccessModelRejectTest` | The table of cooks that must fail. A pointer member under a bound access model, a reflection mismatch, and a codegen error each fail the cook with their own error. A control module still cooks. |
 | `PermutationConstraintTest` | The axis constraint engine. `ActiveWhen` gates an axis the way the old parent link did, `Require` prunes a forbidden combination, and the load check rejects a forward reference, an unknown symbol, and a malformed expression. |
 | `SuggestTest` | The nearest-name suggestion. It measures the edit distance between a mistyped name and the accepted names, and returns the closest one. The cooker and the client both use it for a name rejection. |
 | `EnumTagDecodeTest` | The enum tag-blob decode (`compile/EnumTagDecode`). It reads each integer width, sign-extends a signed tag, zero-extends an unsigned tag, and accepts the `UInt64` wrap above 2^63. It names no Slang type, so the reflection read of an enum case value has a proof that needs no compiler. |
@@ -195,7 +197,7 @@ is therefore a visible word in a diff: the day a file in `emit/` writes
 `CookerErrors.hpp` sits at the top of `include/`, because every folder uses it.
 
 `src/compile/impl/` is the one place a header sits beside its source instead of in `include/`. Those
-five headers name Slang types, so `include/` must not hold them. `include/compile/SlangCompiler.hpp`
+six headers name Slang types, so `include/` must not hold them. `include/compile/SlangCompiler.hpp`
 is the wall, and it names no Slang type. **A file that needs `slang.h` belongs in `src/compile/impl/`
 and nowhere else.**
 
@@ -206,6 +208,7 @@ and nowhere else.**
 | `SlangVariantCompiler` | Link, target codegen, entry point metadata. Returns `LinkedVariant`. | One for each job. |
 | `SlangReflector` | Every reflection walk. Takes `LinkedVariant`, returns `RawVariant`. | One for each job. |
 | `ThreadPool` | An atomic job index and a latch. Spreads variants across workers. | One for each compiler. |
+| `EmbeddedFileSystem` | The Slang file system. It serves the builtin modules from memory, and every other path from disk. | One for the process. |
 
 `client/include/` is not part of this split. It is the contract a renderer links against, and it holds
 four headers and nothing else.
@@ -413,7 +416,8 @@ Four validators run inside that loop. None of them is a stage.
   bindings from Tint's inspector, then compares that against the bindings the entry point uses. Tint
   also proves the emitted WGSL parses and resolves, which the old text scanner could not. A mismatch
   increments a counter, and a nonzero counter fails the cook with `CookError::ReflectionMismatch`. A
-  target that supplies no validator skips this, and the cook says which of the three happened.
+  target that supplies no validator fails the cook with `TargetValidatorUnavailable`. `--no-validate`
+  skips the check, and only on purpose.
 - **The library round trip**, after stage 7. `VerifyLibraryRoundTrip` replays every variant through
   the finished tables and compares the result against the text the compiler produced. It covers the
   **source text** only.
@@ -522,7 +526,7 @@ reads an axis constraint expression as well, which is why it lives in `permute/A
 and not the old `SizeExpression.hpp`. Phase E step E1 gave it comparison and logical operators for the
 constraint language.
 
-The attribute declarations are in `tests/assets/LodestoneAttributes.slang`: `ls_element_count`,
+The attribute declarations are in `builtins/LodestoneAttributes.slang`: `ls_element_count`,
 `ls_extent_2d`, `ls_extent_3d`. Slang has no optional attribute parameters, so each arity needs its
 own name. The README shows `ls_element_count`; the code says `ls_element_count`.
 
@@ -532,7 +536,7 @@ No module data is compiled in. Phase E step E6 deleted the old registry
 (`src/permute/PermutationRegistry.cpp`, `k_ModuleSpaces`, `FindPermutationSpaceForModule`) whole.
 
 An axis is declared in the shader, on its `extern static const` (or `extern struct`, for an interface
-axis) declaration, as an `ls_axis_*` attribute. `tests/assets/LodestoneAttributes.slang` defines the
+axis) declaration, as an `ls_axis_*` attribute. `builtins/LodestoneAttributes.slang` defines the
 attributes: `ls_axis_values`, `ls_axis_boolean`, `ls_axis_active_when`, `ls_axis_kind`, `ls_axis_enum`,
 `ls_axis_interface`, and `ls_axis_interface_impl`. `SlangCompiler::PrepareRawModule` reads them at the
 bootstrap compile through `SlangModuleContext::ReadDeclaredAxes`, and `BuildPermutationSpace` (in
@@ -609,10 +613,25 @@ reason: a rename or a reorder of axes degrades to an empty result, never to a wr
 This repository was extracted from an engine named `velox`. The C++ rename to `lodestone` is
 complete. No `velox` name remains in `src/`, `include/`, `client/`, `tests/`, or `tools/`.
 
-The shader side keeps the old prefix on purpose. `tests/assets/LodestoneAttributes.slang` declares
-`module VeloxAttributes` and the `ls_element_count`, `ls_extent_2d`, and `ls_extent_3d` attributes.
-Those names are part of the shader-side contract, and `src/compile/impl/SlangReflector.cpp` reads
-them by string. A rename there touches every test shader, so treat it as its own task.
+The shader side is renamed too. `builtins/LodestoneAttributes.slang` declares
+`module LodestoneAttributes`, and every attribute uses the `ls_` prefix. The attribute names are part of
+the shader-side contract, and `src/compile/impl/SlangReflector.cpp` reads them by string.
+
+## Builtin modules
+
+The files in `builtins/` are compiled into the library. A cook needs no path to find them.
+
+- `cmake/EmbedBuiltins.cmake` writes each file into a byte array in the generated header
+  `compile/EmbeddedBuiltinModules.hpp`. The module name is the file stem. A new file joins at the next
+  build, because the glob uses `CONFIGURE_DEPENDS`.
+- `EmbeddedFileSystem` in `src/compile/impl/` is the Slang file system of every session. It serves a
+  builtin under the search path `lodestone-builtin`, and every other path from disk. No directory of that
+  name exists.
+- It implements `ISlangFileSystemExt`, not the plain interface. Slang wraps a plain `ISlangFileSystem` in a
+  cache that reports a content hash in place of a path, so `getDependencyFilePath` then names no file.
+- **Do not load a builtin with `loadModuleFromSourceString`.** Measured on 2026-09-24: the worker sessions
+  then fail to load the serialized root module, and Slang reports nothing. An import through the file
+  system works.
 
 ## Documents
 
@@ -643,9 +662,10 @@ beside them.
   2026-09-24). Read it for the reasoning behind the axis model and the policy file.
 - `docs/phase-f-vocabulary.md` — **read this before proposing anything about targets or bindings.**
   It defines axis kind, binding time, and access model, and it divides the work between Slang's
-  capability system and this repository. It is a vocabulary, not a plan. **Phase F is the next work.**
-  Its §9 open questions come first, and each one needs a written answer before phase F becomes a plan.
-  `docs/agent-handoff.md` gives the current order.
+  capability system and this repository. It is a vocabulary, not a plan. Its §9 holds the measured
+  answers that the plan rests on. §9e corrects §9a: link-time specialization selects the access model.
+- `docs/phase-f-plan.md` — **the plan for phase F, the next work.** Decisions, slices, open decisions,
+  and a progress log. Read its progress section first, and update it at the end of each step.
 
 Two terms from phase F are worth carrying into any discussion of variants:
 
