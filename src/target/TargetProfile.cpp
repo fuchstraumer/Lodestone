@@ -8,6 +8,7 @@
 #include <expected>
 #include <span>
 #include <string_view>
+#include <variant>
 #include <vector>
 #if LODESTONE_ENABLE_WGSL
 #include "target/WgslValidator.hpp"
@@ -35,6 +36,7 @@ namespace
     }
 
     constexpr std::string_view k_WgslName = "wgsl";
+    constexpr std::string_view k_SpirvName = "spirv";
 
 #if LODESTONE_ENABLE_WGSL
     static WgslValidator k_WgslValidator;
@@ -46,16 +48,27 @@ namespace
 
     // Slang has no WGSL profile. It ignores a profile that does not imply the target, so the old
     // `spirv_1_4` changed nothing (measured on KitchenSink, 2026-09-25).
-    const std::array<TargetProfile, 1u> k_TargetProfiles
+    // Vulkan 1.2 guarantees SPIR-V 1.5 (decision O5). The validator comes in phase F step F1.4, so a spirv
+    // cook needs --no-validate until then.
+    const std::array<TargetProfile, 2u> k_TargetProfiles
     {
         TargetProfile{ .Name = k_WgslName,
                            .Language = TargetLanguage::Wgsl,
                            .SlangProfileName = "",
                            .Access = AccessModel::Bound,
                            .Validator = k_WgslProfileValidator },
+        TargetProfile{ .Name = k_SpirvName,
+                           .Language = TargetLanguage::Spirv,
+                           .SlangProfileName = "spirv_1_5",
+                           .Access = AccessModel::Bound,
+                           .Validator = nullptr },
     };
 
-    constexpr std::array<std::string_view, 1u> k_TargetProfileNames{ k_WgslName };
+    constexpr std::array<std::string_view, 2u> k_TargetProfileNames
+    {
+        k_WgslName,
+        k_SpirvName,
+    };
 
 } // namespace
 

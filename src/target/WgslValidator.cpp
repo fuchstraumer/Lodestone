@@ -237,7 +237,7 @@ namespace
             if (declaredTuple == reflectedTuple)
             {
                 std::string_view unmangledName = StripSlangNameMangling(declaredBinding.variable_name);
-                std::string scopedName = MakeScopedName(*reflectedBinding, "wgsl"); 
+                std::string scopedName = MakeScopedName(*reflectedBinding); 
                 if (unmangledName != scopedName)
                 {
                     comparison.Matches = false;
@@ -295,7 +295,7 @@ namespace
                 comparison.Report += std::format(" : reflection has @group({}) @binding({}) {}\n",
                                                 std::get<0>(reflectedTuple),
                                                 std::get<1>(reflectedTuple),
-                                                MakeScopedName(*reflectedBinding, "wgsl"));
+                                                MakeScopedName(*reflectedBinding));
                 ++iterReflected;
             }
         }
@@ -322,7 +322,7 @@ namespace
                                             "no binding at that location\n",
                                             GroupOf(*reflectedBinding),
                                             BindingOf(*reflectedBinding),
-                                            MakeScopedName(*reflectedBinding, "wgsl"));
+                                            MakeScopedName(*reflectedBinding));
             ++iterReflected;
         }
 

@@ -114,7 +114,8 @@ The Bound form works on WGSL, so this slice needs no SPIR-V. It can run beside F
 |---|---|---|
 | F3.1 | A string table of capability names and a bitmask over it. Use the feature-bit names in vocabulary §9d, not only extension names. | `ShaderManifestRejectTest` reads the table back. |
 | F3.2 | Fill `Profile::CapabilityFloor` from the profile. | The manifest dump shows it. |
-| F3.3 | Fill `Variant::CapabilityRequirement` from what the variant uses. Source to be decided: Slang metadata, or the SPIR-V capabilities in the binary. | Compare the two sources where both exist. |
+| F3.3 | Fill the capability requirement of each entry point, and collate it for each variant. Source to be decided (O6): Slang metadata, or the SPIR-V capabilities in the binary. | Compare the two sources where both exist. KsVolume: `GroupNonUniformArithmetic` in the 216 wave variants only. |
+| F3.4 | The query takes a device capability set and removes each variant that needs more. It is the base preset, and every other query builds on it. | `ManifestIndexTest` rows: a device without the capability gets no wave variant. |
 
 ### F4 — `spirv-modern`: Pointer buffers and Handle textures
 
@@ -156,7 +157,8 @@ row holds the decision and its date.
 | O3 | F1.1 | One Slang session with two targets, or one session for each profile? | **Decided 2026-09-25.** One session for each profile. Shared work needs the same access model and capability floor on two targets. That case is rare: a build seldom holds two languages. |
 | O4 | F1.5 | A module has no policy section for a requested target. | **Decided 2026-09-25.** The cook fails. Inheritance from another section is in `todo.md`. |
 | O5 | F1.2 | Which Vulkan environment does the `spirv` profile target? | **Decided 2026-09-25.** Vulkan 1.2 (SPIR-V 1.5) for now. At the end of phase F, measure the device coverage and decide the range again, from 1.0 up to 1.4. |
-| O6 | F3.3 | Where does a variant's capability requirement come from? | Decide after F3.1. Measure what Slang metadata gives first. |
+| O6 | F3.3 | Where does a variant's capability requirement come from? | Decide after F3.1. Measure what Slang metadata gives first. The SPIR-V `OpCapability` list is exact for each variant (section 7, F1.2). |
+| O7 | F1.2 | An entry point needs a capability above the profile floor. Slang raises E41012, and our warnings-as-errors fails the module. | **Decided 2026-09-25.** E41012 is off for every target. A device capability is ours to record, not Slang's to reject. F3.3 and F3.4 must record it: until then a cook states no requirement. |
 
 ## 5. Upstream Slang issues to file
 
@@ -214,3 +216,21 @@ commit.
     imply the target (`TargetRequest::getTargetCaps`). The old `spirv_1_4` changed no byte.
   - An unknown Slang profile name fails the session with `SessionCreationFailed`.
   - Next: F1.2.
+- 2026-09-25. **F1.2 in progress**, not committed. The `spirv` row exists (`spirv_1_5`, no validator).
+  `MakeScopedName` lost its target parameter and its assert. The console prints "KiB of shader code".
+  WGSL output is unchanged (`2dfbe8ce...`). 22 of 22 tests.
+  - Was blocked on O7, now decided. `--target=spirv` fails KsVolume: `GenerateCS` uses `WaveActiveSum` behind the
+    capability axis `USE_WAVE_OPS`, and Slang raises E41012 (profile implicitly upgraded). Slang raises it
+    only when a profile is set, and it checks the entry point before specialization. So it condemns every
+    variant, also the variants with `USE_WAVE_OPS=false`.
+  - Probe with E41012 disabled: all 616 variants cook, deterministic, all round trips pass.
+    `GroupNonUniformArithmetic` is in `GenerateCS` of the 216 wave variants only. `spirv-val
+    --target-env vulkan1.2` passes all 147 unique blobs. Other capabilities seen: `Shader`,
+    `StorageImageReadWithoutFormat`, `StorageImageWriteWithoutFormat`. The probe change is reverted.
+  - Fixed on the way (handoff section 3, item 6): `--dump-sources` wrote nothing without
+    `--dump-stage`, because its block sat inside the Cooked dump branch. The folder is now
+    `<module>_<target>_sources`. The dumper still writes `.wgsl` and a text comment header, so a SPIR-V
+    dump is not valid SPIR-V until F1.3.
+- 2026-09-25. **F1.2 done**, not committed. E41012 is off (O7). `--target=spirv --no-validate` cooks
+  KitchenSink: 616 variants, deterministic, all round trips pass. WGSL unchanged (`2dfbe8ce...`). 22 of 22
+  tests, 30 of 30 known-good dumps. Next: F1.3.

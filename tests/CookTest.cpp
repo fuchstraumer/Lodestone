@@ -41,7 +41,7 @@ int main(int argc, char** argv)
     }
 
     std::println(stderr,
-                 "[lodestone] cooked {} modules, {} variants, {} entrypoints, {} KiB of shader source code in {:.1f}ms "
+                 "[lodestone] cooked {} modules, {} variants, {} entrypoints, {} KiB of shader code in {:.1f}ms "
                  "-> {}",
                  statistics.value().ModulesCooked,
                  statistics.value().VariantsCompiled,

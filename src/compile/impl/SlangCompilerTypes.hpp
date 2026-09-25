@@ -328,7 +328,11 @@ struct CompilerOptionRow
 };
 
 constexpr const char* k_AllWarningsAsErrors = "all";
-constexpr const char* k_DisabledWarnings = "31010";
+// 41012: "profile implicitly upgraded". Slang checks the entry point before specialization, so a
+// capability behind a capability axis fails every variant. A device capability is ours to record, not
+// Slang's to reject. The SPIR-V `OpCapability` list states each variant's exact need (phase F plan, O7).
+// Nothing records that need yet: `todo.md` holds the work.
+constexpr const char* k_DisabledWarnings = "31010,41012";
 // Order reaches Slang, and the two warning level rows must stay in this order.
 constexpr std::array<CompilerOptionRow, 8u> k_CompilerOptionRows{
     CompilerOptionRow{ .Name = slang::CompilerOptionName::WarningLevel,

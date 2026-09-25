@@ -18,6 +18,11 @@
     actually supports
     - Alternatively, use foresight about output target to fail builds if unsupported
 # Resource Layer
+- Record the capabilities that each entry point needs. Today no cook records them, because Slang warning
+  41012 is off (phase F plan, O7). Read them from the target output (SPIR-V `OpCapability`). Collate them
+  for each variant.
+- A query takes the device capability set and removes each variant that needs more. This filter is the
+  base preset. Every other query builds on it.
 - We should provide a way for clients to call something like `SetDeviceLimits` or `SetApiLimits` - we can use this to validate resource sizing expressions when being run as a live compiler,
   or we can use it against cooked content (in the device form) to make sure we don't try to create a shader a device can't support
 # Permutation system

@@ -42,7 +42,7 @@ bool RunCookingPipelineWithArgs(const lodestone::CookerOptions& options)
     }
 
     std::println(stdout,
-                 "[lodestone] cooked {} modules, {} variants, {} entrypoints, {} KiB of WGSL in {:.1f}ms "
+                 "[lodestone] cooked {} modules, {} variants, {} entrypoints, {} KiB of shader code in {:.1f}ms "
                  "-> {}",
                  statistics.value().ModulesCooked,
                  statistics.value().VariantsCompiled,

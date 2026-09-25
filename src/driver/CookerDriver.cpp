@@ -213,15 +213,17 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                 {
                     return std::unexpected(writeError);
                 }
+            }
 
-                if (cookState.Options.DumpSources)
+            // Independent of --dump-stage. This block was once inside the Cooked dump branch, so
+            // --dump-sources alone wrote nothing.
+            if (cookState.Options.DumpSources)
+            {
+                const std::string outputDir = std::format("{}_{}_sources", moduleName, targetName);
+                CookError writeError = DumpShaderSources(finalizeResult->Module, outputDir, sink);
+                if (!writeError)
                 {
-                    const std::string outputDir = std::string{ moduleName } + "_sources";
-                    writeError = DumpShaderSources(finalizeResult->Module, outputDir, sink);
-                    if (!writeError)
-                    {
-                        return std::unexpected(writeError);
-                    }
+                    return std::unexpected(writeError);
                 }
             }
 

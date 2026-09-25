@@ -70,12 +70,14 @@ Ordered by what can write wrong output first.
    one at a time, with a timeout, and skip `KitchenSinkCookTest`.
 4. **The capability requirement is always zero.** `Profile::CapabilityFloor` and
    `Variant::CapabilityRequirement` wait for a capability set: a bitmask over a string table of
-   capability names, such as Vulkan extension names. The author agreed to that shape.
+   capability names, such as Vulkan extension names. The author agreed to that shape. Since F1.2, Slang
+   warning 41012 is off, so a variant can need a device capability and no cook states it. Phase F plan
+   F3.3 and F3.4 close this. Do not let them slip.
 5. **Push constants and specialization constants are reserved, not cooked.** `BindingKind::PushConstant`
    exists, and nothing produces it. The specialization-constant table is always empty. Section 7 holds
    the plan.
-6. **`--dump-sources` wrote no source file** for the one-variant cook of the Q3 workgroup probe on
-   2026-09-24. Not investigated. Check it before you rely on the flag.
+6. **Fixed 2026-09-25: `--dump-sources` wrote nothing without `--dump-stage`.** Its block sat inside the
+   Cooked dump branch. The dumper still adds a text header, so a SPIR-V dump is invalid until F1.3.
 7. **No guard fails a cook that emits no manifest.** The required `--target` closes the zero-target
    case. A guard in the emit path is still open.
 8. **The thread count is not tuned.** `ThreadPool::Initialize` uses `hardware_concurrency` and ignores

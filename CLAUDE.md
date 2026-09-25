@@ -164,7 +164,8 @@ A value flag is a row in `k_ValueFlags`, beside `k_SwitchFlags`. Add a row, not 
 `--target` is required, like `-o` and a module path. A cook with no target cooks nothing, so
 `ParseCommandLine` fails with `NoTargetSpecified`. Repeat the flag for more than one target. An unknown
 name is rejected at the command line and never in the driver, so a name that reaches `CookerOptions` is
-a name `FindTargetProfile` accepts. `wgsl` is the only name this build has.
+a name `FindTargetProfile` accepts. This build has `wgsl` and `spirv`. `spirv` has no validator before
+phase F step F1.4, so a spirv cook needs `--no-validate`.
 
 `lodestone` must stay `STATIC`. No header marks a symbol `dllexport`, so a DLL build of this target
 exports nothing and every consumer fails to link. A `SHARED` build is for instrumented performance

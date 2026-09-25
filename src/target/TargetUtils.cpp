@@ -1,6 +1,5 @@
 #include "target/TargetUtils.hpp"
 #include "model/ShaderDataSchema.hpp"
-#include <cassert>
 #include <format>
 #include <string>
 #include <string_view>
@@ -24,17 +23,13 @@ std::string_view StripSlangNameMangling(std::string_view mangled_name) noexcept
     return mangled_name;
 }
 
-std::string MakeScopedName(const ReflectedBinding& binding, std::string_view target_name)
+std::string MakeScopedName(const ReflectedBinding& binding)
 {
     if (binding.ScopeName.empty())
     {
         return binding.Name;
     }
 
-    // we'll need to update this as we add other targets, depending on how they expect targets
-    // to structure their scoped names
-    // for now, asserting on target_name so that it's immediately clear to me i forgot to update this
-    assert(target_name == "wgsl");
     return std::format("{}_{}", binding.ScopeName, binding.Name);
 }
 
