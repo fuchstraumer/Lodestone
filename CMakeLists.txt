@@ -92,6 +92,8 @@ set(LODESTONE_COMPILE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/SymbolTable.cpp")
 
 set(LODESTONE_COMPILE_IMPL_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/EmbeddedFileSystem.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/EmbeddedFileSystem.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangCompilerTypes.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangCompilerTypes.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangModuleContext.hpp"
@@ -159,12 +161,17 @@ set(LODESTONE_PERMUTE_SOURCES
 set(LODESTONE_TARGET_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/target/TargetProfile.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/target/TargetUtils.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/target/WgslValidator.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetProfile.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetUtils.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/WgslValidator.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetUtils.cpp")
 
+# OFF removes Tint and the WGSL validator. The wgsl profile stays, with no validator, so a wgsl cook in
+# that build fails unless the command line passes --no-validate.
 option(LODESTONE_ENABLE_WGSL "Enable WGSL support in Lodestone" ON)
+if (LODESTONE_ENABLE_WGSL)
+    list(APPEND LODESTONE_TARGET_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/target/WgslValidator.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/target/WgslValidator.cpp")
+endif()
 # Set up tint configuration if WGSL is being used with Lodestone
 if (LODESTONE_ENABLE_WGSL)
     set(LODESTONE_DAWN_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/dawn" CACHE PATH
@@ -183,6 +190,23 @@ configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/include/LodestoneConfig.hpp.in"
     "${CMAKE_CURRENT_BINARY_DIR}/generated/include/LodestoneConfig.hpp"
     @ONLY)
+
+# The builtin Slang modules are compiled into the library. The cooker serves them from memory, so a cook
+# needs no path to find them. CONFIGURE_DEPENDS checks the glob again at each build.
+set(LODESTONE_BUILTIN_MODULES "${CMAKE_CURRENT_SOURCE_DIR}/builtins/LodestoneAttributes.slang")
+set(LODESTONE_EMBEDDED_BUILTINS_HEADER
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/include/compile/EmbeddedBuiltinModules.hpp")
+string(REPLACE ";" "|" LODESTONE_BUILTIN_MODULES_ARG "${LODESTONE_BUILTIN_MODULES}")
+add_custom_command(
+    OUTPUT "${LODESTONE_EMBEDDED_BUILTINS_HEADER}"
+    COMMAND "${CMAKE_COMMAND}"
+            "-DOUTPUT=${LODESTONE_EMBEDDED_BUILTINS_HEADER}"
+            "-DSOURCES=${LODESTONE_BUILTIN_MODULES_ARG}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedBuiltins.cmake"
+    DEPENDS ${LODESTONE_BUILTIN_MODULES} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedBuiltins.cmake"
+    COMMENT "Embedding the builtin Slang modules"
+    VERBATIM)
+list(APPEND LODESTONE_COMPILE_IMPL_SOURCES "${LODESTONE_EMBEDDED_BUILTINS_HEADER}")
 
 # Static on purpose. No header marks a symbol dllexport, so a Windows DLL build of this target exports
 # nothing and every consumer fails to link. A SHARED build is a temporary measure for instrumented

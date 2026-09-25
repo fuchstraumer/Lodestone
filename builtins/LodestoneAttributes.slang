@@ -1,4 +1,4 @@
-module VeloxAttributes;
+module LodestoneAttributes;
 
 // Annotations the shader cooker reads back through reflection. They describe sizes that only the
 // shader author knows, so the graph stops being told them a second time on the CPU side, where the
