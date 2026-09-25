@@ -132,4 +132,19 @@ PlacementKind PlacementKindFromAccessModel(AccessModel model) noexcept
     }
 }
 
+ShaderCodeFormat CodeFormatFromLanguage(TargetLanguage language) noexcept
+{
+    switch (language)
+    {
+    case TargetLanguage::Wgsl:
+        return ShaderCodeFormat::Wgsl;
+    case TargetLanguage::Spirv:
+        return ShaderCodeFormat::Spirv;
+    case TargetLanguage::Invalid:
+        [[fallthrough]];
+    default:
+        return ShaderCodeFormat::None;
+    }
+}
+
 } // namespace lodestone

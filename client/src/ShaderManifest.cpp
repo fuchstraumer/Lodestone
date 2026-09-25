@@ -85,6 +85,8 @@ namespace
             "a variant's axis mask sets a bit past the module's axis count",
             "a profile has an unknown access model",
             "a variant names a suffix string past the string table",
+            "a profile has an unknown code format",
+            "a SPIR-V source does not start on a 4-byte boundary, or its length is not a multiple of 4",
         });
 
     static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ErrorCode::Count),
@@ -176,6 +178,7 @@ namespace
         uint64_t EntryPointCount{ 0u };
         uint32_t AxisMaskWordCount{ 0u };
         uint32_t ModuleAxisCount{ 0u };
+        ShaderCodeFormat CodeFormat{ ShaderCodeFormat::None };
     };
 
     using BundleValidator = ErrorState (*)(const Header&, std::span<const std::byte>) noexcept;
@@ -535,7 +538,8 @@ ManifestResult<EnvironmentView> EnvironmentView::Open(const BundleView& bundle,
                                       .StringCount = bundle.StringCount(),
                                       .EntryPointCount = view.module.EntryPoints().size(),
                                       .AxisMaskWordCount = view.module.AxisMaskWordCount(),
-                                      .ModuleAxisCount = view.module.AxisCount() };
+                                      .ModuleAxisCount = view.module.AxisCount(),
+                                      .CodeFormat = bundle.Profiles()[profile_index].CodeFormat };
 
     for (const EnvironmentValidator validator : k_EnvironmentValidators)
     {
@@ -591,12 +595,27 @@ std::string_view EnvironmentView::String(uint32_t string_index) const noexcept
     return module.Bundle().String(string_index);
 }
 
+ShaderCodeFormat EnvironmentView::CodeFormat() const noexcept
+{
+    return ProfileRecord().CodeFormat;
+}
+
 std::string_view EnvironmentView::Source(uint32_t source_index) const noexcept
 {
     // if this assert fires on source_index, caller provided invalid index
     assert(source_index < sources.size());
+    assert(CodeFormat() == ShaderCodeFormat::Wgsl);
     const SourceRef& reference = sources[source_index];
     return std::string_view{ sourceBlob.data() + reference.Offset, reference.Length };
+}
+
+std::span<const uint32_t> EnvironmentView::SpirvWords(uint32_t source_index) const noexcept
+{
+    assert(source_index < sources.size());
+    assert(CodeFormat() == ShaderCodeFormat::Spirv);
+    const SourceRef& reference = sources[source_index];
+    return std::span<const uint32_t>{ reinterpret_cast<const uint32_t*>(sourceBlob.data() + reference.Offset),
+                                      reference.Length / sizeof(uint32_t) };
 }
 
 std::span<const VariantKey> EnvironmentView::VariantKeys() const noexcept
@@ -954,6 +973,11 @@ std::string_view EntryPointInstanceView::Source() const noexcept
     return environment->Source(slot->Source);
 }
 
+std::span<const uint32_t> EntryPointInstanceView::SpirvWords() const noexcept
+{
+    return environment->SpirvWords(slot->Source);
+}
+
 WorkgroupSize EntryPointInstanceView::Workgroup() const noexcept
 {
     return WorkgroupSize{ .X = slot->WorkgroupX, .Y = slot->WorkgroupY, .Z = slot->WorkgroupZ };
@@ -1031,6 +1055,14 @@ std::string_view ShaderSourceProvider::Source(uint32_t entry_point,
     const EntryPointInstance* slot = view.FindSlot(entry_point, variant);
     assert(slot != nullptr);
     return view.Source(slot->Source);
+}
+
+std::span<const uint32_t> ShaderSourceProvider::SpirvWords(uint32_t entry_point,
+                                                           VariantKey variant) const noexcept
+{
+    const EntryPointInstance* slot = view.FindSlot(entry_point, variant);
+    assert(slot != nullptr);
+    return view.SpirvWords(slot->Source);
 }
 
 LayoutRange ShaderSourceProvider::Bindings(uint32_t entry_point, VariantKey variant) const noexcept
@@ -1336,6 +1368,14 @@ namespace
                          .RecordIndex = i,
                          .Detail = static_cast<uint32_t>(profile.AccessModel) };
             }
+
+            if (profile.CodeFormat < ShaderCodeFormat::Wgsl || profile.CodeFormat > ShaderCodeFormat::Spirv)
+            {
+                return { .Code = ErrorCode::InvalidProfileCodeFormat,
+                         .Table = ShaderManifestTable::Profiles,
+                         .RecordIndex = i,
+                         .Detail = static_cast<uint32_t>(profile.CodeFormat) };
+            }
         }
 
         return k_ManifestOk;
@@ -1529,6 +1569,15 @@ namespace
     {
         const EnvironmentHeader& environment = context.Environment;
         const std::span<const SourceRef> sourceSpan = Map<SourceRef>(context.Extent, environment.Sources);
+        // A SPIR-V source is read as words, so the blob, each offset, and each length must be multiples of 4.
+        const bool readAsWords = context.CodeFormat == ShaderCodeFormat::Spirv;
+        if (readAsWords && (environment.SourceBlob.Offset % sizeof(uint32_t)) != 0u)
+        {
+            return ErrorState{ .Code = ErrorCode::SpirvSourceMisaligned,
+                               .Table = ShaderManifestTable::Sources,
+                               .Detail = environment.SourceBlob.Offset };
+        }
+
         for (int32_t i = 0; std::cmp_less(i, sourceSpan.size()); ++i)
         {
             const SourceRef& reference = sourceSpan[i];
@@ -1536,6 +1585,14 @@ namespace
                 reference.Offset > environment.SourceBlob.Count - reference.Length)
             {
                 return ErrorState{ .Code = ErrorCode::SourceOutOfBounds,
+                                   .Table = ShaderManifestTable::Sources,
+                                   .RecordIndex = static_cast<uint32_t>(i) };
+            }
+
+            if (readAsWords &&
+                ((reference.Offset % sizeof(uint32_t)) != 0u || (reference.Length % sizeof(uint32_t)) != 0u))
+            {
+                return ErrorState{ .Code = ErrorCode::SpirvSourceMisaligned,
                                    .Table = ShaderManifestTable::Sources,
                                    .RecordIndex = static_cast<uint32_t>(i) };
             }

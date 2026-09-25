@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cwchar>
 #include <filesystem>
+#include <system_error>
 #include <fstream>
 #include <ios>
 #include <map>
@@ -40,6 +41,14 @@ CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::str
     if (std::wcslen(artifactPath.c_str()) > 255)
     {
         return CookError::OutputPathTooLong;
+    }
+
+    // An artifact name can hold a subdirectory, such as the `--dump-sources` folder.
+    std::error_code directoryError;
+    std::filesystem::create_directories(artifactPath.parent_path(), directoryError);
+    if (directoryError)
+    {
+        return CookError::OutputFileOpenFailed;
     }
 
     std::ofstream stream{ artifactPath, std::ios::binary | std::ios::trunc };

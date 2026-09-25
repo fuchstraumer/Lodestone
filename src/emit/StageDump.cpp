@@ -16,7 +16,6 @@
 #include "permute/PermutationValue.hpp"
 
 #include <algorithm>
-#include <filesystem>
 #include <format>
 #include <magic_enum/magic_enum.hpp>
 
@@ -879,17 +878,13 @@ static std::vector<NameValuePair> ParseVariantDescription(std::string_view descr
     return result;
 }
 
-CookError DumpShaderSources(const CookedModule& module, std::string_view subdir, OutputSink& sink)
+CookError DumpShaderSources(const CookedModule& module,
+                            std::string_view subdir,
+                            ShaderCodeFormat code_format,
+                            OutputSink& sink)
 {
-    // sneaky little attempt to create output directory, since it probably doesn't exist
-    std::filesystem::path childDir(subdir);
-    std::filesystem::path sinkDir(sink.Describe());
-    std::filesystem::path outputPath = sinkDir / childDir;
-    if (!std::filesystem::exists(outputPath))
-    {
-        // we create this using full path, but later we just use output_directory
-        std::filesystem::create_directories(outputPath);
-    }
+    // The sink creates the subdirectory. A memory sink has no directory, so this function must not
+    // create one: under --verify-deterministic that left `<output>_first` and `<output>_second` on disk.
 
     std::unordered_map<uint32_t, std::string> sourceIdxToFilename;
 
@@ -897,6 +892,22 @@ CookError DumpShaderSources(const CookedModule& module, std::string_view subdir,
     {
         const ContentHashValue hashedSource = HashSourceString(module.Sources[sourceIdx]);
         std::string source = module.Sources[sourceIdx];
+        const bool isSpirv = code_format == ShaderCodeFormat::Spirv;
+        std::string filename =
+            std::format("{}_{:016X}.{}", module.Name, hashedSource, isSpirv ? "spv" : "wgsl");
+        sourceIdxToFilename[sourceIdx] = filename;
+        std::string outputName = std::format("{}/{}", subdir, filename);
+        if (isSpirv)
+        {
+            // SourceTable.json names the variants. A comment would make the file invalid SPIR-V.
+            CookError writeResult = sink.WriteArtifact(outputName, source);
+            if (!writeResult)
+            {
+                return writeResult;
+            }
+            continue;
+        }
+
         std::string usageComment = "/*\n    Used by variant(s):\n";
         for (const auto& variant : module.Variants)
         {
@@ -909,9 +920,6 @@ CookError DumpShaderSources(const CookedModule& module, std::string_view subdir,
         usageComment += "*/\n";
         source.insert_range(source.begin(), usageComment);
 
-        std::string filename = std::format("{}_{:016X}.wgsl", module.Name, hashedSource);
-        sourceIdxToFilename[sourceIdx] = filename;
-        std::string outputName = std::format("{}/{}", subdir, filename);
         CookError writeResult = sink.WriteArtifact(outputName, source);
         if (!writeResult)
         {

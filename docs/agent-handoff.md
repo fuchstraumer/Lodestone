@@ -20,7 +20,7 @@ earlier update. Git history holds the full text.
 
 - Phases D and E are complete. E8 closed Phase E. Its final measurements are in
   `docs/phase-e-data-driven-permutations.md` §11a.
-- The manifest is one bundle for each cook, format version 6. Version 6 added `Binding::SampleType`. `CLAUDE.md` ("One output form") holds the
+- The manifest is one bundle for each cook, format version 7. Version 7 added `Profile::CodeFormat`. `CLAUDE.md` ("One output form") holds the
   layout.
 - The client reads the bundle through `BundleView`, `ModuleView`, `EnvironmentView`, and the view types
   (`VariantView`, `EntryPointInstanceView`, `LayoutRange`, `ResolvedResource`, `UniformMemberRange`).
@@ -113,7 +113,11 @@ Review points from the view-type work, not faults:
   cooks each KitchenSink module and compares every stage dump. It once found a defect that no validator
   saw. Accept a changed dump only after you read the diff.
 - For a change that must not change output, save the KitchenSink bundle hash and a
-  `manifest_dump --with-sources` JSON before the change. Compare both after it.
+  `manifest_dump --with-sources` JSON before the change. Compare both after it. The WGSL baseline since
+  F1.3 is `ae72f733...`.
+- **An incremental link can keep stale code.** Measured on 2026-09-25: after a change to
+  `src/emit/StageDump.cpp`, ninja relinked `lodestone_cooker_console.exe`, and the exe still ran the old
+  function. Delete the `.exe` and the `.ilk`, then build. Do this when a fix seems to have no effect.
 
 ## 5. Measured facts (do not measure again)
 

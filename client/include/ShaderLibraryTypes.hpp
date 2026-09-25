@@ -31,6 +31,15 @@ enum class PlacementKind : uint8_t
     Pointer,
 };
 
+/** @brief The form of a profile's code. `Wgsl` is text. `Spirv` is 32-bit words, so each SPIR-V source
+ * starts on a 4-byte boundary and its length is a multiple of 4. */
+enum class ShaderCodeFormat : uint8_t
+{
+    None = 0,
+    Wgsl,
+    Spirv,
+};
+
 /** @brief Type of a memory footprint field: `None` means unspecified in the shader,
  *  so users are expected to handle it. */
 enum class FootprintKind : uint8_t

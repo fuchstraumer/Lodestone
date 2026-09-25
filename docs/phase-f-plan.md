@@ -90,8 +90,8 @@ control row that must cook.
 | F1.1 | Remove the WGSL assumptions in `compile/impl`: `k_WgslTargetIndex` and `target.format = SLANG_WGSL`. The profile supplies the Slang target. | WGSL output stays byte-identical. Save the KitchenSink bundle hash first. |
 | F1.2 | Add the `spirv` profile row. Remove `assert(target_name == "wgsl")` in `TargetUtils.cpp`. | `--target=spirv` cooks KitchenSink. |
 | F1.3 | Store the SPIR-V payload (decision O1). | The library round trip compares the bytes. |
-| F1.4 | Add a SPIR-V validator (decision O2). | It must find a planted mismatch, and pass KitchenSink. |
-| F1.5 | Per-target policy: a module with no section for a requested target (decision O4). | `PolicyDocumentTest` rows. |
+| F1.4 | Add a SPIR-V validator (decision O2). The same walk collects each entry point's `OpCapability` list. The dedupe report prints the collated set for each environment. | It must find a planted mismatch, and pass KitchenSink. The report shows `GroupNonUniformArithmetic` for KsVolume only. |
+| F1.5 | Per-target policy (decision O4). A module with no policy entry cooks with no limits. A module with an entry for another target, and none for this one, gets a warning that names the module and the target. | `PolicyDocumentTest` rows. |
 | F1.6 | Cook KitchenSink for both targets in one cook. Add SPIR-V known-good dumps. | The bundle holds two real profiles. The known-good check covers both. |
 
 ### F2 — The shim module and the two tables, proved on WGSL
@@ -115,7 +115,24 @@ The Bound form works on WGSL, so this slice needs no SPIR-V. It can run beside F
 | F3.1 | A string table of capability names and a bitmask over it. Use the feature-bit names in vocabulary §9d, not only extension names. | `ShaderManifestRejectTest` reads the table back. |
 | F3.2 | Fill `Profile::CapabilityFloor` from the profile. | The manifest dump shows it. |
 | F3.3 | Fill the capability requirement of each entry point, and collate it for each variant. Source to be decided (O6): Slang metadata, or the SPIR-V capabilities in the binary. | Compare the two sources where both exist. KsVolume: `GroupNonUniformArithmetic` in the 216 wave variants only. |
-| F3.4 | The query takes a device capability set and removes each variant that needs more. It is the base preset, and every other query builds on it. | `ManifestIndexTest` rows: a device without the capability gets no wave variant. |
+| F3.4 | The query takes a device capability set and removes each (variant, entry point) that needs more. It is the base preset, and every other query builds on it. | `ManifestIndexTest` rows: a device without the capability gets no wave variant of `GenerateCS`, and still gets `BlurCS`. |
+| F3.5 | Cross-check each capability-kind axis against the measured requirement. A variant with the axis off must not need the capability. | A must-fail row: an "off" path that still calls a wave op. |
+
+Design notes for F3, agreed on 2026-09-25:
+
+- **One device description, several readers.** The query filter (F3.4), cook-time pruning for named device
+  classes, the check of size expressions against limits (`todo.md`, `SetDeviceLimits`), and the profile
+  choice (D11) all read it.
+- **Features and limits are two halves.** A feature is a boolean, and the test is a subset. A limit is a
+  number, and the test is less-or-equal for each field. `OpCapability` gives features only. Limits come
+  from reflection (workgroup size, `groupshared` bytes). Design both halves in F3.1. Fill the features first.
+- **The manifest stores Vulkan feature names, not SPIR-V capability names.** The client holds Vulkan
+  feature structs. The map is not one to one: `GroupNonUniformArithmetic` is a bit of
+  `subgroupSupportedOperations`, and support also depends on the stage. Generate the map from the
+  `<spirvcapabilities>` section of `vk.xml`. WGSL uses the same shape with its own table: `enable`
+  directives, WebGPU features and limits.
+- **The grain is the entry point.** KsVolume `BlurCS` needs no wave operation, also in a wave variant.
+  A filter that removes whole variants removes usable pipelines.
 
 ### F4 — `spirv-modern`: Pointer buffers and Handle textures
 
@@ -155,7 +172,7 @@ row holds the decision and its date.
 | O1 | F1.3 | How is the SPIR-V payload stored? | **Decided 2026-09-25.** Binary words, aligned to 4 bytes. `--dump-sources` writes `.spv`. The validator takes bytes. The client gets a byte accessor beside `Source()`. The two renderers fork, so a function for each language is correct. |
 | O2 | F1.4 | What is the SPIR-V second opinion? | **Decided 2026-09-25.** SPIRV-Tools `spvBinaryParse` reads `DescriptorSet`, `Binding`, and variable types. `spirv-val` checks legality. A facade in `target/`. Keep the walk linear, as the WGSL validator does. The first validator was O(n^2). |
 | O3 | F1.1 | One Slang session with two targets, or one session for each profile? | **Decided 2026-09-25.** One session for each profile. Shared work needs the same access model and capability floor on two targets. That case is rare: a build seldom holds two languages. |
-| O4 | F1.5 | A module has no policy section for a requested target. | **Decided 2026-09-25.** The cook fails. Inheritance from another section is in `todo.md`. |
+| O4 | F1.5 | A module has no policy section for a requested target. | **Decided 2026-09-25, revised the same day.** The policy is opt-in. An absent section means no limits. A module with a section for another target, and none for this one, gets a warning, not a failure. Inheritance from another section is in `todo.md`. |
 | O5 | F1.2 | Which Vulkan environment does the `spirv` profile target? | **Decided 2026-09-25.** Vulkan 1.2 (SPIR-V 1.5) for now. At the end of phase F, measure the device coverage and decide the range again, from 1.0 up to 1.4. |
 | O6 | F3.3 | Where does a variant's capability requirement come from? | Decide after F3.1. Measure what Slang metadata gives first. The SPIR-V `OpCapability` list is exact for each variant (section 7, F1.2). |
 | O7 | F1.2 | An entry point needs a capability above the profile floor. Slang raises E41012, and our warnings-as-errors fails the module. | **Decided 2026-09-25.** E41012 is off for every target. A device capability is ours to record, not Slang's to reject. F3.3 and F3.4 must record it: until then a cook states no requirement. |
@@ -234,3 +251,21 @@ commit.
 - 2026-09-25. **F1.2 done**, not committed. E41012 is off (O7). `--target=spirv --no-validate` cooks
   KitchenSink: 616 variants, deterministic, all round trips pass. WGSL unchanged (`2dfbe8ce...`). 22 of 22
   tests, 30 of 30 known-good dumps. Next: F1.3.
+- 2026-09-25. **F1.3 done**, not committed. Manifest format version 7.
+  - `ShaderCodeFormat` (`Wgsl`, `Spirv`) sits in the old `Profile::Reserved0` byte. The record size
+    did not change. `Open` rejects an unknown format, and a SPIR-V source that is not whole words.
+  - Client: `SpirvWords()` returns `std::span<const uint32_t>` on `EnvironmentView`,
+    `EntryPointInstanceView`, and `ShaderSourceProvider`. `Source()` and `SpirvWords()` each assert the
+    format. The cooker keeps `std::string` as the byte container (the author's decision).
+  - Codegen fails a SPIR-V payload that is not whole words or has no magic number. The sources are packed
+    with no padding, because SPIR-V is always whole words.
+  - The round trip reads SPIR-V back through `SpirvWords()`. `--dump-sources` writes `.spv` with no
+    header. `manifest_dump` prints `codeFormat`, and `spirvBytes` in place of a SPIR-V source.
+  - Fixed: `DumpShaderSources` created its folder from `sink.Describe()`, so `--verify-deterministic`
+    left `<output>_first` and `<output>_second` on disk, and the real write then failed. The file sink now
+    creates the parent folder of each artifact.
+  - Proof: KitchenSink for `spirv` is deterministic, and all 325 unique `.spv` files pass
+    `spirv-val --target-env vulkan1.2`. The WGSL bundle differs from `2dfbe8ce...` in two bytes only (the
+    version and the format byte). New WGSL baseline: `ae72f733...`. 22 of 22 tests, 30 of 30 known-good
+    dumps. Debug builds. `ShaderManifestRejectTest` and `ManifestIndexTest` pass in Debug.
+  - Next: F1.4.

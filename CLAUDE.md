@@ -92,7 +92,7 @@ Slang, and it takes about one second.
 | `AttributeExpressionTest` | The attribute expression grammar — arithmetic, comparison, and logic — and every rejection it must make. |
 | `ContentInternerTest` | A hash never decides equality. It supplies a hash that returns one constant, so only the byte comparison can separate the payloads. |
 | `PermutationIndexTest` | A variant index is unique, dense, and stable, and a partial assignment resolves to one variant. |
-| `ShaderManifestRejectTest` | The bundle reader rejects a short, misaligned, or damaged file, and opens a real one. It also proves that the header region opens alone, that an extent read on its own opens against that bundle, that an environment the cook skipped reads as absent, and that a damaged directory entry or variant key table is rejected by name. |
+| `ShaderManifestRejectTest` | The bundle reader rejects a short, misaligned, or damaged file, and opens a real one. It rejects an unknown code format and a SPIR-V source that is not whole words, and reads SPIR-V back as words. It also proves that the header region opens alone, that an extent read on its own opens against that bundle, that an environment the cook skipped reads as absent, and that a damaged directory entry or variant key table is rejected by name. |
 | `WgslValidatorTest` | The WGSL cross-check on Tint. It parses fixed WGSL, reads the used bindings from Tint's inspector, and compares them against hand-written reflection. It proves a match, and a mismatch of kind, shape, access, or name. It also proves that a comparison sampler and a depth texture read back correctly, that a storage buffer's structured or raw shape does not change the WGSL kind, and that invalid WGSL is a parse error, not a mismatch. |
 | `ReflectionSchemaTest` | The pure data of the binding schema, with no Slang. The `ResourceShape` flag layout (a base shape in the low nibble plus array, multisample, shadow, and feedback flags, read with `GetBaseShape`), the `ToString` tables for `ResourceShape`, `BindingKind`, and `TextureSampleType`, and the `ReflectedUniformMember` equality that dedup rests on, which includes matrix layout and element stride. It also proves that every `CookError` band has names, above the 127 limit of magic_enum's default range. |
 | `StageDumpTest` | A stage dump holds the model and no target text, it names itself the way `--dump-stage` names it, and two dumps of one input agree byte for byte. |
@@ -156,8 +156,10 @@ that `tests/CMakeLists.txt` supplies.
 `ParseCommandLine` in `src/driver/CookerOptions.cpp` parses the flags, and `GetUsageText` prints them:
 `--output/-o`, `--cache-dir`, `--O0` to `--O3`, `--target=<name>`, `--no-validate`, `--quiet`,
 `--single-threaded`, `--no-dedupe`, `--verify-deterministic`, `--dump-stage=<name>`, and
-`--dump-sources`. `--dump-sources` writes every unique compiled source to a per-module subfolder,
-beside a `SourceTable.json` that names each variant by its axis description and its source hashes.
+`--dump-sources`. `--dump-sources` writes every unique compiled source to a subfolder
+`<module>_<target>_sources`, beside a `SourceTable.json` that names each variant by its axis description
+and its source hashes. A WGSL file starts with a comment that names its variants. A SPIR-V file (`.spv`)
+holds the words only, so `spirv-dis` and `spirv-val` read it. The output sink creates the subfolder.
 
 A value flag is a row in `k_ValueFlags`, beside `k_SwitchFlags`. Add a row, not a branch.
 
@@ -460,7 +462,7 @@ unordered container reached the output.
 | `CookedModule`, `CookedLibrary` | `model/CookedLibrary.hpp` | The frozen model. Every emitter reads this and nothing earlier. |
 | `BundleView`, `ModuleView`, `EnvironmentView` | `client/include/ShaderManifest.hpp` | Read-only spans over the bundle bytes, one type for each scope: the whole cook, one module, and one module cooked for one profile. Each `Open` validates its scope once and allocates nothing. |
 | `ManifestIndex`, `ManifestQueryBuilder` | `client/include/ShaderManifestIndex.hpp` | The client query surface, frozen. `ManifestIndex` decodes and enumerates variants and hands out a value-semantic builder. The builder resolves axis names and values by name, and its terminals (`Keys`, `Variants`, `First`) return keys or an error. A malformed query is an error; a valid query with no variant is an empty set. |
-| `ShaderSourceProvider` | `client/include/ShaderManifest.hpp` | Where a renderer gets source, bindings, and workgroup size. `Bindings()` returns a `LayoutRange` of `ResolvedResource` views, built on demand, so the provider allocates nothing. `Generation()` is the hot-reload hook. |
+| `ShaderSourceProvider` | `client/include/ShaderManifest.hpp` | Where a renderer gets code, bindings, and workgroup size. `Source()` gives WGSL text, and `SpirvWords()` gives SPIR-V words. Each asserts the profile's `ShaderCodeFormat`. `Bindings()` returns a `LayoutRange` of `ResolvedResource` views, built on demand, so the provider allocates nothing. `Generation()` is the hot-reload hook. |
 | `LayoutRange`, `ResolvedResource`, `VariantView`, `EntryPointInstanceView` | `client/include/ShaderManifest.hpp` | Views over one environment. `LayoutRange::operator[]` is the one place that resolves `resources[visible[i]]`. A view points at its `EnvironmentView`, so keep that environment alive and do not move it. |
 
 `ContentHashValue` is xxHash3, 64 bit. `model/ContentHash.hpp` holds the streaming form as well, which the
@@ -585,6 +587,11 @@ profile. Each profile applies its own policy, so two profiles of one module can 
 Two modules share a root axis when the name, kind, domain, and binding time agree and the module's
 values fit the root values in order. Otherwise the axis gets a root record of its own. A root axis is a
 storage and dedup optimization only: keys are per module, so no key crosses a module boundary.
+
+Each profile records its `ShaderCodeFormat` (format version 7). A SPIR-V source is read as words, so
+`Open` rejects a SPIR-V source that is not on a 4-byte boundary or not whole words. The sources are packed
+with no padding: every SPIR-V module is whole words, so each offset stays aligned. Codegen fails a SPIR-V
+payload that is not whole words or has no SPIR-V magic number.
 
 Every cross-reference is an index or an offset, never a pointer, so the reader is a set of spans and it
 relocates nothing. Sections start on 8-byte boundaries. A record must be trivially copyable, and the

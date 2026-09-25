@@ -322,7 +322,8 @@ CookResult<std::string> EmitShaderManifest(const CookedLibrary& library)
     for (const CookedProfile& profile : library.Profiles)
     {
         profiles.push_back(manifest::Profile{ .TargetNameString = strings.Add(profile.TargetName),
-                                              .AccessModel = profile.AccessModel });
+                                              .AccessModel = profile.AccessModel,
+                                              .CodeFormat = profile.CodeFormat });
     }
 
     // Build every extent before the header region, because an extent adds binding names and suffixes to
@@ -1181,11 +1182,16 @@ namespace
                                   const LibraryVariant& variant,
                                   size_t entry_point_index)
     {
+        // Read back through the accessor a consumer of this format uses, and compare bytes.
         const std::string_view expectedSource = ResolveSource(module, variant, entry_point_index);
         const VariantKey variantKey = module.VariantKeys[variant.Index];
-        const std::string_view providerSource =
-            provider.Source(static_cast<uint32_t>(entry_point_index), variantKey);
-        if (providerSource == expectedSource)
+        const uint32_t entryPoint = static_cast<uint32_t>(entry_point_index);
+        const std::span<const std::byte> expectedBytes = std::as_bytes(std::span{ expectedSource });
+        const std::span<const std::byte> providerBytes =
+            (provider.View().CodeFormat() == ShaderCodeFormat::Spirv)
+                ? std::as_bytes(provider.SpirvWords(entryPoint, variantKey))
+                : std::as_bytes(std::span{ provider.Source(entryPoint, variantKey) });
+        if (std::ranges::equal(providerBytes, expectedBytes))
         {
             return CookError::Success;
         }

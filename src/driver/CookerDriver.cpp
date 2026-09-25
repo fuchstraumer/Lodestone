@@ -1,4 +1,5 @@
 #include "driver/CookerDriver.hpp"
+#include "ShaderLibraryTypes.hpp"
 #include "compile/SymbolTable.hpp"
 #include "driver/CookerOptions.hpp"
 #include "CookerErrors.hpp"
@@ -220,7 +221,9 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
             if (cookState.Options.DumpSources)
             {
                 const std::string outputDir = std::format("{}_{}_sources", moduleName, targetName);
-                CookError writeError = DumpShaderSources(finalizeResult->Module, outputDir, sink);
+                const ShaderCodeFormat codeFormat =
+                    CodeFormatFromLanguage(cookState.TargetProfiles.at(targetName).Language);
+                CookError writeError = DumpShaderSources(finalizeResult->Module, outputDir, codeFormat, sink);
                 if (!writeError)
                 {
                     return std::unexpected(writeError);
@@ -343,8 +346,9 @@ namespace
         for (const std::string& targetName : cook_state.Options.TargetNames)
         {
             const TargetProfile& profile = cook_state.TargetProfiles.at(targetName);
-            library.Profiles.push_back(
-                CookedProfile{ .TargetName = targetName, .AccessModel = PlacementKindFromAccessModel(profile.Access) });
+            library.Profiles.push_back(CookedProfile{ .TargetName = targetName,
+                                                          .AccessModel = PlacementKindFromAccessModel(profile.Access),
+                                                          .CodeFormat = CodeFormatFromLanguage(profile.Language) });
         }
 
         library.Environments.resize(library.Profiles.size() * library.ModuleNames.size());

@@ -98,10 +98,27 @@ CookedLibrary MakeSmallLibrary()
 {
     CookedLibrary library;
     library.ModuleNames = { "TestModule" };
-    library.Profiles = { CookedProfile{ .TargetName = "wgsl", .AccessModel = lodestone::PlacementKind::Bound },
-                         CookedProfile{ .TargetName = "spirv", .AccessModel = lodestone::PlacementKind::Bound } };
+    library.Profiles = { CookedProfile{ .TargetName = "wgsl",
+                                        .AccessModel = lodestone::PlacementKind::Bound,
+                                        .CodeFormat = lodestone::ShaderCodeFormat::Wgsl },
+                         CookedProfile{ .TargetName = "spirv",
+                                        .AccessModel = lodestone::PlacementKind::Bound,
+                                        .CodeFormat = lodestone::ShaderCodeFormat::Spirv } };
     library.Environments.emplace_back(MakeSmallModule());
     library.Environments.emplace_back(std::nullopt);
+    return library;
+}
+
+/** The same module, cooked for the SPIR-V profile only. Each source is whole words. The emitter does not
+ * read SPIR-V, so the words need not be a real module. */
+CookedLibrary MakeSpirvLibrary()
+{
+    CookedLibrary library = MakeSmallLibrary();
+    CookedModule module = MakeSmallModule();
+    module.Sources = { std::string(8u, '\x01'), std::string(12u, '\x02') };
+    library.Environments = {};
+    library.Environments.emplace_back(std::nullopt);
+    library.Environments.emplace_back(std::move(module));
     return library;
 }
 
@@ -241,6 +258,35 @@ int main()
     WriteValue(badKeys, secondKeyOffset, VariantKey{ 0u });
     runner.Check(EnvironmentErrorFrom(badKeys, 0u) == ErrorCode::InvalidVariantKeyOrder,
                  "two equal keys are rejected when the environment opens");
+
+    runner.BeginSection("the code format of a profile");
+    const size_t firstFormatOffset = header.Profiles.Offset + offsetof(lodestone::manifest::Profile, CodeFormat);
+    std::vector<std::byte> badFormat = valid;
+    WriteValue(badFormat, firstFormatOffset, lodestone::ShaderCodeFormat::None);
+    runner.Check(BundleErrorFrom(badFormat) == ErrorCode::InvalidProfileCodeFormat,
+                 "a profile with no code format is rejected when the bundle opens");
+
+    // The WGSL sources of the small module are 24 and 23 bytes, so the second is not whole words.
+    std::vector<std::byte> textAsSpirv = valid;
+    WriteValue(textAsSpirv, firstFormatOffset, lodestone::ShaderCodeFormat::Spirv);
+    runner.Check(EnvironmentErrorFrom(textAsSpirv, 0u) == ErrorCode::SpirvSourceMisaligned,
+                 "a SPIR-V environment whose source is not whole words is rejected when it opens");
+
+    const CookedLibrary spirvLibrary = MakeSpirvLibrary();
+    const lodestone::CookResult<std::string> spirvManifest = EmitShaderManifest(spirvLibrary);
+    runner.Check(spirvManifest.has_value(), "the emitter accepts a SPIR-V environment");
+    if (spirvManifest.has_value())
+    {
+        runner.Check(lodestone::VerifyManifestRoundTrip(spirvLibrary, *spirvManifest) == lodestone::CookError::Success,
+                     "the round trip reads the SPIR-V words back through SpirvWords");
+        const std::vector<std::byte> spirvBytes = ToBytes(*spirvManifest);
+        const ManifestResult<BundleView> spirvBundle = BundleView::Open(spirvBytes);
+        const ManifestResult<EnvironmentView> spirvEnvironment =
+            spirvBundle.has_value() ? spirvBundle->OpenEnvironment(1u, 0u)
+                                    : ManifestResult<EnvironmentView>{ std::unexpected(spirvBundle.error()) };
+        runner.Check(spirvEnvironment.has_value() && spirvEnvironment->SpirvWords(1u).size() == 3u,
+                     "a 12-byte SPIR-V source reads back as three words");
+    }
 
     return runner.Report();
 }

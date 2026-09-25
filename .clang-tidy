@@ -25,7 +25,8 @@ Checks: >
   -modernize-use-auto,
   -readability-avoid-const-params-in-decls,
   -modernize-use-designated-initializers,
-  -readability-convert-member-functions-to-static
+  -readability-convert-member-functions-to-static,
+  -cppcoreguidelines-pro-type-reinterpret-cast
 
 WarningsAsErrors: ''
 HeaderFilterRegex: '.*(src|include|client|tests)/.*'

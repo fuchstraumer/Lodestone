@@ -2,6 +2,7 @@
 #ifndef LODESTONE_STAGE_DUMP_HPP
 #define LODESTONE_STAGE_DUMP_HPP
 #include "CookerErrors.hpp"
+#include "ShaderLibraryTypes.hpp"
 #include "driver/CookerOptions.hpp"
 #include <span>
 #include <string>
@@ -52,7 +53,12 @@ std::string DumpInternedModule(const InternedModule& module);
 std::string DumpCookedModule(const CookedModule& module);
 /** @brief Dumps the shader source strings to the given subdir under the output sink, keyed by the 
   * module name on the input cooked module. */
-CookError DumpShaderSources(const CookedModule& module, std::string_view subdir, class OutputSink& sink);
+/** Writes each unique source of one module to `subdir`, beside a `SourceTable.json`. A WGSL file starts with a
+ * comment that names its variants. A SPIR-V file holds the words only, so a tool can read it. */
+CookError DumpShaderSources(const CookedModule& module,
+                            std::string_view subdir,
+                            ShaderCodeFormat code_format,
+                            class OutputSink& sink);
 
 } // namespace lodestone
 

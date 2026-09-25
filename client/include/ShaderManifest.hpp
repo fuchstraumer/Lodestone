@@ -27,7 +27,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 6u;
+inline constexpr uint32_t k_ShaderManifestVersion = 7u;
 
 // clang-tidy complains about enums being too big, but uint32_t means
 // the error struct is 16bytes, which is great alignment and still compact
@@ -76,6 +76,8 @@ enum class ErrorCode : uint32_t
     InvalidVariantAxisMask = 39,
     InvalidProfileAccessModel = 40,
     InvalidVariantSuffixString = 41,
+    InvalidProfileCodeFormat = 42,
+    SpirvSourceMisaligned = 43,
     Count
 };
 
@@ -215,7 +217,7 @@ struct alignas(8) Profile
     uint32_t TargetNameString{ 0u };
     uint32_t CapabilityFloor{ 0u };
     PlacementKind AccessModel{ PlacementKind::None };
-    uint8_t Reserved0{ 0u };
+    ShaderCodeFormat CodeFormat{ ShaderCodeFormat::None };
     uint16_t Reserved1{ 0u };
     uint32_t Reserved2{ 0u };
 };
@@ -659,7 +661,10 @@ private:
 class EntryPointInstanceView
 {
 public:
+    /** @brief The WGSL text. Only for a `Wgsl` profile. */
     [[nodiscard]] std::string_view Source() const noexcept;
+    /** @brief The SPIR-V words. Only for a `Spirv` profile. */
+    [[nodiscard]] std::span<const uint32_t> SpirvWords() const noexcept;
     [[nodiscard]] WorkgroupSize Workgroup() const noexcept;
     [[nodiscard]] LayoutRange Layout() const noexcept;
     //[[nodiscard]] RasterView Raster() const noexcept;
@@ -804,7 +809,11 @@ public:
     [[nodiscard]] uint32_t ProfileIndex() const noexcept;
     [[nodiscard]] const Profile& ProfileRecord() const noexcept;
     [[nodiscard]] std::string_view String(uint32_t string_index) const noexcept;
+    [[nodiscard]] ShaderCodeFormat CodeFormat() const noexcept;
+    /** @brief The WGSL text of one source. Only for a `Wgsl` profile. */
     [[nodiscard]] std::string_view Source(uint32_t source_index) const noexcept;
+    /** @brief The SPIR-V words of one source. Only for a `Spirv` profile. `Open` checked the alignment. */
+    [[nodiscard]] std::span<const uint32_t> SpirvWords(uint32_t source_index) const noexcept;
 
     [[nodiscard]] std::span<const VariantKey> VariantKeys() const noexcept;
     [[nodiscard]] std::span<const Variant> Variants() const noexcept;
@@ -877,8 +886,12 @@ class ShaderSourceProvider
 public:
     ShaderSourceProvider(EnvironmentView view, uint64_t generation) noexcept;
 
+    /** @brief The WGSL text. Only for a `Wgsl` profile. */
     [[nodiscard]] std::string_view Source(uint32_t entry_point,
                                           VariantKey variant) const noexcept;
+    /** @brief The SPIR-V words, ready for `VkShaderModuleCreateInfo::pCode`. Only for a `Spirv` profile. */
+    [[nodiscard]] std::span<const uint32_t> SpirvWords(uint32_t entry_point,
+                                                       VariantKey variant) const noexcept;
     [[nodiscard]] LayoutRange Bindings(uint32_t entry_point, VariantKey variant) const noexcept;
     [[nodiscard]] WorkgroupSize Workgroup(uint32_t entry_point,
                                           VariantKey variant) const noexcept;

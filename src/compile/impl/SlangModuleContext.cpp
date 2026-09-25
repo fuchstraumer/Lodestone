@@ -11,6 +11,7 @@
 #include "permute/PermutationValue.hpp"
 #include "slang-com-ptr.h"
 #include "slang.h"
+#include "target/TargetProfile.hpp"
 
 #include <algorithm>
 #include <array>
@@ -167,6 +168,7 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
 {
     diagnosticSink = &sink;
     placementKind = create_info.AccessModel;
+    language = create_info.Language;
     if (k_UseSlangWorkaround)
     {
         const SlangResult created = slang_createGlobalSessionWithoutCoreModule(SLANG_API_VERSION, globalSession.writeRef());
@@ -420,6 +422,11 @@ std::vector<std::string_view> SlangModuleContext::ModuleSourceStringViews() cons
 PlacementKind SlangModuleContext::PlacementKindForTarget() const noexcept
 {
     return placementKind;
+}
+
+TargetLanguage SlangModuleContext::Language() const noexcept
+{
+    return language;
 }
 
 std::vector<SerializedModule> SlangModuleContext::SerializeModules() const

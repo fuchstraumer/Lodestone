@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <expected>
 #include <string>
 #include <string_view>
@@ -26,6 +27,21 @@ using namespace lodestone;
 
 // Each session holds one target (SlangModuleContext::Initialize), so its index is always 0.
 constexpr SlangInt k_TargetIndex = 0;
+constexpr uint32_t k_SpirvMagicNumber = 0x07230203u;
+constexpr size_t k_SpirvHeaderBytes = 5u * sizeof(uint32_t);
+
+/** The manifest reads SPIR-V as words, so a payload that is not whole words cannot reach it. */
+bool IsSpirvModule(std::string_view code) noexcept
+{
+    if (code.size() < k_SpirvHeaderBytes || (code.size() % sizeof(uint32_t)) != 0u)
+    {
+        return false;
+    }
+
+    uint32_t magic = 0u;
+    std::memcpy(&magic, code.data(), sizeof(magic));
+    return magic == k_SpirvMagicNumber;
+}
 
 /** What one entry point's codegen produced. The diagnostic text travels with the code so that a
  * worker thread never touches a sink. coalesced after threads join */
@@ -65,7 +81,8 @@ CookResult<std::vector<std::string>> GenerateEntryPointCode(SlangModuleContext& 
         const int32_t failureCount = result.Diagnostics.empty()
                                          ? 0
                                          : ParseSlangDiagnostics(result.Diagnostics, "getEntryPointCode", sink);
-        if (result.CallFailed || (failureCount > 0) || result.Code.empty())
+        const bool badSpirv = (context.Language() == TargetLanguage::Spirv) && !IsSpirvModule(result.Code);
+        if (result.CallFailed || (failureCount > 0) || result.Code.empty() || badSpirv)
         {
             anyEntryPointFailed = true;
         }

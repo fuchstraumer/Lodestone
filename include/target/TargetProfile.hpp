@@ -97,6 +97,9 @@ std::span<const std::string_view> GetTargetProfileNames() noexcept;
 
 PlacementKind PlacementKindFromAccessModel(AccessModel model) noexcept;
 
+/** The code format the manifest records for a language. */
+ShaderCodeFormat CodeFormatFromLanguage(TargetLanguage language) noexcept;
+
 } // namespace lodestone
 
 #endif // !LODESTONE_TARGET_PROFILE_HPP

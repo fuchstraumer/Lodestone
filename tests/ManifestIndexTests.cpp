@@ -234,7 +234,8 @@ std::vector<std::byte> EmitBytes(const lodestone::CookedLibrary& library)
 lodestone::CookedProfile MakeProfile(std::string target_name)
 {
     return lodestone::CookedProfile{ .TargetName = std::move(target_name),
-                                     .AccessModel = lodestone::PlacementKind::Bound };
+                                     .AccessModel = lodestone::PlacementKind::Bound,
+                                     .CodeFormat = lodestone::ShaderCodeFormat::Wgsl };
 }
 
 // One module, cooked for one profile.

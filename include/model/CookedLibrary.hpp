@@ -148,6 +148,7 @@ struct CookedProfile
 {
     std::string TargetName;
     PlacementKind AccessModel{ PlacementKind::None };
+    ShaderCodeFormat CodeFormat{ ShaderCodeFormat::None };
 };
 
 /**@brief The whole cook: every module, cooked for every profile.
