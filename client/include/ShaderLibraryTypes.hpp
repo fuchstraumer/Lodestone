@@ -86,6 +86,12 @@ enum class ShaderStageKind : uint8_t
     Amplification,
     Dispatch,
     Node,
+    // These are so old I forgot to add them....
+    // putting at end bc they're rare nowadays (god i feel old)
+    TessellationControl,
+    TessellationEvaluation,
+    Geometry,
+    Task,
     Count
 };
 
