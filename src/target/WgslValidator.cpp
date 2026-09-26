@@ -6,6 +6,7 @@
 #include "target/TargetProfile.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include <algorithm>
+#include <cstddef>
 #include <expected>
 #include <format>
 #include <span>
@@ -33,7 +34,7 @@ namespace
 WgslValidator::WgslValidator() = default;
 WgslValidator::~WgslValidator() = default;
 
-CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::string_view source_code,
+CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::span<const std::byte> source_code,
                                                                 std::span<const ReflectedBinding*> bindings,
                                                                 DiagnosticSink& sink) const
 {
@@ -43,7 +44,9 @@ CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::string_view
     wgsl::reader::Options readerOptions;
     readerOptions.allowed_features = wgsl::AllowedFeatures::Everything();
     // build a source file
-    Source::File entrypointSource("source.wgsl", source_code);
+    // cast the source code span to a string_view
+    std::string_view source_code_view(reinterpret_cast<const char*>(source_code.data()), source_code.size());
+    Source::File entrypointSource("source.wgsl", source_code_view);
 
     Program entrypointProgram = wgsl::reader::Parse(&entrypointSource, readerOptions);
     if (!entrypointProgram.IsValid())

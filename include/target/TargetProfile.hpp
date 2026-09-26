@@ -63,12 +63,12 @@ public:
 
     /**@brief This outer function exists to sort the input `used` bindings, before passing it to the virtual derived
      * validateEntryPoint method. This is just a shim that ensures the bindings are sorted before validation. */
-    [[nodiscard]] CookResult<BindingComparison> ValidateEntryPoint(std::string_view target_text,
+    [[nodiscard]] CookResult<BindingComparison> ValidateEntryPoint(std::span<const std::byte> target_code,
                                                                    std::span<const ReflectedBinding*> used,
                                                                    DiagnosticSink& sink) const;
 
 protected:
-    [[nodiscard]] virtual CookResult<BindingComparison> validateEntryPoint(std::string_view target_text,
+    [[nodiscard]] virtual CookResult<BindingComparison> validateEntryPoint(std::span<const std::byte> target_code,
                                                                            std::span<const ReflectedBinding*> used,
                                                                            DiagnosticSink& sink) const = 0;
 };

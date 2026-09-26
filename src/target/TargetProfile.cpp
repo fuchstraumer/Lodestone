@@ -72,14 +72,14 @@ namespace
 
 } // namespace
 
-CookResult<BindingComparison> ResolvedLibraryValidator::ValidateEntryPoint(std::string_view target_text,
-                                                                   std::span<const ReflectedBinding*> used,
-                                                                   DiagnosticSink& sink) const
+CookResult<BindingComparison> ResolvedLibraryValidator::ValidateEntryPoint(std::span<const std::byte> target_code,
+                                                                           std::span<const ReflectedBinding*> used,
+                                                                           DiagnosticSink& sink) const
 {
     // its just a vector of pointers, so copying is fine (this is the validation path, anyways)
     std::vector<const ReflectedBinding*> sortedUsed(used.begin(), used.end());
     std::ranges::sort(sortedUsed, BoundPlacementLess);
-    return validateEntryPoint(target_text, sortedUsed, sink);
+    return validateEntryPoint(target_code, sortedUsed, sink);
 }
 
 std::string_view ToString(AccessModel model) noexcept

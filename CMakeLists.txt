@@ -159,8 +159,10 @@ set(LODESTONE_PERMUTE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PolicyDocument.cpp")
 
 set(LODESTONE_TARGET_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/target/SpvValidator.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/target/TargetProfile.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/target/TargetUtils.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/SpvValidator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetProfile.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetUtils.cpp")
 
@@ -230,6 +232,14 @@ target_link_libraries(lodestone PRIVATE slang lodestone::client_internal xxHash:
 if (LODESTONE_ENABLE_WGSL)
     target_link_libraries(lodestone PRIVATE Tint::tint)
 endif()
+# The SPIR-V validator reads and checks SPIR-V with SPIRV-Tools. Slang builds SPIRV-Tools in its own tree
+# (third_party/slang/external/spirv-tools), so this needs no switch, as Tint does. Only
+# src/target/SpirvValidator.cpp includes a SPIRV-Tools header.
+# SPIRV-Headers gives spirv.hpp11: the `spv::Op` and `spv::Decoration` enums, and `CapabilityToString`.
+if (NOT TARGET SPIRV-Tools-static OR NOT TARGET SPIRV-Headers::SPIRV-Headers)
+    message(FATAL_ERROR "Lodestone needs the SPIRV-Tools-static and SPIRV-Headers targets from the Slang build.")
+endif()
+target_link_libraries(lodestone PRIVATE SPIRV-Tools-static SPIRV-Headers::SPIRV-Headers)
 # /Ob2 and /arch:AVX2 are MSVC spellings, and the full Clang driver rejects both. The pure Clang
 # build therefore gets the GNU spelling of the same two requests. Every other flag decision in this
 # file goes through the compiler test at the top, and this one must also.
