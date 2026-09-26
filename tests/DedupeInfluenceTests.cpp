@@ -94,7 +94,7 @@ CompiledEntryPoint MakeEntryPoint(std::string_view name, std::string code)
 {
     CompiledEntryPoint entryPoint;
     entryPoint.Name = name;
-    entryPoint.Code = std::move(code);
+    entryPoint.Code = lodestone::tests::BytesOf(code);
     entryPoint.Reflection.Name = entryPoint.Name;
     entryPoint.Reflection.Stage = ShaderStageKind::Compute;
     entryPoint.Reflection.Workgroup = WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u };

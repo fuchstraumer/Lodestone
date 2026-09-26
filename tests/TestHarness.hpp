@@ -2,8 +2,10 @@
 #ifndef LODESTONE_TESTS_TEST_HARNESS_HPP
 #define LODESTONE_TESTS_TEST_HARNESS_HPP
 #include <cstddef>
+#include <span>
 #include <string_view>
 #include <source_location>
+#include <vector>
 
 // Not GTest or Catch2: a counter, a comparison helper, and a nonzero exit code. Each test executable
 // runs by hand or under ctest, and prints only failures plus a one-line summary.
@@ -34,6 +36,13 @@ private:
     size_t checksRun;
     size_t failures;
 };
+
+/** @brief The bytes of a text, in the form the cooker stores target code. */
+inline std::vector<std::byte> BytesOf(std::string_view text)
+{
+    const std::span<const std::byte> bytes = std::as_bytes(std::span{ text });
+    return std::vector<std::byte>{ bytes.begin(), bytes.end() };
+}
 
 } // namespace lodestone::tests
 

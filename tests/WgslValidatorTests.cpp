@@ -169,7 +169,7 @@ int main()
     runner.BeginSection("agreeing reflection passes the cross-check");
     const std::vector<ReflectedBinding> agreeing = MakeAgreeingReflection();
     std::vector<const ReflectedBinding*> agreeingPointers = PointersTo(agreeing);
-    const CookResult<BindingComparison> match = validator.ValidateEntryPoint(k_Wgsl, agreeingPointers, sink);
+    const CookResult<BindingComparison> match = validator.ValidateEntryPoint(std::as_bytes(std::span{ k_Wgsl }), agreeingPointers, sink);
     runner.Check(match.has_value(), "valid WGSL and agreeing reflection produce a result, not an error");
     runner.Check(match.has_value() && match->Matches, "reflection that agrees with the emitted text passes");
     runner.Check(match.has_value() && match->Report.empty(), "a passing comparison reports nothing");
@@ -181,7 +181,7 @@ int main()
     wrongKind[0].Kind = BindingKind::StorageBuffer;
     std::vector<const ReflectedBinding*> wrongKindPointers = PointersTo(wrongKind);
     const CookResult<BindingComparison> kindMismatch =
-        validator.ValidateEntryPoint(k_Wgsl, wrongKindPointers, sink);
+        validator.ValidateEntryPoint(std::as_bytes(std::span{ k_Wgsl }), wrongKindPointers, sink);
     runner.Check(kindMismatch.has_value() && !kindMismatch->Matches,
                  "a uniform declared as a storage buffer fails");
     runner.Check(kindMismatch.has_value() && !kindMismatch->Report.empty(),
@@ -194,7 +194,7 @@ int main()
     wrongAccess[2].Access = ResourceAccess::ReadOnly;
     std::vector<const ReflectedBinding*> wrongAccessPointers = PointersTo(wrongAccess);
     const CookResult<BindingComparison> accessMismatch =
-        validator.ValidateEntryPoint(k_Wgsl, wrongAccessPointers, sink);
+        validator.ValidateEntryPoint(std::as_bytes(std::span{ k_Wgsl }), wrongAccessPointers, sink);
     runner.Check(accessMismatch.has_value() && !accessMismatch->Matches,
                  "a read-write storage buffer reflected as read-only fails");
 
@@ -205,7 +205,7 @@ int main()
     notDepth[6].Shape = MakeTextureShape(ResourceShape::Texture2D, true, false);
     std::vector<const ReflectedBinding*> notDepthPointers = PointersTo(notDepth);
     const CookResult<BindingComparison> depthMismatch =
-        validator.ValidateEntryPoint(k_Wgsl, notDepthPointers, sink);
+        validator.ValidateEntryPoint(std::as_bytes(std::span{ k_Wgsl }), notDepthPointers, sink);
     runner.Check(depthMismatch.has_value() && !depthMismatch->Matches,
                  "a depth texture reflected without the shadow flag fails");
 
@@ -217,7 +217,7 @@ int main()
     structured[1].Shape = MakeBufferShape(true);
     std::vector<const ReflectedBinding*> structuredPointers = PointersTo(structured);
     const CookResult<BindingComparison> structuredResult =
-        validator.ValidateEntryPoint(k_Wgsl, structuredPointers, sink);
+        validator.ValidateEntryPoint(std::as_bytes(std::span{ k_Wgsl }), structuredPointers, sink);
     runner.Check(structuredResult.has_value() && structuredResult->Matches,
                  "a storage buffer reflected as structured still matches, because the shape is not a wgsl kind");
 
@@ -226,7 +226,7 @@ int main()
     wrongName[1].Name = "SomeOtherBuffer";
     std::vector<const ReflectedBinding*> wrongNamePointers = PointersTo(wrongName);
     const CookResult<BindingComparison> nameMismatch =
-        validator.ValidateEntryPoint(k_Wgsl, wrongNamePointers, sink);
+        validator.ValidateEntryPoint(std::as_bytes(std::span{ k_Wgsl }), wrongNamePointers, sink);
     runner.Check(nameMismatch.has_value() && !nameMismatch->Matches,
                  "a binding whose name disagrees fails");
 
@@ -235,7 +235,7 @@ int main()
     missing.pop_back();
     std::vector<const ReflectedBinding*> missingPointers = PointersTo(missing);
     const CookResult<BindingComparison> missingBinding =
-        validator.ValidateEntryPoint(k_Wgsl, missingPointers, sink);
+        validator.ValidateEntryPoint(std::as_bytes(std::span{ k_Wgsl }), missingPointers, sink);
     runner.Check(missingBinding.has_value() && !missingBinding->Matches,
                  "a wgsl declaration with no reflection record fails");
 
@@ -244,7 +244,7 @@ int main()
                                   MakeBufferShape(false), ResourceAccess::ReadOnly));
     std::vector<const ReflectedBinding*> extraPointers = PointersTo(extra);
     const CookResult<BindingComparison> extraBinding =
-        validator.ValidateEntryPoint(k_Wgsl, extraPointers, sink);
+        validator.ValidateEntryPoint(std::as_bytes(std::span{ k_Wgsl }), extraPointers, sink);
     runner.Check(extraBinding.has_value() && !extraBinding->Matches,
                  "a reflection record the wgsl never declares fails");
 
@@ -252,7 +252,7 @@ int main()
     // A parse failure is a different outcome from a mismatch: the validator returns an error, not a
     // `BindingComparison`. The sink prints the Tint diagnostics on purpose.
     constexpr std::string_view k_Broken = "this is not valid wgsl @group";
-    const CookResult<BindingComparison> broken = validator.ValidateEntryPoint(k_Broken, agreeingPointers, sink);
+    const CookResult<BindingComparison> broken = validator.ValidateEntryPoint(std::as_bytes(std::span{ k_Broken }), agreeingPointers, sink);
     runner.Check(!broken.has_value(), "source Tint cannot parse produces an error");
     runner.Check(!broken.has_value() && broken.error() == lodestone::CookError::TargetValidationEntryPointParseFailed,
                  "the error names the parse failure");
@@ -273,13 +273,13 @@ int main()
     if (wgslProfile.has_value() && wgslProfile->Validator != nullptr)
     {
         const CookResult<BindingComparison> throughProfile =
-            wgslProfile->Validator->ValidateEntryPoint(k_Wgsl, agreeingPointers, sink);
+            wgslProfile->Validator->ValidateEntryPoint(std::as_bytes(std::span{ k_Wgsl }), agreeingPointers, sink);
         runner.Check(throughProfile.has_value() && match.has_value() &&
                          throughProfile->Matches == match->Matches,
                      "the profile validator agrees with a direct one on output that matches");
 
         const CookResult<BindingComparison> mismatchThroughProfile =
-            wgslProfile->Validator->ValidateEntryPoint(k_Wgsl, extraPointers, sink);
+            wgslProfile->Validator->ValidateEntryPoint(std::as_bytes(std::span{ k_Wgsl }), extraPointers, sink);
         runner.Check(mismatchThroughProfile.has_value() && extraBinding.has_value() &&
                          mismatchThroughProfile->Matches == extraBinding->Matches &&
                          mismatchThroughProfile->Report == extraBinding->Report,

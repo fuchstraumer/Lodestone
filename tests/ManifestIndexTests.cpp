@@ -134,7 +134,7 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space, Keep keep, Ac
 
     module.EntryPoints.push_back(
         lodestone::LibraryEntryPoint{ .Name = "MainCS", .Stage = lodestone::ShaderStageKind::Compute });
-    module.Sources.emplace_back("// wgsl for the test module");
+    module.Sources.emplace_back(lodestone::tests::BytesOf("// wgsl for the test module"));
 
     lodestone::ReflectedBinding binding;
     binding.Name = "Data";
@@ -220,15 +220,13 @@ bool ShadeActiveWhenDither(const std::array<uint32_t, 4>& digits, uint32_t axis_
 // can go once this returns. An emit failure returns no bytes, and the open that follows reports it.
 std::vector<std::byte> EmitBytes(const lodestone::CookedLibrary& library)
 {
-    const lodestone::CookResult<std::string> manifest = EmitShaderManifest(library);
+    lodestone::CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library);
     if (!manifest.has_value())
     {
         return {};
     }
 
-    std::vector<std::byte> bytes(manifest->size());
-    std::memcpy(bytes.data(), manifest->data(), manifest->size());
-    return bytes;
+    return std::move(*manifest);
 }
 
 lodestone::CookedProfile MakeProfile(std::string target_name)
@@ -287,7 +285,7 @@ lodestone::CookedModule BuildTileModule(std::string name, const PermutationSpace
     module.Space = &space;
     module.EntryPoints.push_back(
         lodestone::LibraryEntryPoint{ .Name = "MainCS", .Stage = lodestone::ShaderStageKind::Compute });
-    module.Sources.emplace_back("// wgsl for a tile module");
+    module.Sources.emplace_back(lodestone::tests::BytesOf("// wgsl for a tile module"));
     module.ResourceLists.emplace_back();
     module.FootprintLists.emplace_back();
     module.VisibilityLists.emplace_back();

@@ -55,8 +55,8 @@ CookedModule MakeSmallModule()
     module.EntryPoints.push_back(
         lodestone::LibraryEntryPoint{ .Name="MainCS", .Stage=lodestone::ShaderStageKind::Compute });
 
-    module.Sources.emplace_back("// wgsl for variant zero");
-    module.Sources.emplace_back("// wgsl for variant one");
+    module.Sources.emplace_back(lodestone::tests::BytesOf("// wgsl for variant zero"));
+    module.Sources.emplace_back(lodestone::tests::BytesOf("// wgsl for variant one"));
 
     lodestone::ReflectedBinding binding;
     binding.Name = "IfftInput";
@@ -115,18 +115,11 @@ CookedLibrary MakeSpirvLibrary()
 {
     CookedLibrary library = MakeSmallLibrary();
     CookedModule module = MakeSmallModule();
-    module.Sources = { std::string(8u, '\x01'), std::string(12u, '\x02') };
+    module.Sources = { std::vector<std::byte>(8u, std::byte{ 0x01 }), std::vector<std::byte>(12u, std::byte{ 0x02 }) };
     library.Environments = {};
     library.Environments.emplace_back(std::nullopt);
     library.Environments.emplace_back(std::move(module));
     return library;
-}
-
-std::vector<std::byte> ToBytes(const std::string& manifest)
-{
-    std::vector<std::byte> bytes(manifest.size());
-    std::memcpy(bytes.data(), manifest.data(), manifest.size());
-    return bytes;
 }
 
 template<typename ValueType>
@@ -168,13 +161,13 @@ int main()
     lodestone::tests::TestRunner runner{ "ShaderManifestRejectTests" };
 
     const CookedLibrary library = MakeSmallLibrary();
-    const lodestone::CookResult<std::string> manifest = EmitShaderManifest(library);
+    const lodestone::CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library);
     runner.Check(manifest.has_value(), "the emitter accepts the library");
     if (!manifest.has_value())
     {
         return runner.Report();
     }
-    const std::vector<std::byte> valid = ToBytes(*manifest);
+    const std::vector<std::byte>& valid = *manifest;
     const Header header = ReadRecord<Header>(valid, 0u);
 
     runner.BeginSection("a manifest the cooker wrote opens and reads back");
@@ -273,13 +266,13 @@ int main()
                  "a SPIR-V environment whose source is not whole words is rejected when it opens");
 
     const CookedLibrary spirvLibrary = MakeSpirvLibrary();
-    const lodestone::CookResult<std::string> spirvManifest = EmitShaderManifest(spirvLibrary);
+    const lodestone::CookResult<std::vector<std::byte>> spirvManifest = EmitShaderManifest(spirvLibrary);
     runner.Check(spirvManifest.has_value(), "the emitter accepts a SPIR-V environment");
     if (spirvManifest.has_value())
     {
         runner.Check(lodestone::VerifyManifestRoundTrip(spirvLibrary, *spirvManifest) == lodestone::CookError::Success,
                      "the round trip reads the SPIR-V words back through SpirvWords");
-        const std::vector<std::byte> spirvBytes = ToBytes(*spirvManifest);
+        const std::vector<std::byte>& spirvBytes = *spirvManifest;
         const ManifestResult<BundleView> spirvBundle = BundleView::Open(spirvBytes);
         const ManifestResult<EnvironmentView> spirvEnvironment =
             spirvBundle.has_value() ? spirvBundle->OpenEnvironment(1u, 0u)

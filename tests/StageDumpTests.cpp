@@ -57,7 +57,7 @@ CompiledVariant MakeVariant(uint64_t index, const std::string& suffix, std::stri
     CompiledEntryPoint entryPoint;
     entryPoint.Name = "MainCS";
     entryPoint.VariantSuffix = suffix;
-    entryPoint.Code = std::move(code);
+    entryPoint.Code = lodestone::tests::BytesOf(code);
     entryPoint.Reflection.Name = "MainCS";
     entryPoint.Reflection.Stage = ShaderStageKind::Compute;
     entryPoint.Reflection.Workgroup = WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u };
@@ -138,7 +138,7 @@ RawModule BuildRawModule()
     entryPoint.Name = "MainCS";
     entryPoint.Stage = ShaderStageKind::Compute;
     entryPoint.Workgroup = WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u };
-    entryPoint.TargetText = "// the target text never reaches a dump\n";
+    entryPoint.TargetCode = lodestone::tests::BytesOf("// the target text never reaches a dump\n");
     entryPoint.UsedBindingIndices.push_back(1u);
 
     RawModule module;
@@ -464,7 +464,7 @@ void CheckCookedDumpDetectsChange(lodestone::tests::TestRunner& runner)
         return;
     }
 
-    changed.Sources[0].push_back('X');
+    changed.Sources[0].push_back(std::byte{ 'X' });
     runner.Check(DumpCookedModule(original) != DumpCookedModule(changed),
                  "one changed byte of source moves the dump");
 

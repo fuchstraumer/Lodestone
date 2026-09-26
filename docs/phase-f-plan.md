@@ -269,3 +269,7 @@ commit.
     version and the format byte). New WGSL baseline: `ae72f733...`. 22 of 22 tests, 30 of 30 known-good
     dumps. Debug builds. `ShaderManifestRejectTest` and `ManifestIndexTest` pass in Debug.
   - Next: F1.4.
+- 2026-09-25. **F1.4 is the author's to write.** `CMakeLists.txt` links `SPIRV-Tools-static` and
+  `SPIRV-Headers::SPIRV-Headers` to `lodestone`, with no switch. `docs/phase-f-f14-guide.md` holds the
+  guide: three decisions (scope separator, byte parameter, capability path), the API calls, and the
+  data-format facts, each checked with a scratch probe on KitchenSink SPIR-V.

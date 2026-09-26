@@ -158,8 +158,8 @@ that `tests/CMakeLists.txt` supplies.
 `--single-threaded`, `--no-dedupe`, `--verify-deterministic`, `--dump-stage=<name>`, and
 `--dump-sources`. `--dump-sources` writes every unique compiled source to a subfolder
 `<module>_<target>_sources`, beside a `SourceTable.json` that names each variant by its axis description
-and its source hashes. A WGSL file starts with a comment that names its variants. A SPIR-V file (`.spv`)
-holds the words only, so `spirv-dis` and `spirv-val` read it. The output sink creates the subfolder.
+and its source hashes. Each file holds the target code only (`.wgsl` or `.spv`), so Tint, `spirv-dis`,
+and `spirv-val` read it directly. The output sink creates the subfolder.
 
 A value flag is a row in `k_ValueFlags`, beside `k_SwitchFlags`. Add a row, not a branch.
 

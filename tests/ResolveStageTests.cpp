@@ -350,7 +350,7 @@ void TestEntryPoints(TestRunner& runner, DiagnosticSink& sink)
     raw.VariantSuffix = "_S512_W1";
     raw.Stage = ShaderStageKind::Compute;
     raw.Workgroup = { .X = 8u, .Y = 8u, .Z = 1u };
-    raw.TargetText = "@compute fn SpectrumUpdate() {}";
+    raw.TargetCode = lodestone::tests::BytesOf("@compute fn SpectrumUpdate() {}");
     raw.UsedBindingIndices = { 0u };
 
     RawVariant variant = MakeVariantWithOneBuffer();
@@ -366,7 +366,7 @@ void TestEntryPoints(TestRunner& runner, DiagnosticSink& sink)
     }
 
     const auto& entryPoint = resolved.value().EntryPoints.front();
-    runner.Check(entryPoint.Code == "@compute fn SpectrumUpdate() {}",
+    runner.Check(entryPoint.Code == lodestone::tests::BytesOf("@compute fn SpectrumUpdate() {}"),
                  "the target text becomes the code, unread and unchanged");
     runner.Check(entryPoint.Name == "SpectrumUpdate" && entryPoint.Reflection.Name == "SpectrumUpdate",
                  "the entry point name reaches both the record and its reflection");
