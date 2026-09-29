@@ -7,6 +7,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace lodestone
 {
@@ -45,6 +46,10 @@ struct BindingComparison
 {
     bool Matches{ false };
     std::string Report;
+    /** Capabilities read back by the validator, based on what the shader code requested or declares
+      * This happens as a separate pass bc especially with SPIR-V there's a whole tangled nest of 
+      * related,nested,dependent etc caps and features that are really easy to miss otherwise */
+    std::vector<std::string> Capabilities;
 };
 
 /**@brief A valuble second opinon about what one entry point really declared. The emitted artifact

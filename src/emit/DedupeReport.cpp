@@ -292,7 +292,15 @@ std::string GenerateDedupeReport(const CookedLibrary& library)
         report += std::format("  hash function: {}\n", module.SourceTable.HashName);
         report += std::format("  hash collisions resolved by byte compare: {}\n", collisions);
         report += std::format("  byte comparisons forced by a hash hit: {}\n", comparisons);
-        report += "  normalization passes active: (none)\n\n";
+        report += "  normalization passes active: (none)\n";
+        // What the target's validator read from the emitted code. A device needs all of these to run every variant
+        // (which is not thbe expected case of course, but can set the "ultra" spec or something similar based on hardware support)
+        std::string capabilities;
+        for (const std::string& capability : module.ObservedCapabilities)
+        {
+            capabilities += capabilities.empty() ? capability : std::format(", {}", capability);
+        }
+        report += std::format("  capabilities observed: {}\n\n", capabilities.empty() ? "(none)" : capabilities);
 
         const ModuleInfluence influence = ComputeActualInfluence(module);
         report += EmitInfluenceTable(module, influence);

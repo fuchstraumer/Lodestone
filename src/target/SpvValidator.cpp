@@ -9,12 +9,16 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <expected>
 #include <format>
 #include <span>
+#include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
+#include <magic_enum/magic_enum.hpp>
 
 #include "spirv-tools/libspirv.h"
 #define SPV_ENABLE_UTILITY_CODE
@@ -134,6 +138,24 @@ namespace
 
     void ApplyPendingMembers(ParseState& parse_state);
 
+    /** One resource the SPIR-V declares for the entry point, classified from its variable, pointer, and
+     * pointee records. `Unsupported` names a form this validator does not read yet. */
+    struct DeclaredBinding
+    {
+        uint32_t Group{ 0u };
+        uint32_t Binding{ 0u };
+        BindingKind Kind{ BindingKind::Invalid };
+        ResourceShape Shape{ ResourceShape::Invalid };
+        ResourceAccess Access{ ResourceAccess::Invalid };
+        std::string_view Name;
+        std::string_view Unsupported;
+    };
+
+    std::vector<DeclaredBinding> CollectDeclaredBindings(const ParseState& parse_state);
+
+    BindingComparison CompareBindings(std::span<const DeclaredBinding> declared,
+                                      std::span<const ReflectedBinding*> reflected);
+
 }
 
 SpvValidator::SpvValidator() : context{ spvContextCreate(SPV_ENV_VULKAN_1_2) }
@@ -153,8 +175,65 @@ CookResult<BindingComparison> SpvValidator::validateEntryPoint(std::span<const s
                                                                std::span<const ReflectedBinding*> bindings,
                                                                DiagnosticSink& sink) const
 {
-    // Implementation goes here
-    return std::unexpected(CookError::Invalid);
+    if (source_code.empty() || (source_code.size() % sizeof(uint32_t)) != 0u)
+    {
+        const std::string errStr =
+            std::format("the SPIR-V entry point is {} bytes, which is not whole words", source_code.size());
+        return std::unexpected(ReportError(sink, CookError::TargetValidationEntryPointParseFailed, errStr));
+    }
+
+    // A copy, so no alignment of the source bytes is assumed
+    std::vector<uint32_t> words(source_code.size() / sizeof(uint32_t));
+    std::memcpy(words.data(), source_code.data(), source_code.size());
+
+    // Legality first: spirv-val with the Vulkan 1.2 rules. Tint gives the WGSL side this for free.
+    spv_diagnostic diagnostic = nullptr;
+    const spv_result_t validResult = spvValidateBinary(context, words.data(), words.size(), &diagnostic);
+    if (validResult != SPV_SUCCESS)
+    {
+        std::string errStr = std::format("spirv-val rejects the entry point: {}",
+                                         (diagnostic != nullptr) ? diagnostic->error : "no diagnostic");
+        spvDiagnosticDestroy(diagnostic);
+        return std::unexpected(ReportError(sink, CookError::TargetValidationEntryPointInvalid, std::move(errStr)));
+    }
+    spvDiagnosticDestroy(diagnostic);
+    diagnostic = nullptr;
+
+    ParseState state;
+    const spv_result_t parsed = spvBinaryParse(context,
+                                               &state,
+                                               words.data(),
+                                               words.size(),
+                                               &OnHeader,
+                                               &OnInstruction,
+                                               &diagnostic);
+    // SPV_REQUESTED_TERMINATION is the stop at the first OpFunction: a success
+    if ((parsed != SPV_SUCCESS) && (parsed != SPV_REQUESTED_TERMINATION))
+    {
+        std::string errStr = std::format("the SPIR-V parse failed: {}",
+                                         (diagnostic != nullptr) ? diagnostic->error : "no diagnostic");
+        spvDiagnosticDestroy(diagnostic);
+        return std::unexpected(ReportError(sink, CookError::TargetValidationEntryPointParseFailed, std::move(errStr)));
+    }
+    spvDiagnosticDestroy(diagnostic);
+
+    ApplyPendingMembers(state);
+
+    std::vector<DeclaredBinding> declared = CollectDeclaredBindings(state);
+    // the interface list is not sorted. `bindings` arrives sorted by (group, binding).
+    std::ranges::sort(declared, {}, [](const DeclaredBinding& binding)
+    {
+        return std::make_tuple(binding.Group, binding.Binding);
+    });
+
+    BindingComparison comparison = CompareBindings(declared, bindings);
+    comparison.Capabilities.reserve(state.Capabilities.size());
+    for (const std::string_view capability : state.Capabilities)
+    {
+        comparison.Capabilities.emplace_back(capability);
+    }
+
+    return comparison;
 }
 
 namespace
@@ -611,6 +690,215 @@ namespace
                 break;
             }
         }
+    }
+
+    /** Classifies one interface variable: variable -> pointer type -> pointee type. The storage class sits
+     * on the pointer. Only a variable with a DescriptorSet is a binding: builtins, varyings, and Workgroup
+     * variables have none. */
+    DeclaredBinding ClassifyVariable(const ParseState& parse_state, const IdRecord& variable)
+    {
+        DeclaredBinding declared{ .Group = variable.Group, .Binding = variable.Binding, .Name = variable.Name };
+        const IdRecord& pointer = parse_state.Ids[variable.TypeId];
+        const IdRecord& pointee = parse_state.Ids[pointer.PointeeType];
+
+        if ((pointee.OpCode == spv::Op::OpTypeArray) || (pointee.OpCode == spv::Op::OpTypeRuntimeArray))
+        {
+            declared.Unsupported = "a binding array, which this validator does not read yet";
+            return declared;
+        }
+
+        switch (static_cast<spv::StorageClass>(pointer.StorageClass))
+        {
+        case spv::StorageClass::UniformConstant:
+            switch (pointee.OpCode)
+            {
+            case spv::Op::OpTypeSampler:
+                declared.Kind = BindingKind::Sampler;
+                break;
+            case spv::Op::OpTypeSampledImage:
+                declared.Kind = BindingKind::CombinedTextureSampler;
+                break;
+            case spv::Op::OpTypeImage:
+                // Sampled 2 is a storage image, and its access comes from the variable's decorations
+                declared.Kind = (pointee.SampledMode == 2u) ? BindingKind::StorageTexture : BindingKind::Texture;
+                declared.Shape = pointee.Shape;
+                declared.Access = variable.Access;
+                break;
+            default:
+                declared.Unsupported = "a UniformConstant variable of a type this validator does not read";
+                break;
+            }
+            break;
+        case spv::StorageClass::StorageBuffer:
+            // NonWritable on the variable gives read-only (StructuredBuffer), none gives read-write
+            declared.Kind = BindingKind::StorageBuffer;
+            declared.Access = variable.Access;
+            break;
+        case spv::StorageClass::Uniform:
+            declared.Kind = BindingKind::UniformBuffer;
+            break;
+        default:
+            declared.Unsupported = "a storage class this validator does not read";
+            break;
+        }
+
+        return declared;
+    }
+
+    std::vector<DeclaredBinding> CollectDeclaredBindings(const ParseState& parse_state)
+    {
+        std::vector<DeclaredBinding> declared;
+        declared.reserve(parse_state.EntryPoint.Interfaces.size());
+        for (const uint32_t variableId : parse_state.EntryPoint.Interfaces)
+        {
+            const IdRecord& variable = parse_state.Ids[variableId];
+            if (variable.Group == ~0u)
+            {
+                continue;
+            }
+
+            declared.push_back(ClassifyVariable(parse_state, variable));
+        }
+
+        return declared;
+    }
+
+    /** The shape and the access are compared only where both sides state them. SPIR-V states the shape of
+     * an image only. It states the access of a storage buffer and a storage image only: reflection writes
+     * ReadOnly on every sampled texture, and SPIR-V has no word for that. */
+    bool ShapeIsStated(BindingKind kind) noexcept
+    {
+        return (kind == BindingKind::Texture) || (kind == BindingKind::StorageTexture);
+    }
+
+    bool AccessIsStated(BindingKind kind) noexcept
+    {
+        return (kind == BindingKind::StorageBuffer) || (kind == BindingKind::StorageTexture);
+    }
+
+    /** SPIR-V names a scoped variable with dots (`Surface.Material.Albedo`). Reflection joins a scope with
+     * underscores, which is the WGSL spelling (`todo.md` holds the scope question). Set and binding already
+     * agree when this runs, so the last segment is enough to find a wrong resource at the right slot. */
+    std::string_view LastNameSegment(std::string_view spirv_name) noexcept
+    {
+        const size_t lastDot = spirv_name.rfind('.');
+        return (lastDot == std::string_view::npos) ? spirv_name : spirv_name.substr(lastDot + 1u);
+    }
+
+    void CompareOneBinding(const DeclaredBinding& declared,
+                           const ReflectedBinding& reflected,
+                           BindingComparison& comparison)
+    {
+        const auto report = [&declared, &comparison](std::string_view what)
+        {
+            comparison.Matches = false;
+            comparison.Report += std::format("  spir-v declares set {} binding {} {} : {}\n",
+                                             declared.Group,
+                                             declared.Binding,
+                                             declared.Name,
+                                             what);
+        };
+
+        if (!declared.Unsupported.empty())
+        {
+            report(declared.Unsupported);
+            return;
+        }
+
+        const std::string_view declaredName = StripSlangNameMangling(LastNameSegment(declared.Name));
+        if (declaredName != reflected.Name)
+        {
+            report(std::format("reflection has mismatched name \"{}\"", reflected.Name));
+        }
+
+        if (declared.Kind != reflected.Kind)
+        {
+            report(std::format("declared as {}, reflection has kind {}", ToString(declared.Kind), ToString(reflected.Kind)));
+            return;
+        }
+
+        if (ShapeIsStated(declared.Kind) && (declared.Shape != reflected.Shape))
+        {
+            report(std::format("declared with shape {}, reflection has shape {}",
+                               ToString(declared.Shape),
+                               ToString(reflected.Shape)));
+        }
+
+        if (AccessIsStated(declared.Kind) && (declared.Access != reflected.Access))
+        {
+            report(std::format("declared with access {}, reflection has access {}",
+                               magic_enum::enum_name(declared.Access),
+                               magic_enum::enum_name(reflected.Access)));
+        }
+    }
+
+    /** Both lists are sorted by (set, binding), so one pass of two iterators compares them: O(N + M), the
+     * same walk as the WGSL validator. */
+    BindingComparison CompareBindings(std::span<const DeclaredBinding> declared,
+                                      std::span<const ReflectedBinding*> reflected)
+    {
+        BindingComparison comparison;
+        comparison.Matches = true;
+        auto iterDeclared = declared.begin();
+        auto iterReflected = reflected.begin();
+
+        while ((iterDeclared != declared.end()) && (iterReflected != reflected.end()))
+        {
+            const DeclaredBinding& declaredBinding = *iterDeclared;
+            const ReflectedBinding& reflectedBinding = **iterReflected;
+            const auto declaredTuple = std::make_tuple(declaredBinding.Group, declaredBinding.Binding);
+            const auto reflectedTuple = std::make_tuple(GroupOf(reflectedBinding), BindingOf(reflectedBinding));
+
+            if (declaredTuple == reflectedTuple)
+            {
+                CompareOneBinding(declaredBinding, reflectedBinding, comparison);
+                ++iterDeclared;
+                ++iterReflected;
+            }
+            else if (declaredTuple < reflectedTuple)
+            {
+                comparison.Matches = false;
+                comparison.Report += std::format("  spir-v declares set {} binding {} {} : reflection has no binding "
+                                                 "at that location\n",
+                                                 declaredBinding.Group,
+                                                 declaredBinding.Binding,
+                                                 declaredBinding.Name);
+                ++iterDeclared;
+            }
+            else
+            {
+                comparison.Matches = false;
+                comparison.Report += std::format("  reflection has set {} binding {} {} : spir-v has no binding "
+                                                 "at that location\n",
+                                                 std::get<0>(reflectedTuple),
+                                                 std::get<1>(reflectedTuple),
+                                                 reflectedBinding.Name);
+                ++iterReflected;
+            }
+        }
+
+        for (; iterDeclared != declared.end(); ++iterDeclared)
+        {
+            comparison.Matches = false;
+            comparison.Report += std::format("  spir-v declares set {} binding {} {} : reflection has no binding "
+                                             "at that location\n",
+                                             iterDeclared->Group,
+                                             iterDeclared->Binding,
+                                             iterDeclared->Name);
+        }
+
+        for (; iterReflected != reflected.end(); ++iterReflected)
+        {
+            const ReflectedBinding& reflectedBinding = **iterReflected;
+            comparison.Matches = false;
+            comparison.Report += std::format("  reflection has set {} binding {} {} : spir-v has no binding at that "
+                                             "location\n",
+                                             GroupOf(reflectedBinding),
+                                             BindingOf(reflectedBinding),
+                                             reflectedBinding.Name);
+        }
+
+        return comparison;
     }
 }
 

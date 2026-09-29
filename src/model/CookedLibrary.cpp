@@ -196,6 +196,7 @@ CookedModule FreezeModuleTables(InternedModule&& interned)
     module.FootprintLists = interned.FootprintListInterner.ConsumeTable();
     module.VisibilityLists = interned.VisibilityInterner.ConsumeTable();
     module.RasterStates = interned.RasterInterner.ConsumeTable();
+    module.ObservedCapabilities = std::move(interned.ObservedCapabilities);
 
     module.SourceTable = DescribeTable(interned.SourceInterner);
     module.ResourceTable = DescribeTable(interned.ResourceInterner);

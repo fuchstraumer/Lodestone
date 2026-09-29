@@ -119,7 +119,8 @@ enum class CookError : uint16_t
 
     // start of target validation errors
     TargetValidatorUnavailable = 300,
-    TargetValidationEntryPointParseFailed = 301
+    TargetValidationEntryPointParseFailed = 301,
+    TargetValidationEntryPointInvalid = 302
 };
 
 constexpr bool operator!(CookError error) noexcept

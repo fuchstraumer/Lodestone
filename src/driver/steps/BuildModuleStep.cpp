@@ -42,8 +42,10 @@ namespace
     // reflection cross check: reads emitted text back and compares it against what the reflection
     // claims for the source text. each target decides how to read it's own output, so if `target`
     // is not valid or doesn't contain a validator the function will simply return 0 mismatches.
+    // The capabilities the validator reads are merged into `observed_capabilities`, sorted and unique.
     CookResult<uint32_t> ValidateResolvedLibrary(const TargetProfile& target,
                                                  const CompiledVariant& variant,
+                                                 std::vector<std::string>& observed_capabilities,
                                                  DiagnosticSink& diagnostics);
     void ReportUnreferencedBindings(const CompiledVariant& variant, DiagnosticSink& diagnostics);
     [[nodiscard]] CookResult<CookStatistics> CompileModuleVariants(const SharedCookState& shared_state,
@@ -208,6 +210,7 @@ namespace
 
     CookResult<uint32_t> ValidateResolvedLibrary(const TargetProfile& target,
                                                  const CompiledVariant& variant,
+                                                 std::vector<std::string>& observed_capabilities,
                                                  DiagnosticSink& diagnostics)
     {
         if (target.Validator == nullptr)
@@ -239,7 +242,18 @@ namespace
                 // (e.g, the backend parser failed to parse the entry point code)
                 return std::unexpected(comparison.error());
             }
-            else if (!comparison->Matches)
+
+            // a module declares a handful of capabilities, so a sorted insert stays cheap
+            for (const std::string& capability : comparison->Capabilities)
+            {
+                const auto position = std::ranges::lower_bound(observed_capabilities, capability);
+                if ((position == observed_capabilities.end()) || (*position != capability))
+                {
+                    observed_capabilities.insert(position, capability);
+                }
+            }
+
+            if (!comparison->Matches)
             {
                 ++mismatchCount;
                 const std::string warningStr =
@@ -325,7 +339,10 @@ namespace
             if (shared_state.Options.ValidateAgainstEmittedText)
             {
                 const CookResult<uint32_t> mismatches =
-                    ValidateResolvedLibrary(target, variant, *shared_state.Diagnostics);
+                    ValidateResolvedLibrary(target,
+                                            variant,
+                                            interned_module.ObservedCapabilities,
+                                            *shared_state.Diagnostics);
                 if (!mismatches)
                 {
                     return std::unexpected(mismatches.error());

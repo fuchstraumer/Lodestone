@@ -3,6 +3,7 @@
 #include "LodestoneConfig.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "target/SpvValidator.hpp"
 #include <array>
 #include <algorithm>
 #include <expected>
@@ -38,6 +39,8 @@ namespace
     constexpr std::string_view k_WgslName = "wgsl";
     constexpr std::string_view k_SpirvName = "spirv";
 
+    static SpvValidator k_SpvValidator;
+
 #if LODESTONE_ENABLE_WGSL
     static WgslValidator k_WgslValidator;
     const ResolvedLibraryValidator* const k_WgslProfileValidator = &k_WgslValidator;
@@ -48,8 +51,7 @@ namespace
 
     // Slang has no WGSL profile. It ignores a profile that does not imply the target, so the old
     // `spirv_1_4` changed nothing (measured on KitchenSink, 2026-09-25).
-    // Vulkan 1.2 guarantees SPIR-V 1.5 (decision O5). The validator comes in phase F step F1.4, so a spirv
-    // cook needs --no-validate until then.
+    // Vulkan 1.2 guarantees SPIR-V 1.5 (decision O5).
     const std::array<TargetProfile, 2u> k_TargetProfiles
     {
         TargetProfile{ .Name = k_WgslName,
@@ -61,7 +63,7 @@ namespace
                            .Language = TargetLanguage::Spirv,
                            .SlangProfileName = "spirv_1_5",
                            .Access = AccessModel::Bound,
-                           .Validator = nullptr },
+                           .Validator = &k_SpvValidator },
     };
 
     constexpr std::array<std::string_view, 2u> k_TargetProfileNames

@@ -105,7 +105,10 @@ struct InternedModule
     ContentInterner<ResourceList> ResourceListInterner{ &HashResourceList, k_HashName };
     ContentInterner<FootprintList> FootprintListInterner{ &HashFootprintList, k_HashName };
     ContentInterner<VisibilityList> VisibilityInterner{ &HashVisibilityList, k_HashName };
-    ContentInterner<ReflectedRasterState> RasterInterner{ &HashReflectedRasterState, k_HashName };
+    ContentInterner<ReflectedRasterState> RasterInterner{ &HashReflectedRasterState, k_HashName };'
+    // Required capabilities read back from the target's validator in any variant, stored as names since those
+    // are easiest to associate with renderer runtime caps (e.g., Vulkan device features/extensions)
+    std::vector<std::string> ObservedCapabilities;
 
     void DisableDedupe() noexcept
     {
@@ -136,6 +139,7 @@ struct CookedModule
     std::vector<ReflectedRasterState> RasterStates;
     std::vector<VariantKey> VariantKeys;
     std::vector<LibraryVariant> Variants;
+    std::vector<std::string> ObservedCapabilities;
 
     TableStatistics SourceTable;
     TableStatistics ResourceTable;
