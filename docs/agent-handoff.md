@@ -15,8 +15,8 @@ earlier update. Git history holds the full text.
 
 | Configuration | Build | Tests | Known-good dumps |
 |---|---|---|---|
-| RelWithDebInfo, `ninja-msvc` | green | 22 of 22 | 30 of 30 |
-| Debug, `ninja-msvc` | green | 21 of 22: all but `KitchenSinkCookTest` (section 3, item 3) | — |
+| RelWithDebInfo, `ninja-msvc` | green | 23 of 23 | 30 of 30 |
+| Debug, `ninja-msvc` | green | Not run in full since F1.4. `SpvValidatorTest` passes. Skip `KitchenSinkCookTest` (section 3, item 3). | — |
 
 - Phases D and E are complete. E8 closed Phase E. Its final measurements are in
   `docs/phase-e-data-driven-permutations.md` §11a.
@@ -269,6 +269,9 @@ One line for each update. Git history holds the full text.
   built and wired into the driver. The round trip gained key-decode and axis-mask checks.
 - **2026-09-23.** `TableRef` and format version 5. Strong index types were tried and removed. The view
   types were added.
+- **2026-09-28.** F1.1 to F1.4 done. `spirv` is a second target with its own validator (`SpvValidator`, on
+  SPIRV-Tools). Manifest format version 7 records the code format. The dedupe report prints the
+  capabilities each environment needs. `docs/phase-f-plan.md` section 7 holds the detail.
 - **2026-09-25.** F0 reviewed. Two style rules added to `.github/copilot-instructions.md`: an array
   initializer opens its brace on a new line, and a value leaves `std::expected` through
   `std::move(*result)`. `CLAUDE.md` ("Builtin modules") records what `EmbeddedFileSystem` covers.

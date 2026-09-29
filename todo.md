@@ -18,6 +18,13 @@
     actually supports
     - Alternatively, use foresight about output target to fail builds if unsupported
 # Resource Layer
+- Reflection joins a scope with `_` (`JoinScopeName` in `SlangReflector.cpp`), which is the WGSL
+  spelling. SPIR-V uses `.`. Store `.`, and let each validator make its own form. `SpvValidator` compares
+  the last name segment only until then.
+- `SpvValidator` reads more than it compares. Pass the `CompiledEntryPoint` to the validator, then compare
+  the LocalSize, the member layout (Offset, ArrayStride, MatrixStride, and the inverted matrix major), the
+  vertex inputs, the color targets, and `WritesFragDepth`. Add a per-variant hook for the vertex-to-fragment
+  link check.
 - Record the capabilities that each entry point needs. Today no cook records them, because Slang warning
   41012 is off (phase F plan, O7). Read them from the target output (SPIR-V `OpCapability`). Collate them
   for each variant.

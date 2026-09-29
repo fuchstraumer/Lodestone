@@ -82,9 +82,9 @@ it exits 1 on `NoOutputSpecified`, which reads like a failure rather than a usag
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
-Twenty-two test targets exist. Seventeen are unit tests, and each one proves a claim the repository
-makes. Sixteen need no Slang and no asset, and together they run in about half a second.
-`WgslValidatorTest` links Tint to read WGSL. `AccessModelRejectTest` cooks two small modules through
+Twenty-three test targets exist. Eighteen are unit tests, and each one proves a claim the repository
+makes. Seventeen need no Slang and no asset, and together they run in about half a second.
+`WgslValidatorTest` links Tint to read WGSL. `SpvValidatorTest` links SPIRV-Tools to assemble SPIR-V. `AccessModelRejectTest` cooks two small modules through
 Slang, and it takes about one second.
 
 | Target | Proves |
@@ -94,6 +94,7 @@ Slang, and it takes about one second.
 | `PermutationIndexTest` | A variant index is unique, dense, and stable, and a partial assignment resolves to one variant. |
 | `ShaderManifestRejectTest` | The bundle reader rejects a short, misaligned, or damaged file, and opens a real one. It rejects an unknown code format and a SPIR-V source that is not whole words, and reads SPIR-V back as words. It also proves that the header region opens alone, that an extent read on its own opens against that bundle, that an environment the cook skipped reads as absent, and that a damaged directory entry or variant key table is rejected by name. |
 | `WgslValidatorTest` | The WGSL cross-check on Tint. It parses fixed WGSL, reads the used bindings from Tint's inspector, and compares them against hand-written reflection. It proves a match, and a mismatch of kind, shape, access, or name. It also proves that a comparison sampler and a depth texture read back correctly, that a storage buffer's structured or raw shape does not change the WGSL kind, and that invalid WGSL is a parse error, not a mismatch. |
+| `SpvValidatorTest` | The SPIR-V cross-check on SPIRV-Tools. It assembles Slang's own output for one entry point from text, and compares it against hand-written reflection. It proves a match, a moved binding, a missing and an extra binding, and a mismatch of kind, access, name, and depth shape. It proves that a builtin in the interface list is not read as a binding, that the capabilities read back, and that a module spirv-val rejects, or code that is not whole words, is an error and not a mismatch. |
 | `ReflectionSchemaTest` | The pure data of the binding schema, with no Slang. The `ResourceShape` flag layout (a base shape in the low nibble plus array, multisample, shadow, and feedback flags, read with `GetBaseShape`), the `ToString` tables for `ResourceShape`, `BindingKind`, and `TextureSampleType`, and the `ReflectedUniformMember` equality that dedup rests on, which includes matrix layout and element stride. It also proves that every `CookError` band has names, above the 127 limit of magic_enum's default range. |
 | `StageDumpTest` | A stage dump holds the model and no target text, it names itself the way `--dump-stage` names it, and two dumps of one input agree byte for byte. |
 | `SymbolTableTest` | The tokenizer that powers axis-reachability pruning: it strips `extern static const` declarations and reserved keywords, and reports the axis names no reachable source uses. |
@@ -166,8 +167,8 @@ A value flag is a row in `k_ValueFlags`, beside `k_SwitchFlags`. Add a row, not 
 `--target` is required, like `-o` and a module path. A cook with no target cooks nothing, so
 `ParseCommandLine` fails with `NoTargetSpecified`. Repeat the flag for more than one target. An unknown
 name is rejected at the command line and never in the driver, so a name that reaches `CookerOptions` is
-a name `FindTargetProfile` accepts. This build has `wgsl` and `spirv`. `spirv` has no validator before
-phase F step F1.4, so a spirv cook needs `--no-validate`.
+a name `FindTargetProfile` accepts. This build has `wgsl` and `spirv`. Each has a validator:
+`WgslValidator` (Tint) and `SpvValidator` (SPIRV-Tools).
 
 `lodestone` must stay `STATIC`. No header marks a symbol `dllexport`, so a DLL build of this target
 exports nothing and every consumer fails to link. A `SHARED` build is for instrumented performance
@@ -193,7 +194,7 @@ is therefore a visible word in a diff: the day a file in `emit/` writes
 | `permute/` | `PermutationValue`, `PermutationAxis`, `PermutationAssignment`, `PermutationSpace`, `PolicyDocument`, `AttributeExpression` | The authoring parameter domain. Stages 1 and 2. Phase E filled this folder. |
 | `compile/` | `SlangCompiler`, `SlangDiagnosticParser`, `RawLibrary`, `Diagnostics`, and `src/compile/impl/` | **The Slang wall. No file outside this folder names a Slang type.** |
 | `model/` | `ResolveStage`, `ShaderDataSchema`, `ContentHash`, `ContentInterner`, `CookedLibrary` | The data that flows, interns, and freezes. Stages 4, 6, and 7. |
-| `target/` | `TargetProfile`, `TargetUtils`, `WgslValidator` | A target, its access model, and its validator. Phase F fills this folder. |
+| `target/` | `TargetProfile`, `TargetUtils`, `WgslValidator`, `SpvValidator` | A target, its access model, and its validator. Phase F fills this folder. |
 | `emit/` | `ShaderLibraryEmitter`, `ShaderManifestEmitter`, `OutputSink`, `StageDump`, `DedupeReport` | Everything that writes through a sink. Stage 8, plus the two reports. |
 | `driver/` | `CookerDriver`, `CookerOptions` | The loop and its command line. |
 
@@ -219,7 +220,8 @@ four headers and nothing else.
 There is no `validate/` folder, and that is worth knowing. Three of the four validators are functions
 inside the file they check: `VerifyLibraryRoundTrip` and `VerifyLayoutRoundTrip` live in
 `src/driver/CookerDriver.cpp`, and `VerifyManifestRoundTrip` lives in
-`src/emit/ShaderManifestEmitter.cpp`. Only `WgslValidator` is its own file. The tree cannot show
+`src/emit/ShaderManifestEmitter.cpp`. Only the reflection cross-check has its own files, one for each
+target: `WgslValidator` and `SpvValidator`. The tree cannot show
 that validators rank beside stages, and no arrangement of the current files would.
 
 ## The two problem domains

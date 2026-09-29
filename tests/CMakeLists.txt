@@ -98,6 +98,10 @@ add_lodestone_unit_test(ShaderManifestRejectTest ShaderManifestRejectTests.cpp)
 if (LODESTONE_ENABLE_WGSL)
     add_lodestone_unit_test(WgslValidatorTest WgslValidatorTests.cpp)
 endif()
+# The SPIR-V cross-check. The test assembles its fixture with the SPIRV-Tools assembler, so it links
+# SPIRV-Tools itself. No switch: Slang builds SPIRV-Tools in every configuration.
+add_lodestone_unit_test(SpvValidatorTest SpvValidatorTests.cpp)
+target_link_libraries(SpvValidatorTest PRIVATE SPIRV-Tools-static)
 add_lodestone_unit_test(ReflectionSchemaTest ReflectionSchemaTests.cpp)
 add_lodestone_unit_test(DiagnosticParserTest DiagnosticParserTests.cpp)
 add_lodestone_unit_test(ResolveStageTest ResolveStageTests.cpp)

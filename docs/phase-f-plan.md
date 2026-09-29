@@ -273,3 +273,25 @@ commit.
   `SPIRV-Headers::SPIRV-Headers` to `lodestone`, with no switch. `docs/phase-f-f14-guide.md` holds the
   guide: three decisions (scope separator, byte parameter, capability path), the API calls, and the
   data-format facts, each checked with a scratch probe on KitchenSink SPIR-V.
+- 2026-09-28. **F1.4 done**, not committed. The author wrote the parse (`src/target/SpvValidator.cpp`),
+  and the agent finished it on her request. The first half is staged, the rest is not.
+  - The parse: one flat record for each id, sized from the header's id bound. It stops at the first
+    `OpFunction`. Member names and decorations are deferred and applied after the parse, because they
+    come before `OpTypeStruct`. Constants and spec constants record their raw bits. `OpSpecConstantOp`
+    is marked derived and not evaluated.
+  - The check: `spvValidateBinary` (Vulkan 1.2 rules) first, then the parse, then a merge walk against
+    reflection on (set, binding). It compares the kind always, the shape of an image, the access of a
+    storage buffer or storage image, and the last segment of the name (the scope separator is in
+    `todo.md`). A spirv-val rejection is `TargetValidationEntryPointInvalid` (302).
+  - Capabilities: `BindingComparison::Capabilities`, merged into `InternedModule::ObservedCapabilities`,
+    frozen onto `CookedModule`, and printed in the dedupe report for each environment. `--no-validate`
+    gives none.
+  - Proof: `SpvValidatorTest` (15 checks). A validated `--target=spirv` cook of KitchenSink,
+    `EntryPointParams`, `ParameterBlocks`, `InterfaceAxisTest`, and `EnumAxisTest` finds no mismatch. Both
+    bundles are byte-identical (`ae72f733...`, `e060e442...`). 23 of 23 tests, 30 of 30 known-good dumps.
+    Debug builds.
+  - Found by the report: KsGeometry needs `Float16` and `StorageInputOutput16` (16-bit varyings), and
+    KsPost needs `DrawParameters`. Both are device features, not Vulkan 1.2 guarantees.
+  - Deferred (they need the `CompiledEntryPoint` in the validator signature): the LocalSize check, the
+    member layout check (F4.5), vertex inputs and color targets, and the vertex-to-fragment link check.
+  - Next: F1.5.
