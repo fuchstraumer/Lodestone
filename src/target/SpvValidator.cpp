@@ -9,11 +9,8 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
 #include <expected>
 #include <format>
-#include <limits>
-#include <print>
 #include <span>
 #include <string_view>
 #include <utility>
@@ -32,10 +29,11 @@ namespace
     {
         ShaderStageKind Stage{ ShaderStageKind::Invalid };
         std::string_view Name;
-        // Variables attached to the entry point
+        // Variables attached to the entry point. From SPIR-V 1.4 this lists every global the entry point
+        // uses, in every storage class. It is not sorted.
         std::vector<uint32_t> Interfaces;
         bool LocalSizeFromIds{ false };
-        // holds the LocalSize directly, or the IDs of the size constants otehrwise
+        // holds the LocalSize directly, or the IDs of the size constants otherwise
         uint32_t LocalSizeX{ 0u };
         uint32_t LocalSizeY{ 0u };
         uint32_t LocalSizeZ{ 0u };
@@ -46,7 +44,9 @@ namespace
         uint32_t TypeId{ 0u };
         uint32_t Offset{ ~0u };
         uint32_t MatrixStride{ 0u };
-        uint32_t MatrixMajor{ 0u }; // 1 = row-major, 0 = column-major (in SPIR-V)
+        // The SPIR-V decoration, as written. Slang writes ColMajor for what its reflection calls RowMajor
+        // (measured on KsGeometry ViewProjection, 2026-09-26), so a comparison must invert it.
+        MatrixLayout MatrixMajor{ MatrixLayout::Invalid };
         std::string_view Name;
     };
 
@@ -54,32 +54,57 @@ namespace
     {
         uint32_t StructId{ 0u };
         uint32_t MemberIndex{ 0u };
+        // Max marks a member name (OpMemberName) rather than a decoration
         spv::Decoration Decoration{ spv::Decoration::Max };
         std::span<const uint32_t> Values;
+        // names are read from the debug section, which is before
+        // the actual structs, so we have to also store the name here temporarily.
+        std::string_view Name;
+    };
+
+    /** How an id holds a value. Only a `Spec` record with a SpecId is a pipeline input. `SpecDerived` is an
+     * expression over other constants (OpSpecConstantOp, OpSpecConstantComposite), with no value here. */
+    enum class ConstantKind : uint8_t
+    {
+        None = 0,
+        Constant,
+        Spec,
+        SpecDerived,
     };
 
     /** Initially called this resource info bc I thought we'd be able to go right into
-    / * that mapping concept, but really we need to track individual SPIR-V ID records.
+      * that mapping concept, but really we need to track individual SPIR-V ID records.
       * This won't become a concept we could recognize as a resource until after parse */
     struct IdRecord
     {
         std::string_view Name;
-        uint32_t Binding{ std::numeric_limits<uint32_t>::max() };
-        uint32_t Group{ std::numeric_limits<uint32_t>::max() };
+        uint32_t Binding{ ~0u };
+        uint32_t Group{ ~0u };
         // assume RW by default, because of SPIR-V's behavior being "opt out" focused
         ResourceAccess Access{ ResourceAccess::ReadWrite };
         bool Block{ false };
-        spv::Op OpCode{ 0u };
+        spv::Op OpCode{ spv::Op::OpNop };
         uint32_t StorageClass{ 0u };
         uint32_t PointeeType{ 0u };
         uint32_t TypeId{ 0u };
         ResourceShape Shape{ ResourceShape::Invalid };
-        uint8_t IsSampled{ 0u };
+        // OpTypeImage "Sampled": 0 decided at runtime, 1 sampled, 2 storage
+        uint8_t SampledMode{ 0u };
         uint32_t SampledType{ 0u };
         uint32_t Format{ 0u };
         uint32_t FirstMember{ 0u };
         uint32_t MemberCount{ 0u };
-        std::span<const uint32_t> Values;
+        uint32_t SpecId{ ~0u };
+        // OpTypeInt / OpTypeFloat
+        uint32_t ScalarWidth{ 0u };
+        bool ScalarSigned{ false };
+        // OpTypeArray / OpTypeRuntimeArray. LengthId names a constant, and is 0 for a runtime array.
+        uint32_t ElementType{ 0u };
+        uint32_t LengthId{ 0u };
+        uint32_t ArrayStride{ 0u };
+        ConstantKind Constant{ ConstantKind::None };
+        // raw bits: the type record says how to read them
+        uint64_t ConstantBits{ 0u };
     };
 
     struct ParseState
@@ -96,8 +121,6 @@ namespace
         spv::AddressingModel AddressingModel{ spv::AddressingModel::Max };
     };
 
-    BindingComparison CompareBindings();
-
     spv_result_t OnHeader(void* user_data,
                           spv_endianness_t endianness,
                           uint32_t magic,
@@ -105,10 +128,12 @@ namespace
                           uint32_t generator,
                           uint32_t id_bound,
                           uint32_t schema);
-    
+
     spv_result_t OnInstruction(void* user_data,
                                const spv_parsed_instruction_t* inst);
-                            
+
+    void ApplyPendingMembers(ParseState& parse_state);
+
 }
 
 SpvValidator::SpvValidator() : context{ spvContextCreate(SPV_ENV_VULKAN_1_2) }
@@ -142,6 +167,7 @@ namespace
                           uint32_t id_bound,
                           uint32_t schema)
     {
+        // every id is below id_bound, so a flat table indexed by id replaces a map
         ParseState* parseState = static_cast<ParseState*>(user_data);
         parseState->Ids.resize(id_bound);
         return SPV_SUCCESS;
@@ -161,71 +187,62 @@ namespace
         parse_state.Extensions.emplace_back(extensionName);
     }
 
+    ShaderStageKind StageFromExecutionModel(spv::ExecutionModel exec_model) noexcept
+    {
+        switch (exec_model)
+        {
+        case spv::ExecutionModel::Vertex:
+            return ShaderStageKind::Vertex;
+        case spv::ExecutionModel::TessellationControl:
+            return ShaderStageKind::TessellationControl;
+        case spv::ExecutionModel::TessellationEvaluation:
+            return ShaderStageKind::TessellationEvaluation;
+        case spv::ExecutionModel::Geometry:
+            return ShaderStageKind::Geometry;
+        case spv::ExecutionModel::Fragment:
+            return ShaderStageKind::Fragment;
+        case spv::ExecutionModel::GLCompute:
+            return ShaderStageKind::Compute;
+        case spv::ExecutionModel::TaskNV:
+        case spv::ExecutionModel::TaskEXT:
+            return ShaderStageKind::Task;
+        case spv::ExecutionModel::MeshNV:
+        case spv::ExecutionModel::MeshEXT:
+            return ShaderStageKind::Mesh;
+        case spv::ExecutionModel::RayGenerationKHR:
+            return ShaderStageKind::RayGeneration;
+        case spv::ExecutionModel::IntersectionKHR:
+            return ShaderStageKind::Intersection;
+        case spv::ExecutionModel::AnyHitKHR:
+            return ShaderStageKind::AnyHit;
+        case spv::ExecutionModel::ClosestHitKHR:
+            return ShaderStageKind::ClosestHit;
+        case spv::ExecutionModel::MissKHR:
+            return ShaderStageKind::Miss;
+        case spv::ExecutionModel::CallableKHR:
+            return ShaderStageKind::Callable;
+        default:
+            return ShaderStageKind::Invalid;
+        }
+    }
+
     void OnOpEntryPoint(ParseState& parse_state,
                         std::span<const uint32_t> words,
                         std::span<const spv_parsed_operand_t> operands)
     {
-
-        // execution model is in words[1]
+        // execution model is in words[1]. Slang names every entry point "main": the original name is on
+        // the OpName of the function id.
         EntryPointInfo entryPoint;
-        spv::ExecutionModel execModel = static_cast<spv::ExecutionModel>(words[1]);
-        switch (execModel)
-        {
-        case spv::ExecutionModel::Vertex:
-            entryPoint.Stage = ShaderStageKind::Vertex;
-            break;
-        case spv::ExecutionModel::TessellationControl:
-            entryPoint.Stage = ShaderStageKind::TessellationControl;
-            break;
-        case spv::ExecutionModel::TessellationEvaluation:
-            entryPoint.Stage = ShaderStageKind::TessellationEvaluation;
-            break;
-        case spv::ExecutionModel::Geometry:
-            entryPoint.Stage = ShaderStageKind::Geometry;
-            break;
-        case spv::ExecutionModel::Fragment:
-            entryPoint.Stage = ShaderStageKind::Fragment;
-            break;
-        case spv::ExecutionModel::GLCompute:
-            entryPoint.Stage = ShaderStageKind::Compute;
-            break;
-        case spv::ExecutionModel::TaskNV:
-        case spv::ExecutionModel::TaskEXT:
-            entryPoint.Stage = ShaderStageKind::Task;
-            break;
-        case spv::ExecutionModel::MeshNV:
-        case spv::ExecutionModel::MeshEXT:
-            entryPoint.Stage = ShaderStageKind::Mesh;
-            break;
-        case spv::ExecutionModel::RayGenerationKHR:
-            entryPoint.Stage = ShaderStageKind::RayGeneration;
-            break;
-        case spv::ExecutionModel::IntersectionKHR:
-            entryPoint.Stage = ShaderStageKind::Intersection;
-            break;
-        case spv::ExecutionModel::AnyHitKHR:
-            entryPoint.Stage = ShaderStageKind::AnyHit;
-            break;
-        case spv::ExecutionModel::ClosestHitKHR:
-            entryPoint.Stage = ShaderStageKind::ClosestHit;
-            break;
-        case spv::ExecutionModel::MissKHR:
-            entryPoint.Stage = ShaderStageKind::Miss;
-            break;
-        case spv::ExecutionModel::CallableKHR:
-            entryPoint.Stage = ShaderStageKind::Callable;
-            break;
-        default:
-            entryPoint.Stage = ShaderStageKind::Invalid;
-            break;
-        }
+        entryPoint.Stage = StageFromExecutionModel(static_cast<spv::ExecutionModel>(words[1]));
+        entryPoint.Name = reinterpret_cast<const char*>(words.data() + operands[2].offset);
 
         // actual operands start at 3: 0-2 are exec model, function id, name string
-        for (int16_t i = 3; std::cmp_less(i, operands.size()); ++i)
+        for (size_t i = 3u; i < operands.size(); ++i)
         {
-            parse_state.EntryPoint.Interfaces.emplace_back(words[operands[i].offset]);
+            entryPoint.Interfaces.emplace_back(words[operands[i].offset]);
         }
 
+        // LocalSize arrives later (execution modes follow entry points), so nothing is lost here
         parse_state.EntryPoint = std::move(entryPoint);
     }
 
@@ -238,8 +255,8 @@ namespace
     }
 
     void OnOpTypeStruct(ParseState& parse_state,
-                    std::span<const uint32_t> words,
-                    uint32_t result_id)
+                        std::span<const uint32_t> words,
+                        uint32_t result_id)
     {
         IdRecord& record = parse_state.Ids[result_id];
         record.FirstMember = static_cast<uint32_t>(parse_state.Members.size());
@@ -271,6 +288,12 @@ namespace
         case spv::Decoration::Block:
             parse_state.Ids[words[1]].Block = true;
             break;
+        case spv::Decoration::SpecId:
+            parse_state.Ids[words[1]].SpecId = words[3];
+            break;
+        case spv::Decoration::ArrayStride:
+            parse_state.Ids[words[1]].ArrayStride = words[3];
+            break;
         default:
             break;
         }
@@ -278,28 +301,27 @@ namespace
 
     void OnOpMemberDecorate(ParseState& parse_state, std::span<const uint32_t> words)
     {
-        parse_state.PendingMembers.emplace_back(words[1],
-                                                words[2],
-                                                static_cast<spv::Decoration>(words[3]),
-                                                words.subspan(4u));
+        parse_state.PendingMembers.push_back(PendingMemberDecoration{ .StructId = words[1],
+                                                                      .MemberIndex = words[2],
+                                                                      .Decoration = static_cast<spv::Decoration>(words[3]),
+                                                                      .Values = words.subspan(4u) });
     }
 
     void OnOpMemberName(ParseState& parse_state,
                         std::span<const uint32_t> words)
     {
-        const uint32_t structId = words[1];
-        const uint32_t memberIndex = words[2];
-        const uint32_t* nameWords = words.data() + 3u;
-        const char* name = reinterpret_cast<const char*>(nameWords);
-        // Store the member name in the appropriate member record
-        parse_state.Members[parse_state.Ids[structId].FirstMember + memberIndex].Name = name;
+        // OpMemberName is in the debug section, before OpTypeStruct gives the struct its member range.
+        // Defer it like a member decoration.
+        const char* name = reinterpret_cast<const char*>(words.data() + 3u);
+        parse_state.PendingMembers.push_back(PendingMemberDecoration{ .StructId = words[1],
+                                                                      .MemberIndex = words[2],
+                                                                      .Name = name });
     }
 
     void OnOpTypePointer(ParseState& parse_state,
                          std::span<const uint32_t> words,
                          uint32_t result_id)
     {
-        // Handle OpTypePointer instruction
         // words[2] is the storage class
         // words[3] is the type ID
         parse_state.Ids[result_id].StorageClass = words[2];
@@ -310,28 +332,31 @@ namespace
                        std::span<const uint32_t> words,
                        uint32_t result_id)
     {
-        parse_state.Ids[result_id].SampledType = words[2];
+        IdRecord& record = parse_state.Ids[result_id];
+        record.SampledType = words[2];
         const spv::Dim imageDim = static_cast<spv::Dim>(words[3]);
         switch (imageDim)
         {
         case spv::Dim::Dim1D:
-            parse_state.Ids[result_id].Shape |= ResourceShape::Texture1D;
+            record.Shape |= ResourceShape::Texture1D;
             break;
         case spv::Dim::Dim2D:
-            parse_state.Ids[result_id].Shape |= ResourceShape::Texture2D;
+            record.Shape |= ResourceShape::Texture2D;
             break;
         case spv::Dim::Dim3D:
-            parse_state.Ids[result_id].Shape |= ResourceShape::Texture3D;
-            break;    
+            record.Shape |= ResourceShape::Texture3D;
+            break;
         case spv::Dim::Cube:
-            parse_state.Ids[result_id].Shape |= ResourceShape::TextureCube;
+            record.Shape |= ResourceShape::TextureCube;
             break;
         case spv::Dim::SubpassData:
-            parse_state.Ids[result_id].Shape |= ResourceShape::TextureSubpass;
+            record.Shape |= ResourceShape::TextureSubpass;
             break;
         case spv::Dim::Rect:
-            [[fallthrough]]; // what to do for this one?
+            // not valid in Vulkan. The shape stays Invalid, so the comparison reports it.
+            [[fallthrough]];
         case spv::Dim::Buffer:
+            // a texel buffer (BindingKind::TexelBuffer). No asset uses one yet.
             [[fallthrough]];
         default:
             break;
@@ -341,47 +366,46 @@ namespace
         // 1 is the only guaranteed "this is definitely a depth texture" value
         if (words[4] == 1u)
         {
-            parse_state.Ids[result_id].Shape |= ResourceShape::ShadowFlag;
+            record.Shape |= ResourceShape::ShadowFlag;
         }
 
         if (static_cast<bool>(words[5]))
         {
-            parse_state.Ids[result_id].Shape |= ResourceShape::ArrayFlag;
+            record.Shape |= ResourceShape::ArrayFlag;
         }
 
         if (static_cast<bool>(words[6]))
         {
-            parse_state.Ids[result_id].Shape |= ResourceShape::MultisampleFlag;
+            record.Shape |= ResourceShape::MultisampleFlag;
         }
 
-        parse_state.Ids[result_id].IsSampled = static_cast<uint8_t>(words[7]);
-
-        parse_state.Ids[result_id].Format = words[8];
-
-        if (words.size() > 9)
-        {
-            const spv::AccessQualifier accessQualifier = static_cast<spv::AccessQualifier>(words[9]);
-            switch (accessQualifier)
-            {
-            case spv::AccessQualifier::ReadOnly:
-                parse_state.Ids[result_id].Access = ResourceAccess::ReadOnly;
-                break;
-            case spv::AccessQualifier::WriteOnly:
-                parse_state.Ids[result_id].Access = ResourceAccess::WriteOnly;
-                break;
-            case spv::AccessQualifier::ReadWrite:
-                parse_state.Ids[result_id].Access = ResourceAccess::ReadWrite;
-                break;
-            case spv::AccessQualifier::Max:
-                break;
-            }
-        }
+        record.SampledMode = static_cast<uint8_t>(words[7]);
+        record.Format = words[8];
+        // words[9], the access qualifier, is Kernel-only. A Vulkan storage image takes its access from
+        // NonWritable / NonReadable on the variable instead.
     }
 
-    void OnOpVariable(ParseState& parse_state, std::span<const uint32_t> words, uint32_t result_id, uint32_t type_id)
+    void OnOpTypeScalar(ParseState& parse_state, std::span<const uint32_t> words, uint32_t result_id)
     {
-        parse_state.Ids[result_id].TypeId = type_id;
-        parse_state.Ids[type_id].StorageClass = words[3];
+        // OpTypeInt: words[2] width, words[3] signedness. OpTypeFloat: words[2] width (words[3] is an
+        // optional encoding, not a sign).
+        IdRecord& record = parse_state.Ids[result_id];
+        record.ScalarWidth = words[2];
+        record.ScalarSigned = (record.OpCode == spv::Op::OpTypeInt) && (words[3] != 0u);
+    }
+
+    void OnOpTypeArray(ParseState& parse_state, std::span<const uint32_t> words, uint32_t result_id)
+    {
+        // words[2] element type, words[3] the id of the length constant (OpTypeArray only)
+        IdRecord& record = parse_state.Ids[result_id];
+        record.ElementType = words[2];
+        record.LengthId = words.size() > 3u ? words[3] : 0u;
+    }
+
+    void OnOpVariable(ParseState& parse_state, std::span<const uint32_t> words, uint32_t result_id)
+    {
+        // the prelude already stored TypeId (the pointer type)
+        parse_state.Ids[result_id].StorageClass = words[3];
     }
 
     void OnOpExecutionMode(ParseState& parse_state, std::span<const uint32_t> words)
@@ -397,14 +421,14 @@ namespace
 
     void OnOpExecutionModeId(ParseState& parse_state, std::span<const uint32_t> words)
     {
-        if (words.size() < 3)
+        if (words.size() < 6u)
         {
             return;
         }
 
         const spv::ExecutionMode executionMode = static_cast<spv::ExecutionMode>(words[2]);
         if (executionMode == spv::ExecutionMode::LocalSizeId)
-        {   
+        {
             // later pass will have to resolve the values using the IDs: this opcode comes before
             // any of the actual spec constants
             parse_state.EntryPoint.LocalSizeFromIds = true;
@@ -416,23 +440,44 @@ namespace
 
     void OnOpMemoryModel(ParseState& parse_state, std::span<const uint32_t> words)
     {
-        // logical = bound, physicalstoragebuffer64 = pointers
+        // logical = bound, physicalstoragebuffer64 = pointers. The memory model (words[2]) is GLSL450 from
+        // Slang, which is normal for Vulkan: the Vulkan memory model is opt-in.
         parse_state.AddressingModel = static_cast<spv::AddressingModel>(words[1]);
-        const spv::MemoryModel memoryModel = static_cast<spv::MemoryModel>(words[2]);
-        if (memoryModel != spv::MemoryModel::Vulkan)
+    }
+
+    /** OpConstant and OpSpecConstant: words[1] type, words[2] result, words[3..] the value. One word up to 32
+     * bits, two words (low word first) for 64 bits. The True/False forms have no words[3]: the opcode is
+     * the value. */
+    void OnOpConstant(ParseState& parse_state,
+                      std::span<const uint32_t> words,
+                      uint32_t result_id,
+                      ConstantKind kind)
+    {
+        IdRecord& record = parse_state.Ids[result_id];
+        record.Constant = kind;
+        switch (record.OpCode)
         {
-            std::println(stderr, "Memory model is not set to Vulkan? Hunh?");
+        case spv::Op::OpConstantTrue:
+        case spv::Op::OpSpecConstantTrue:
+            record.ConstantBits = 1u;
+            return;
+        case spv::Op::OpConstantFalse:
+        case spv::Op::OpSpecConstantFalse:
+            record.ConstantBits = 0u;
+            return;
+        default:
+            break;
         }
-    }
 
-    void OnOpSpecConstant(ParseState& parse_state, std::span<const uint32_t> words, uint32_t result_id)
-    {
+        if (words.size() > 3u)
+        {
+            record.ConstantBits = words[3];
+        }
 
-    }
-
-    void OnOpConstant(ParseState& parse_state, std::span<const uint32_t> words, uint32_t result_id)
-    {
-
+        if (words.size() > 4u)
+        {
+            record.ConstantBits |= uint64_t{ words[4] } << 32u;
+        }
     }
 
     spv_result_t OnInstruction(void* user_data,
@@ -442,8 +487,14 @@ namespace
         std::span<const uint32_t> words{ inst->words, inst->num_words };
         std::span<const spv_parsed_operand_t> operands{ inst->operands, inst->num_operands };
         const spv::Op opCode = static_cast<spv::Op>(inst->opcode);
-        parseState->Ids[inst->result_id].OpCode = opCode;
-        parseState->Ids[inst->result_id].TypeId = inst->type_id;
+        const uint32_t resultId = inst->result_id;
+        // id 0 is never valid: it means "no result"
+        if (resultId != 0u)
+        {
+            parseState->Ids[resultId].OpCode = opCode;
+            parseState->Ids[resultId].TypeId = inst->type_id;
+        }
+
         switch (opCode)
         {
         case spv::Op::OpCapability:
@@ -459,7 +510,7 @@ namespace
             OnOpName(*parseState, words);
             break;
         case spv::Op::OpTypeStruct:
-            OnOpTypeStruct(*parseState, words, inst->result_id);
+            OnOpTypeStruct(*parseState, words, resultId);
             break;
         case spv::Op::OpDecorate:
             OnOpDecorate(*parseState, words);
@@ -471,13 +522,21 @@ namespace
             OnOpMemberName(*parseState, words);
             break;
         case spv::Op::OpTypePointer:
-            OnOpTypePointer(*parseState, words, inst->result_id);
+            OnOpTypePointer(*parseState, words, resultId);
             break;
         case spv::Op::OpTypeImage:
-            OnOpTypeImage(*parseState, words, inst->result_id);
+            OnOpTypeImage(*parseState, words, resultId);
+            break;
+        case spv::Op::OpTypeInt:
+        case spv::Op::OpTypeFloat:
+            OnOpTypeScalar(*parseState, words, resultId);
+            break;
+        case spv::Op::OpTypeArray:
+        case spv::Op::OpTypeRuntimeArray:
+            OnOpTypeArray(*parseState, words, resultId);
             break;
         case spv::Op::OpVariable:
-            OnOpVariable(*parseState, words, inst->result_id, inst->type_id);
+            OnOpVariable(*parseState, words, resultId);
             break;
         case spv::Op::OpExecutionMode:
             OnOpExecutionMode(*parseState, words);
@@ -488,10 +547,22 @@ namespace
         case spv::Op::OpMemoryModel:
             OnOpMemoryModel(*parseState, words);
             break;
+        case spv::Op::OpConstant:
+        case spv::Op::OpConstantTrue:
+        case spv::Op::OpConstantFalse:
+            OnOpConstant(*parseState, words, resultId, ConstantKind::Constant);
+            break;
+        case spv::Op::OpSpecConstant:
         case spv::Op::OpSpecConstantTrue:
         case spv::Op::OpSpecConstantFalse:
-        case spv::Op::OpSpecConstant:
-            OnOpSpecConstant(*parseState, words, inst->result_id);
+            OnOpConstant(*parseState, words, resultId, ConstantKind::Spec);
+            break;
+        case spv::Op::OpSpecConstantOp:
+        case spv::Op::OpSpecConstantComposite:
+            // an expression over other constants: no value and no SpecId. SPIRV-Tools-opt can fold these
+            // (CreateFreezeSpecConstantValuePass, CreateFoldSpecConstantOpAndCompositePass) when phase F
+            // needs the numbers.
+            parseState->Ids[resultId].Constant = ConstantKind::SpecDerived;
             break;
         case spv::Op::OpFunction:
             // Terminate parsing when a function is encountered, bc everything we care about
@@ -503,6 +574,43 @@ namespace
         }
 
         return SPV_SUCCESS;
+    }
+
+    /** Runs once after the parse. Each struct now has its member range, so each pending entry indexes its
+     * member directly. */
+    void ApplyPendingMembers(ParseState& parse_state)
+    {
+        for (const PendingMemberDecoration& pending : parse_state.PendingMembers)
+        {
+            const IdRecord& structRecord = parse_state.Ids[pending.StructId];
+            if (pending.MemberIndex >= structRecord.MemberCount)
+            {
+                // a member of a struct the parse never reached (it stops at the first function)
+                continue;
+            }
+
+            MemberRecord& member = parse_state.Members[structRecord.FirstMember + pending.MemberIndex];
+            switch (pending.Decoration)
+            {
+            case spv::Decoration::Max:
+                member.Name = pending.Name;
+                break;
+            case spv::Decoration::Offset:
+                member.Offset = pending.Values[0];
+                break;
+            case spv::Decoration::MatrixStride:
+                member.MatrixStride = pending.Values[0];
+                break;
+            case spv::Decoration::RowMajor:
+                member.MatrixMajor = MatrixLayout::RowMajor;
+                break;
+            case spv::Decoration::ColMajor:
+                member.MatrixMajor = MatrixLayout::ColumnMajor;
+                break;
+            default:
+                break;
+            }
+        }
     }
 }
 
