@@ -81,6 +81,16 @@ CookResult<PreparedPermutationSpace> PreparePermutationSpaceStep::operator()(con
         return std::unexpected(policyValidationResult);
     }
 
+    if (policy.FindTargetCoverage(module_name, target_name) == TargetPolicyCoverage::OtherTargetsOnly)
+    {
+        const std::string warningMessage =
+            std::format("Target '{}' in module '{}' has no specific policy coverage, only other targets are covered",
+                        target_name,
+                        module_name);
+                        
+        ReportWarning(*shared_state.Diagnostics, warningMessage);
+    }
+
     const TargetCookPolicy& targetPolicy = policy.FindTargetPolicy(module_name, target_name);
 
     CookResult<VariantSet> variantsResult = space.EnumerateVariants(targetPolicy, *shared_state.Diagnostics);

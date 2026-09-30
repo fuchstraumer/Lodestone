@@ -9,7 +9,9 @@
 #include <expected>
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 
@@ -104,6 +106,14 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input) cons
         }
         // remember, to move properly from expected, dereference the result
         result.Policy = std::move(*policyDocResult);
+
+        // validate policy target names against input (from options) target names
+        std::span<const std::string_view> targetProfileNames = GetTargetProfileNames();
+        CookError validateTargetsError = result.Policy.ValidateTargetNames(targetProfileNames, *result.Diagnostics);
+        if (!validateTargetsError)
+        {
+            return std::unexpected(validateTargetsError);
+        }
     }
 
     // sanity check: do all the module paths exist?

@@ -159,7 +159,7 @@ CookError PolicyDocument::ValidateAgainstSpace(std::string_view module_name,
 
     // now extract names from axes
     auto allAxesStrs = space.Axes() |
-                       std::views::transform([](const PermutationAxis& axis) { return std::string_view{ axis.Name }; }) |
+                       std::views::transform(&PermutationAxis::Name) |
                        std::ranges::to<std::vector<std::string_view>>();
     std::ranges::sort(allAxesStrs);
 
@@ -184,6 +184,52 @@ CookError PolicyDocument::ValidateAgainstSpace(std::string_view module_name,
 size_t PolicyDocument::ModuleCount() const noexcept
 {
     return modules.size();
+}
+
+TargetPolicyCoverage PolicyDocument::FindTargetCoverage(std::string_view module_name,
+                                                        std::string_view target_name) const noexcept
+{
+    const auto moduleIter = modules.find(module_name);
+    if (moduleIter == modules.end())
+    {
+        return TargetPolicyCoverage::NoModuleEntry;
+    }
+
+    const StringMap<TargetCookPolicy>& targets = moduleIter->second.Targets;
+    if (targets.empty())
+    {
+        return TargetPolicyCoverage::NoTargetSections;
+    }
+
+    const auto targetIter = targets.find(target_name);
+    if (targetIter != targets.end())
+    {
+        return TargetPolicyCoverage::Present;
+    }
+
+    return TargetPolicyCoverage::OtherTargetsOnly;
+}
+
+CookError PolicyDocument::ValidateTargetNames(std::span<const std::string_view> target_names,
+                                              DiagnosticSink& sink) const
+{
+    // validate that target names *in the policy* match the provided list of target names
+    // as in, reject unknown names since those could be misspellings 
+    for (const auto& [module_name, module_entry] : modules)
+    {
+        for (const auto& targetName: std::views::keys(module_entry.Targets))
+        {
+            if (!std::ranges::contains(target_names, targetName))
+            {
+                // Use suggest module to provide closest matching valid target name, if available
+                return ReportError(sink,
+                                   CookError::PolicyUnknownTargetName,
+                                   std::format("Unknown target name '{}'", targetName));
+            }
+        }
+    }
+
+    return CookError::Success;
 }
 
 namespace

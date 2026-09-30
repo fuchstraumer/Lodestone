@@ -62,6 +62,18 @@ struct PolicyParseError
     uint32_t Column{ 0u };
 };
 
+/** @brief What the policy document says about a specific (module, target) pair.
+ * `OtherTargetsOnly` as a result will raise a warning, since it's error-prone for 
+ * someone to constrain one target but not others. */
+enum class TargetPolicyCoverage : uint8_t
+{
+    Invalid = 0,
+    NoModuleEntry, // module has no policy coverage at all
+    NoTargetSections, // no per-target policy sections at all
+    Present, // (module, target) pair is covered
+    OtherTargetsOnly, // only other targets have policy coverage
+};
+
 template<typename T>
 using PolicyDocResult = std::expected<T, PolicyParseError>;
 
@@ -89,6 +101,11 @@ public:
                                                  DiagnosticSink& sink) const;
 
     [[nodiscard]] size_t ModuleCount() const noexcept;
+
+    [[nodiscard]] TargetPolicyCoverage FindTargetCoverage(std::string_view module_name,
+                                                          std::string_view target_name) const noexcept;
+    [[nodiscard]] CookError ValidateTargetNames(std::span<const std::string_view> target_names,
+                                                DiagnosticSink& sink) const;
 
 private:
     StringMap<ModulePolicyEntry> modules;

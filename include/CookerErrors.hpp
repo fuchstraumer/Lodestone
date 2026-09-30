@@ -92,6 +92,7 @@ enum class CookError : uint16_t
     PolicyCookIfInvalid = 132,
     PolicyDocumentLoadFailed = 133,
     PolicyInertAxisNotInertWhenCooked = 134,
+    PolicyUnknownTargetName = 135,
 
     // start system errors
     SystemError = 200,
