@@ -98,7 +98,7 @@ Slang, and it takes about one second.
 | `ReflectionSchemaTest` | The pure data of the binding schema, with no Slang. The `ResourceShape` flag layout (a base shape in the low nibble plus array, multisample, shadow, and feedback flags, read with `GetBaseShape`), the `ToString` tables for `ResourceShape`, `BindingKind`, and `TextureSampleType`, and the `ReflectedUniformMember` equality that dedup rests on, which includes matrix layout and element stride. It also proves that every `CookError` band has names, above the 127 limit of magic_enum's default range. |
 | `StageDumpTest` | A stage dump holds the model and no target text, it names itself the way `--dump-stage` names it, and two dumps of one input agree byte for byte. |
 | `SymbolTableTest` | The tokenizer that powers axis-reachability pruning: it strips `extern static const` declarations and reserved keywords, and reports the axis names no reachable source uses. |
-| `PolicyDocumentTest` | The TOML policy reader, its query surface, and its validation of every axis name and value against the declared space. |
+| `PolicyDocumentTest` | The TOML policy reader, its query surface, and its validation of every axis name and value against the declared space. It also proves the four coverage answers (no module entry, no target sections, present, and other targets only) and the rejection of a target name the build does not know. |
 | `DedupeInfluenceTest` | Dedup changes what the tables cost and never what the cook measures. It builds one module in both arms and checks that the axis influence agrees, and that the measurement reads every group of variants. |
 | `DiagnosticParserTest` | The parser reads Slang's machine-readable diagnostic form into a record, and counts the records whose severity is a failure. Codegen reads that count. It names no Slang type, so it needs no compiler. |
 | `ResolveStageTest` | Stage 4 resolves a hand-built `RawVariant` with no Slang present. This test is the proof that the stage 3 and stage 4 split worked, and before phase D step D5 it could not be written at all. |
@@ -552,10 +552,16 @@ and names the case. The reflection reads each case name and its value. The manif
 the value stays a cook-time fact for a size expression to use later.
 
 The cook policy is data, not code. A `PolicyDocument` reads a TOML file through toml++, behind a facade
-in `src/permute/PolicyDocument.cpp` (no toml++ type leaves that file). Each module names an
-`InertAxesForEntryPoints` table and one section for each target profile, and a target section carries
+in `src/permute/PolicyDocument.cpp` (no toml++ type leaves that file). A module can name an
+`InertAxesForEntryPoints` table and a section for each target profile, and a target section carries
 `MaxVariants`, a `CookValues` allow-list, and a `CookIf` predicate. The `--policy-file` option names the
 file. `tests/assets/KitchenSink/KitchenSink.toml` is the reference.
+
+The policy is opt-in (phase F decision O4). A module with no entry, or with no `targets` table, cooks every
+variant with no limit, and the cook says nothing. `FindTargetCoverage` names the one suspicious case: a
+module that has a section for another target and none for the cooked one. That cook continues with no
+limit, and prints a warning that names the module and the target. A section for a target the build does
+not know (`targets.spriv`) fails the load with `PolicyUnknownTargetName`, as an unknown `--target` does.
 
 A `PermutationSpace` owns its axes by value, so a copy would leave every `PermutationBinding` of the
 original aimed at a different object, and a gated axis would then read as absent and quietly reduce the

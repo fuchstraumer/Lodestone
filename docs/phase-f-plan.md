@@ -295,3 +295,15 @@ commit.
   - Deferred (they need the `CompiledEntryPoint` in the validator signature): the LocalSize check, the
     member layout check (F4.5), vertex inputs and color targets, and the vertex-to-fragment link check.
   - Next: F1.5.
+- 2026-09-30. **F1.5 done.** The author wrote the code (`42cd23d`). The agent wrote the tests and the docs,
+  not committed.
+  - `PolicyDocument::FindTargetCoverage` gives `NoModuleEntry`, `NoTargetSections`, `Present`, or
+    `OtherTargetsOnly`. `PreparePermutationSpaceStep` warns on `OtherTargetsOnly`, and the cook continues
+    with no limit (decision O4).
+  - `PolicyDocument::ValidateTargetNames` rejects a target key the build does not know, with
+    `PolicyUnknownTargetName`. `PrepareCookStep` calls it after the load.
+  - Proof: `PolicyDocumentTest` (36 checks, 10 new). KitchenSink for both targets gives no warning, with
+    both hashes unchanged. A copy with only `[KsMaterial.targets.wgsl]` gives one warning on `spirv`, none
+    on `wgsl`. A `targets.spriv` section fails the load. 23 of 23 tests, 30 of 30 known-good dumps.
+  - Open, small: `ValidateTargetNames` does not yet name the module or suggest the nearest name.
+  - Next: F1.6.

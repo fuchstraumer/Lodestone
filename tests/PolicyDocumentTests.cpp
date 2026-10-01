@@ -5,6 +5,7 @@
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
 #include "TestHarness.hpp"
+#include <array>
 #include <string_view>
 
 using lodestone::AxisKind;
@@ -17,6 +18,7 @@ using lodestone::PermutationValue;
 using lodestone::PolicyDocument;
 using lodestone::RecordingDiagnosticSink;
 using lodestone::StderrDiagnosticSink;
+using lodestone::TargetPolicyCoverage;
 using lodestone::tests::TestRunner;
 
 namespace
@@ -167,11 +169,79 @@ void TestValidationAgainstSpace(TestRunner& runner)
 
 } // namespace
 
+// The policy is opt-in (phase F decision O4). A module with no entry, or an entry with no targets table, has
+// no opinion. Only a module that states a policy for some target and not the cooked one is suspicious.
+void TestTargetCoverage(TestRunner& runner)
+{
+    runner.BeginSection("target coverage");
+
+    constexpr std::string_view k_CoveragePolicy = R"toml(
+[InertOnly.InertAxesForEntryPoints]
+MainCS = ["QUALITY"]
+
+[WgslOnly.targets.wgsl]
+MaxVariants = 64
+)toml";
+
+    const auto parsed = PolicyDocument::Parse(k_CoveragePolicy);
+    runner.Check(parsed.has_value(), "the coverage file parses");
+    if (!parsed)
+    {
+        return;
+    }
+    const PolicyDocument& document = *parsed;
+
+    runner.Check(document.FindTargetCoverage("Absent", "spirv") == TargetPolicyCoverage::NoModuleEntry,
+                 "a module the file does not name has no entry");
+    runner.Check(document.FindTargetCoverage("InertOnly", "spirv") == TargetPolicyCoverage::NoTargetSections,
+                 "a module with influence statements only has no target sections");
+    runner.Check(document.FindTargetCoverage("WgslOnly", "wgsl") == TargetPolicyCoverage::Present,
+                 "a target with its own section is present");
+    runner.Check(document.FindTargetCoverage("WgslOnly", "spirv") == TargetPolicyCoverage::OtherTargetsOnly,
+                 "a target with no section, beside one that has a section, is the suspicious case");
+}
+
+// A target key the build does not know is a misspelling until proven otherwise, as an unknown --target is.
+void TestTargetNames(TestRunner& runner)
+{
+    runner.BeginSection("target names");
+
+    constexpr std::array<std::string_view, 2u> k_KnownTargets{ "wgsl", "spirv" };
+
+    const auto known = PolicyDocument::Parse(k_ValidPolicy);
+    runner.Check(known.has_value(), "the valid file parses");
+    if (known)
+    {
+        RecordingDiagnosticSink sink;
+        runner.Check(known->ValidateTargetNames(k_KnownTargets, sink) == CookError::Success,
+                     "sections for known targets are accepted");
+    }
+
+    const auto misspelled = PolicyDocument::Parse("[OceanFft.targets.spriv]\nMaxVariants = 8\n");
+    runner.Check(misspelled.has_value(), "a misspelled target still parses");
+    if (misspelled)
+    {
+        RecordingDiagnosticSink sink;
+        runner.Check(misspelled->ValidateTargetNames(k_KnownTargets, sink) == CookError::PolicyUnknownTargetName,
+                     "a section for an unknown target is rejected by name");
+    }
+
+    const auto noTargets = PolicyDocument::Parse("[OceanFft.InertAxesForEntryPoints]\nMainCS = [\"A\"]\n");
+    if (noTargets)
+    {
+        RecordingDiagnosticSink sink;
+        runner.Check(noTargets->ValidateTargetNames(k_KnownTargets, sink) == CookError::Success,
+                     "a file with no target sections has nothing to reject");
+    }
+}
+
 int main()
 {
     TestRunner runner{ "PolicyDocumentTests" };
     TestParseAndQuery(runner);
     TestParseRejections(runner);
     TestValidationAgainstSpace(runner);
+    TestTargetCoverage(runner);
+    TestTargetNames(runner);
     return runner.Report();
 }
