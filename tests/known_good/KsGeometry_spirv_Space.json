@@ -1,0 +1,50 @@
+{
+    "stage": "space",
+    "module": "KsGeometry",
+    "axisCount": 3,
+    "spaceSize": 16,
+    "axes": [
+        {
+            "name": "TONE_MAP",
+            "kind": "None",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Enum",
+            "values": [
+                "ToneMapOperator::Linear",
+                "ToneMapOperator::Reinhard",
+                "ToneMapOperator::Aces",
+                "ToneMapOperator::Filmic"
+            ],
+            "enumCaseValues": [
+                10,
+                40,
+                20,
+                30
+            ],
+            "activeWhen": null
+        },
+        {
+            "name": "HAS_TANGENTS",
+            "kind": "Technique",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Boolean",
+            "values": [
+                "false",
+                "true"
+            ],
+            "activeWhen": null
+        },
+        {
+            "name": "VERTEX_COLOR",
+            "kind": "Technique",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Boolean",
+            "values": [
+                "false",
+                "true"
+            ],
+            "activeWhen": null
+        }
+    ],
+    "require": []
+}

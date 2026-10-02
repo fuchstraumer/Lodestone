@@ -1,0 +1,86 @@
+{
+    "stage": "space",
+    "module": "KsVolume",
+    "axisCount": 6,
+    "spaceSize": 432,
+    "axes": [
+        {
+            "name": "QUALITY",
+            "kind": "None",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Enum",
+            "values": [
+                "QualityTier::Low",
+                "QualityTier::Medium",
+                "QualityTier::High",
+                "QualityTier::Ultra"
+            ],
+            "enumCaseValues": [
+                3,
+                1,
+                7,
+                2
+            ],
+            "activeWhen": null
+        },
+        {
+            "name": "GRID_SIZE",
+            "kind": "Tuning",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Integral",
+            "values": [
+                "32",
+                "64",
+                "128"
+            ],
+            "activeWhen": null
+        },
+        {
+            "name": "USE_WAVE_OPS",
+            "kind": "Capability",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Boolean",
+            "values": [
+                "false",
+                "true"
+            ],
+            "activeWhen": null
+        },
+        {
+            "name": "WAVE_SIZE",
+            "kind": "Capability",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Integral",
+            "values": [
+                "16",
+                "32",
+                "64"
+            ],
+            "activeWhen": "USE_WAVE_OPS == 1"
+        },
+        {
+            "name": "WRITE_DEBUG",
+            "kind": "Technique",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Boolean",
+            "values": [
+                "false",
+                "true"
+            ],
+            "activeWhen": null
+        },
+        {
+            "name": "NOISE",
+            "kind": "Technique",
+            "earliestBindingTime": "Cook",
+            "valueDomain": "Type",
+            "values": [
+                "PerlinNoise",
+                "ValueNoise",
+                "WorleyNoise"
+            ],
+            "activeWhen": null
+        }
+    ],
+    "require": []
+}

@@ -1,0 +1,536 @@
+{
+    "stage": "variants",
+    "module": "KsGeometry",
+    "variantCount": 16,
+    "spaceSize": 16,
+    "variants": [
+        {
+            "index": 0,
+            "suffix": "_ToneMapOperator::Linear_false_false",
+            "description": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=false, VERTEX_COLOR=false",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ]
+        },
+        {
+            "index": 1,
+            "suffix": "_ToneMapOperator::Linear_false_true",
+            "description": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=false, VERTEX_COLOR=true",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ]
+        },
+        {
+            "index": 2,
+            "suffix": "_ToneMapOperator::Linear_true_false",
+            "description": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=true, VERTEX_COLOR=false",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ]
+        },
+        {
+            "index": 3,
+            "suffix": "_ToneMapOperator::Linear_true_true",
+            "description": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=true, VERTEX_COLOR=true",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Linear"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ]
+        },
+        {
+            "index": 4,
+            "suffix": "_ToneMapOperator::Reinhard_false_false",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=false, VERTEX_COLOR=false",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ]
+        },
+        {
+            "index": 5,
+            "suffix": "_ToneMapOperator::Reinhard_false_true",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=false, VERTEX_COLOR=true",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ]
+        },
+        {
+            "index": 6,
+            "suffix": "_ToneMapOperator::Reinhard_true_false",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=true, VERTEX_COLOR=false",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ]
+        },
+        {
+            "index": 7,
+            "suffix": "_ToneMapOperator::Reinhard_true_true",
+            "description": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=true, VERTEX_COLOR=true",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Reinhard"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ]
+        },
+        {
+            "index": 8,
+            "suffix": "_ToneMapOperator::Aces_false_false",
+            "description": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=false, VERTEX_COLOR=false",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ]
+        },
+        {
+            "index": 9,
+            "suffix": "_ToneMapOperator::Aces_false_true",
+            "description": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=false, VERTEX_COLOR=true",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ]
+        },
+        {
+            "index": 10,
+            "suffix": "_ToneMapOperator::Aces_true_false",
+            "description": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=true, VERTEX_COLOR=false",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ]
+        },
+        {
+            "index": 11,
+            "suffix": "_ToneMapOperator::Aces_true_true",
+            "description": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=true, VERTEX_COLOR=true",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Aces"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ]
+        },
+        {
+            "index": 12,
+            "suffix": "_ToneMapOperator::Filmic_false_false",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=false, VERTEX_COLOR=false",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ]
+        },
+        {
+            "index": 13,
+            "suffix": "_ToneMapOperator::Filmic_false_true",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=false, VERTEX_COLOR=true",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "false"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ]
+        },
+        {
+            "index": 14,
+            "suffix": "_ToneMapOperator::Filmic_true_false",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=true, VERTEX_COLOR=false",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "false"
+                }
+            ]
+        },
+        {
+            "index": 15,
+            "suffix": "_ToneMapOperator::Filmic_true_true",
+            "description": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=true, VERTEX_COLOR=true",
+            "active": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ],
+            "canonical": [
+                {
+                    "axis": "TONE_MAP",
+                    "value": "ToneMapOperator::Filmic"
+                },
+                {
+                    "axis": "HAS_TANGENTS",
+                    "value": "true"
+                },
+                {
+                    "axis": "VERTEX_COLOR",
+                    "value": "true"
+                }
+            ]
+        }
+    ]
+}

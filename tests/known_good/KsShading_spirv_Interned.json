@@ -1,0 +1,101 @@
+{
+    "stage": "interned",
+    "module": "KsShading",
+    "spaceSize": 1,
+    "variantCount": 1,
+    "entryPoints": [],
+    "variants": [
+        {
+            "index": 0,
+            "suffix": "",
+            "description": "",
+            "canonical": [],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [],
+            "visibilityIndices": [],
+            "rasterIndices": [],
+            "workgroups": []
+        }
+    ],
+    "interners": {
+        "sources": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 0,
+            "uniqueEntries": 0,
+            "hashCollisions": 0,
+            "byteComparisons": 0
+        },
+        "resources": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 0,
+            "uniqueEntries": 0,
+            "hashCollisions": 0,
+            "byteComparisons": 0
+        },
+        "resourceLists": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 1,
+            "uniqueEntries": 1,
+            "hashCollisions": 0,
+            "byteComparisons": 0
+        },
+        "footprintLists": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 1,
+            "uniqueEntries": 1,
+            "hashCollisions": 0,
+            "byteComparisons": 0
+        },
+        "visibility": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 0,
+            "uniqueEntries": 0,
+            "hashCollisions": 0,
+            "byteComparisons": 0
+        },
+        "rasterStates": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 0,
+            "uniqueEntries": 0,
+            "hashCollisions": 0,
+            "byteComparisons": 0
+        }
+    },
+    "provenance": {
+        "sources": [],
+        "resources": [],
+        "resourceLists": [
+            {
+                "index": 0,
+                "mappedFrom": [
+                    {
+                        "entryPoint": "",
+                        "variant": "",
+                        "variantIndex": 0
+                    }
+                ]
+            }
+        ],
+        "footprintLists": [
+            {
+                "index": 0,
+                "mappedFrom": [
+                    {
+                        "entryPoint": "",
+                        "variant": "",
+                        "variantIndex": 0
+                    }
+                ]
+            }
+        ],
+        "visibility": [],
+        "rasterStates": []
+    }
+}

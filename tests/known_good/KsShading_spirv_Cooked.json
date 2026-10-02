@@ -1,0 +1,95 @@
+{
+    "stage": "cooked",
+    "module": "KsShading",
+    "spaceSize": 1,
+    "sourceCount": 0,
+    "resourceCount": 0,
+    "resourceListCount": 1,
+    "footprintListCount": 1,
+    "visibilityListCount": 0,
+    "rasterStateCount": 0,
+    "variantCount": 1,
+    "entryPoints": [],
+    "sources": [],
+    "resources": [],
+    "resourceLists": [
+        {
+            "index": 0,
+            "contentHash": 3244421341483603138,
+            "indices": []
+        }
+    ],
+    "footprintLists": [
+        {
+            "index": 0,
+            "contentHash": 3244421341483603138,
+            "footprints": []
+        }
+    ],
+    "visibilityLists": [],
+    "rasterStates": [],
+    "variants": [
+        {
+            "index": 0,
+            "suffix": "",
+            "description": "",
+            "canonical": [],
+            "resourceListIndex": 0,
+            "footprintListIndex": 0,
+            "sourceIndices": [],
+            "visibilityIndices": [],
+            "rasterIndices": [],
+            "workgroups": []
+        }
+    ],
+    "interners": {
+        "sources": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 0,
+            "uniqueEntries": 0,
+            "hashCollisions": 0,
+            "byteComparisons": 0
+        },
+        "resources": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 0,
+            "uniqueEntries": 0,
+            "hashCollisions": 0,
+            "byteComparisons": 0
+        },
+        "resourceLists": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 1,
+            "uniqueEntries": 1,
+            "hashCollisions": 0,
+            "byteComparisons": 0
+        },
+        "footprintLists": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 1,
+            "uniqueEntries": 1,
+            "hashCollisions": 0,
+            "byteComparisons": 0
+        },
+        "visibility": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 0,
+            "uniqueEntries": 0,
+            "hashCollisions": 0,
+            "byteComparisons": 0
+        },
+        "rasterStates": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 0,
+            "uniqueEntries": 0,
+            "hashCollisions": 0,
+            "byteComparisons": 0
+        }
+    }
+}
