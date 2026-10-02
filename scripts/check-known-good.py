@@ -2,7 +2,8 @@
 
 The cooker writes six stage dumps for each module and target. `tests/known_good/` holds one accepted
 copy of each. This script
-cooks the module, compares each dump against its accepted copy, and prints one line for each stage.
+cooks the module once for each target, compares each dump against its accepted copy, and prints one
+line for each stage.
 
 A diff does not always mean a bug, of course. We could have updated the schema by adding, removing,
 or changing fields. The script just reports what changed and where, and that it's correct. To accept
@@ -37,7 +38,8 @@ import tempfile
 
 STAGES = ("Space", "Variants", "Raw", "Resolved", "Interned", "Cooked")
 # The cooker names a dump `<module>_<target>_<Stage>.json`. The known good copy has the same name.
-TARGET = "wgsl"
+# Each target cooks on its own, so a dump of one target never depends on the other.
+TARGETS = ("wgsl", "spirv")
 # The default regime cooks each KitchenSink module on its own, against the KitchenSink policy, and
 # compares its six dumps. Each module's dumps are named by its stem, so the sets never collide.
 DEFAULT_MODULES = (
@@ -80,14 +82,14 @@ def normalize(path: pathlib.Path) -> list:
     return text.replace("\r\n", "\n").split("\n")
 
 
-def cook(cooker: pathlib.Path, module: pathlib.Path, out_directory: pathlib.Path) -> None:
+def cook(cooker: pathlib.Path, module: pathlib.Path, target: str, out_directory: pathlib.Path) -> None:
     """Runs one cook with every stage dump turned on."""
     result = subprocess.run(
         [
             str(cooker),
             "-o",
             str(out_directory),
-            f"--target={TARGET}",
+            f"--target={target}",
             "--dump-stage=all",
             str(module),
             "--policy-file",
@@ -101,20 +103,21 @@ def cook(cooker: pathlib.Path, module: pathlib.Path, out_directory: pathlib.Path
         raise SystemExit(f"the cook failed with exit code {result.returncode}")
 
 
-def check_module(cooker: pathlib.Path, module: pathlib.Path, known_good: pathlib.Path,
+def check_module(cooker: pathlib.Path, module: pathlib.Path, target: str, known_good: pathlib.Path,
                  context: int, accept: bool) -> list:
-    """Cooks one module and compares its six dumps. Returns a label for each stage that differs.
+    """Cooks one module for one target and compares its six dumps. Returns a label for each stage
+    that differs.
 
-    Each dump is named by the module stem, so two modules never write the same file. The report
-    prints the stem beside the stage, so a mixed run stays readable."""
-    stem = module.stem
+    Each dump is named by the module stem and the target, so two cooks never write the same file. The
+    report prints the stem and the target beside the stage, so a mixed run stays readable."""
+    stem = f"{module.stem}_{target}"
     differing = []
     with tempfile.TemporaryDirectory() as temporary:
         out_directory = pathlib.Path(temporary)
-        cook(cooker, module, out_directory)
+        cook(cooker, module, target, out_directory)
 
         for stage in STAGES:
-            name = f"{stem}_{TARGET}_{stage}.json"
+            name = f"{stem}_{stage}.json"
             produced = out_directory / name
             accepted = known_good / name
 
@@ -181,9 +184,11 @@ def main() -> int:
 
     differing = []
     for module in modules:
-        differing.extend(check_module(cooker, module, known_good, arguments.context, arguments.accept))
+        for target in TARGETS:
+            differing.extend(check_module(cooker, module, target, known_good, arguments.context,
+                                          arguments.accept))
 
-    total_stages = len(modules) * len(STAGES)
+    total_stages = len(modules) * len(TARGETS) * len(STAGES)
     if not differing:
         print("all stages match the known good dumps")
         return 0

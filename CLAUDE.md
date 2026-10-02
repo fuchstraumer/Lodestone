@@ -112,14 +112,15 @@ An error check prints a diagnostic to `stderr` on purpose. Read the last line fo
 
 The last five are different. Each one is the cooker driver, and not an assertion suite.
 `tests/CMakeLists.txt` gives each a command line through `TEST_ARGS`, and all five build from
-`CookTest.cpp`. Each one passes `--target=wgsl` and `--verify-deterministic`. Exit code 0 there is a
-real statement: every variant compiled, every reflection agreed with the emitted WGSL, all three round
-trips read back the same bytes, and two cooks agreed byte for byte.
+`CookTest.cpp`. Each one passes `--target=wgsl`, `--target=spirv`, and `--verify-deterministic`, so one
+cook writes a bundle with two profiles. Exit code 0 there is a real statement: every variant compiled
+for both targets, every reflection agreed with the emitted WGSL (Tint) and the emitted SPIR-V
+(SPIRV-Tools), all three round trips read back the same bytes, and two cooks agreed byte for byte.
 
 - `KitchenSinkCookTest` cooks the four KitchenSink modules together against
   `tests/assets/KitchenSink/KitchenSink.toml`. It is the end-to-end coverage of the permutation path:
-  616 variants, every axis domain, nested parameter blocks, and raster state. One cook takes about
-  3.4 seconds in RelWithDebInfo, so the test takes about 7 seconds.
+  616 variants for each target, every axis domain, nested parameter blocks, and raster state. One cook
+  of both targets takes 7 to 9 seconds in RelWithDebInfo, and the test takes about 18 seconds.
 - `EntryPointParamsCookTest` cooks `tests/assets/EntryPointParams.slang`. Three of its four entry
   points declare a `uniform` parameter, and one of those takes a struct with an annotated field.
   Phase E step E0a needed it, and it is the acceptance test for the entry point scope walk. It cooks
@@ -179,8 +180,10 @@ links only `lodestone::client_internal`, never the cooker or Slang. That link li
 the client half stays free of the compiler.
 
 Test shaders live in `tests/assets/`. The KitchenSink set in `tests/assets/KitchenSink/` is the
-reference. `scripts/check-known-good.py` cooks each KitchenSink module on its own and compares its six
-stage dumps against `tests/known_good/`. A dump is named `<module>_<target>_<Stage>.json`.
+reference. `scripts/check-known-good.py` cooks each KitchenSink module on its own, once for each target,
+and compares its six stage dumps against `tests/known_good/`. A dump is named
+`<module>_<target>_<Stage>.json`. The `wgsl` and `spirv` dumps of one module differ only in the code
+length and the code hash. The reflection is the same for both targets.
 
 ## Where the code lives
 

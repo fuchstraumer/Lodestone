@@ -33,6 +33,7 @@ endfunction()
 add_lodestone_unit_test(EntryPointParamsCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/entry_point_params_output"
               --target=wgsl
+              --target=spirv
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/EntryPointParams.slang")
 # The same driver, on the probe module that phase E step E0b needed. `ParameterBlocks.slang` declares
@@ -42,6 +43,7 @@ add_lodestone_unit_test(EntryPointParamsCookTest CookTest.cpp
 add_lodestone_unit_test(ParameterBlocksCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/parameter_blocks_output"
               --target=wgsl
+              --target=spirv
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/ParameterBlocks.slang")
 # The same driver, on the module that phase E step E7 needed. `InterfaceAxisTest.slang` declares an
@@ -53,6 +55,7 @@ add_lodestone_unit_test(ParameterBlocksCookTest CookTest.cpp
 add_lodestone_unit_test(InterfaceAxisCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/interface_axis_output"
               --target=wgsl
+              --target=spirv
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/InterfaceAxis/InterfaceAxisTest.slang")
 # The same driver, on an enum-axis module. `EnumAxisTest.slang` declares an `[ls_axis_enum]` extern
@@ -63,6 +66,7 @@ add_lodestone_unit_test(InterfaceAxisCookTest CookTest.cpp
 add_lodestone_unit_test(EnumAxisCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/enum_axis_output"
               --target=wgsl
+              --target=spirv
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/EnumAxis/EnumAxisTest.slang")
 # The same driver, on the multi-module KitchenSink set. This is the stress and coverage asset: four
@@ -73,6 +77,7 @@ add_lodestone_unit_test(EnumAxisCookTest CookTest.cpp
 add_lodestone_unit_test(KitchenSinkCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/kitchen_sink_output"
               --target=wgsl
+              --target=spirv
               --verify-deterministic
               --policy-file "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KitchenSink.toml"
               "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KsGeometry.slang"

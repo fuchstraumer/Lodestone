@@ -118,6 +118,7 @@ void WriteProfiles(lodestone::JsonWriter& writer, const manifest::BundleView& bu
         writer.BeginObject();
         writer.KeyString("target", bundle.String(profile.TargetNameString));
         writer.KeyString("accessModel", magic_enum::enum_name(profile.AccessModel));
+        writer.KeyString("codeFormat", magic_enum::enum_name(profile.CodeFormat));
         writer.EndObject();
     }
     writer.EndArray();
@@ -333,7 +334,15 @@ void WriteSlot(lodestone::JsonWriter& writer,
 
     if (with_sources)
     {
-        writer.KeyString("source", instance.Source());
+        // SPIR-V is binary, so the dump states its size only. Run spirv-dis on a --dump-sources file to read it.
+        if (view.CodeFormat() == lodestone::ShaderCodeFormat::Spirv)
+        {
+            writer.KeyUInt("spirvBytes", instance.SpirvWords().size_bytes());
+        }
+        else
+        {
+            writer.KeyString("source", instance.Source());
+        }
     }
 
     writer.EndObject();

@@ -43,7 +43,7 @@ for %%T in ("%BIN%\*Test.exe") do (
 
 REM The interface-axis end-to-end cook (phase E step E7). It cooks six variants over a Type axis
 REM crossed with a boolean axis.
-"%BIN%\InterfaceAxisCookTest.exe" -o "%REPO%\build\%PRESET%\tests\interface_axis_output" --target=wgsl --verify-deterministic "%REPO%\tests\assets\InterfaceAxis\InterfaceAxisTest.slang" >nul 2>&1
+"%BIN%\InterfaceAxisCookTest.exe" -o "%REPO%\build\%PRESET%\tests\interface_axis_output" --target=wgsl --target=spirv --verify-deterministic "%REPO%\tests\assets\InterfaceAxis\InterfaceAxisTest.slang" >nul 2>&1
 if !ERRORLEVEL! neq 0 (
     echo [FAIL] InterfaceAxisCookTest
     set "FAILED=1"
@@ -53,7 +53,7 @@ if !ERRORLEVEL! neq 0 (
 
 REM The enum-axis end-to-end cook. It cooks six variants over an Enum axis (three cases addressed by
 REM name, with non-ascending underlying values) crossed with a boolean axis.
-"%BIN%\EnumAxisCookTest.exe" -o "%REPO%\build\%PRESET%\tests\enum_axis_output" --target=wgsl --verify-deterministic "%REPO%\tests\assets\EnumAxis\EnumAxisTest.slang" >nul 2>&1
+"%BIN%\EnumAxisCookTest.exe" -o "%REPO%\build\%PRESET%\tests\enum_axis_output" --target=wgsl --target=spirv --verify-deterministic "%REPO%\tests\assets\EnumAxis\EnumAxisTest.slang" >nul 2>&1
 if !ERRORLEVEL! neq 0 (
     echo [FAIL] EnumAxisCookTest
     set "FAILED=1"
@@ -62,7 +62,7 @@ if !ERRORLEVEL! neq 0 (
 )
 
 REM The same driver, on the probe module for the entry point parameter scope. It cooks one variant.
-"%BIN%\EntryPointParamsCookTest.exe" -o "%REPO%\build\%PRESET%\tests\entry_point_params_output" --target=wgsl --verify-deterministic "%REPO%\tests\assets\EntryPointParams.slang" >nul 2>&1
+"%BIN%\EntryPointParamsCookTest.exe" -o "%REPO%\build\%PRESET%\tests\entry_point_params_output" --target=wgsl --target=spirv --verify-deterministic "%REPO%\tests\assets\EntryPointParams.slang" >nul 2>&1
 if !ERRORLEVEL! neq 0 (
     echo [FAIL] EntryPointParamsCookTest
     set "FAILED=1"
@@ -71,7 +71,7 @@ if !ERRORLEVEL! neq 0 (
 )
 
 REM The same driver, on the probe module for the parameter block walk. It cooks one variant.
-"%BIN%\ParameterBlocksCookTest.exe" -o "%REPO%\build\%PRESET%\tests\parameter_blocks_output" --target=wgsl --verify-deterministic "%REPO%\tests\assets\ParameterBlocks.slang" >nul 2>&1
+"%BIN%\ParameterBlocksCookTest.exe" -o "%REPO%\build\%PRESET%\tests\parameter_blocks_output" --target=wgsl --target=spirv --verify-deterministic "%REPO%\tests\assets\ParameterBlocks.slang" >nul 2>&1
 if !ERRORLEVEL! neq 0 (
     echo [FAIL] ParameterBlocksCookTest
     set "FAILED=1"
@@ -79,10 +79,11 @@ if !ERRORLEVEL! neq 0 (
     echo [ ok ] ParameterBlocksCookTest
 )
 
-REM The multi-module KitchenSink cook. Four consumer modules cook together against one policy. It is
-REM the stress and coverage asset. Exit code 0 states that every variant compiled, every reflection
-REM agreed with the emitted WGSL, every round trip read back, and two cooks agreed byte for byte.
-"%BIN%\KitchenSinkCookTest.exe" -o "%REPO%\build\%PRESET%\tests\kitchen_sink_output" --target=wgsl --verify-deterministic --policy-file "%REPO%\tests\assets\KitchenSink\KitchenSink.toml" "%REPO%\tests\assets\KitchenSink\KsGeometry.slang" "%REPO%\tests\assets\KitchenSink\KsMaterial.slang" "%REPO%\tests\assets\KitchenSink\KsVolume.slang" "%REPO%\tests\assets\KitchenSink\KsPost.slang" >nul 2>&1
+REM The multi-module KitchenSink cook. Four consumer modules cook together against one policy, for
+REM both targets. It is the stress and coverage asset. Exit code 0 states that every variant compiled,
+REM every reflection agreed with the emitted WGSL and SPIR-V, every round trip read back, and two cooks
+REM agreed byte for byte.
+"%BIN%\KitchenSinkCookTest.exe" -o "%REPO%\build\%PRESET%\tests\kitchen_sink_output" --target=wgsl --target=spirv --verify-deterministic --policy-file "%REPO%\tests\assets\KitchenSink\KitchenSink.toml" "%REPO%\tests\assets\KitchenSink\KsGeometry.slang" "%REPO%\tests\assets\KitchenSink\KsMaterial.slang" "%REPO%\tests\assets\KitchenSink\KsVolume.slang" "%REPO%\tests\assets\KitchenSink\KsPost.slang" >nul 2>&1
 if !ERRORLEVEL! neq 0 (
     echo [FAIL] KitchenSinkCookTest
     set "FAILED=1"

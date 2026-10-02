@@ -307,3 +307,21 @@ commit.
     on `wgsl`. A `targets.spriv` section fails the load. 23 of 23 tests, 30 of 30 known-good dumps.
   - Open, small: `ValidateTargetNames` does not yet name the module or suggest the nearest name.
   - Next: F1.6.
+- 2026-10-01. **F1.6 done. F1 is closed.** The agent did the step, not committed.
+  - One cook of KitchenSink with `--target=wgsl --target=spirv` writes a bundle with two profiles (`Wgsl`
+    and `Spirv`, both `Bound`). `manifest_dump` shows that each environment, with its sources, is equal to
+    the environment of the single-target cook. A fresh cache, a warm shared cache, and
+    `--verify-deterministic` give the same bundle (`c690979d...`). One cache directory for two targets is
+    safe.
+  - Cost (decision O3), RelWithDebInfo, warm caches, three runs: one two-target cook takes 8.6 to 9.0 s,
+    and two single cooks take 8.7 to 9.4 s. The difference is about one process start. One session for
+    each profile costs nothing that we can see.
+  - All five cook tests pass `--target=spirv` too. `KitchenSinkCookTest` takes about 18 s in
+    RelWithDebInfo and about 19 minutes in Debug.
+  - `check-known-good.py` cooks each module once for each target. 30 new `<module>_spirv_<Stage>.json`
+    dumps. Before the accept, each one was compared with its WGSL partner. Only the code length and the
+    code hash differ. The reflection is equal for every variant, and each module dedups to the same count
+    of unique sources on both targets.
+  - Proof: 23 of 23 tests (RelWithDebInfo), 60 of 60 known-good dumps. Both single-target hashes are
+    unchanged (`ae72f733...`, `e060e442...`).
+  - Next: F2.
