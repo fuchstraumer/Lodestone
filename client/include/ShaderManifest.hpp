@@ -1,6 +1,7 @@
 #pragma once
 #ifndef LODESTONE_SHADER_MANIFEST_HPP
 #define LODESTONE_SHADER_MANIFEST_HPP
+#include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "VariantKey.hpp"
 #include <cstddef>

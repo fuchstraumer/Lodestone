@@ -1,9 +1,8 @@
 #pragma once
 #ifndef LODESTONE_SHADER_LIBRARY_TYPES_HPP
 #define LODESTONE_SHADER_LIBRARY_TYPES_HPP
-#include "ResourceFlags.hpp"
+#include "EnumClassUtils.hpp"
 #include <cstdint>
-#include <span>
 #include <string_view>
 
 /**
@@ -68,32 +67,34 @@ enum class BindingKind : uint8_t
     PushConstant
 };
 
-enum class ShaderStageKind : uint8_t
+enum class ShaderStageKind : uint32_t
 {
-    Invalid = 0,
-    Vertex,
-    Hull,
-    Domain,
-    Fragment,
-    Compute,
-    RayGeneration,
-    Intersection,
-    AnyHit,
-    ClosestHit,
-    Miss,
-    Callable,
-    Mesh,
-    Amplification,
-    Dispatch,
-    Node,
+    Invalid = 0u,
+    Vertex = 1u << 0u,
+    Hull = 1u << 1u,
+    Domain = 1u << 2u,
+    Fragment = 1u << 3u,
+    Compute = 1u << 4u,
+    RayGeneration = 1u << 5u,
+    Intersection = 1u << 6u,
+    AnyHit = 1u << 7u,
+    ClosestHit = 1u << 8u,
+    Miss = 1u << 9u,
+    Callable = 1u << 10u,
+    Mesh = 1u << 11u,
+    Amplification = 1u << 12u,
+    Dispatch = 1u << 13u,
+    Node = 1u << 14u,
     // These are so old I forgot to add them....
     // putting at end bc they're rare nowadays (god i feel old)
-    TessellationControl,
-    TessellationEvaluation,
-    Geometry,
-    Task,
-    Count
+    TessellationControl = 1u << 15u,
+    TessellationEvaluation = 1u << 16u,
+    Geometry = 1u << 17u,
+    Task = 1u << 18u,
+    Count = Task + 1u, // just enough to compare against numerically (e.g, stage >= Count stuff)
 };
+
+MAKE_ENUM_CLASS_FLAGS(ShaderStageKind)
 
 /** @brief The shape of a bound resource, as the shader declares it. This should be viewed
  * as authoritative, where the CPU side only follows from this.
@@ -189,7 +190,7 @@ enum class AxisKind : uint8_t
     ResourcePresence, // Whether a resource is used (e.g, texture, buffer, etc.)
     Capability, // Whether a specific capability is required, e.g Wave or Subgroup ops
     Tuning, // Often uses a size expression: buffer sizes, wave dims, thread dims, etc
-    Technique // Which technique or algorithm is used: uniform branching
+    Technique, // Which technique or algorithm is used: uniform branching
 };
 
 /** @brief When a permutation axis value is made concrete and discretely bound

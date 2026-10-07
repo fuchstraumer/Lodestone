@@ -1,4 +1,5 @@
 #include "model/ShaderDataSchema.hpp"
+#include "EnumClassUtils.hpp"
 #include "model/ContentHash.hpp"
 #include "ShaderLibraryTypes.hpp"
 
@@ -11,6 +12,7 @@
 #include <string>
 #include <string_view>
 #include <magic_enum/magic_enum.hpp>
+#include <utility>
 
 namespace lodestone
 {
@@ -215,6 +217,14 @@ std::string_view ToString(ShaderStageKind stage) noexcept
         return "Dispatch";
     case ShaderStageKind::Node:
         return "Node";
+    case ShaderStageKind::TessellationControl:
+        return "TessellationControl";
+    case ShaderStageKind::TessellationEvaluation:
+        return "TessellationEvaluation";
+    case ShaderStageKind::Geometry:
+        return "Geometry";
+    case ShaderStageKind::Task:
+        return "Task";
     case ShaderStageKind::Invalid:
         return "Invalid";
     case ShaderStageKind::Count:
