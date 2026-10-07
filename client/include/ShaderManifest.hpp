@@ -54,11 +54,11 @@ enum class ErrorCode : uint32_t
     InvalidResourceListRun = 16,
     InvalidFootprintListRun = 17,
     InvalidVisibilityListRun = 18,
-    InvalidSlotSourceIndex = 19,
-    InvalidSlotVisibilityIndex = 20,
-    InvalidSlotRasterIndex = 21,
+    InvalidEntryPointInstanceSourceIndex = 19,
+    InvalidEntryPointInstanceVisibilityIndex = 20,
+    InvalidEntryPointInstanceRasterIndex = 21,
     InvalidVariantKeyOrder = 22,
-    SlotGridSizeMismatch = 23,
+    EntryPointInstanceGridSizeMismatch = 23,
     InvalidRasterVertexInputRange = 24,
     InvalidRasterColorTargetRange = 25,
     InvalidVertexInput = 26,
@@ -99,7 +99,7 @@ enum class ShaderManifestTable : uint32_t
     VisibilityLists,
     VisibilityIndices,
     EntryPoints,
-    Slots,
+    EntryPointInstances,
     Variants,
     VariantKeys,
     AxisMasks,
@@ -273,15 +273,15 @@ struct alignas(8) EntryPoint
  * - Variant keys and variant records share a size
  * - The axis mask table holds one bitmask per variant. The length of the individual records
  *   is somewhat unique though: ceil(ModuleAxisCount / 64) words per variant, since it's a bitmask
- * - The slot table (a slot being a distinct entrypoint instance) is `VariantCount * EntryPointCount` records.
- *   Thus, the slot for (variant V, entry point E) is at `V * EntryPointCount + E`. */
+ * - The EntryPointInstance table is `VariantCount * EntryPointCount` records.
+ *   Thus, the entry point instance for (variant V, entry point E) is at `V * EntryPointCount + E`. */
 struct alignas(8) EnvironmentHeader
 {
     uint32_t VariantCount{ 0u };
     uint32_t VariantKeyTableOffset{ 0u };
     uint32_t VariantTableOffset{ 0u };
     uint32_t AxisMaskTableOffset{ 0u };
-    uint32_t SlotTableOffset{ 0u };
+    uint32_t EntryPointInstanceTableOffset{ 0u };
     uint32_t Reserved{ 0u };
 
     TableRef Sources{ 0u, 0u };
@@ -411,7 +411,7 @@ struct alignas(8) ColorTarget
 };
 
 /** @brief Runs of vertex inputs and color targets. A compute entry point names a raster record whose
-* counts are both zero, so every slot can name one and no accessor needs a stage test. */
+* counts are both zero, so every EntryPointInstance can name one and no accessor needs a stage test. */
 struct alignas(8) RasterState
 {
     uint32_t FirstVertexInput{ 0u };
@@ -547,6 +547,8 @@ public:
     /** @brief Null when the footprint list is shorter than the resource list. */
     [[nodiscard]] const Footprint* FootprintRecord() const noexcept;
 
+    // totally null view, used for default-construction with MergedResource
+    ResolvedResource() noexcept = default;
 private:
     friend class LayoutRange;
     ResolvedResource(const EnvironmentView* _environment,
@@ -555,6 +557,12 @@ private:
     const EnvironmentView* environment{ nullptr };
     const Binding* record{ nullptr };
     const Footprint* footprint{ nullptr };
+};
+
+struct MergedResource
+{
+    ResolvedResource Resource{};
+    ShaderStageKind Stage{ ShaderStageKind::Invalid };
 };
 
 /** The resources one entry point of one variant reads, in binding order. */
@@ -666,6 +674,7 @@ public:
     [[nodiscard]] std::string_view Source() const noexcept;
     /** @brief The SPIR-V words. Only for a `Spirv` profile. */
     [[nodiscard]] std::span<const uint32_t> SpirvWords() const noexcept;
+    [[nodiscard]] ShaderStageKind Stage() const noexcept;
     [[nodiscard]] WorkgroupSize Workgroup() const noexcept;
     [[nodiscard]] LayoutRange Layout() const noexcept;
     //[[nodiscard]] RasterView Raster() const noexcept;
@@ -675,10 +684,10 @@ public:
 private:
     friend class VariantView;
     EntryPointInstanceView(const EnvironmentView* _environment,
-                           const EntryPointInstance* _slot,
+                           const EntryPointInstance* _entry_point_instance,
                            const Variant* _variant) noexcept;
     const EnvironmentView* environment{ nullptr };
-    const EntryPointInstance* slot{ nullptr };
+    const EntryPointInstance* entryPointInstance{ nullptr };
     const Variant* variant{ nullptr };
 };
 
@@ -794,7 +803,7 @@ private:
 *
 * Every offset inside an extent is relative to the extent start, so the extent can sit in its own buffer.
 * The variant keys, the variant records, and the axis masks are parallel: the position of a key is the
-* index of its variant. The slot for (variant V, entry point E) is at `V * EntryPointCount + E`.
+* index of its variant. The EntryPointInstance for (variant V, entry point E) is at `V * EntryPointCount + E`.
 */
 class EnvironmentView
 {
@@ -826,12 +835,11 @@ public:
     [[nodiscard]] std::span<const uint64_t> AxisMask(uint32_t variant_index) const noexcept;
     [[nodiscard]] bool IsAxisActive(uint32_t variant_index, uint32_t local_axis) const noexcept;
 
-    [[nodiscard]] std::span<const EntryPointInstance> SlotTable() const noexcept;
-    /** @brief One slot for each entry point of this variant, in entry point order. */
-    [[nodiscard]] std::span<const EntryPointInstance> VariantSlots(uint32_t variant_index) const noexcept;
+    [[nodiscard]] std::span<const EntryPointInstance> EntryPointInstanceTable() const noexcept;
+    [[nodiscard]] std::span<const EntryPointInstance> VariantEntryPoints(uint32_t variant_index) const noexcept;
     /** @brief The entry-point specific information for one entry point of one variant, or null when this
      * environment did not cook the key. */
-    [[nodiscard]] const EntryPointInstance* FindSlot(uint32_t entry_point, VariantKey variant) const noexcept;
+    [[nodiscard]] const EntryPointInstance* FindEntryPointInstance(uint32_t entry_point, VariantKey variant) const noexcept;
 
     [[nodiscard]] std::span<const Binding> Bindings() const noexcept;
     [[nodiscard]] const Binding& BindingRecord(uint32_t binding_index) const noexcept;
@@ -847,6 +855,8 @@ public:
     [[nodiscard]] bool WritesFragDepth(uint32_t raster_index) const noexcept;
     [[nodiscard]] std::span<const SpecializationConstant> SpecializationConstants() const noexcept;
 
+    
+
 private:
     ModuleView module;
     uint32_t profileIndex{ 0u };
@@ -854,7 +864,7 @@ private:
     std::span<const VariantKey> variantKeys;
     std::span<const Variant> variants;
     std::span<const uint64_t> axisMasks;
-    std::span<const EntryPointInstance> slots;
+    std::span<const EntryPointInstance> entryPointInstances;
     std::span<const SourceRef> sources;
     std::span<const char> sourceBlob;
     std::span<const Binding> bindings;

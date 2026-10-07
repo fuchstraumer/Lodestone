@@ -22,7 +22,6 @@
 #include <string>
 #include <string_view>
 #include <utility>
-#include <vector>
 
 namespace lodestone::manifest
 {
@@ -277,7 +276,7 @@ std::string DescribeShaderManifestError(const ErrorState& error)
     case ErrorCode::TooSmall:
         out += std::format(" (span is only {} bytes)", error.Detail);
         break;
-    case ErrorCode::SlotGridSizeMismatch:
+    case ErrorCode::EntryPointInstanceGridSizeMismatch:
         out += std::format(" (variant count {})", error.Detail);
         break;
     default:
@@ -556,8 +555,9 @@ ManifestResult<EnvironmentView> EnvironmentView::Open(const BundleView& bundle,
     view.variants = Map<Variant>(extent_bytes, TableRef{ .Offset = parsed.VariantTableOffset, .Count = parsed.VariantCount });
     const TableRef64 axisMaskTableRef{ .Offset = static_cast<uint64_t>(parsed.AxisMaskTableOffset), .Count = maskWordCount };
     view.axisMasks = Map<uint64_t>(extent_bytes, axisMaskTableRef);
-    const TableRef64 slotTableRef{ .Offset = static_cast<uint64_t>(parsed.SlotTableOffset), .Count = slotCount };
-    view.slots = Map<EntryPointInstance>(extent_bytes, slotTableRef);
+    const TableRef64 entryPointInstanceTableRef{
+        .Offset = static_cast<uint64_t>(parsed.EntryPointInstanceTableOffset), .Count = slotCount };
+    view.entryPointInstances = Map<EntryPointInstance>(extent_bytes, entryPointInstanceTableRef);
     view.sources = Map<SourceRef>(extent_bytes, parsed.Sources);
     view.sourceBlob = Map<char>(extent_bytes, parsed.SourceBlob);
     view.bindings = Map<Binding>(extent_bytes, parsed.Bindings);
@@ -671,26 +671,26 @@ bool EnvironmentView::IsAxisActive(uint32_t variant_index, uint32_t local_axis) 
     return ((word >> (local_axis % k_AxisMaskWordBits)) & 1u) != 0u;
 }
 
-std::span<const EntryPointInstance> EnvironmentView::SlotTable() const noexcept
+std::span<const EntryPointInstance> EnvironmentView::EntryPointInstanceTable() const noexcept
 {
-    return slots;
+    return entryPointInstances;
 }
 
-std::span<const EntryPointInstance> EnvironmentView::VariantSlots(uint32_t variant_index) const noexcept
+std::span<const EntryPointInstance> EnvironmentView::VariantEntryPoints(uint32_t variant_index) const noexcept
 {
     const size_t entryPointCount = module.EntryPoints().size();
-    return slots.subspan(static_cast<size_t>(variant_index) * entryPointCount, entryPointCount);
+    return entryPointInstances.subspan(static_cast<size_t>(variant_index) * entryPointCount, entryPointCount);
 }
 
-const EntryPointInstance* EnvironmentView::FindSlot(uint32_t entry_point, VariantKey variant_key) const noexcept
+const EntryPointInstance* EnvironmentView::FindEntryPointInstance(uint32_t entry_point, VariantKey variant_key) const noexcept
 {
     const std::optional<uint32_t> variantIndex = FindVariant(variant_key);
     if (!variantIndex.has_value()) [[unlikely]]
     {
         return nullptr;
     }
-
-    return &VariantSlots(variantIndex.value())[entry_point];
+    std::span<const EntryPointInstance> variantEPs = VariantEntryPoints(variantIndex.value());
+    return &variantEPs[entry_point];
 }
 
 std::span<const Binding> EnvironmentView::Bindings() const noexcept
@@ -955,50 +955,54 @@ ResolvedResource LayoutRange::operator[](uint32_t position) const noexcept
     // A visibility entry is a position in the resource list of the variant, and the footprint list has
     // the same order. This is the one place that resolves that chain.
     const uint32_t local = visible[position];
+    // recall that footprints can be null, this is expected behavior - some resources may not have compile-time sizing info
     const Footprint* footprint = local < footprints.size() ? &footprints[local] : nullptr;
     return ResolvedResource{ environment, &environment->BindingRecord(resources[local]), footprint };
 }
 
 EntryPointInstanceView::EntryPointInstanceView(const EnvironmentView* _environment,
-                                               const EntryPointInstance* _slot,
+                                               const EntryPointInstance* _entry_point_instance,
                                                const Variant* _variant) noexcept
     : environment{ _environment },
-      slot{ _slot },
+      entryPointInstance{ _entry_point_instance },
       variant{ _variant }
 {
 }
 
 std::string_view EntryPointInstanceView::Source() const noexcept
 {
-    return environment->Source(slot->Source);
+    return environment->Source(entryPointInstance->Source);
 }
 
 std::span<const uint32_t> EntryPointInstanceView::SpirvWords() const noexcept
 {
-    return environment->SpirvWords(slot->Source);
+    return environment->SpirvWords(entryPointInstance->Source);
 }
 
 WorkgroupSize EntryPointInstanceView::Workgroup() const noexcept
 {
-    return WorkgroupSize{ .X = slot->WorkgroupX, .Y = slot->WorkgroupY, .Z = slot->WorkgroupZ };
+    return WorkgroupSize{
+        .X = entryPointInstance->WorkgroupX,
+        .Y = entryPointInstance->WorkgroupY,
+        .Z = entryPointInstance->WorkgroupZ };
 }
 
 LayoutRange EntryPointInstanceView::Layout() const noexcept
 {
     return LayoutRange{ environment,
-                        environment->VisibilityList(slot->Visibility),
+                        environment->VisibilityList(entryPointInstance->Visibility),
                         environment->ResourceList(variant->ResourceList),
                         environment->FootprintList(variant->FootprintList) };
 }
 
 uint32_t EntryPointInstanceView::Raster() const noexcept
 {
-    return slot->Raster;
+    return entryPointInstance->Raster;
 }
 
 const EntryPointInstance& EntryPointInstanceView::Record() const noexcept
 {
-    return *slot;
+    return *entryPointInstance;
 }
 
 VariantView::VariantView(const EnvironmentView* _environment, uint32_t _index) noexcept
@@ -1034,12 +1038,14 @@ uint32_t VariantView::EntryPointCount() const noexcept
 
 EntryPointInstanceView VariantView::EntryPoint(uint32_t entry_point) const noexcept
 {
-    return EntryPointInstanceView{ environment, &environment->VariantSlots(index)[entry_point], &Record() };
+    const std::span<const EntryPointInstance> entryPointInstances = environment->VariantEntryPoints(index);
+    return EntryPointInstanceView{ environment, &entryPointInstances[entry_point], &Record() };
 }
 
 const Variant& VariantView::Record() const noexcept
 {
-    return environment->Variants()[index];
+    const std::span<const Variant> variants = environment->Variants();
+    return variants[index];
 }
 
 ShaderSourceProvider::ShaderSourceProvider(EnvironmentView _view,
@@ -1052,7 +1058,7 @@ ShaderSourceProvider::ShaderSourceProvider(EnvironmentView _view,
 std::string_view ShaderSourceProvider::Source(uint32_t entry_point,
                                               VariantKey variant) const noexcept
 {
-    const EntryPointInstance* slot = view.FindSlot(entry_point, variant);
+    const EntryPointInstance* slot = view.FindEntryPointInstance(entry_point, variant);
     assert(slot != nullptr);
     return view.Source(slot->Source);
 }
@@ -1060,7 +1066,7 @@ std::string_view ShaderSourceProvider::Source(uint32_t entry_point,
 std::span<const uint32_t> ShaderSourceProvider::SpirvWords(uint32_t entry_point,
                                                            VariantKey variant) const noexcept
 {
-    const EntryPointInstance* slot = view.FindSlot(entry_point, variant);
+    const EntryPointInstance* slot = view.FindEntryPointInstance(entry_point, variant);
     assert(slot != nullptr);
     return view.SpirvWords(slot->Source);
 }
@@ -1075,7 +1081,7 @@ LayoutRange ShaderSourceProvider::Bindings(uint32_t entry_point, VariantKey vari
 WorkgroupSize ShaderSourceProvider::Workgroup(uint32_t entry_point,
                                               VariantKey variant) const noexcept
 {
-    const EntryPointInstance* slot = view.FindSlot(entry_point, variant);
+    const EntryPointInstance* slot = view.FindEntryPointInstance(entry_point, variant);
     assert(slot != nullptr);
     return WorkgroupSize{ .X = slot->WorkgroupX, .Y = slot->WorkgroupY, .Z = slot->WorkgroupZ };
 }
@@ -1523,7 +1529,7 @@ namespace
                                               context.EntryPointCount,
                                               sizeof(EntryPointInstance),
                                               extentSize);
-        const TableRef64 slotTableLoc{ environment.SlotTableOffset,
+        const TableRef64 slotTableLoc{ environment.EntryPointInstanceTableOffset,
                                        static_cast<uint64_t>(environment.VariantCount) * context.EntryPointCount };
         const bool tableInBounds = TableIsInBounds(slotTableLoc,
                                                    sizeof(EntryPointInstance),
@@ -1531,8 +1537,8 @@ namespace
 
         if (!validGrid || !tableInBounds)
         {
-            return { .Code = ErrorCode::SlotGridSizeMismatch,
-                     .Table = ShaderManifestTable::Slots,
+            return { .Code = ErrorCode::EntryPointInstanceGridSizeMismatch,
+                     .Table = ShaderManifestTable::EntryPointInstances,
                      .Detail = environment.VariantCount };
         }
 
@@ -1697,7 +1703,7 @@ namespace
     {
         const EnvironmentHeader& environment = context.Environment;
         const uint64_t numSlots = context.EntryPointCount * environment.VariantCount;
-        const TableRef64 slotsLoc{ environment.SlotTableOffset, numSlots };
+        const TableRef64 slotsLoc{ environment.EntryPointInstanceTableOffset, numSlots };
         const std::span<const EntryPointInstance> slotSpan = Map<EntryPointInstance>(context.Extent,
                                                                                      slotsLoc);
         for (int32_t i = 0u; std::cmp_less(i, slotSpan.size()); ++i)
@@ -1705,24 +1711,24 @@ namespace
             const EntryPointInstance& slot = slotSpan[i];
             if (slot.Source >= environment.Sources.Count)
             {
-                return { .Code = ErrorCode::InvalidSlotSourceIndex,
-                         .Table = ShaderManifestTable::Slots,
+                return { .Code = ErrorCode::InvalidEntryPointInstanceSourceIndex,
+                         .Table = ShaderManifestTable::EntryPointInstances,
                          .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = slot.Source };
             }
 
             if (slot.Visibility >= environment.VisibilityLists.Count)
             {
-                return { .Code = ErrorCode::InvalidSlotVisibilityIndex,
-                         .Table = ShaderManifestTable::Slots,
+                return { .Code = ErrorCode::InvalidEntryPointInstanceVisibilityIndex,
+                         .Table = ShaderManifestTable::EntryPointInstances,
                          .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = slot.Visibility };
             }
 
             if (slot.Raster >= environment.Rasters.Count)
             {
-                return { .Code = ErrorCode::InvalidSlotRasterIndex,
-                         .Table = ShaderManifestTable::Slots,
+                return { .Code = ErrorCode::InvalidEntryPointInstanceRasterIndex,
+                         .Table = ShaderManifestTable::EntryPointInstances,
                          .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = slot.Raster };
             }
@@ -1763,8 +1769,8 @@ namespace
         const std::span<const uint32_t> visibilityIndices = Map<uint32_t>(extent, environment.VisibilityIndices);
         
         const uint64_t numSlots = context.EntryPointCount * environment.VariantCount;
-        const TableRef64 slotsLoc{ environment.SlotTableOffset, numSlots };
-        const std::span<const EntryPointInstance> slotSpan = Map<EntryPointInstance>(extent, slotsLoc);
+        const TableRef64 slotsLoc{ environment.EntryPointInstanceTableOffset, numSlots };
+        const std::span<const EntryPointInstance> entryPointInstanceSpan = Map<EntryPointInstance>(extent, slotsLoc);
         const size_t entryPointCount = static_cast<size_t>(context.EntryPointCount);
 
         for (int32_t variantIdx = 0; std::cmp_less(variantIdx, variantSpan.size()); ++variantIdx)
@@ -1800,7 +1806,7 @@ namespace
             const std::span<const uint32_t> variantResourceIndices =
                 RunOf(resourceLists, resourceIndexList, variant.ResourceList);
             const std::span<const EntryPointInstance> variantSlots =
-                slotSpan.subspan(static_cast<size_t>(variantIdx) * entryPointCount, entryPointCount);
+                entryPointInstanceSpan.subspan(static_cast<size_t>(variantIdx) * entryPointCount, entryPointCount);
             for (const EntryPointInstance& slot : variantSlots)
             {
                 const std::span<const uint32_t> slotVisibilityIndices =
@@ -1815,7 +1821,7 @@ namespace
                     const uint32_t local = slotVisibilityIndices[j];
                     if (local >= variantResourceIndices.size())
                     {
-                        return { .Code = ErrorCode::InvalidSlotVisibilityIndex,
+                        return { .Code = ErrorCode::InvalidEntryPointInstanceVisibilityIndex,
                                  .Table = ShaderManifestTable::VisibilityIndices,
                                  .RecordIndex = runOffset + static_cast<uint32_t>(j),
                                  .Detail = local };

@@ -943,7 +943,7 @@ namespace
         environment.VariantKeyTableOffset = AppendTable(extent, variants.Keys).Offset;
         environment.VariantTableOffset = AppendTable(extent, variants.Variants).Offset;
         environment.AxisMaskTableOffset = AppendTable(extent, variants.AxisMasks).Offset;
-        environment.SlotTableOffset = AppendTable(extent, variants.Slots).Offset;
+        environment.EntryPointInstanceTableOffset = AppendTable(extent, variants.Slots).Offset;
 
         environment.Sources = AppendTable(extent, sources.Refs);
         // The count of the blob is in bytes.
