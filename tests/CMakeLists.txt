@@ -17,7 +17,7 @@ function(add_lodestone_unit_test NAME)
         "${CMAKE_SOURCE_DIR}/include"
         "${CMAKE_SOURCE_DIR}/client/include")
 
-    target_link_libraries(${NAME} PRIVATE lodestone slang lodestone::client_internal)
+    target_link_libraries(${NAME} PRIVATE lodestone slang lodestone::client_library)
     if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
         target_compile_options(${NAME} PRIVATE "$<$<CONFIG:Debug>:-fcolor-diagnostics;-fansi-escape-codes;-fstandalone-debug;-fno-limit-debug-info;-fno-omit-frame-pointer>")
     endif()

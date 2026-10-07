@@ -228,7 +228,7 @@ target_include_directories(lodestone PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/magic_enum/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/tomlplusplus/include"
     "${CMAKE_CURRENT_BINARY_DIR}/generated/include")
-target_link_libraries(lodestone PRIVATE slang lodestone::client_internal xxHash::xxhash lodestone::json)
+target_link_libraries(lodestone PRIVATE slang lodestone::client_library xxHash::xxhash lodestone::json)
 if (LODESTONE_ENABLE_WGSL)
     target_link_libraries(lodestone PRIVATE Tint::tint)
 endif()

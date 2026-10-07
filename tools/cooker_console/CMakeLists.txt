@@ -6,5 +6,5 @@ target_include_directories(lodestone_cooker_console PRIVATE
     "${CMAKE_SOURCE_DIR}/include"
     "${CMAKE_SOURCE_DIR}/tools/shared"
     "${CMAKE_SOURCE_DIR}/client/include")
-target_link_libraries(lodestone_cooker_console PRIVATE lodestone::lodestone lodestone::client_internal)
+target_link_libraries(lodestone_cooker_console PRIVATE lodestone::lodestone lodestone::client_library)
 copy_slang_dlls_to_target(lodestone_cooker_console)

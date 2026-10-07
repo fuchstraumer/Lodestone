@@ -10,7 +10,7 @@ target_include_directories(manifest_dump PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${CMAKE_SOURCE_DIR}/client/include"
     "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
-target_link_libraries(manifest_dump PRIVATE lodestone::client_internal lodestone::json)
+target_link_libraries(manifest_dump PRIVATE lodestone::client_library lodestone::json)
 
 if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     target_compile_options(manifest_dump PRIVATE "$<$<CONFIG:Debug>:-fcolor-diagnostics;-fansi-escape-codes;-fstandalone-debug;-fno-limit-debug-info;-fno-omit-frame-pointer>")
