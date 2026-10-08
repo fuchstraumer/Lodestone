@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.24) # need multiconfig support
 project(lodestone LANGUAGES CXX VERSION 0.1.0)
 
-set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+if (PROJECT_IS_TOP_LEVEL)
+    set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
 
 # cmake/ contains our own FindVulkanHeaders.cmake; must be set before any find_package calls
 if (NOT TARGET Vulkan::Vulkan)
