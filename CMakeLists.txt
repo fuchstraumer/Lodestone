@@ -12,33 +12,6 @@ if (NOT TARGET Vulkan::Vulkan)
     set(VulkanHeaders_INCLUDE_DIR ${Vulkan_INCLUDE_DIR} CACHE PATH "" FORCE)
 endif()
 
-include(cmake/ConfigureBuildFlags.cmake)
-
-if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND NOT EMSCRIPTEN)
-    if (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "Clang")
-        message(FATAL_ERROR "Clang-CL in MSVC frontend variant is not supported. Please use a different compiler.")
-    else()
-        message(STATUS "Using MSVC build flags and tools")
-        add_msvc_exclusive_build_flags_all_targets()
-        add_shared_msvc_style_build_flags_all_targets()
-    endif()
-elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT EMSCRIPTEN)
-    if (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-        # Running as clang, but with MSVC frontend (clang-cl as shim layer)
-        message(STATUS "Using clang-cl")
-        add_shared_msvc_style_build_flags_all_targets()
-        disable_msvc_frontend_clang_compiler_warnings_all_targets()
-    else()
-        message(STATUS "Using Fully-Clang-Based build flags and tools")
-        add_shared_clang_style_build_flags_all_targets()
-        add_clang_style_build_flags_all_targets()
-    endif()
-else()
-    message(STATUS
-        "Could not find supported compiler. Please use Clang, MSVC, or Emscripten and make sure they are on your PATH.")
-    message(FATAL_ERROR "Unsupported compiler: ${CMAKE_CXX_COMPILER_ID}")
-endif()
-
 include(cmake/ConfigureSlang.cmake)
 
 # xxHash runs a plain option(BUILD_SHARED_LIBS ... ON), which writes ON into the cache. Its own
