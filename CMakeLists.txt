@@ -22,10 +22,13 @@ include(cmake/ConfigureSlang.cmake)
 # its bundled miniz, builds miniz as a DLL, and marks every miniz symbol dllimport. miniz is
 # EXCLUDE_FROM_ALL and no rule copies miniz.dll, so slang-bootstrap.exe then fails to load with
 # STATUS_DLL_NOT_FOUND and the core module never generates. Claim the cache entry first to stop this.
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build third party dependencies as static libraries" FORCE)
+function(add_xxhash)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build third party dependencies as static libraries" FORCE)
+    set(XXHASH_BUILD_XXHSUM OFF)
+    add_subdirectory(third_party/xxHash/build/cmake EXCLUDE_FROM_ALL)
+endfunction()
 
-set(XXHASH_BUILD_XXHSUM OFF)
-add_subdirectory(third_party/xxHash/build/cmake EXCLUDE_FROM_ALL)
+add_xxhash()
 
 add_slang_subdirectory(third_party/slang)
 set_target_properties(slang PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
