@@ -19,6 +19,15 @@ set(SLANG_USE_SYSTEM_VULKAN_HEADERS ON)
 set(SLANG_ENABLE_MIMALLOC ON)
 set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC ON)
 
+if (TARGET SPIRV-Tools-static)
+    set(SLANG_USE_SYSTEM_SPIRV_TOOLS ON)
+    set(redirect_dir "${CMAKE_BINARY_DIR}/lodestone_find_redirects")
+    file(WRITE "${redirect_dir}/spirv-tools-config.cmake" "")
+    file(WRITE "${redirect_dir}/spirv-tools-config-version.cmake"
+        "set(PACKAGE_VERSION_COMPATIBLE TRUE)\n")
+    set(CMAKE_FIND_PACKAGE_REDIRECTS_DIR "${redirect_dir}")
+endif()
+
 # Wraps add_subdirectory for Slang with warning suppression
 # This applies flags to ALL targets created within the Slang directory
 function(add_slang_subdirectory SLANG_DIR)

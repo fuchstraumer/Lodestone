@@ -25,7 +25,7 @@ include(cmake/ConfigureSlang.cmake)
 function(add_xxhash)
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build third party dependencies as static libraries" FORCE)
     set(XXHASH_BUILD_XXHSUM OFF)
-    add_subdirectory(third_party/xxHash/build/cmake EXCLUDE_FROM_ALL)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/third_party/xxHash/build/cmake" EXCLUDE_FROM_ALL)
 endfunction()
 
 add_xxhash()
