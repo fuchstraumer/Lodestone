@@ -18,8 +18,9 @@ earlier update. Git history holds the full text.
 | RelWithDebInfo, `ninja-msvc` | green | 23 of 23 | 30 of 30 |
 | Debug, `ninja-msvc` | green | Not run in full since F1.4. `SpvValidatorTest` passes. Skip `KitchenSinkCookTest` (section 3, item 3). | — |
 
-- Phases D and E are complete. E8 closed Phase E. Its final measurements are in
-  `docs/phase-e-data-driven-permutations.md` §11a.
+- Phases D and E are complete. E8 closed Phase E. Their plans were removed on 2026-10-14. Read them
+  from history: `git show e113d8c:docs/phase-e-data-driven-permutations.md` (§11a holds the final
+  measurements).
 - The manifest is one bundle for each cook, format version 7. Version 7 added `Profile::CodeFormat`. `CLAUDE.md` ("One output form") holds the
   layout.
 - The client reads the bundle through `BundleView`, `ModuleView`, `EnvironmentView`, and the view types
@@ -31,10 +32,14 @@ earlier update. Git history holds the full text.
 - The KitchenSink set is the reference. `KitchenSinkCookTest` cooks 616 variants. The known-good check
   compares its five modules, six stages each.
 
-**Phase F is the next work.** Section 2 gives the order.
+**2026-10-14: phase F is paused.** F0 and F1 are done (two targets, `wgsl` and `spirv`, both Bound;
+`docs/phase-f-plan.md` section 7). The next work is the rendergraph integration in VeloxRhi:
+`docs/rendergraph-integration-tasks.md`. RelWithDebInfo: 24 of 24 tests, 60 of 60 known-good dumps
+(`wgsl` and `spirv`), when the PC has free commit (section 3, item 8).
 
 ## 2. Next work, in order
 
+0. **The rendergraph tasks** (`docs/rendergraph-integration-tasks.md`), from R1 down. Phase F waits.
 1. **Answer the open Phase F questions.** Done on 2026-09-24. `docs/phase-f-vocabulary.md` §9a to §9e
    hold the answers. §9e corrects §9a: an interface axis selects the access model at link time.
    WebGPU stays Bound (`DescriptorHandle` gives invalid WGSL). Through Slang, a WGSL `override` sizes
@@ -64,6 +69,11 @@ Ordered by what can write wrong output first.
    `RunWorkerSetup` fails. Nothing catches it, so the process ends with 0xC0000409. A worker thread
    returns instead, but its thread sink is not merged, so the Slang diagnostic is lost. Measured on
    2026-09-24 during step F0.3. Return a `CookError`, and merge the thread sinks on every path.
+   On 2026-10-14 a stale module cache caused it. `%TEMP%\LodestoneShaderCooker` held IR version 32
+   modules from Slang `6eb89786c`, and the `ac945e5` build reads version 31 only. Every Slang test
+   crashed with 0xC0000409 and no message. A `--single-threaded` cook prints the cause (E00131). Rename
+   the folder to clear it. The cache path must name the Slang build tag
+   (`docs/rendergraph-integration-tasks.md`, found items).
 3. **The Debug Slang build asserts on `KsMaterial`.** This is a Slang fault, not ours. Section 5 has
    the cause and a two-file reproduction. A Debug run can also hang: the full Debug test script once
    waited 15 minutes with no output. Do not run `run-tests.bat Debug` unattended. Run the Debug tests
@@ -81,7 +91,11 @@ Ordered by what can write wrong output first.
 7. **No guard fails a cook that emits no manifest.** The required `--target` closes the zero-target
    case. A guard in the emit path is still open.
 8. **The thread count is not tuned.** `ThreadPool::Initialize` uses `hardware_concurrency` and ignores
-   `SlangCompilerCreateInfo::ExpectedBatchSize`. Measure before you tune.
+   `SlangCompilerCreateInfo::ExpectedBatchSize`. Measure before you tune. Each worker loads its own core
+   module: KitchenSink commits 1.62 GB with 16 workers and 0.89 GB single-threaded. Slang does not check
+   `malloc`, so a cook that runs out of commit crashes with 0xC0000005, 0xC0000409, or 0xC00000FD and no
+   message. On 2026-10-12 the author's PC had no page file, and `KitchenSinkCookTest` crashed that way.
+   `todo.md` holds the item.
 9. **The Slang global-session convoy.** `slang_createGlobalSession` serializes per-thread startup.
    `k_UseSlangWorkaround` in `SlangModuleContext.cpp` toggles a bypass. It helps a release cook and hurts
    a Debug cook. It is `true` now. Read it before you measure anything.
@@ -123,9 +137,24 @@ Review points from the view-type work, not faults:
 
 Slang documents none of these. Probe modules measured them.
 
-**Documents that hold more facts.** `docs/phase-e-attribute-spike.md` holds the attribute and axis-read
-facts, including the `__include` recursion. `docs/phase-e-interface-spike.md` holds the interface-axis
-facts. `src/compile/impl/SlangReflector.cpp` holds the scope, block, and binding-range walk.
+**Facts from the phase E spikes** (removed on 2026-10-14, full text in
+`git show e113d8c:docs/phase-e-attribute-spike.md` and `phase-e-interface-spike.md`):
+
+- An `extern static const` reflects as a `Variable` decl, and reflection reads each attribute string.
+- An imported axis is not in the importer's reflection. The session holds every loaded module, so the
+  axis read iterates the loaded modules, not the root module alone.
+- An `__include`d fragment reflects as an Unsupported (kind 0) node named for the file. Its decls are
+  children of that node, so the axis read recurses. Do not call `getType` on an Unsupported node: it
+  crashes. `getDeclSourceLocation` fails for a decl inside a fragment, so a missing location is soft.
+- Link-time specialization fills an `extern struct` of interface type, by the same mechanism as an
+  `extern static const`. No API lists the types that conform to an interface: walk the decls and test
+  each struct for conformance. The type name is not module qualified.
+- **An interface conformance cannot carry a resource.** The resource member does not become a
+  parameter, the layout does not change, and codegen fails with E56003 ("use of uninitialized opaque
+  handle") at the use site, not at the conformance. So an interface axis carries behaviour only, and
+  resource presence stays a constant axis. Phase F step F2 (the shim module) must respect this.
+
+Other fact sources: `src/compile/impl/SlangReflector.cpp` holds the scope, block, and binding-range walk.
 
 **Reflection.**
 
@@ -198,7 +227,7 @@ facts. `src/compile/impl/SlangReflector.cpp` holds the scope, block, and binding
 - **A plain `ISlangFileSystem` hides the paths.** Slang wraps it in a cache that uses a content hash as
   the identity, so `getDependencyFilePath` gives `name.slang:<hash>`. Implement `ISlangFileSystemExt`.
 
-**Cook cost.** `docs/phase-e-data-driven-permutations.md` §11a. A one-variant cook takes about 0.4 s,
+**Cook cost.** `git show e113d8c:docs/phase-e-data-driven-permutations.md`, §11a. A one-variant cook takes about 0.4 s,
 so startup dominates a small cook. KitchenSink takes about 3.4 s for 616 variants.
 
 ## 6. Design decisions in force
@@ -284,3 +313,9 @@ One line for each update. Git history holds the full text.
   layer reads the axis-active mask. `AxisNames` and `AxisValues` were added. The stage dumps were fixed
   and the KitchenSink known-good baseline was accepted. The stale `CookTest` line was retired. E8 closed
   Phase E. Format version 6 added `Binding::SampleType`, read through `ResolvedResource::SampleType()`.
+- **2026-09-25 to 2026-10-01.** Phase F slices F0 and F1: the `spirv` profile, format version 7
+  (`ShaderCodeFormat`), `SpvValidator`, per-target policy, and SPIR-V known-good dumps.
+- **2026-10-12 to 2026-10-14.** `MergedLayoutView` (L8). The diagnosis of the commit-exhaustion crash.
+  Phase F paused for the rendergraph tasks.
+- **2026-10-14.** L10: `LODESTONE_BUILD_COOKER` and the client-only preset. The Slang checkout is
+  `ac945e5` since 2026-10-12. A stale module cache from `6eb89786c` stopped every cook.

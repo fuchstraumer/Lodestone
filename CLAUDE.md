@@ -41,6 +41,13 @@ different toolset, and it leaves a build tree that no longer builds.
 Presets: `ninja-msvc` and `ninja-clang-cl`. Configurations: `Debug` and `RelWithDebInfo`.
 Clang-CL with the MSVC frontend variant is a hard configure error.
 
+`LODESTONE_BUILD_COOKER` (default `NOT EMSCRIPTEN`) selects the cooker half. With it OFF, the build adds
+the client library, the JSON writer, `tools/suggest`, and `manifest_dump`, and nothing more: no Vulkan SDK,
+no Slang, no Tint. `cmake/LodestoneCooker.cmake` holds the cooker half, and the root file includes it only
+when the option is ON. Every test links the cooker, so `LODESTONE_BUILD_TESTS` follows the option, and
+tests ON with the cooker OFF fail the configure. The preset `ninja-msvc-client` turns the cooker off:
+`scripts\configure.bat ninja-msvc-client`, then `scripts\build.bat RelWithDebInfo ninja-msvc-client`.
+
 `LODESTONE_ENABLE_WGSL` (default ON) pulls in Tint from the Dawn submodule at `third_party/dawn`,
 configured by `cmake/ConfigureTint.cmake`. The WGSL validator parses the emitted text with Tint, so a
 standalone configure needs Python and network access: `DAWN_FETCH_DEPENDENCIES` is ON, and Dawn fetches
@@ -495,7 +502,9 @@ Break one of these and the cook can exit 0 with wrong content.
    the four binding tables collapse hard, and a bad collapse has to be found by comparison rather than
    trusted. `CheckManifestLayout` walks the manifest the way a consumer walks it, so it proves the
    serialization is faithful. Every field a consumer reads must still take part in a key, and a field
-   cannot leave a key while it stays in the type. See `docs/phase-d-stage-separation-plan.md` §4b.
+   cannot leave a key while it stays in the type. The tables are separate because one binding record
+   carried three concerns with three keys: placement (per module), visibility (per entry point), and
+   footprint (per variant). OceanFft once interned 21 layouts, and 21 = 1 x 3 x 7.
 4. **The emitted artifact decides group and binding numbers. Reflection decides sizes and types.**
    That asymmetry is the only reason the cross-check finds real errors. A **name** is neither: the
    cross-check builds the name it expects from `ScopeName` and `Name`, and compares that against the
@@ -694,17 +703,19 @@ renamed. `ls docs/` is the only reliable answer.
 Phases D, E, and F are a **sequence**. Each depends on the one before it. The tooling track runs
 beside them.
 
-- `docs/phase-d-stage-separation-plan.md` — separate stage 3 from stage 4, and add `--dump-stage`.
-  **Complete.** Read it for the reasoning behind the shape of the pipeline, and for §4b, which states
-  why a binding record is four tables and not one.
-- `docs/phase-e-data-driven-permutations.md` — axis declarations in the shader, policy in a data file,
-  constraint expressions, and a sorted key table in place of mixed radix. **Complete** (E8 closed it on
-  2026-09-24). Read it for the reasoning behind the axis model and the policy file.
+- Phases D (stage separation, `--dump-stage`) and E (axes in the shader, policy in a data file,
+  constraint expressions, the sorted key table) are **complete**. Their plans and the two phase E spikes
+  were removed on 2026-10-14. Read one from history: `git show e113d8c:docs/<name>.md`, with the names
+  `phase-d-stage-separation-plan`, `phase-d-tail-handoff`, `phase-e-data-driven-permutations`,
+  `phase-e-attribute-spike`, and `phase-e-interface-spike`.
 - `docs/phase-f-vocabulary.md` — **read this before proposing anything about targets or bindings.**
   It defines axis kind, binding time, and access model, and it divides the work between Slang's
   capability system and this repository. It is a vocabulary, not a plan. Its §9 holds the measured
   answers that the plan rests on. §9e corrects §9a: link-time specialization selects the access model.
-- `docs/phase-f-plan.md` — **the plan for phase F, the next work.** Decisions, slices, open decisions,
+- `docs/rendergraph-integration-tasks.md` — **the current work (2026-10-14).** The Lodestone tasks that
+  the VeloxRhi rendergraph needs, numbered L1 to L18 as in the Velox note. Phase F is paused until the
+  graph path works on WebGPU. Read its sections 4 and 5 first.
+- `docs/phase-f-plan.md` — **the plan for phase F, paused on 2026-10-14.** Decisions, slices, open decisions,
   and a progress log. Read its progress section first, and update it at the end of each step.
 
 Two terms from phase F are worth carrying into any discussion of variants:

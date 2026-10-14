@@ -325,3 +325,15 @@ commit.
   - Proof: 23 of 23 tests (RelWithDebInfo), 60 of 60 known-good dumps. Both single-target hashes are
     unchanged (`ae72f733...`, `e060e442...`).
   - Next: F2.
+- 2026-10-12 to 2026-10-14. **Phase F paused.** The author moves to the VeloxRhi rendergraph first,
+  because the graph will shape the client API and parts of F2 to F5. `docs/rendergraph-integration-tasks.md`
+  holds that work. Its section 5 lists the tasks that touch phase F.
+  - Done in the pause: the merged layout of one pipeline (`MergedLayoutView`, `01dc278`). The cooker now
+    sorts each visibility list by placement, and `EnvironmentView::Open` checks the order
+    (`InvalidVisibilityListOrder`) and that each entry point stage is one bit. `MergedLayoutTest` (21
+    checks). No known-good dump changed.
+  - The merge rejects a placement that is not Bound. F4.2 and F4.3 must add a reference from a pointer
+    or a handle to its containing record, because `PlacementPayload` gives only a byte offset.
+  - Measured: `KitchenSinkCookTest` crashed on 2026-10-12 from commit exhaustion on a PC with no page
+    file, not from a code fault. `todo.md` holds the thread-count item.
+  - Next, when phase F resumes: F2, with the rendergraph lessons applied.

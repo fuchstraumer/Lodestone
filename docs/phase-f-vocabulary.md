@@ -4,9 +4,9 @@ This document gives the words. It is not a plan. It exists so that a later sessi
 starts with the same terms and does not build a second vocabulary next to this one.
 
 Phase F is the long-horizon work: one shader source that serves both a WebGPU target and a desktop
-Vulkan target that reaches resources through buffer device addresses. Read
-`docs/phase-d-stage-separation-plan.md` and `docs/phase-e-data-driven-permutations.md` first. Phase F
-comes after both, and section 8 states what each of them must do to prepare for it.
+Vulkan target that reaches resources through buffer device addresses. Phases D and E are
+complete, and their plans were removed on 2026-10-14 (`git show e113d8c:docs/<name>.md`). Section 8
+states what each of them had to do to prepare for phase F.
 
 ---
 
