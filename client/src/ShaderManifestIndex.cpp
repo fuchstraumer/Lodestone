@@ -646,27 +646,6 @@ std::span<const VariantKey> ManifestIndex::filterKeys(std::span<const ScanConstr
     return std::span<const VariantKey>{ first, last };
 }
 
-VariantKey ManifestIndex::first(std::span<const ScanConstraint> constraints) const
-{
-    std::span<const VariantKey> candidates = filterKeys(constraints);
-    if (candidates.empty())
-    {
-        return INVALID_VARIANT; // or some sentinel value indicating no match
-    }
-
-    // candidates is a subspan of the key table, so its offset is the variant index of its first key
-    const uint32_t firstIndex = static_cast<uint32_t>(candidates.data() - environment.VariantKeys().data());
-    for (const auto&& [offset, key] : std::views::enumerate(candidates))
-    {
-        if (matches(firstIndex + static_cast<uint32_t>(offset), key, constraints))
-        {
-            return key;
-        }
-    }
-
-    return INVALID_VARIANT;
-}
-
 std::vector<VariantKey> ManifestIndex::scan(std::span<const ScanConstraint> constraints) const
 {
     std::span<const VariantKey> candidates = filterKeys(constraints);

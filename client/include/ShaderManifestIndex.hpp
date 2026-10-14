@@ -204,8 +204,6 @@ private:
                                VariantKey key,
                                std::span<const ScanConstraint> constraints) const noexcept;
     void markInactiveAxes(uint32_t variant_index, std::span<QueryAxisValue> values) const noexcept;
-    /** @brief Returns the first key that matches the given constraints. */
-    [[nodiscard]] VariantKey first(std::span<const ScanConstraint> constraints) const;
     [[nodiscard]] std::vector<VariantKey> scan(std::span<const ScanConstraint> constraints) const;
 
     [[nodiscard]] std::vector<std::string_view> stringTableForAxis(uint32_t axis_index) const;
