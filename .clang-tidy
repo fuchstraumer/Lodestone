@@ -27,7 +27,8 @@ Checks: >
   -modernize-use-designated-initializers,
   -readability-convert-member-functions-to-static,
   -cppcoreguidelines-pro-type-reinterpret-cast,
-  -modernize-use-using
+  -modernize-use-using,
+  -readability-else-after-return
 
 WarningsAsErrors: ''
 HeaderFilterRegex: '.*(src|include|client|tests)/.*'

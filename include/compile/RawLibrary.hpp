@@ -110,7 +110,7 @@ struct RawEntryPoint
     WorkgroupSize Workgroup;
     /** The text the target backend generated. Stage 3 does not read it. */
     std::vector<std::byte> TargetCode;
-    /** Indices into `RawVariant::Bindings`, ascending. This is visibility. */
+    /** Indices into `RawVariant::Bindings`, in placement order (`PlacementLess`). This is visibility. */
     std::vector<uint32_t> UsedBindingIndices;
     ReflectedRasterState Raster;
 };

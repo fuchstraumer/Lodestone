@@ -528,6 +528,7 @@ ResourceAccess FromSlangAccessType(SlangResourceAccess access)
     case SLANG_RESOURCE_ACCESS_UNKNOWN:
         return ResourceAccess::Invalid;
     }
+    return ResourceAccess::Invalid;
 }
 
 } // namespace
@@ -586,6 +587,17 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
         std::span<const RawBinding> entryPointBindings = std::span{ rawVariant.Bindings }.subspan(ownedBaseSize);
         std::vector entryPointIndices = CollectUsedBindingIndices(linked_variant, i, entryPointBindings, ownedBaseSize);
         rawEntryPoint.UsedBindingIndices.append_range(std::move(entryPointIndices));
+        // we need to sort the entry point binding indices, as global bindings are sorted,
+        // and our later guarantees in the manifest about merging layout views correctly
+        // require *all bindings* used by any entry point to be in strict ascending placement order.
+        const std::span<const RawBinding> allBindings = rawVariant.Bindings;
+        std::ranges::stable_sort(rawEntryPoint.UsedBindingIndices,
+                                 PlacementLess,
+                                 [allBindings](uint32_t binding_index) -> const RawPlacement&
+                                 {
+                                     const RawBinding& binding = allBindings[binding_index];
+                                     return binding.Placement;
+                                 });
 
         // set suffix, and copy over the target text
         rawEntryPoint.VariantSuffix = rawVariant.VariantSuffix;

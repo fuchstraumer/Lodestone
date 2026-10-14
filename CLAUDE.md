@@ -82,8 +82,8 @@ it exits 1 on `NoOutputSpecified`, which reads like a failure rather than a usag
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
-Twenty-three test targets exist. Eighteen are unit tests, and each one proves a claim the repository
-makes. Seventeen need no Slang and no asset, and together they run in about half a second.
+Twenty-four test targets exist. Nineteen are unit tests, and each one proves a claim the repository
+makes. Eighteen need no Slang and no asset, and together they run in about half a second.
 `WgslValidatorTest` links Tint to read WGSL. `SpvValidatorTest` links SPIRV-Tools to assemble SPIR-V. `AccessModelRejectTest` cooks two small modules through
 Slang, and it takes about one second.
 
@@ -107,6 +107,7 @@ Slang, and it takes about one second.
 | `SuggestTest` | The nearest-name suggestion. It measures the edit distance between a mistyped name and the accepted names, and returns the closest one. The cooker and the client both use it for a name rejection. |
 | `EnumTagDecodeTest` | The enum tag-blob decode (`compile/EnumTagDecode`). It reads each integer width, sign-extends a signed tag, zero-extends an unsigned tag, and accepts the `UInt64` wrap above 2^63. It names no Slang type, so the reflection read of an enum case value has a proof that needs no compiler. |
 | `ManifestIndexTest` | The client query surface, end to end. It builds a bundle inline through the emitter, with one axis of each domain, then drives `ManifestQueryBuilder` through every valid construction and every error path, plus a sparse manifest and an `ActiveWhen`-gated one. On the gated manifest, a constraint on the gated axis selects only the variants where that axis is active, and `Decode` marks the inactive axis. It proves that two profiles of one module each key their own subset, and that two modules share a root axis only when their values agree in order. It also covers `AxisNames` and `AxisValues`. It needs no Slang. |
+| `MergedLayoutTest` | The merged layout of one pipeline. It builds a bundle inline through the emitter, with a vertex, a fragment, and a compute entry point. It proves that a resource both stages read appears once with both stage bits, that the order is (group, binding), and that instances from two variants merge. It proves a conflict of kind and of byte size, a duplicate stage, and too many stages. It also proves that `Open` rejects a visibility list that is not in placement order. It needs no Slang. |
 
 An error check prints a diagnostic to `stderr` on purpose. Read the last line for the result.
 
@@ -468,6 +469,7 @@ unordered container reached the output.
 | `BundleView`, `ModuleView`, `EnvironmentView` | `client/include/ShaderManifest.hpp` | Read-only spans over the bundle bytes, one type for each scope: the whole cook, one module, and one module cooked for one profile. Each `Open` validates its scope once and allocates nothing. |
 | `ManifestIndex`, `ManifestQueryBuilder` | `client/include/ShaderManifestIndex.hpp` | The client query surface, frozen. `ManifestIndex` decodes and enumerates variants and hands out a value-semantic builder. The builder resolves axis names and values by name, and its terminals (`Keys`, `Variants`, `First`) return keys or an error. A malformed query is an error; a valid query with no variant is an empty set. |
 | `ShaderSourceProvider` | `client/include/ShaderManifest.hpp` | Where a renderer gets code, bindings, and workgroup size. `Source()` gives WGSL text, and `SpirvWords()` gives SPIR-V words. Each asserts the profile's `ShaderCodeFormat`. `Bindings()` returns a `LayoutRange` of `ResolvedResource` views, built on demand, so the provider allocates nothing. `Generation()` is the hot-reload hook. |
+| `MergedLayoutView`, `MergedResource` | `client/include/ShaderManifest.hpp` | The layout of one pipeline. `Merge` takes one `EntryPointInstanceView` for each stage, checks every shared (group, binding) once, and gives each resource once with a mask of the stages that read it, in placement order. No template and no allocation: a fixed array of up to `k_MaxPipelineStages` ranges. It rests on the placement order of each visibility list, which the cooker sorts and `Open` checks. |
 | `LayoutRange`, `ResolvedResource`, `VariantView`, `EntryPointInstanceView` | `client/include/ShaderManifest.hpp` | Views over one environment. `LayoutRange::operator[]` is the one place that resolves `resources[visible[i]]`. A view points at its `EnvironmentView`, so keep that environment alive and do not move it. |
 
 `ContentHashValue` is xxHash3, 64 bit. `model/ContentHash.hpp` holds the streaming form as well, which the

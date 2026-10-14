@@ -60,6 +60,23 @@
   check with `std::filesystem::last_write_time` that each expected artifact is newer than the cook's
   start time, and that every expected artifact exists. `check-known-good.py` should also refuse to
   compare an artifact whose timestamp predates the cook it just ran.
+- Tune the worker thread count against memory, and measure it. `ThreadPool::Initialize` uses
+  `hardware_concurrency` and ignores `SlangCompilerCreateInfo::ExpectedBatchSize`. Nothing measures the
+  count against anything.
+    - Each worker has its own global session and its own copy of the core module (the
+      `k_UseSlangWorkaround` path). Measured on 2026-10-12, KitchenSink, RelWithDebInfo, 16 workers: a
+      one-target cook peaks at 1.62 GB of commit. `--single-threaded` peaks at 0.89 GB. That is about
+      45 MB for each worker, before any variant work.
+    - Slang does not check `malloc` (`source/core/slang-allocator.h`). Out of commit, a cook does not
+      fail with an error. It crashes with 0xC0000005 (a null write in `List::reserve`), 0xC0000409
+      (`bad_alloc` to `std::terminate`), or 0xC00000FD (a stack page that cannot commit). On 2026-10-12
+      a PC with no page file and about 8 GB of free commit gave all three, and three parallel cooks
+      crashed in most runs.
+    - Threading across environments (several targets or modules at once) multiplies the sessions. Decide
+      the count from a memory budget and the variant count of the batch, not from the core count alone.
+      Measure peak commit and wall time against the count first: 1, 2, 4, 8, 16.
+    - Consider one global session and core module shared by the workers, if Slang allows it. Measure
+      the global-session convoy again first (handoff fault 9).
 - Make `RunCookOnce` and the determinism path emit through one code path. The determinism branch
   replays memory artifacts to the real sink with its own `sink.Write`/`WriteArtifact` loop instead of
   the shared emit, so the two paths can diverge (they did). Route both through the same emit.

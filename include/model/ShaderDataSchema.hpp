@@ -232,7 +232,8 @@ struct ReflectedRasterState
  * todo-ship: That's not always going to be true, especially with entrypoint parameter blocks. This will
  * need revision.
  *
- * `UsedBindingIndices` holds indices into that shared list, in ascending order. A list rather than a
+ * `UsedBindingIndices` holds indices into that shared list, in placement order (`PlacementLess`), so a
+ * client merges the lists of several stages in one pass. `EnvironmentView::Open` checks it. A list rather than a
  * bit mask, because a mask caps a module at the width of the mask. */
 struct EntryPointReflection
 {

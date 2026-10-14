@@ -1,4 +1,5 @@
 #include "ShaderManifest.hpp"
+#include "EnumClassUtils.hpp"
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "VariantKey.hpp"
@@ -35,6 +36,13 @@ namespace
 {
 
     constexpr ErrorState k_ManifestOk{ .Code = ErrorCode::Success };
+
+    /** One integer that orders Bound placements: the group in the high half, the binding in the low half.
+     * It orders as the cooker's `PlacementLess` does for two Bound placements. */
+    constexpr uint64_t BoundPlacementKey(const PlacementPayload& placement) noexcept
+    {
+        return (static_cast<uint64_t>(placement.Word0) << 32u) | static_cast<uint64_t>(placement.Word1);
+    }
 
     // expanded descriptions for manifest error codes, since making these clear to users is important
     // static_assert will break compile if new code is added without updating the descriptions array
@@ -86,6 +94,11 @@ namespace
             "a variant names a suffix string past the string table",
             "a profile has an unknown code format",
             "a SPIR-V source does not start on a 4-byte boundary, or its length is not a multiple of 4",
+            "a visibility list is not in placement order: Bound resources first, in strictly ascending (group, binding) order",
+            "a merged layout got more entry point instances than MergedLayoutView::k_MaxPipelineStages",
+            "a merged layout got two entry point instances of the same stage",
+            "a merged layout got a resource that is not Bound",
+            "a merged layout got two different resources at one group and binding",
         });
 
     static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ErrorCode::Count),
@@ -749,6 +762,8 @@ static_assert(std::input_iterator<LayoutRange::Iterator>);
 static_assert(std::ranges::input_range<LayoutRange>);
 static_assert(std::input_iterator<UniformMemberRange::Iterator>);
 static_assert(std::ranges::input_range<UniformMemberRange>);
+static_assert(std::input_iterator<MergedLayoutView::Iterator>);
+static_assert(std::ranges::input_range<MergedLayoutView>);
 
 UniformMemberView::UniformMemberView(const EnvironmentView* _environment, const UniformMember* _record) noexcept
     : environment{ _environment },
@@ -929,6 +944,23 @@ const Footprint* ResolvedResource::FootprintRecord() const noexcept
     return footprint;
 }
 
+bool ResolvedResource::operator==(const ResolvedResource& rhs) const noexcept
+{
+    return Kind() == rhs.Kind() &&
+           Shape() == rhs.Shape() &&
+           Access() == rhs.Access() &&
+           StorageFormat() == rhs.StorageFormat() &&
+           SampleType() == rhs.SampleType() &&
+           IsComparisonSampler() == rhs.IsComparisonSampler() &&
+           ArrayCount() == rhs.ArrayCount() &&
+           ByteSize() == rhs.ByteSize();
+}
+
+bool ResolvedResource::operator!=(const ResolvedResource& rhs) const noexcept
+{
+    return !(*this == rhs);
+}
+
 LayoutRange::LayoutRange(const EnvironmentView* _environment,
                          std::span<const uint32_t> _visible,
                          std::span<const uint32_t> _resources,
@@ -962,11 +994,19 @@ ResolvedResource LayoutRange::operator[](uint32_t position) const noexcept
 
 EntryPointInstanceView::EntryPointInstanceView(const EnvironmentView* _environment,
                                                const EntryPointInstance* _entry_point_instance,
-                                               const Variant* _variant) noexcept
+                                               const Variant* _variant,
+                                               uint32_t _entry_point) noexcept
     : environment{ _environment },
       entryPointInstance{ _entry_point_instance },
-      variant{ _variant }
+      variant{ _variant },
+      entryPoint{ _entry_point }
 {
+}
+
+ShaderStageKind EntryPointInstanceView::Stage() const noexcept
+{
+    const std::span<const EntryPoint> entryPoints = environment->Module().EntryPoints();
+    return static_cast<ShaderStageKind>(entryPoints[entryPoint].Stage);
 }
 
 std::string_view EntryPointInstanceView::Source() const noexcept
@@ -1039,13 +1079,243 @@ uint32_t VariantView::EntryPointCount() const noexcept
 EntryPointInstanceView VariantView::EntryPoint(uint32_t entry_point) const noexcept
 {
     const std::span<const EntryPointInstance> entryPointInstances = environment->VariantEntryPoints(index);
-    return EntryPointInstanceView{ environment, &entryPointInstances[entry_point], &Record() };
+    return EntryPointInstanceView{ environment, &entryPointInstances[entry_point], &Record(), entry_point };
 }
 
 const Variant& VariantView::Record() const noexcept
 {
     const std::span<const Variant> variants = environment->Variants();
     return variants[index];
+}
+
+namespace
+{
+    // no Bound key reaches this value: a group of 0xFFFFFFFF with a binding of 0xFFFFFFFF
+    constexpr uint64_t k_NoPlacement = std::numeric_limits<uint64_t>::max();
+
+    /**The smallest placement under any cursor, where the cursor is the position within each entry 
+     * entry point's layout range. All the ranges are in strictly ascending order already, so this
+     * is the next key of a N-way merge - where N is the number of stages being merged. */
+    uint64_t NextPlacement(std::span<const LayoutRange> ranges,
+                           std::span<const uint32_t> stage_layout_positions) noexcept
+    {
+        uint64_t next = k_NoPlacement;
+        for (const auto&& [i, range] : std::views::enumerate(ranges))
+        {
+            if (stage_layout_positions[i] >= range.Size())
+            {
+                continue;
+            }
+
+            const ResolvedResource& resource = range[stage_layout_positions[i]];
+            next = std::min(next, BoundPlacementKey(resource.PlacementValue()));
+        }
+        
+        return next;
+    }
+
+    /** Writes the index of each stage whose layout position index sits on `key` into `out_stages`,
+      * and returns how many stages matched that key. This tells us how many entry points / stages
+      * are "sharing" a resource placement. */
+    uint32_t StagesAtPlacement(std::span<const LayoutRange> ranges,
+                               std::span<const uint32_t> stage_layout_positions,
+                               uint64_t key,
+                               std::span<uint32_t> out_stages) noexcept
+    {
+        uint32_t count = 0u;
+        for (const auto&& [i, range] : std::views::enumerate(ranges))
+        {
+            if (stage_layout_positions[i] >= range.Size())
+            {
+                continue;
+            }
+
+            const ResolvedResource& resource = range[stage_layout_positions[i]];
+            // PlacementValue is just a generic container of data per placement binding model...
+            if (BoundPlacementKey(resource.PlacementValue()) == key)
+            {
+                // if the current key matches the current entry points resource at it's active
+                // position, we record this stage as one that uses the given placement key.
+                // this is the culmination of the merge at this step, effectively giving us the result we are after
+                out_stages[count] = static_cast<uint32_t>(i);
+                ++count;
+            }
+
+        }
+
+        return count;
+    }
+
+    /** True when two resources at one placement can share one layout entry. The fields are the ones a bind
+     * group layout entry or a descriptor set layout binding reads. The names do not take part. */
+    bool SameLayoutBinding(const ResolvedResource& lhs, const ResolvedResource& rhs) noexcept
+    {
+        // one binding record: the same environment and the same resource, so we can shortcut
+        if (&lhs.Record() == &rhs.Record())
+        {
+            return true;
+        }
+        // otherwise we have to compare the fields
+        return lhs == rhs;
+    }
+
+} // namespace
+
+ManifestResult<MergedLayoutView> MergedLayoutView::Merge(std::span<const EntryPointInstanceView> entry_points) noexcept
+{
+    if (entry_points.size() > k_MaxPipelineStages)
+    {
+        return std::unexpected(ErrorState{ .Code = ErrorCode::MergedLayoutTooManyStages,
+                                           .Detail = static_cast<uint32_t>(entry_points.size()) });
+    }
+
+    MergedLayoutView view;
+    view.stageCount = static_cast<uint32_t>(entry_points.size());
+
+    // don't allow duplicate stages
+    ShaderStageKind seenStages = ShaderStageKind::Invalid;
+    for (uint32_t i = 0u; i < view.stageCount; ++i)
+    {
+        const EntryPointInstanceView& instance = entry_points[i];
+        const ShaderStageKind stage = instance.Stage();
+        if (HasAnyFlag(seenStages, stage))
+        {
+            return std::unexpected(ErrorState{ .Code = ErrorCode::MergedLayoutDuplicateStage,
+                                               .Table = ShaderManifestTable::EntryPoints,
+                                               .Detail = i });
+        }
+        seenStages |= stage;
+
+        view.shaderStages[i] = stage;
+        view.layoutRanges[i] = instance.Layout();
+
+        // will need to validate/verify layouts as bound/pointer/bindless etc here as appropriate, too
+    }
+
+    // The conflict pass is the same N-way walk the iterator does, with no output. after this,
+    // iteration can't fail and can just run unchecked with no concern for the layouts
+    const std::span<const LayoutRange> ranges = std::span{ view.layoutRanges }.first(view.stageCount);
+    // stageLayoutPositions is the index (per entry point) in that entry point's layout range, 
+    // telling us where in our walk through the layout ranges each stage currently is.
+    // we need that so we can correctly merge the layout ranges across stages.
+    std::array<uint32_t, k_MaxPipelineStages> stageLayoutPositionsArray;
+    stageLayoutPositionsArray.fill(0u);
+    const std::span<uint32_t> stageLayoutPositions = std::span{ stageLayoutPositionsArray }.first(view.stageCount);
+
+    std::array<uint32_t, k_MaxPipelineStages> stagesAtKey{};
+
+    for (uint64_t key = NextPlacement(ranges, stageLayoutPositions); key != k_NoPlacement;
+         key = NextPlacement(ranges, stageLayoutPositions))
+    {
+        const uint32_t matchCount = StagesAtPlacement(ranges, stageLayoutPositions, key, stagesAtKey);
+        const uint32_t firstStage = stagesAtKey[0];
+        const LayoutRange& firstRange = ranges[firstStage];
+        const ResolvedResource firstResource = firstRange[stageLayoutPositions[firstStage]];
+        for (uint32_t match = 1u; match < matchCount; ++match)
+        {
+            const uint32_t stage = stagesAtKey[match];
+            const LayoutRange& range = ranges[stage];
+            const ResolvedResource resource = range[stageLayoutPositions[stage]];
+            if (!SameLayoutBinding(firstResource, resource))
+            {
+                return std::unexpected(ErrorState{ .Code = ErrorCode::MergedLayoutConflict,
+                                                         .Table = ShaderManifestTable::Bindings,
+                                                         .RecordIndex = resource.Index(),
+                                                         .Detail = stage });
+            }
+        }
+
+        for (uint32_t match = 0u; match < matchCount; ++match)
+        {
+            ++stageLayoutPositions[stagesAtKey[match]];
+        }
+    }
+
+    return view;
+}
+
+MergedLayoutView::Iterator MergedLayoutView::begin() const noexcept
+{
+    return Iterator{ this, std::array<uint32_t, k_MaxPipelineStages>{} };
+}
+
+MergedLayoutView::Iterator MergedLayoutView::end() const noexcept
+{
+    std::array<uint32_t, k_MaxPipelineStages> positions{};
+    for (uint32_t i = 0u; i < stageCount; ++i)
+    {
+        const LayoutRange& range = layoutRanges[i];
+        positions[i] = range.Size();
+    }
+    return Iterator{ this, positions };
+}
+
+uint32_t MergedLayoutView::StageCount() const noexcept
+{
+    return stageCount;
+}
+
+MergedLayoutView::Iterator::Iterator(const MergedLayoutView* _layout,
+                                     const std::array<uint32_t, k_MaxPipelineStages>& _positions) noexcept
+    : layout{ _layout },
+      positions{ _positions }
+{
+}
+
+MergedResource MergedLayoutView::Iterator::operator*() const noexcept
+{
+    const std::span<const LayoutRange> ranges = std::span{ layout->layoutRanges }.first(layout->stageCount);
+    const std::span<const uint32_t> activePositions = std::span{ positions }.first(layout->stageCount);
+    const uint64_t key = NextPlacement(ranges, activePositions);
+    // a dereference of end() is undefined, as it is for every iterator: begin() != end() means a key exists
+    assert(key != k_NoPlacement);
+
+    std::array<uint32_t, k_MaxPipelineStages> stagesAtKey{};
+    const uint32_t matchCount = StagesAtPlacement(ranges, activePositions, key, stagesAtKey);
+    ShaderStageKind stages = ShaderStageKind::Invalid;
+    for (uint32_t match = 0u; match < matchCount; ++match)
+    {
+        const uint32_t stage = stagesAtKey[match];
+        stages |= layout->shaderStages[stage];
+    }
+
+    const uint32_t firstStage = stagesAtKey[0];
+    const LayoutRange& firstRange = ranges[firstStage];
+    return MergedResource{ .Resource = firstRange[activePositions[firstStage]], .Stages = stages };
+}
+
+MergedLayoutView::Iterator& MergedLayoutView::Iterator::operator++() noexcept
+{
+    const std::span<const LayoutRange> ranges = std::span{ layout->layoutRanges }.first(layout->stageCount);
+    const std::span<uint32_t> activePositions = std::span{ positions }.first(layout->stageCount);
+    const uint64_t key = NextPlacement(ranges, activePositions);
+
+    // every stage that reads this placement moves past it together
+    std::array<uint32_t, k_MaxPipelineStages> stagesAtKey{};
+    const uint32_t matchCount = StagesAtPlacement(ranges, activePositions, key, stagesAtKey);
+    for (uint32_t match = 0u; match < matchCount; ++match)
+    {
+        ++activePositions[stagesAtKey[match]];
+    }
+
+    return *this;
+}
+
+MergedLayoutView::Iterator MergedLayoutView::Iterator::operator++(int) noexcept
+{
+    Iterator previous = *this;
+    ++*this;
+    return previous;
+}
+
+bool MergedLayoutView::Iterator::operator==(const Iterator& other) const noexcept
+{
+    return layout == other.layout && positions == other.positions;
+}
+
+bool MergedLayoutView::Iterator::operator!=(const Iterator& other) const noexcept
+{
+    return !(*this == other);
 }
 
 ShaderSourceProvider::ShaderSourceProvider(EnvironmentView _view,
@@ -1441,8 +1711,10 @@ namespace
                              .Detail = entryPoint.NameString };
                 }
 
+                // a stage is one bit of ShaderStageKind. A merged layout ORs stages into one mask, so a value
+                // with two bits would read as two stages
                 if (entryPoint.Stage >= static_cast<uint32_t>(ShaderStageKind::Count) ||
-                    entryPoint.Stage == static_cast<uint32_t>(ShaderStageKind::Invalid))
+                    !std::has_single_bit(entryPoint.Stage))
                 {
                     return { .Code = ErrorCode::EntryPointInvalidStage,
                              .Table = ShaderManifestTable::EntryPoints,
@@ -1767,7 +2039,8 @@ namespace
         const std::span<const uint32_t> resourceIndexList = Map<uint32_t>(extent, environment.ResourceIndices);
         const std::span<const Run> visibilityLists = Map<Run>(extent, environment.VisibilityLists);
         const std::span<const uint32_t> visibilityIndices = Map<uint32_t>(extent, environment.VisibilityIndices);
-        
+        const std::span<const Binding> bindingSpan = Map<Binding>(extent, environment.Bindings);
+
         const uint64_t numSlots = context.EntryPointCount * environment.VariantCount;
         const TableRef64 slotsLoc{ environment.EntryPointInstanceTableOffset, numSlots };
         const std::span<const EntryPointInstance> entryPointInstanceSpan = Map<EntryPointInstance>(extent, slotsLoc);
@@ -1814,6 +2087,11 @@ namespace
                 // absolute offset of this run into the visibility index table, so a bad entry names its row
                 const uint32_t runOffset = static_cast<uint32_t>(slotVisibilityIndices.data() - visibilityIndices.data());
 
+                // The placement order is checked for each instance, not once for each visibility list: an
+                // entry indexes the resource list of the variant, and two variants can share one list.
+                bool hasPreviousBound = false;
+                bool seenNotBound = false;
+                uint64_t previousKey = 0u;
                 for (int32_t j = 0; std::cmp_less(j, slotVisibilityIndices.size()); ++j)
                 {
                     // the entry indexes the variant's resource list, and the resource list was checked
@@ -1826,6 +2104,26 @@ namespace
                                  .RecordIndex = runOffset + static_cast<uint32_t>(j),
                                  .Detail = local };
                     }
+
+                    const uint32_t bindingIndex = variantResourceIndices[local];
+                    const Binding& binding = bindingSpan[bindingIndex];
+                    if (binding.PlacementKind != std::to_underlying(PlacementKind::Bound))
+                    {
+                        seenNotBound = true;
+                        continue;
+                    }
+
+                    const uint64_t key = BoundPlacementKey(binding.Placement);
+                    if (seenNotBound || (hasPreviousBound && key <= previousKey))
+                    {
+                        return { .Code = ErrorCode::InvalidVisibilityListOrder,
+                                 .Table = ShaderManifestTable::VisibilityIndices,
+                                 .RecordIndex = runOffset + static_cast<uint32_t>(j),
+                                 .Detail = local };
+                    }
+
+                    previousKey = key;
+                    hasPreviousBound = true;
                 }
             }
         }

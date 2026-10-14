@@ -4,6 +4,7 @@
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "VariantKey.hpp"
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -79,6 +80,11 @@ enum class ErrorCode : uint32_t
     InvalidVariantSuffixString = 41,
     InvalidProfileCodeFormat = 42,
     SpirvSourceMisaligned = 43,
+    InvalidVisibilityListOrder = 44,
+    MergedLayoutTooManyStages = 45,
+    MergedLayoutDuplicateStage = 46,
+    MergedLayoutPlacementUnsupported = 47,
+    MergedLayoutConflict = 48,
     Count
 };
 
@@ -546,9 +552,8 @@ public:
     [[nodiscard]] const Binding& Record() const noexcept;
     /** @brief Null when the footprint list is shorter than the resource list. */
     [[nodiscard]] const Footprint* FootprintRecord() const noexcept;
-
-    // totally null view, used for default-construction with MergedResource
-    ResolvedResource() noexcept = default;
+    [[nodiscard]] bool operator==(const ResolvedResource& rhs) const noexcept;
+    [[nodiscard]] bool operator!=(const ResolvedResource& rhs) const noexcept;
 private:
     friend class LayoutRange;
     ResolvedResource(const EnvironmentView* _environment,
@@ -559,16 +564,22 @@ private:
     const Footprint* footprint{ nullptr };
 };
 
+/** One resource of a merged layout, and the stages that use it. */
 struct MergedResource
 {
-    ResolvedResource Resource{};
-    ShaderStageKind Stage{ ShaderStageKind::Invalid };
+    /** The view of the first stage that reads the resource, in the order given to `Merge`. */
+    ResolvedResource Resource;
+    ShaderStageKind Stages{ ShaderStageKind::Invalid };
 };
 
-/** The resources one entry point of one variant reads, in binding order. */
+/** The resources one entry point of one variant uses, in placement order. `EnvironmentView::Open` checks
+ * the order: the Bound resources come first, in strictly ascending (group, binding) order. */
 class LayoutRange
 {
 public:
+    /** An empty range. `MergedLayoutView` holds a fixed array of ranges, and needs this. */
+    LayoutRange() noexcept = default;
+
     class Iterator
     {
     public:
@@ -684,11 +695,14 @@ public:
 private:
     friend class VariantView;
     EntryPointInstanceView(const EnvironmentView* _environment,
-                           const EntryPointInstance* _entry_point_instance,
-                           const Variant* _variant) noexcept;
+                           const EntryPointInstance* entry_point_instance,
+                           const Variant* _variant,
+                           uint32_t entry_point) noexcept;
     const EnvironmentView* environment{ nullptr };
     const EntryPointInstance* entryPointInstance{ nullptr };
     const Variant* variant{ nullptr };
+    // the position of the entry point in the module, which gives the stage
+    uint32_t entryPoint{ 0u };
 };
 
 /** One variant of one environment. */
@@ -708,6 +722,77 @@ private:
     VariantView(const EnvironmentView* _environment, uint32_t _index) noexcept;
     const EnvironmentView* environment{ nullptr };
     uint32_t index{};
+};
+
+/** @brief The merged resources of the entry point instances of one pipeline, in placement order.
+ *
+ * A pipeline layout needs each resource once, with every stage that reads it. `Merge` takes the instances,
+ * one for each stage, and checks every shared placement once. Iteration after that runs unchecked, and it
+ * gives one `MergedResource` for each (group, binding). A change of group in the sequence starts the next
+ * bind group layout or descriptor set layout.
+ *
+ * The instances can come from different variants, modules, or environments.
+ * @note The view points at the environments of its instances. Keep them alive, and do not move them. An
+ * iterator points at its view, so keep the view alive while you iterate it. */
+class MergedLayoutView
+{
+public:
+    // over what we'll actually need, but keeps things nicely rounded
+    static constexpr uint32_t k_MaxPipelineStages = 8u;
+
+    class Iterator
+    {
+    public:
+        // std::ranges::range needs a default constructor
+        Iterator() noexcept = default;
+
+        // a proxy iterator, as LayoutRange::Iterator is: it returns MergedResource by value
+        using iterator_concept = std::input_iterator_tag;
+        using iterator_category = std::input_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = MergedResource;
+        using pointer = value_type*;
+        using reference = value_type&;
+
+        void* operator->() const noexcept = delete;
+
+        [[nodiscard]] MergedResource operator*() const noexcept;
+        Iterator& operator++() noexcept;
+        Iterator operator++(int) noexcept;
+        [[nodiscard]] bool operator==(const Iterator& other) const noexcept;
+        [[nodiscard]] bool operator!=(const Iterator& other) const noexcept;
+
+    private:
+        friend class MergedLayoutView;
+        Iterator(const MergedLayoutView* _layout,
+                 const std::array<uint32_t, k_MaxPipelineStages>& _positions) noexcept;
+        const MergedLayoutView* layout{ nullptr };
+        // one position for each stage's range; a stage at the end of its range has position == size
+        std::array<uint32_t, k_MaxPipelineStages> positions{};
+    };
+
+    /** @brief Merges the layouts of one pipeline's entry point instances, one instance for each stage.
+     *
+     * Fails when:
+     * - there are more than `k_MaxPipelineStages` instances (`MergedLayoutTooManyStages`)
+     * - two instances have the same stage (`MergedLayoutDuplicateStage`)
+     * - a resource is not Bound (`MergedLayoutPlacementUnsupported`) (other binding/layout forms coming later)
+     * - two resources at one (group, binding) differ in kind, shape, access, storage format, sample type,
+     *   comparison, array count, or byte size (`MergedLayoutConflict`). The names do not take part.
+     *
+     * A failure names the binding record in `RecordIndex` and the position of the instance in `Detail`. */
+    [[nodiscard]] static ManifestResult<MergedLayoutView> Merge(
+        std::span<const EntryPointInstanceView> entry_points) noexcept;
+
+    [[nodiscard]] Iterator begin() const noexcept;
+    [[nodiscard]] Iterator end() const noexcept;
+    [[nodiscard]] uint32_t StageCount() const noexcept;
+
+private:
+    MergedLayoutView() noexcept = default;
+    uint32_t stageCount{ 0u };
+    std::array<LayoutRange, k_MaxPipelineStages> layoutRanges{};
+    std::array<ShaderStageKind, k_MaxPipelineStages> shaderStages{};
 };
 
 

@@ -197,6 +197,29 @@ for valid paths and directories.
   Avoid them as much as possible, and attempt to provide a way for modules of code to shutdown and restart
   in a known-good state to recover from errors.
 
+#### Accessor Chaining
+
+When writing a function that returns a value that can be accessed via operators like `[]`, instead of using it inline like:
+
+```cpp
+auto value = Getter()[index];
+```
+
+or 
+
+```cpp
+return SomeNewStruct{ .Field = Getter()[index] };
+```
+
+Prefer to do the following, so it's much clearer what is being accessed and how the value is obtained:
+
+```cpp
+std::span<MyStruct> values = Getter();
+return SomeNewStruct{ .Field = values[index] };
+```
+
+Don't short-circuit or shortcut into accessors like the initial examples were, ever, as it introduces ambiguity and potential lifetime issues with the accessed values: as well as just being generally ugly. The extra line is not going to actually change the generated assembly, but it will make the intent and the lifetime of the accessed values much clearer.
+
 #### Header Conventions
 - Headers carry **both** `#pragma once` and a traditional `#ifndef`/`#define`/`#endif` guard. This is
   intentional and consistent across the repo — do not "clean it up" to one or the other. Guard macros are
@@ -229,8 +252,8 @@ Write for clarity first, and apply the rules below to avoid the cases that cost 
 - **Prefer `std::ranges::to` over a manual fill loop**, but read the reserve rule below first
 - **Write a loop instead when the pipeline needs more than three adaptors.** A deep pipeline depends on the
   inliner, and the inliner gives up. A loop states the same thing and never surprises a reader
+
 ##### Two families of adaptor
- 
 Know which family an adaptor belongs to. The family decides the cost.
  
 - **Index adaptors** keep `sized_range` and `random_access_range`: `transform`, `take`, `drop`, `stride`,

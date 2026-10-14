@@ -119,6 +119,7 @@ add_lodestone_unit_test(SuggestTest SuggestTests.cpp)
 target_link_libraries(SuggestTest PRIVATE lodestone::suggest)
 add_lodestone_unit_test(EnumTagDecodeTest EnumTagDecodeTests.cpp)
 add_lodestone_unit_test(ManifestIndexTest ManifestIndexTests.cpp)
+add_lodestone_unit_test(MergedLayoutTest MergedLayoutTests.cpp)
 
 # Standalone Slang-only probe (not a unit test). Prints DeclReflection kinds so we can see what an
 # interface vs an enum reports, and whether getType() identity holds. It links ONLY slang, so it
