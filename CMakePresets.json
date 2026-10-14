@@ -30,6 +30,15 @@
             }
         },
         {
+            "name": "ninja-msvc-client",
+            "displayName": "Win64 MSVC, client only",
+            "description": "The client library and manifest_dump. No Vulkan SDK, no Slang, and no Tint.",
+            "inherits": "ninja-msvc",
+            "cacheVariables": {
+                "LODESTONE_BUILD_COOKER": "OFF"
+            }
+        },
+        {
             "name": "ninja-clang-cl",
             "displayName": "Win64 Clang-CL",
             "inherits": "ninja-x64",

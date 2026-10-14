@@ -7,31 +7,29 @@ if (PROJECT_IS_TOP_LEVEL)
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
-# cmake/ contains our own FindVulkanHeaders.cmake; must be set before any find_package calls
-if (NOT TARGET Vulkan::Vulkan)
-    list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-    find_package(Vulkan REQUIRED)
-    set(VulkanHeaders_INCLUDE_DIR ${Vulkan_INCLUDE_DIR} CACHE PATH "" FORCE)
+# OFF gives a client-only build: the manifest reader, the query layer, and manifest_dump. That build needs
+# no Vulkan SDK, no Slang, and no Tint, so it configures under Emscripten. The default follows the
+# platform: a desktop parent gets the cooker for its cook build step, and a web parent gets none.
+if (EMSCRIPTEN)
+    set(LODESTONE_BUILD_COOKER_DEFAULT OFF)
+else()
+    set(LODESTONE_BUILD_COOKER_DEFAULT ON)
 endif()
-
-include(cmake/ConfigureSlang.cmake)
-
-# xxHash runs a plain option(BUILD_SHARED_LIBS ... ON), which writes ON into the cache. Its own
-# CMAKE_DEPENDENT_OPTION then forces the value back to OFF for xxHash only, as a directory variable,
-# so the cache entry stays ON for every subdirectory added after this one. Slang reads that entry for
-# its bundled miniz, builds miniz as a DLL, and marks every miniz symbol dllimport. miniz is
-# EXCLUDE_FROM_ALL and no rule copies miniz.dll, so slang-bootstrap.exe then fails to load with
-# STATUS_DLL_NOT_FOUND and the core module never generates. Claim the cache entry first to stop this.
-function(add_xxhash)
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build third party dependencies as static libraries" FORCE)
-    set(XXHASH_BUILD_XXHSUM OFF)
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/third_party/xxHash/build/cmake" EXCLUDE_FROM_ALL)
-endfunction()
-
-add_xxhash()
-
-add_slang_subdirectory(third_party/slang)
-set_target_properties(slang PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+option(LODESTONE_BUILD_COOKER "Build the cooker (Slang, Tint, and the lodestone library)" ${LODESTONE_BUILD_COOKER_DEFAULT})
+# Every test links the cooker: the client tests build their bundles through the emitter. So the tests
+# follow the cooker, and a client-only build has none.
+if (LODESTONE_BUILD_COOKER)
+    set(LODESTONE_BUILD_TESTS_DEFAULT ${PROJECT_IS_TOP_LEVEL})
+else()
+    set(LODESTONE_BUILD_TESTS_DEFAULT OFF)
+endif()
+# Lodestone tests don't use google test, but do use ctest
+option(LODESTONE_BUILD_TESTS "Build the standalone unit test executables" ${LODESTONE_BUILD_TESTS_DEFAULT})
+# These tools are standalone executables mostly intended for debugging or iterative shader work
+option(LODESTONE_BUILD_TOOLS "Build the standalone tools" ${PROJECT_IS_TOP_LEVEL})
+if (LODESTONE_BUILD_TESTS AND NOT LODESTONE_BUILD_COOKER)
+    message(FATAL_ERROR "LODESTONE_BUILD_TESTS needs LODESTONE_BUILD_COOKER: every test links the cooker.")
+endif()
 
 # Add our various internal libraries first: the client library, and our
 # JSON writer that is used by some of the .exe tools and the cooker lib
@@ -40,223 +38,20 @@ add_subdirectory(tools/json)
 add_subdirectory(tools/suggest)
 add_subdirectory(client)
 
-set(LODESTONE_CLIENT_HEADERS
-    "${CMAKE_CURRENT_SOURCE_DIR}/client/include/ResourceFlags.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/client/include/ShaderLibraryTypes.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/client/include/ShaderManifest.hpp")
-
-set(LODESTONE_CLIENT_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/client/src/ResourceFlags.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/client/src/ShaderLibraryTypes.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/client/src/ShaderManifest.cpp")
-
-set(LODESTONE_COMMON_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/CookerErrors.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/Diagnostics.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/TransparentHash.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/CookerErrors.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/Diagnostics.cpp")
-
-set(LODESTONE_COMPILE_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/EnumTagDecode.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/EnumTagDecode.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/RawLibrary.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/SlangCompiler.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/SlangDiagnosticParser.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/compile/SymbolTable.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/RawLibrary.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/SlangCompiler.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/SlangDiagnosticParser.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/SymbolTable.cpp")
-
-set(LODESTONE_COMPILE_IMPL_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/EmbeddedFileSystem.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/EmbeddedFileSystem.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangCompilerTypes.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangCompilerTypes.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangModuleContext.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangModuleContext.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangReflector.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangReflector.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangVariantCompiler.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangVariantCompiler.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/ThreadPool.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/ThreadPool.cpp")
-
-set(LODESTONE_DRIVER_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/CookerDriver.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/CookerOptions.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/CookerSteps.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/steps/BuildModuleStep.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/steps/FinalizeModuleStep.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/steps/PrepareCookStep.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/steps/PrepareModuleStep.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/steps/PreparePermutationSpaceStep.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/CookerDriver.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/CookerOptions.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/steps/BuildModuleStep.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/steps/FinalizeModuleStep.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/steps/PrepareCookStep.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/steps/PrepareModuleStep.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/steps/PreparePermutationSpaceStep.cpp")
-
-set(LODESTONE_EMIT_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/DedupeReport.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/OutputSink.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/ShaderManifestEmitter.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/StageDump.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/DedupeReport.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/OutputSink.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/ShaderManifestEmitter.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/StageDump.cpp")
-
-set(LODESTONE_MODEL_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/model/ContentHash.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/model/ContentInterner.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/model/CookedLibrary.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/model/ResolveStage.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/model/ShaderDataSchema.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/ContentHash.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/CookedLibrary.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/ResolveStage.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/ShaderDataSchema.cpp")
-
-set(LODESTONE_PERMUTE_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/AttributeExpression.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationAssignment.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationAxis.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationSpace.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationTypes.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PermutationValue.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/permute/PolicyDocument.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/AttributeExpression.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PermutationAssignment.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PermutationAxis.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PermutationSpace.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PermutationValue.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/permute/PolicyDocument.cpp")
-
-set(LODESTONE_TARGET_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/target/SpvValidator.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/target/TargetProfile.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/target/TargetUtils.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/SpvValidator.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetProfile.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetUtils.cpp")
-
-# OFF removes Tint and the WGSL validator. The wgsl profile stays, with no validator, so a wgsl cook in
-# that build fails unless the command line passes --no-validate.
-option(LODESTONE_ENABLE_WGSL "Enable WGSL support in Lodestone" ON)
-if (LODESTONE_ENABLE_WGSL)
-    list(APPEND LODESTONE_TARGET_SOURCES
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/target/WgslValidator.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/target/WgslValidator.cpp")
+if (LODESTONE_BUILD_COOKER)
+    include(cmake/LodestoneCooker.cmake)
 endif()
-# Set up tint configuration if WGSL is being used with Lodestone
-if (LODESTONE_ENABLE_WGSL)
-    set(LODESTONE_DAWN_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/dawn" CACHE PATH
-        "Path to the Dawn/Tint source tree. Point this at a parent project's own Dawn checkout to share it.")
-    # A parent project that embeds lodestone and also builds the full Dawn tree for its own WebGPU
-    # backend already defines tint_api: Dawn's own CMakeLists.txt always adds src/tint. Reuse that
-    # target instead of adding the same source directory a second time, which CMake forbids outright.
-    if (NOT TARGET tint_api)
-        include(cmake/ConfigureTint.cmake)
-        add_subdirectory("${LODESTONE_DAWN_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/lodestone_tint" EXCLUDE_FROM_ALL)
-    endif()
-    add_library(Tint::tint ALIAS tint_api)
-endif()
-
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/LodestoneConfig.hpp.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/include/LodestoneConfig.hpp"
-    @ONLY)
-
-# The builtin Slang modules are compiled into the library. The cooker serves them from memory, so a cook
-# needs no path to find them. CONFIGURE_DEPENDS checks the glob again at each build.
-set(LODESTONE_BUILTIN_MODULES "${CMAKE_CURRENT_SOURCE_DIR}/builtins/LodestoneAttributes.slang")
-set(LODESTONE_EMBEDDED_BUILTINS_HEADER
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/include/compile/EmbeddedBuiltinModules.hpp")
-string(REPLACE ";" "|" LODESTONE_BUILTIN_MODULES_ARG "${LODESTONE_BUILTIN_MODULES}")
-add_custom_command(
-    OUTPUT "${LODESTONE_EMBEDDED_BUILTINS_HEADER}"
-    COMMAND "${CMAKE_COMMAND}"
-            "-DOUTPUT=${LODESTONE_EMBEDDED_BUILTINS_HEADER}"
-            "-DSOURCES=${LODESTONE_BUILTIN_MODULES_ARG}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedBuiltins.cmake"
-    DEPENDS ${LODESTONE_BUILTIN_MODULES} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedBuiltins.cmake"
-    COMMENT "Embedding the builtin Slang modules"
-    VERBATIM)
-list(APPEND LODESTONE_COMPILE_IMPL_SOURCES "${LODESTONE_EMBEDDED_BUILTINS_HEADER}")
-
-# Static on purpose. No header marks a symbol dllexport, so a Windows DLL build of this target exports
-# nothing and every consumer fails to link. A SHARED build is a temporary measure for instrumented
-# performance analysis only, and it needs WINDOWS_EXPORT_ALL_SYMBOLS to link at all.
-add_library(lodestone STATIC ${LODESTONE_COMMON_SOURCES} ${LODESTONE_COMPILE_SOURCES} ${LODESTONE_DRIVER_SOURCES}
-                             ${LODESTONE_EMIT_SOURCES} ${LODESTONE_MODEL_SOURCES} ${LODESTONE_PERMUTE_SOURCES}
-                             ${LODESTONE_TARGET_SOURCES} ${LODESTONE_COMPILE_IMPL_SOURCES})
-add_library(lodestone::lodestone ALIAS lodestone)
-set_target_properties(lodestone PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
-# The engine include path carries shader/ShaderLibraryTypes.hpp and resource/ResourceFlags.hpp. The
-# cooker and the rendergraph share that vocabulary, so neither can drift from the other. Neither
-# header pulls in Dawn: ResourceFlagConversions.hpp is the only file that names a WebGPU type.
-target_include_directories(lodestone PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/client/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/slang/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/magic_enum/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/tomlplusplus/include"
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/include")
-target_link_libraries(lodestone PRIVATE slang lodestone::client_library xxHash::xxhash lodestone::json)
-if (LODESTONE_ENABLE_WGSL)
-    target_link_libraries(lodestone PRIVATE Tint::tint)
-endif()
-# The SPIR-V validator reads and checks SPIR-V with SPIRV-Tools. Slang builds SPIRV-Tools in its own tree
-# (third_party/slang/external/spirv-tools), so this needs no switch, as Tint does. Only
-# src/target/SpirvValidator.cpp includes a SPIRV-Tools header.
-# SPIRV-Headers gives spirv.hpp11: the `spv::Op` and `spv::Decoration` enums, and `CapabilityToString`.
-if (NOT TARGET SPIRV-Tools-static OR NOT TARGET SPIRV-Headers::SPIRV-Headers)
-    message(FATAL_ERROR "Lodestone needs the SPIRV-Tools-static and SPIRV-Headers targets from the Slang build.")
-endif()
-target_link_libraries(lodestone PRIVATE SPIRV-Tools-static SPIRV-Headers::SPIRV-Headers)
-# /Ob2 and /arch:AVX2 are MSVC spellings, and the full Clang driver rejects both. The pure Clang
-# build therefore gets the GNU spelling of the same two requests. Every other flag decision in this
-# file goes through the compiler test at the top, and this one must also.
-if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-    target_compile_options(lodestone PUBLIC "$<$<CONFIG:RelWithDebInfo>:/Ob2;/arch:AVX2>")
-else()
-    target_compile_options(lodestone PUBLIC "$<$<CONFIG:RelWithDebInfo>:-mavx2>")
-endif()
-if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    target_compile_definitions(lodestone PRIVATE "_HAS_CXX23=1")
-    # No sanitizer here. AddressSanitizer on Windows does not support the debug CRT: it intercepts
-    # malloc and free, ucrtbased.dll allocates through _malloc_dbg, and ASan then reports the teardown
-    # free as a bad free and aborts before main. To turn the sanitizers on, every target in the
-    # process must first use the release CRT, slang included.
-    target_compile_options(lodestone PRIVATE "$<$<CONFIG:Debug>:-fcolor-diagnostics;-fansi-escape-codes;-fstandalone-debug;-fno-limit-debug-info;-fno-omit-frame-pointer>")
-endif()
-
-source_group("common" FILES ${LODESTONE_COMMON_SOURCES})
-source_group("compile" FILES ${LODESTONE_COMPILE_SOURCES})
-source_group("compile/impl" FILES ${LODESTONE_COMPILE_IMPL_SOURCES})
-source_group("driver" FILES ${LODESTONE_DRIVER_SOURCES})
-source_group("emit" FILES ${LODESTONE_EMIT_SOURCES})
-source_group("model" FILES ${LODESTONE_MODEL_SOURCES})
-source_group("permute" FILES ${LODESTONE_PERMUTE_SOURCES})
-source_group("target" FILES ${LODESTONE_TARGET_SOURCES})
-source_group("client" FILES ${LODESTONE_CLIENT_HEADERS} ${LODESTONE_CLIENT_SOURCES})
-
-copy_slang_dlls_to_target(lodestone)
-# Lodestone tests don't use google test, but do use ctest
-option(LODESTONE_BUILD_TESTS "Build the standalone unit test executables" ${PROJECT_IS_TOP_LEVEL})
-# These tools are standalone executables mostly intended for debugging or iterative shader work
-option(LODESTONE_BUILD_TOOLS "Build the standalone tools" ${PROJECT_IS_TOP_LEVEL})
 
 if(LODESTONE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
 
+# manifest_dump links only the client half. That link line is the proof that the client stays free of
+# the compiler, so it builds in a client-only build too.
 if(LODESTONE_BUILD_TOOLS)
     add_subdirectory(tools/manifest_dump)
-    add_subdirectory(tools/cooker_console)
+    if (LODESTONE_BUILD_COOKER)
+        add_subdirectory(tools/cooker_console)
+    endif()
 endif()
