@@ -425,17 +425,9 @@ int main()
     runner.Check(KeyCount(index.Query().Where("TILE", 8u).Where("TILE", 16u)) == 24u,
                  "a second Where on the same axis widens the constraint");
 
-    runner.BeginSection("First returns the smallest matching key");
-    const ManifestQueryBuilder tileQuery = index.Query().Where("TILE", 16u);
-    const lodestone::QueryResult<VariantKey> firstKey = tileQuery.First();
-    const lodestone::QueryResult<std::vector<VariantKey>> tileKeys = tileQuery.Keys();
-    runner.Check(firstKey.has_value() && tileKeys.has_value(), "both terminals resolve");
-    if (firstKey.has_value() && tileKeys.has_value() && !tileKeys->empty())
-    {
-        runner.Check(*firstKey == tileKeys->front(), "First equals the first of the sorted keys");
-    }
-
     runner.BeginSection("VariantsFromKeys agrees with Variants");
+    const ManifestQueryBuilder tileQuery = index.Query().Where("TILE", 16u);
+    const lodestone::QueryResult<std::vector<VariantKey>> tileKeys = tileQuery.Keys();
     if (tileKeys.has_value())
     {
         const std::vector<DecodedVariant> fromKeys = tileQuery.VariantsFromKeys(*tileKeys);
@@ -462,9 +454,6 @@ int main()
     runner.Check(!unknownAxis.Keys().has_value() &&
                  unknownAxis.Keys().error() == QueryErrorCode::UnknownAxis,
                  "the terminal returns the error code");
-    runner.Check(!unknownAxis.First().has_value() &&
-                 unknownAxis.First().error() == QueryErrorCode::UnknownAxis,
-                 "First returns the query error, not a variant");
 
     runner.BeginSection("a value in the wrong domain reports IncorrectValueDomain");
     const ManifestQueryBuilder wrongDomain = index.Query().Where("DITHER", 5u);
@@ -529,9 +518,6 @@ int main()
         const ManifestQueryBuilder absentValue = sparse.Query().Where("TILE", 32u);
         runner.Check(absentValue.IsValid(), "a declared value is not an error");
         runner.Check(KeyCount(absentValue) == 0u, "but it names no cooked variant, so the result is empty");
-        runner.Check(!absentValue.First().has_value() &&
-                     absentValue.First().error() == QueryErrorCode::NoVariantForConstraints,
-                     "First reports no variant for the constraints");
     }
 
     // An ActiveWhen gate appears at the query layer as a structured hole, not as a schema field: the
@@ -562,9 +548,6 @@ int main()
             gated.Query().Where("DITHER", false).Where("SHADE", AxisValueDomain::Type, "Phong");
         runner.Check(gatedOff.IsValid(), "the gated-off combination uses two valid values");
         runner.Check(KeyCount(gatedOff) == 0u, "yet it names no variant");
-        runner.Check(!gatedOff.First().has_value() &&
-                     gatedOff.First().error() == QueryErrorCode::NoVariantForConstraints,
-                     "First reports no variant for the gated-off combination");
 
         // The gated-off variants hold SHADE at its default digit (Lambert), but SHADE is inactive there.
         // A digit test alone returns them for a Lambert query. The axis-active mask removes them.

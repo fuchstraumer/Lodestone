@@ -238,30 +238,6 @@ std::vector<DecodedVariant> ManifestQueryBuilder::VariantsFromKeys(const std::ve
     return results;
 }
 
-QueryResult<VariantKey> ManifestQueryBuilder::First() const noexcept
-{
-    if (!errors.empty())
-    {
-        return std::unexpected(errors.front().Code);
-    }
-
-    const std::vector<ManifestIndex::ScanConstraint> scanConstraints = index->convertToScanConstraints(constraints);
-    if (scanConstraints.empty())
-    {
-        return std::unexpected(QueryErrorCode::NoVariantForConstraints);
-    }
-
-    VariantKey result = index->first(scanConstraints);
-    if (!result)
-    {
-        return std::unexpected(QueryErrorCode::NoVariantForConstraints);
-    }
-    else
-    {
-        return result;
-    }
-}
-
 bool ManifestQueryBuilder::IsValid() const noexcept
 {
     return errors.empty();

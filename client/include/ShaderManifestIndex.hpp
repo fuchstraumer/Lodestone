@@ -125,9 +125,6 @@ struct ManifestQueryBuilder
     /** @brief If you've already built Keys(), then this will be a (slightly) cheaper way to get the variants 
       * Returns without using QueryResult because Keys() can fail, but Variants() cannot. */
     [[nodiscard]] std::vector<DecodedVariant> VariantsFromKeys(const std::vector<VariantKey>& keys) const noexcept;
-    /** @brief Returns the first VariantKey matching the query, or the query's error state.
-     *  @note This is quite an inefficient accessor, so prefer using Keys() and Variants() when at all suitable. */
-    [[nodiscard]] QueryResult<VariantKey> First() const noexcept;
 
     [[nodiscard]] bool IsValid() const noexcept;
     [[nodiscard]] std::span<const QueryError> Errors() const noexcept;
