@@ -492,6 +492,23 @@ std::span<const EntryPoint> ModuleView::EntryPoints() const noexcept
     return entryPoints;
 }
 
+ManifestResult<const EntryPoint*> ModuleView::FindEntryPoint(std::string_view name) const noexcept
+{
+    for (const EntryPoint& entryPoint : entryPoints)
+    {
+        std::string_view epName = bundle.String(entryPoint.NameString);
+        if (epName == name)
+        {
+            return &entryPoint;
+        }
+    }
+    
+    return std::unexpected(ErrorState{ .Code = ErrorCode::EntryPointInvalidName,
+                                       .Table = ShaderManifestTable::EntryPoints,
+                                       .RecordIndex = moduleIndex,
+                                       .Detail = 0 });
+}
+
 std::span<const ModuleAxis> ModuleView::ModuleAxes() const noexcept
 {
     return moduleAxes;

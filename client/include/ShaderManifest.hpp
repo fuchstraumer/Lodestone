@@ -864,6 +864,7 @@ public:
     [[nodiscard]] uint32_t Index() const noexcept;
     [[nodiscard]] std::string_view Name() const noexcept;
     [[nodiscard]] std::span<const EntryPoint> EntryPoints() const noexcept;
+    [[nodiscard]] ManifestResult<const EntryPoint*> FindEntryPoint(std::string_view name) const noexcept;
     [[nodiscard]] std::span<const ModuleAxis> ModuleAxes() const noexcept;
     [[nodiscard]] uint32_t AxisCount() const noexcept;
     /** @brief The root axis record behind module axis `local_axis`. */
