@@ -101,6 +101,52 @@ namespace lodestone
             return ExternConstantDeclaration{ .Name=identifier, .Value=value };
         }
 
+        /**@brief Returns true when `keyword` appears in `text` as a whole identifier token, so that a type named
+         * `MyStaticData` does not count as the keyword `static`. */
+        bool ContainsToken(std::string_view text, std::string_view keyword) noexcept
+        {
+            for (auto chunk : text | std::views::chunk_by(ChunkSeparator))
+            {
+                if (std::string_view(std::ranges::data(chunk), std::ranges::size(chunk)) == keyword)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**@brief Reads `static const <Type> <Name> = <Expression>;` from one line, or returns nothing when the line
+         * is not such a declaration. Lines with `extern` are skipped: those are axes or undriven extern constants,
+         * which the extern table handles. The expression runs from `=` to `;`, so it must be on one line. */
+        std::optional<DerivedConstantDeclaration> ExtractDerivedConstant(std::string_view line,
+                                                                          std::string_view source_path,
+                                                                          uint32_t source_line)
+        {
+            const size_t assignmentIndex = line.find('=');
+            if (assignmentIndex == std::string_view::npos)
+            {
+                return std::nullopt;
+            }
+
+            const std::string_view declaration = line.substr(0, assignmentIndex);
+            if (!ContainsToken(declaration, "static") || !ContainsToken(declaration, "const") ||
+                ContainsToken(declaration, "extern"))
+            {
+                return std::nullopt;
+            }
+
+            const std::string_view name = ExtractIdentifier(line, assignmentIndex);
+            const std::string_view expression = ExtractValueAssignment(line, assignmentIndex);
+            if (!IsValidIdentifier(name) || expression.empty())
+            {
+                return std::nullopt;
+            }
+            return DerivedConstantDeclaration{ .Name = name,
+                                               .Expression = expression,
+                                               .SourcePath = source_path,
+                                               .SourceLine = source_line };
+        }
+
         /**@brief Reads `extern struct <Name> : <Interface> = <Default>;` from one line, or returns nothing when the
          * line is not such a declaration. The identifier just before `=` is the interface, not the struct, so the
          * name is the token after the `struct` keyword. Keywords are matched as whole tokens, so a type named
@@ -175,14 +221,18 @@ namespace lodestone
         return std::ranges::binary_search(k_ReservedKeywords, keyword);
     }
 
-    void SymbolTable::AddSource(std::string_view module_name, std::string_view source_code) noexcept
+    void SymbolTable::AddSource(std::string_view module_name,
+                                std::string_view source_path,
+                                std::string_view source_code) noexcept
     {
         // Accumulate tokens for this module - one module may receive tokens from
         // several sources, due to how slang handles `__include` directives.
         TokenSet& tokens = tokenMap[module_name];
         ExternConstSet& externConsts = externConstMap[module_name];
         ExternConstSet& externTypeDefaults = externTypeDefaultMap[module_name];
+        std::vector<DerivedConstantDeclaration>& derivedConstants = derivedConstantMap[module_name];
         size_t lineStart = 0u;
+        uint32_t lineNumber = 0u;
 
         while (std::cmp_less(lineStart, source_code.size()))
         {
@@ -194,6 +244,14 @@ namespace lodestone
 
             std::string_view line = source_code.substr(lineStart, lineEnd - lineStart);
             lineStart = lineEnd + 1;
+            ++lineNumber;
+
+            // no `continue` here either: the expression names axes, and those still count as tokens
+            if (const std::optional<DerivedConstantDeclaration> derived =
+                    ExtractDerivedConstant(line, source_path, lineNumber))
+            {
+                derivedConstants.push_back(*derived);
+            }
 
             // no `continue` here: the struct name still counts as a token, the same as before we read defaults
             if (const std::optional<ExternConstantDeclaration> typeDefault = ExtractExternTypeDefault(line))
@@ -255,6 +313,16 @@ namespace lodestone
         }
         
         return missing;
+    }
+
+    std::span<const DerivedConstantDeclaration> SymbolTable::DerivedConstantsForModule(std::string_view module_name) const
+    {
+        const auto iter = derivedConstantMap.find(module_name);
+        if (iter != derivedConstantMap.end())
+        {
+            return iter->second;
+        }
+        return {};
     }
 
     std::vector<ExternConstantDeclaration> SymbolTable::ExternTypeDefaultsForModule(std::string_view module_name) const

@@ -2,6 +2,7 @@
 #ifndef LODESTONE_SHADER_SYMBOL_TABLE_HPP
 #define LODESTONE_SHADER_SYMBOL_TABLE_HPP
 #include "TransparentHash.hpp"
+#include <cstdint>
 #include <functional>
 #include <span>
 #include <string>
@@ -27,6 +28,16 @@ namespace lodestone
         }
     };
 
+    /**@brief A `static const <Type> <Name> = <Expression>;` line that is not `extern`, with its source location.
+     * The expression is kept as written, because it can name axes and must be evaluated for each variant. */
+    struct DerivedConstantDeclaration
+    {
+        std::string_view Name;
+        std::string_view Expression;
+        std::string_view SourcePath;
+        uint32_t SourceLine{ 0u };
+    };
+
     struct ExternConstHash
     {
         std::size_t operator()(const ExternConstantDeclaration& decl) const noexcept
@@ -49,8 +60,9 @@ namespace lodestone
     {
         SymbolTable() = default;
         /**@brief Adds given source code for `module_name` to the table - strips out reserved keywords
-         * and extern static const decls. */
-        void AddSource(std::string_view module_name, std::string_view source_code) noexcept;
+         * and extern static const decls. `source_path` is stored with each derived constant, so that errors
+         * can report where it is declared. */
+        void AddSource(std::string_view module_name, std::string_view source_path, std::string_view source_code) noexcept;
         /** @brief Returns the set of tokens not found in the symbol tables for the given modules */
         [[nodiscard]] std::vector<std::string_view> MissingTokens(std::span<const std::string> module_names,
                                                                   std::span<const std::string_view> tokens) const;
@@ -60,12 +72,17 @@ namespace lodestone
           * the struct, and `Value` is the default type as written. These are kept apart from the extern constants,
           * because a type default is not an expression and must never be evaluated as one. */
         [[nodiscard]] std::vector<ExternConstantDeclaration> ExternTypeDefaultsForModule(std::string_view module_name) const;
+        /** @brief Returns the non-`extern` `static const` declarations of a module, in source order. A name can
+          * appear more than once (a function-local constant, or two modules that each declare it), so the
+          * caller decides which ones are module scope and whether a duplicate is an error. */
+        [[nodiscard]] std::span<const DerivedConstantDeclaration> DerivedConstantsForModule(std::string_view module_name) const;
     private:
         using TokenSet = std::unordered_set<std::string_view>;
         std::unordered_map<std::string_view, TokenSet, TransparentStringHash, std::equal_to<>> tokenMap;
         using ExternConstSet = std::unordered_set<ExternConstantDeclaration, ExternConstHash>;
         std::unordered_map<std::string_view, ExternConstSet> externConstMap;
         std::unordered_map<std::string_view, ExternConstSet> externTypeDefaultMap;
+        std::unordered_map<std::string_view, std::vector<DerivedConstantDeclaration>> derivedConstantMap;
     };
 }
 
