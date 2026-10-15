@@ -1,12 +1,14 @@
 #include "compile/SymbolTable.hpp"
 #include "TestHarness.hpp"
 #include <algorithm>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
 using lodestone::SymbolTable;
 using lodestone::ExternConstantDeclaration;
+using lodestone::DerivedConstantDeclaration;
 using lodestone::tests::TestRunner;
 
 namespace
@@ -35,6 +37,9 @@ bool DeclarationMatches(const std::vector<ExternConstantDeclaration>& externs,
 
 // A whole `extern static const` line is dropped, in any keyword order. A line that has only some of
 // the three keywords is an ordinary declaration, and its name stays a token.
+// a placeholder source path: only derived constants record it, and only their tests read it back
+constexpr std::string_view k_TestSourcePath = "test.slang";
+
 void TestExternStaticConstStripping(TestRunner& runner)
 {
     runner.BeginSection("extern static const stripping");
@@ -49,7 +54,7 @@ uint FFF = 2;
 )";
 
     SymbolTable table;
-    table.AddSource("decls", k_Source);
+    table.AddSource("decls", k_TestSourcePath, k_Source);
 
     runner.Check(Missing(table, { "decls" }, { "AAA", "BBB", "CCC" }).size() == 3u,
                  "every arrangement of extern static const is stripped");
@@ -74,7 +79,7 @@ void doWork(uint count)
 )";
 
     SymbolTable table;
-    table.AddSource("kernel", k_Source);
+    table.AddSource("kernel", k_TestSourcePath, k_Source);
 
     runner.Check(Missing(table, { "kernel" }, { "RWStructuredBuffer", "float", "void", "uint", "for" }).size() == 5u,
                  "reserved words and built-in type names are stripped");
@@ -109,8 +114,8 @@ void csMain(uint3 tid : SV_DispatchThreadID)
 )";
 
     SymbolTable table;
-    table.AddSource("common", k_Common);
-    table.AddSource("main", k_Main);
+    table.AddSource("common", k_TestSourcePath, k_Common);
+    table.AddSource("main", k_TestSourcePath, k_Main);
 
     const std::vector<std::string_view> missing =
         Missing(table, { "common", "main" }, { "USE_WAVE_OPS", "FFT_SIZE", "UNUSED_TILE" });
@@ -133,14 +138,76 @@ void TestAccumulationAndUnknownModule(TestRunner& runner)
     runner.BeginSection("accumulation and unknown module");
 
     SymbolTable table;
-    table.AddSource("mod", "alpha beta");
-    table.AddSource("mod", "gamma delta"); // pools into "mod" alongside the first source
+    table.AddSource("mod", k_TestSourcePath, "alpha beta");
+    table.AddSource("mod", k_TestSourcePath, "gamma delta"); // pools into "mod" alongside the first source
 
     runner.Check(Missing(table, { "mod" }, { "alpha", "gamma" }).empty(),
                  "a second AddSource for the same module pools its tokens in");
 
     runner.Check(Missing(table, { "nonexistent" }, { "alpha" }).size() == 1u,
                  "an unknown module holds no tokens, so the token is missing");
+}
+
+// Derived constants are non-extern `static const` declarations, kept with their expression text and source
+// location. The line scan cannot tell scopes apart, so a function-local constant is captured here too: the
+// compiler filters these by the module-scope names that reflection reports.
+void TestDerivedConstantExtraction(TestRunner& runner)
+{
+    runner.BeginSection("derived constants");
+
+    constexpr std::string_view k_Source = R"(module Lighting;
+    extern static const uint GRID_X = 4u;
+    static const uint CLUSTER_COUNT = GRID_X * GRID_Y;
+    const static uint LIGHT_SLOTS = CLUSTER_COUNT * 16u;
+    staticconst_t SUBSTRING_ONLY = 3u;
+    static const uint SIZES[2] = { 1, 2 };
+    void main() { static const uint LOCAL_ONLY = 7u; }
+    )";
+
+    SymbolTable table;
+    table.AddSource("Lighting", "Lighting.slang", k_Source);
+
+    const std::span<const DerivedConstantDeclaration> derived = table.DerivedConstantsForModule("Lighting");
+    auto find = [&](std::string_view name) -> const DerivedConstantDeclaration*
+    {
+        const auto iter = std::ranges::find(derived, name, &DerivedConstantDeclaration::Name);
+        return iter == derived.end() ? nullptr : &*iter;
+    };
+
+    runner.Check(derived.size() == 3u, "three static const lines with an initializer are captured");
+    const DerivedConstantDeclaration* clusterCount = find("CLUSTER_COUNT");
+    runner.Check(clusterCount != nullptr && clusterCount->Expression == "GRID_X * GRID_Y",
+                 "the expression is kept as written, not evaluated");
+    runner.Check(clusterCount != nullptr && clusterCount->SourcePath == "Lighting.slang" && clusterCount->SourceLine == 3u,
+                 "the source path and the line number are recorded");
+    runner.Check(find("LIGHT_SLOTS") != nullptr, "the keyword order does not matter");
+    runner.Check(find("GRID_X") == nullptr, "an extern constant is not a derived constant");
+    runner.Check(find("SUBSTRING_ONLY") == nullptr, "`static` and `const` must be whole tokens, not parts of a type name");
+    runner.Check(find("LOCAL_ONLY") != nullptr, "a function-local constant is captured, for the scope filter to remove");
+    runner.Check(find("SIZES") == nullptr, "an array declaration is skipped, because its name is not before the `=`");
+    runner.Check(Missing(table, { "Lighting" }, { "GRID_Y" }).empty(),
+                 "the names in a derived expression still count as tokens");
+}
+
+// Every declaration is classified by one scan of its keywords as whole tokens. The extern constant check used
+// to test substrings of the whole line, so a type name that contained `static` and `const` passed it.
+void TestDeclarationKeywordTokens(TestRunner& runner)
+{
+    runner.BeginSection("declaration keywords are whole tokens");
+
+    constexpr std::string_view k_Source = R"(module Keywords;
+    extern static const staticconst_buffer TYPED = 2u;
+    extern staticconst_buffer NOT_STATIC_CONST = 3u;
+    )";
+
+    SymbolTable table;
+    table.AddSource("Keywords", k_TestSourcePath, k_Source);
+
+    const std::vector<ExternConstantDeclaration> externs = table.ExternConstantsForModule("Keywords");
+    runner.Check(externs.size() == 1u && DeclarationMatches(externs, "TYPED", "2u"),
+                 "an extern static const of a type named staticconst_buffer is read with its own name");
+    runner.Check(!DeclarationMatches(externs, "NOT_STATIC_CONST", "3u"),
+                 "`static` and `const` inside a type name do not make a line an extern static const");
 }
 
 // Interface axes are `extern struct` declarations. The identifier just before `=` is the interface, so the
@@ -160,7 +227,7 @@ void TestExternTypeDefaultExtraction(TestRunner& runner)
     )";
 
     SymbolTable table;
-    table.AddSource("Shading", k_Source);
+    table.AddSource("Shading", k_TestSourcePath, k_Source);
 
     const std::vector<ExternConstantDeclaration> types = table.ExternTypeDefaultsForModule("Shading");
     runner.Check(types.size() == 2u, "only extern struct declarations with an initializer are recognized");
@@ -194,7 +261,7 @@ void TestExternConstExtraction(TestRunner& runner)
     )";
 
     SymbolTable table;
-    table.AddSource("OceanFft", k_Source);
+    table.AddSource("OceanFft", k_TestSourcePath, k_Source);
 
     const std::vector<ExternConstantDeclaration> externs = table.ExternConstantsForModule("OceanFft");
     runner.Check(externs.size() == 4u, "A line needs extern static const and = to be recognized.");
@@ -205,7 +272,7 @@ void TestExternConstExtraction(TestRunner& runner)
     runner.Check(DeclarationMatches(externs, "ANOTHER_HEX_CONSTANT", "0x9e3779b9"), "a hex constant reads back correctly");
 
     constexpr std::string_view k_IdentifierExtractionSrc = "extern static const uint SPACED    =   42 ; \n";
-    table.AddSource("Identifiers", k_IdentifierExtractionSrc);
+    table.AddSource("Identifiers", k_TestSourcePath, k_IdentifierExtractionSrc);
     const std::vector<ExternConstantDeclaration> identifiersExterns = table.ExternConstantsForModule("Identifiers");
     runner.Check(identifiersExterns.size() == 1u, "Should extract the single extern static const declaration.");
     runner.Check(DeclarationMatches(identifiersExterns, "SPACED", "42"), "The extracted declaration should match the source.");
@@ -222,5 +289,7 @@ int main()
     TestAccumulationAndUnknownModule(runner);
     TestExternConstExtraction(runner);
     TestExternTypeDefaultExtraction(runner);
+    TestDerivedConstantExtraction(runner);
+    TestDeclarationKeywordTokens(runner);
     return runner.Report();
 }

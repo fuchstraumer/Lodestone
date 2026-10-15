@@ -1,4 +1,5 @@
 #include "compile/SymbolTable.hpp"
+#include "EnumClassUtils.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cctype>
@@ -93,50 +94,63 @@ namespace lodestone
             return TrimWhitespace(valueStr);
         }
 
-        ExternConstantDeclaration ExtractExternConst(std::string_view line)
+        /**@brief The declaration keywords found before the `=` of one line. Using a bitmask lets us
+          *freely combine and order these, just like how C-like languages allow natively */
+        enum class DeclarationKeyword : uint8_t
         {
-            const size_t assignmentIndex = line.find('=');
-            const std::string_view identifier = ExtractIdentifier(line, assignmentIndex);
-            const std::string_view value = ExtractValueAssignment(line, assignmentIndex);
+            None = 0,
+            Extern = 1u << 0u,
+            Static = 1u << 1u,
+            Const = 1u << 2u,
+            Struct = 1u << 3u,
+        };
+        MAKE_ENUM_CLASS_FLAGS(DeclarationKeyword)
+
+        /**@brief Walks the tokens of `declaration` once and returns every declaration keyword it contains. Keywords
+         * are matched as whole tokens, so a type named `staticconst_buffer` sets no flag. */
+        DeclarationKeyword ScanDeclarationKeywords(std::string_view declaration) noexcept
+        {
+            DeclarationKeyword keywords = DeclarationKeyword::None;
+            for (auto chunk : declaration | std::views::chunk_by(ChunkSeparator))
+            {
+                const std::string_view token(std::ranges::data(chunk), std::ranges::size(chunk));
+                if (token == "extern")
+                {
+                    keywords |= DeclarationKeyword::Extern;
+                }
+                else if (token == "static")
+                {
+                    keywords |= DeclarationKeyword::Static;
+                }
+                else if (token == "const")
+                {
+                    keywords |= DeclarationKeyword::Const;
+                }
+                else if (token == "struct")
+                {
+                    keywords |= DeclarationKeyword::Struct;
+                }
+            }
+            return keywords;
+        }
+
+        ExternConstantDeclaration ExtractExternConst(std::string_view line, size_t assignment_index)
+        {
+            const std::string_view identifier = ExtractIdentifier(line, assignment_index);
+            const std::string_view value = ExtractValueAssignment(line, assignment_index);
             return ExternConstantDeclaration{ .Name=identifier, .Value=value };
         }
 
-        /**@brief Returns true when `keyword` appears in `text` as a whole identifier token, so that a type named
-         * `MyStaticData` does not count as the keyword `static`. */
-        bool ContainsToken(std::string_view text, std::string_view keyword) noexcept
-        {
-            for (auto chunk : text | std::views::chunk_by(ChunkSeparator))
-            {
-                if (std::string_view(std::ranges::data(chunk), std::ranges::size(chunk)) == keyword)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /**@brief Reads `static const <Type> <Name> = <Expression>;` from one line, or returns nothing when the line
-         * is not such a declaration. Lines with `extern` are skipped: those are axes or undriven extern constants,
-         * which the extern table handles. The expression runs from `=` to `;`, so it must be on one line. */
+        /**@brief Reads `static const <Type> <Name> = <Expression>;` from a line that `keywords` classified as a
+         * non-extern static const declaration. Returns nothing when the name before `=` is not an identifier, such
+         * as an array declaration. The expression runs from `=` to `;`, so it must be on one line. */
         std::optional<DerivedConstantDeclaration> ExtractDerivedConstant(std::string_view line,
+                                                                          size_t assignment_index,
                                                                           std::string_view source_path,
                                                                           uint32_t source_line)
         {
-            const size_t assignmentIndex = line.find('=');
-            if (assignmentIndex == std::string_view::npos)
-            {
-                return std::nullopt;
-            }
-
-            const std::string_view declaration = line.substr(0, assignmentIndex);
-            if (!ContainsToken(declaration, "static") || !ContainsToken(declaration, "const") ||
-                ContainsToken(declaration, "extern"))
-            {
-                return std::nullopt;
-            }
-
-            const std::string_view name = ExtractIdentifier(line, assignmentIndex);
-            const std::string_view expression = ExtractValueAssignment(line, assignmentIndex);
+            const std::string_view name = ExtractIdentifier(line, assignment_index);
+            const std::string_view expression = ExtractValueAssignment(line, assignment_index);
             if (!IsValidIdentifier(name) || expression.empty())
             {
                 return std::nullopt;
@@ -147,21 +161,13 @@ namespace lodestone
                                                .SourceLine = source_line };
         }
 
-        /**@brief Reads `extern struct <Name> : <Interface> = <Default>;` from one line, or returns nothing when the
-         * line is not such a declaration. The identifier just before `=` is the interface, not the struct, so the
-         * name is the token after the `struct` keyword. Keywords are matched as whole tokens, so a type named
-         * `MyStruct` does not count as the `struct` keyword. */
-        std::optional<ExternConstantDeclaration> ExtractExternTypeDefault(std::string_view line)
+        /**@brief Reads `extern struct <Name> : <Interface> = <Default>;` from a line that `keywords` classified as
+         * an extern struct declaration. The identifier just before `=` is the interface, not the struct, so the
+         * name is the identifier token after the `struct` keyword. */
+        std::optional<ExternConstantDeclaration> ExtractExternTypeDefault(std::string_view line, size_t assignment_index)
         {
-            const size_t assignmentIndex = line.find('=');
-            if (assignmentIndex == std::string_view::npos)
-            {
-                return std::nullopt;
-            }
-
-            bool sawExtern = false;
             bool sawStruct = false;
-            for (auto chunk : line.substr(0, assignmentIndex) | std::views::chunk_by(ChunkSeparator))
+            for (auto chunk : line.substr(0, assignment_index) | std::views::chunk_by(ChunkSeparator))
             {
                 const std::string_view token(std::ranges::data(chunk), std::ranges::size(chunk));
                 if (!IsValidIdentifier(token))
@@ -170,14 +176,9 @@ namespace lodestone
                 }
                 if (sawStruct)
                 {
-                    if (!sawExtern)
-                    {
-                        return std::nullopt;
-                    }
                     return ExternConstantDeclaration{ .Name = token,
-                                                      .Value = ExtractValueAssignment(line, assignmentIndex) };
+                                                      .Value = ExtractValueAssignment(line, assignment_index) };
                 }
-                sawExtern = sawExtern || token == "extern";
                 sawStruct = token == "struct";
             }
             return std::nullopt;
@@ -246,28 +247,38 @@ namespace lodestone
             lineStart = lineEnd + 1;
             ++lineNumber;
 
+            // every declaration we read has an initializer, so only the text before `=` is classified
+            const size_t assignmentIndex = line.find('=');
+            const DeclarationKeyword keywords = assignmentIndex == std::string_view::npos
+                                                    ? DeclarationKeyword::None
+                                                    : ScanDeclarationKeywords(line.substr(0, assignmentIndex));
+
+            const bool isExtern = HasAllFlags(keywords, DeclarationKeyword::Extern);
+            const bool isStaticConst = HasAllFlags(keywords, DeclarationKeyword::Static | DeclarationKeyword::Const);
+
             // no `continue` here either: the expression names axes, and those still count as tokens
-            if (const std::optional<DerivedConstantDeclaration> derived =
-                    ExtractDerivedConstant(line, source_path, lineNumber))
+            if (isStaticConst && !isExtern)
             {
-                derivedConstants.push_back(*derived);
+                if (const std::optional<DerivedConstantDeclaration> derived =
+                        ExtractDerivedConstant(line, assignmentIndex, source_path, lineNumber))
+                {
+                    derivedConstants.push_back(*derived);
+                }
             }
 
             // no `continue` here: the struct name still counts as a token, the same as before we read defaults
-            if (const std::optional<ExternConstantDeclaration> typeDefault = ExtractExternTypeDefault(line))
+            if (isExtern && HasAllFlags(keywords, DeclarationKeyword::Struct))
             {
-                externTypeDefaults.emplace(*typeDefault);
+                if (const std::optional<ExternConstantDeclaration> typeDefault =
+                        ExtractExternTypeDefault(line, assignmentIndex))
+                {
+                    externTypeDefaults.emplace(*typeDefault);
+                }
             }
 
-            // We check for these individually to avoid ordering dependencies:
-            // `extern static const` passes and so does `static extern const` etc
-            if (line.contains("extern") &&
-                line.contains("static") &&
-                line.contains("const") &&
-                line.contains("="))
+            if (isExtern && isStaticConst)
             {
-                ExternConstantDeclaration decl = ExtractExternConst(line);
-                externConsts.emplace(decl);
+                externConsts.emplace(ExtractExternConst(line, assignmentIndex));
                 continue;
             }
 
