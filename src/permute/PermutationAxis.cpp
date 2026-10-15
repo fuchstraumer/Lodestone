@@ -84,6 +84,11 @@ std::span<const PermutationValue> PermutationAxis::GetValues() const noexcept
     return std::span<const PermutationValue>{ values.data(), values.size() };
 }
 
+const PermutationValue& PermutationAxis::operator[](uint32_t idx) const noexcept
+{
+    return values[static_cast<size_t>(idx)];
+}
+
 const PermutationValue& PermutationAxis::GetCanonicalValue() const noexcept
 {
     return values.front();

@@ -52,6 +52,7 @@ struct PermutationAxis
 
     [[nodiscard]] size_t NumValues() const noexcept;
     [[nodiscard]] std::span<const PermutationValue> GetValues() const noexcept;
+    [[nodiscard]] const PermutationValue& operator[](uint32_t idx) const noexcept;
     /** @brief Returns the first value. Canonicalization uses it to fill an axis that a variant does not use, so
       * that every key packs the same number of digits. This is not the default the shader declares. */
     [[nodiscard]] const PermutationValue& GetCanonicalValue() const noexcept;
