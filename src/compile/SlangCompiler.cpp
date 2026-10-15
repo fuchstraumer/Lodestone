@@ -121,6 +121,11 @@ const std::vector<std::string>& SlangCompiler::ModuleSourceStrings() const noexc
     return bootstrapContext->ModuleSourceStrings();
 }
 
+const std::vector<std::string>& SlangCompiler::DependencyFilePaths() const noexcept
+{
+    return bootstrapContext->DependencyFilePaths();
+}
+
 std::vector<std::string_view> SlangCompiler::ModuleSourceStringViews() const noexcept
 {
     return bootstrapContext->ModuleSourceStringViews();

@@ -13,6 +13,7 @@
 #include "driver/steps/BuildModuleStep.hpp"
 #include "driver/steps/FinalizeModuleStep.hpp"
 #include "emit/DedupeReport.hpp"
+#include "emit/Depfile.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 #include "target/TargetProfile.hpp"
@@ -28,6 +29,7 @@
 #include <ratio>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 #include "emit/StageDump.hpp"
@@ -50,6 +52,14 @@ namespace
     CookedLibrary MakeEmptyLibrary(const SharedCookState& cook_state);
     /** Stage 8: the bundle, its round trip, and the dedup report, all from the one frozen library. */
     CookError EmitLibraryArtifacts(const CookedLibrary& library, OutputSink& sink);
+
+    // A depfile needs to have normalized absolute paths, so that change detection works correctly.
+    std::string NormalizeDependencyPath(const std::filesystem::path& path)
+    {
+        std::error_code error;
+        const std::filesystem::path absolutePath = std::filesystem::absolute(path, error);
+        return (error ? path : absolutePath).lexically_normal().generic_string();
+    }
 } // namespace
 
 CookResult<CookStatistics> RunCookOnce(CookerOptions options,
@@ -83,6 +93,9 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
     // this loop. So, we keep the space in unique_ptrs (for now) so all axes stored in outputs remain valid.
     std::vector<std::unique_ptr<PermutationSpace>> permutationSpaces;
     permutationSpaces.reserve(library.Environments.size());
+    // input source paths for the depfile. each target reads the same files, so this has duplicates until
+    // the sort below
+    std::vector<std::string> dependencyPaths;
 
     for (auto&& [moduleIdx, modulePath] : std::views::enumerate(cookState.Options.ModulePaths))
     {
@@ -100,6 +113,13 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
             }
 
             const PreparedCompiler& preparedModule = *preparedModuleResult;
+            if (cookState.Options.WriteDepfile)
+            {
+                for (const std::string& dependencyPath : preparedModule.Compiler->DependencyFilePaths())
+                {
+                    dependencyPaths.push_back(NormalizeDependencyPath(dependencyPath));
+                }
+            }
             // The preparation step allows us to do exactly this part - figure out what axes exist in the module's source code.
             std::vector<RawAxisDeclaration> rawAxes = preparedModule.Compiler->BuildAxisDeclarations();
             const std::string_view moduleName = cookState.AllModuleNames[static_cast<size_t>(moduleIdx)];
@@ -250,6 +270,25 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
     if (!emitError)
     {
         return std::unexpected(emitError);
+    }
+
+    if (cookState.Options.WriteDepfile)
+    {
+        // the policy file decides which variants get cooked, so editing it must trigger a re-cook too
+        if (cookState.Options.PolicyFile.has_value())
+        {
+            dependencyPaths.push_back(NormalizeDependencyPath(cookState.Options.PolicyFile.value()));
+        }
+        std::ranges::sort(dependencyPaths);
+        const auto [duplicatesBegin, duplicatesEnd] = std::ranges::unique(dependencyPaths);
+        dependencyPaths.erase(duplicatesBegin, duplicatesEnd);
+
+        const std::string target = NormalizeDependencyPath(cookState.Options.OutputPath / k_ManifestFileName);
+        const CookError depfileError = sink.WriteArtifact(k_DepfileName, GenerateDepfile(target, dependencyPaths));
+        if (!depfileError)
+        {
+            return std::unexpected(depfileError);
+        }
     }
 
     const std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();

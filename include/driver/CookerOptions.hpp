@@ -61,6 +61,10 @@ struct CookerOptions
     uint32_t DumpStageMask{ 0u };
     std::optional<std::filesystem::path> PolicyFile;
     bool DumpSources{ false };
+    /** Set by `--depfile`. When true, the cook writes `ShaderLibrary.d` next to the manifest. This is a
+     * Makefile-form depfile that lists every input source file, so that a build system can re-cook when
+     * one of them changes. */
+    bool WriteDepfile{ false };
 };
 
 bool IsStageDumpRequested(const CookerOptions& options, StageDumpKind kind) noexcept;

@@ -42,6 +42,9 @@ public:
     [[nodiscard]] std::string_view ModuleName() const noexcept;
     [[nodiscard]] const std::vector<std::string>& ModuleSourceStrings() const noexcept;
     [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
+    /**@brief The file path of every input source read by the root module. Embedded builtins are excluded.
+      *This is used to make sure the build step re-cooks when any of the input sources change. */
+    [[nodiscard]] const std::vector<std::string>& DependencyFilePaths() const noexcept;
     [[nodiscard]] PlacementKind PlacementKindForTarget() const noexcept;
     [[nodiscard]] TargetLanguage Language() const noexcept;
 
@@ -101,6 +104,7 @@ private:
     std::vector<std::string> entryPointNames;
     std::string moduleName;
     std::vector<std::string> moduleSourceStrings;
+    std::vector<std::string> dependencyFilePaths;
     PlacementKind placementKind{ PlacementKind::None };
     TargetLanguage language{ TargetLanguage::Invalid };
     DiagnosticSink* diagnosticSink{ nullptr };

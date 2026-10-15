@@ -66,6 +66,9 @@ public:
     [[nodiscard]] const std::vector<std::string>& EntryPointNames() const noexcept;
     [[nodiscard]] const std::vector<std::string>& ModuleSourceStrings() const noexcept;
     [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
+    /** Returns the file path of every input source the module read, excluding embedded builtins. We write
+     * these to the depfile so that the build step re-cooks when any input source changes. */
+    [[nodiscard]] const std::vector<std::string>& DependencyFilePaths() const noexcept;
     [[nodiscard]] std::vector<RawAxisDeclaration> BuildAxisDeclarations() const noexcept;
     [[nodiscard]] const SymbolTable& GetSymbolTable() const noexcept;
 

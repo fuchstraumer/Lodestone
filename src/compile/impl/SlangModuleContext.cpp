@@ -408,6 +408,11 @@ const std::vector<std::string>& SlangModuleContext::ModuleSourceStrings() const 
     return moduleSourceStrings;
 }
 
+const std::vector<std::string>& SlangModuleContext::DependencyFilePaths() const noexcept
+{
+    return dependencyFilePaths;
+}
+
 std::vector<std::string_view> SlangModuleContext::ModuleSourceStringViews() const noexcept
 {
     return moduleSourceStrings |
@@ -558,6 +563,7 @@ CookError SlangModuleContext::readDependencySourceStrings()
 
         moduleSourceStrings.emplace_back(std::istreambuf_iterator<char>(file),
                                          std::istreambuf_iterator<char>());
+        dependencyFilePaths.emplace_back(dependencyPath);
     }
 
     return CookError::Success;

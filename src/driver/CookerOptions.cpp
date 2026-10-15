@@ -28,7 +28,7 @@ namespace
         "Usage: lodestone --output <directory> --target=<name> [--O<level>] [--no-validate] [--quiet]\n"
         "                 [--cache-dir <path>] [--single-threaded] [--no-dedupe]\n"
         "                 [--verify-deterministic] [--dump-stage=<name>]\n"
-        "                 [--policy-file <path>] <module.slang>...\n"
+        "                 [--policy-file <path>] [--depfile] <module.slang>...\n"
         "  --output, -o    output directory (required)\n"
         "  --target=<name> output target profile (required). Repeat it for more than one. Names: wgsl\n"
         "  --O<level>      slang optimization level: 0-3, defaults to 0\n"
@@ -42,7 +42,8 @@ namespace
         "                  Repeat the flag for more than one stage. Names: space, variants, raw,\n"
         "                  resolved, interned, cooked, all.\n"
         "  --dump-sources  write the shader sources to the dump files\n"
-        "  --policy-file <path> specify the policy file to use\n";
+        "  --policy-file <path> specify the policy file to use\n"
+        "  --depfile       write ShaderLibrary.d, a depfile that names every source file the cook read\n";
 
     constexpr std::string_view k_OptimizationPrefix = "--O";
     constexpr std::string_view k_TargetPrefix = "--target=";
@@ -148,13 +149,19 @@ namespace
         options.DumpSources = true;
     }
 
-    constexpr std::array<SwitchFlag, 6u> k_SwitchFlags{
+    void EnableWriteDepfile(CookerOptions& options) noexcept
+    {
+        options.WriteDepfile = true;
+    }
+
+    constexpr std::array<SwitchFlag, 7u> k_SwitchFlags{
         SwitchFlag{ .Name = "--no-dedupe", .Apply = &DisableDedupe },
         SwitchFlag{ .Name = "--verify-deterministic", .Apply = &EnableVerifyDeterminism },
         SwitchFlag{ .Name = "--no-validate", .Apply = &DisableValidateAgainstEmittedText },
         SwitchFlag{ .Name = "--quiet", .Apply = &DisableReflectionReports },
         SwitchFlag{ .Name = "--single-threaded", .Apply = &DisableMultithreadedCompile },
-        SwitchFlag{ .Name = "--dump-sources", .Apply = &EnableDumpSources }
+        SwitchFlag{ .Name = "--dump-sources", .Apply = &EnableDumpSources },
+        SwitchFlag{ .Name = "--depfile", .Apply = &EnableWriteDepfile }
     };
 
     const SwitchFlag* FindSwitchFlag(std::string_view argument) noexcept

@@ -40,7 +40,16 @@ add_subdirectory(client)
 
 if (LODESTONE_BUILD_COOKER)
     include(cmake/LodestoneCooker.cmake)
+    # The console is a CLI interface to the cooker - the build-command-cook lodestone_add_shader_cook 
+    # uses it, so a parent project that turns the tools off will likely still need it - so it follows
+    # the console option and not the TOOLS option.
+    add_subdirectory(tools/cooker_console)
 endif()
+
+# lodestone_add_shader_cook is a shader cook that can run as a build step: it is defined in every build
+# because even client only builds for non-desktop platforms may need to invoke a cooker to build their shaders
+# (using an executable/host cooker that is named by LODESTONE_COOKER_EXECUTABLE)
+include(cmake/LodestoneShaderCook.cmake)
 
 if(LODESTONE_BUILD_TESTS)
     enable_testing()
@@ -51,7 +60,4 @@ endif()
 # the compiler, so it builds in a client-only build too.
 if(LODESTONE_BUILD_TOOLS)
     add_subdirectory(tools/manifest_dump)
-    if (LODESTONE_BUILD_COOKER)
-        add_subdirectory(tools/cooker_console)
-    endif()
 endif()
