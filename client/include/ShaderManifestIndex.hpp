@@ -191,6 +191,9 @@ public:
     /** @brief Returns every value declared by one axis, in digit order, or `UnknownAxis`. Values are listed
       * even when this environment cooked no variant that uses them. */
     [[nodiscard]] QueryResult<std::vector<QueryAxisValue>> AxisValues(std::string_view axis_name) const;
+    /** @brief Returns the default the shader declares for one axis, or `UnknownAxis`. Graph code uses it to
+      * fill an axis that it does not pin. */
+    [[nodiscard]] QueryResult<QueryAxisValue> AxisDefault(std::string_view axis_name) const;
 
 private:
 

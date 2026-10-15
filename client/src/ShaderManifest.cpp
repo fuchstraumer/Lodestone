@@ -99,6 +99,7 @@ namespace
             "a merged layout got two entry point instances of the same stage",
             "a merged layout got a resource that is not Bound",
             "a merged layout got two different resources at one group and binding",
+            "a module axis declares a default digit that is not below the axis radix",
         });
 
     static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ErrorCode::Count),
@@ -527,6 +528,11 @@ const Axis& ModuleView::AxisData(uint32_t local_axis) const noexcept
 uint32_t ModuleView::AxisValueCount(uint32_t local_axis) const noexcept
 {
     return static_cast<uint32_t>(std::popcount(moduleAxes[local_axis].LiveValuesMask));
+}
+
+uint32_t ModuleView::AxisDefaultDigit(uint32_t local_axis) const noexcept
+{
+    return moduleAxes[local_axis].DefaultDigit;
 }
 
 AxisValueType ModuleView::AxisValue(uint32_t local_axis, uint32_t digit) const noexcept
@@ -1771,6 +1777,14 @@ namespace
                              .Table = ShaderManifestTable::ModuleAxes,
                              .RecordIndex = static_cast<uint32_t>(i),
                              .Detail = moduleAxis.LiveValuesMask };
+                }
+
+                if (moduleAxis.DefaultDigit >= static_cast<uint32_t>(std::popcount(moduleAxis.LiveValuesMask)))
+                {
+                    return { .Code = ErrorCode::InvalidModuleAxisDefault,
+                             .Table = ShaderManifestTable::ModuleAxes,
+                             .RecordIndex = static_cast<uint32_t>(i),
+                             .Detail = moduleAxis.DefaultDigit };
                 }
             }
         }

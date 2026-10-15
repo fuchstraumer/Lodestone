@@ -29,7 +29,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 7u;
+inline constexpr uint32_t k_ShaderManifestVersion = 8u;
 
 // clang-tidy complains about enums being too big, but uint32_t means
 // the error struct is 16bytes, which is great alignment and still compact
@@ -85,6 +85,7 @@ enum class ErrorCode : uint32_t
     MergedLayoutDuplicateStage = 46,
     MergedLayoutPlacementUnsupported = 47,
     MergedLayoutConflict = 48,
+    InvalidModuleAxisDefault = 49,
     Count
 };
 
@@ -255,6 +256,9 @@ struct alignas(8) ModuleAxis
     uint32_t AxisIndex{ 0u };
     // a bitmask of the indices of the values live for this axis in *this module*
     uint32_t LiveValuesMask{ 0u };
+    // the default the shader declares for this axis, as a digit of this module's key (below the radix)
+    uint32_t DefaultDigit{ 0u };
+    uint32_t Reserved{ 0u };
 };
 
 // A module has *one* core module root header, which describes the data that is environment-agnostic
@@ -877,6 +881,9 @@ public:
     /** @brief How many values this module uses on one axis. This is also the radix of that axis. */
     [[nodiscard]] uint32_t AxisValueCount(uint32_t local_axis) const noexcept;
     [[nodiscard]] AxisValueType AxisValue(uint32_t local_axis, uint32_t digit) const noexcept;
+    /** @brief Returns the digit of the default the shader declares for one axis. Graph code uses it to fill an
+     * axis that it does not pin. `Open` checked that it is below `AxisValueCount(local_axis)`. */
+    [[nodiscard]] uint32_t AxisDefaultDigit(uint32_t local_axis) const noexcept;
     /** @brief The 64-bit words in one variant's axis-active mask: `ceil(AxisCount() / 64)`. */
     [[nodiscard]] uint32_t AxisMaskWordCount() const noexcept;
 

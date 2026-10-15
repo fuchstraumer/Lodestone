@@ -523,6 +523,18 @@ QueryResult<std::vector<QueryAxisValue>> ManifestIndex::AxisValues(std::string_v
     return values;
 }
 
+QueryResult<QueryAxisValue> ManifestIndex::AxisDefault(std::string_view axis_name) const
+{
+    const auto indexIter = axisNameToIndex.find(axis_name);
+    if (indexIter == axisNameToIndex.end())
+    {
+        return std::unexpected(QueryErrorCode::UnknownAxis);
+    }
+
+    const uint32_t axisIndex = indexIter->second;
+    return decodeAxis(axisIndex, environment.Module().AxisDefaultDigit(axisIndex));
+}
+
 std::vector<ManifestIndex::ScanConstraint> ManifestIndex::convertToScanConstraints(std::span<const QueryAxisRange> query) const
 {
     std::vector<ScanConstraint> scanConstraints;

@@ -84,6 +84,8 @@ namespace
             WriteAxisValue(writer, PermutationBinding{ &axis, value });
         }
         writer.EndArray();
+        writer.Key("default");
+        WriteAxisValue(writer, PermutationBinding{ &axis, axis.GetDeclaredDefault() });
 
         // enum axes store the integer tag of each case, in declaration order. the values array above
         // contains the case names, like a Type axis, so this parallel array is the only place a dump

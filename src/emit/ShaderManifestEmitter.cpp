@@ -75,6 +75,10 @@ namespace
     {
         std::vector<manifest::EntryPoint> EntryPoints;
         std::vector<EncodedAxis> Axes;
+        // the declared default of each axis, as a digit in the module's own value order. this is kept apart
+        // from EncodedAxis, because EncodedAxis is also the root axis record, and root axes are shared
+        // between modules that can declare different defaults
+        std::vector<uint32_t> AxisDefaultDigits;
     };
 
     /** The four cooked tables, flattened into runs over index and payload tables. */
@@ -221,6 +225,14 @@ namespace
     CookError CheckVariantAxisMask(const CookedModule& module,
                                    const LibraryVariant& variant,
                                    manifest::VariantView read_variant);
+    /** True when the value stored at `digit` of one module axis is `value` of `axis`. Both the key check and
+     * the default check read values this way, which is the same way a client reads them. */
+    bool StoredAxisValueMatches(const manifest::EnvironmentView& view,
+                                uint32_t axis_index,
+                                uint32_t digit,
+                                const PermutationAxis& axis,
+                                const PermutationValue& value);
+    CookError CheckAxisDefaults(const CookedModule& module, const manifest::EnvironmentView& view);
     CookError CheckManifestSource(const CookedModule& module,
                                   const manifest::ShaderSourceProvider& provider,
                                   const LibraryVariant& variant,
@@ -303,14 +315,16 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
     std::vector<std::vector<manifest::ModuleAxis>> moduleAxes(moduleCount);
     for (size_t moduleIndex = 0u; moduleIndex < moduleCount; ++moduleIndex)
     {
-        for (const EncodedAxis& moduleAxis : moduleShapes[moduleIndex].Axes)
+        const ModuleShape& shape = moduleShapes[moduleIndex];
+        for (const auto&& [axisIndex, moduleAxis] : std::views::enumerate(shape.Axes))
         {
-            const CookResult<manifest::ModuleAxis> merged = MergeIntoRootAxes(rootAxes, moduleAxis, strings);
+            CookResult<manifest::ModuleAxis> merged = MergeIntoRootAxes(rootAxes, moduleAxis, strings);
             if (!merged)
             {
                 return std::unexpected(merged.error());
             }
-            moduleAxes[moduleIndex].push_back(*merged);
+            merged->DefaultDigit = shape.AxisDefaultDigits[static_cast<size_t>(axisIndex)];
+            moduleAxes[moduleIndex].push_back(std::move(*merged));
         }
     }
 
@@ -685,6 +699,7 @@ namespace
                 }
             }
             shape.Axes.push_back(std::move(encoded));
+            shape.AxisDefaultDigits.push_back(axis.DeclaredDefaultIndex());
         }
 
         return shape;
@@ -697,7 +712,8 @@ namespace
             return left.NameString == right.NameString && left.Stage == right.Stage;
         };
 
-        return std::ranges::equal(lhs.EntryPoints, rhs.EntryPoints, sameEntryPoint) && lhs.Axes == rhs.Axes;
+        return std::ranges::equal(lhs.EntryPoints, rhs.EntryPoints, sameEntryPoint) && lhs.Axes == rhs.Axes &&
+               lhs.AxisDefaultDigits == rhs.AxisDefaultDigits;
     }
 
     CookResult<manifest::ModuleAxis> MergeIntoRootAxes(std::vector<EncodedAxis>& root_axes,
@@ -1044,6 +1060,12 @@ namespace
             return CookError::ManifestMissingVariant;
         }
 
+        const CookError defaultsError = CheckAxisDefaults(module, view);
+        if (defaultsError != CookError::Success)
+        {
+            return defaultsError;
+        }
+
         const manifest::ShaderSourceProvider provider{ view, 0u };
         for (const LibraryVariant& variant : module.Variants)
         {
@@ -1114,27 +1136,7 @@ namespace
         {
             const PermutationBinding& binding = variant.Canonical[axisIndex];
             const PermutationAxis& axis = *binding.Axis;
-            const AxisValueType stored = moduleView.AxisValue(axisIndex, digits[axisIndex]);
-
-            bool matches = view.String(moduleView.AxisData(axisIndex).NameString) == axis.Name;
-            switch (axis.ValueDomain)
-            {
-            case AxisValueDomain::Boolean:
-                [[fallthrough]];
-            case AxisValueDomain::Integral:
-                matches = matches && stored == binding.Value.AsUInt();
-                break;
-            case AxisValueDomain::Enum:
-                matches = matches && view.String(stored) == binding.Value.AsEnumCase(axis);
-                break;
-            case AxisValueDomain::Type:
-                matches = matches && view.String(stored) == binding.Value.AsType(axis);
-                break;
-            case AxisValueDomain::None:
-                std::unreachable();
-            }
-
-            if (!matches)
+            if (!StoredAxisValueMatches(view, axisIndex, digits[axisIndex], axis, binding.Value))
             {
                 std::println(stderr,
                              "[lodestone] manifest key {} of module {} decodes axis '{}' differently than "
@@ -1144,6 +1146,63 @@ namespace
                              axis.Name,
                              variant.Description);
                 return CookError::ManifestVariantKeyMismatch;
+            }
+        }
+
+        return CookError::Success;
+    }
+
+    bool StoredAxisValueMatches(const manifest::EnvironmentView& view,
+                                uint32_t axis_index,
+                                uint32_t digit,
+                                const PermutationAxis& axis,
+                                const PermutationValue& value)
+    {
+        const manifest::ModuleView& moduleView = view.Module();
+        const AxisValueType stored = moduleView.AxisValue(axis_index, digit);
+        if (view.String(moduleView.AxisData(axis_index).NameString) != axis.Name)
+        {
+            return false;
+        }
+
+        switch (axis.ValueDomain)
+        {
+        case AxisValueDomain::Boolean:
+            [[fallthrough]];
+        case AxisValueDomain::Integral:
+            return stored == value.AsUInt();
+        case AxisValueDomain::Enum:
+            return view.String(stored) == value.AsEnumCase(axis);
+        case AxisValueDomain::Type:
+            return view.String(stored) == value.AsType(axis);
+        case AxisValueDomain::None:
+            break;
+        }
+        std::unreachable();
+    }
+
+    CookError CheckAxisDefaults(const CookedModule& module, const manifest::EnvironmentView& view)
+    {
+        if (module.Space == nullptr)
+        {
+            return CookError::Success;
+        }
+
+        // read each default back through the module digit and the root value table, as a client does
+        const std::span<const PermutationAxis> axes = module.Space->Axes();
+        for (uint32_t axisIndex = 0u; axisIndex < axes.size(); ++axisIndex)
+        {
+            const PermutationAxis& axis = axes[axisIndex];
+            const uint32_t digit = view.Module().AxisDefaultDigit(axisIndex);
+            if (!StoredAxisValueMatches(view, axisIndex, digit, axis, axis.GetDeclaredDefault()))
+            {
+                std::println(stderr,
+                             "[lodestone] manifest module {} reads the default of axis '{}' back as digit {}, which "
+                             "is not the declared default",
+                             module.Name,
+                             axis.Name,
+                             digit);
+                return CookError::ManifestAxisDefaultMismatch;
             }
         }
 
