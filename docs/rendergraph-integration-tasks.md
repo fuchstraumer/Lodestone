@@ -34,10 +34,10 @@ then the larger design work.
 | # | Task | Why the graph needs it | Proof |
 |---|---|---|---|
 | L10 | Add a client-only configure. One option (for example `LODESTONE_BUILD_COOKER`). When it is off, add `tools/suggest` and `client` only. Move `find_package(Vulkan)`, Slang, xxHash, Tint, the embed step, and `lodestone` into the cooker branch. Let an Emscripten configure pass: today every compiler branch ends in `FATAL_ERROR` for Emscripten. | The web build cannot build Slang. Velox adds Lodestone on every platform. | A client-only configure builds `lodestone::client_library` and `manifest_dump` with no Slang, no Tint, and no Vulkan SDK. The full configure still passes every test. |
-| L1 | Fix `ManifestQueryBuilder::First` with no constraints. `convertToScanConstraints` returns an empty list both for "no constraints" and for "a value matched nothing", and `First` reads both as a failure (`ShaderManifestIndex.cpp:249`). Give the two cases different results. | A one-variant module, or an unpinned query, cannot use `First`. | `ManifestIndexTest` rows: no constraints gives the smallest key. A value that matches nothing gives an error. |
-| L2 | Add a `Single()` terminal. Success only for exactly one variant. Otherwise an error that names the axes that still vary across the result. | The graph must never choose a variant in silence. `First` returns the smallest key, which is an arbitrary choice. | `ManifestIndexTest` rows: one match, zero matches, and two matches that name the axis. |
+| L1 | **Closed: `First` removed** (2026-10-14, by the author). It returned the smallest matching key, an arbitrary choice that no graph wants. `Single` covers the one-variant case. Old text: fix `ManifestQueryBuilder::First` with no constraints. `convertToScanConstraints` returns an empty list both for "no constraints" and for "a value matched nothing", and `First` reads both as a failure (`ShaderManifestIndex.cpp:249`). Give the two cases different results. | A one-variant module, or an unpinned query, cannot use `First`. | `ManifestIndexTest` rows: no constraints gives the smallest key. A value that matches nothing gives an error. |
+| L2 | **Done** (2026-10-14). Add a `Single()` terminal. Success only for exactly one variant. Otherwise an error that names the axes that still vary across the result. | The graph must never choose a variant in silence. `First` returns the smallest key, which is an arbitrary choice. | `ManifestIndexTest` rows: one match, zero matches, and two matches that name the axis. |
 | L9 | Add `ModuleView::FindEntryPoint(name)`, beside `BundleView::FindModule`. | A graph node names its entry point. | `ManifestIndexTest` rows: a found name, and an unknown name. |
-| L13 | Expose the nearest-name suggestion (`tools/suggest`) through the client headers. | A binding-name typo in the graph gets the same "did you mean" as a query. | `SuggestTest` covers the function. A client test calls it through the client header only. |
+| L13 | **Done** (2026-10-14): `lodestone::NearestName` in `ShaderManifestIndex.hpp`. Expose the nearest-name suggestion (`tools/suggest`) through the client headers. | A binding-name typo in the graph gets the same "did you mean" as a query. | `SuggestTest` covers the function. A client test calls it through the client header only. |
 | L12 | Decide who owns `ResourceFlags.hpp`. The client carries Velox's creation vocabulary (`BufferUsageFlags`, `TextureUsageFlags`), and the names already differ from Velox's copy (`RGBA8Unorm` against `Rgba8Unorm`). Recommendation: Lodestone keeps the shader-facing types (`TextureFormat`, `TextureViewDimension`). Velox owns the usage flags. | One definition. Today the values agree by position only. | Velox builds against the Lodestone `TextureFormat`, and the Velox copy is gone. Decision D-R1 first. |
 | — | A cook as a build step. A CMake function that runs `lodestone_cooker_console` with `add_custom_command`, with the `.slang` files as dependencies, and a cache path (for example `LODESTONE_COOKER_EXECUTABLE`) for a host cooker in a cross build. | A shader edit must re-cook. The Emscripten build needs a cooker that a native build made. | Velox edits one `.slang` file and the next build re-cooks it. A second build with no edit does not. |
 
@@ -91,6 +91,12 @@ no allocation.
 
 - 2026-10-14. List written. L8 done (`01dc278`). Next: R1, starting with L10.
 - 2026-10-14. L10 done (not committed). L9 done by the author (`e113d8c`). D-R3 answered: `LODESTONE_BUILD_COOKER`, default `NOT EMSCRIPTEN`. Next: L1.
+- 2026-10-14. L1 closed: the author removed `First` and `first`. L2 done: `Single()` returns
+  `std::expected<VariantKey, QueryError>`, because a bare code cannot name the varying axes.
+  `AmbiguousVariant` puts the axis names in `AxisName` and the match count in `Detail`. An axis varies when
+  its digit differs between two matches (D-R5: inert axes count until L3). L13 done: `NearestName` is
+  public in `ShaderManifestIndex.hpp`. The query errors already used it for an unknown axis and for an
+  enum or type value. `ManifestIndexTest` has 87 checks. Next: L12 (D-R1), then the cook build step.
 
 ## 5. Phase F, paused
 
@@ -114,5 +120,5 @@ decide how a pointer or a handle names its container before a merge can read it.
 | D-R1 | L12: which side owns which type in `ResourceFlags.hpp`? | Lodestone keeps the shader-facing types. Velox owns the usage flags. |
 | D-R2 | L4: what does a preset do with an axis a module does not declare? | Skip it. The graph fails when no module in the graph declares it. |
 | D-R3 | L10: the option name, and its default when Lodestone is not the top-level project. | **Answered:** `LODESTONE_BUILD_COOKER`, default `NOT EMSCRIPTEN`. |
-| D-R4 | L1: how `First` reports "no constraints" against "no match". | Return the scan constraints as an expected, or as an optional, so empty is never an error code. |
+| D-R4 | L1: how `First` reports "no constraints" against "no match". | **Moot:** `First` is removed. |
 | D-R5 | L2: does `Single()` ignore an inert axis (L3) from the start, or only after L3? | After L3. Until then, two variants that differ only in an inert axis are an error that names the axis. |

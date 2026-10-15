@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <expected>
 #include <optional>
 #include <span>
 #include <string>
@@ -203,6 +204,12 @@ bool KeepAll(const std::array<uint32_t, 4>&)
 bool KeepSmallTiles(const std::array<uint32_t, 4>& digits)
 {
     return digits[k_TileAxis] != 2u;
+}
+
+// A module that cooked one variant, the first one: the case where a query needs no constraint at all.
+bool KeepFirstOnly(const std::array<uint32_t, 4>& digits)
+{
+    return digits == std::array<uint32_t, 4>{ 0u, 0u, 0u, 0u };
 }
 
 bool AllActive(const std::array<uint32_t, 4>&, uint32_t)
@@ -502,6 +509,51 @@ int main()
                  emptyUnknown.Errors().front().Code == QueryErrorCode::UnknownAxis,
                  "an unknown axis is reported before the empty set");
 
+    // Single() is the terminal a renderer uses to pick a variant. It returns one key or an error, and
+    // never chooses between two matches.
+    runner.BeginSection("Single returns the one match, and names the axes when there are more");
+    const std::expected<VariantKey, lodestone::QueryError> pinned = index.Query()
+                                                                        .Where("DITHER", true)
+                                                                        .Where("QUALITY", AxisValueDomain::Enum, "High")
+                                                                        .Where("TILE", 16u)
+                                                                        .Where("SHADE", AxisValueDomain::Type, "Phong")
+                                                                        .Single();
+    runner.Check(pinned.has_value() &&
+                 *pinned == PackVariantKey(std::array<uint32_t, 4>{ 1u, 1u, 1u, 1u }, k_Radices),
+                 "four pinned axes give the one matching key");
+    const std::expected<VariantKey, lodestone::QueryError> partial =
+        index.Query().Where("DITHER", true).Where("TILE", 16u).Single();
+    runner.Check(!partial.has_value() && partial.error().Code == QueryErrorCode::AmbiguousVariant,
+                 "two pinned axes of four are ambiguous");
+    if (!partial.has_value())
+    {
+        runner.Check(partial.error().AxisName == "QUALITY, SHADE", "the error names the unpinned axes, in axis order");
+        runner.Check(partial.error().Detail == 6u, "the error counts the matches");
+    }
+    const std::expected<VariantKey, lodestone::QueryError> badSingle = index.Query().Where("DITHR", true).Single();
+    runner.Check(!badSingle.has_value() && badSingle.error().Code == QueryErrorCode::UnknownAxis &&
+                 badSingle.error().Suggestion == "DITHER",
+                 "a builder error reaches Single whole, with its suggestion");
+
+    const std::vector<std::byte> oneVariantBytes = BuildManifest(&KeepFirstOnly, &AllActive);
+    const ManifestResult<EnvironmentView> oneVariantOpened = OpenEnvironment(oneVariantBytes, 0u, 0u);
+    runner.Check(oneVariantOpened.has_value(), "the one-variant manifest opens");
+    if (oneVariantOpened.has_value())
+    {
+        const ManifestIndex oneVariant{ oneVariantOpened.value() };
+        const std::expected<VariantKey, lodestone::QueryError> only = oneVariant.Query().Single();
+        runner.Check(only.has_value() && *only == PackVariantKey(std::array<uint32_t, 4>{ 0u, 0u, 0u, 0u }, k_Radices),
+                     "a query with no constraint on a one-variant module gives that variant");
+    }
+
+    // The query errors fill Suggestion through NearestName. A renderer calls it the same way for a name
+    // of its own, through the client header alone.
+    runner.BeginSection("NearestName gives the query's suggestion to any caller");
+    const std::vector<std::string_view> axisNames = index.AxisNames();
+    runner.Check(lodestone::NearestName("QUALTY", axisNames) == "QUALITY", "one missing letter finds the axis");
+    runner.Check(lodestone::NearestName("TLIE", axisNames) == "TILE", "a transposition counts as one edit");
+    runner.Check(lodestone::NearestName("BLOOM", axisNames).empty(), "a name far from every candidate gives nothing");
+
     // manifest where one axis value was left out: queries are still valid, because it is an axis value,
     // but it was not cooked into any variant so the query resolves to an empty span
     runner.BeginSection("a valid value with no cooked variant returns an empty result");
@@ -518,6 +570,10 @@ int main()
         const ManifestQueryBuilder absentValue = sparse.Query().Where("TILE", 32u);
         runner.Check(absentValue.IsValid(), "a declared value is not an error");
         runner.Check(KeyCount(absentValue) == 0u, "but it names no cooked variant, so the result is empty");
+        const std::expected<VariantKey, lodestone::QueryError> absentSingle = absentValue.Single();
+        runner.Check(!absentSingle.has_value() &&
+                     absentSingle.error().Code == QueryErrorCode::NoVariantForConstraints,
+                     "Single reports the empty result as NoVariantForConstraints");
     }
 
     // An ActiveWhen gate appears at the query layer as a structured hole, not as a schema field: the
@@ -558,6 +614,9 @@ int main()
                      "WhereNoneOf on a gated axis also selects only where the axis is active");
         runner.Check(KeyCount(gated.Query().Where("DITHER", false)) == 9u,
                      "a query that does not name the gated axis still returns the gated-off variants");
+        const std::expected<VariantKey, lodestone::QueryError> gatedSingle = gated.Query().Where("DITHER", false).Single();
+        runner.Check(!gatedSingle.has_value() && gatedSingle.error().AxisName == "QUALITY, TILE",
+                     "an axis that is inactive in every match does not vary, so Single does not name it");
 
         const VariantKey gatedOffKey = PackVariantKey(std::array<uint32_t, 4>{ 0u, 0u, 0u, 0u }, k_Radices);
         const std::vector<lodestone::QueryAxisValue> decoded = gated.Decode(gatedOffKey);
