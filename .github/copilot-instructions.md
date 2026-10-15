@@ -81,6 +81,59 @@ Struct::Struct(int _val0, int _val1, int _val2) :
 - **Eagerly factor out common logic**: If some bit of code is greater than 4-5 lines and being duplicated, factor it out into a common function.
 - **`todo` comments**: Spare these for things that are actually worth having greppable as distinct work items. For things that will need to be fixed before shipping this to customers or clients who are not devs or friends: use `todo-ship`. use `todo-perf` for things that could grant sizeable performance benefits. Minimize the usage of `todo` as much as possible: we need to get to MVP, but we also don't need to fill our backlog on that road.
 
+#### Comment Style
+
+Codified on 2026-10-15 from a review of agent-written comments against the author's rewrites. These rules
+apply to code comments. Where they differ from the ASD-STE100 rules under "Response style" (passive voice,
+vocabulary, sentence fragments), these rules win inside code. Write fewer comments first: the "Comment
+usage" rule above still applies, and most comments that break the rules below should not exist at all.
+
+- **Use the domain's exact term.** Write "file path", "normalized", "deduplicate", "canonical", even where
+  a plainer English word exists. Do not substitute a plain word that is less exact: a path is not a "disk
+  file", and a normalized path is not "one spelling".
+- **Use literal verbs.** Write returns, contains, stores, lists, points to, is written to. Do not use data
+  verbs as metaphors: "names", "holds", "gives", "states", "carries", and "owns" (outside its C++ meaning).
+- **Speak about a category in the plural, or state the fact.** Write "Embedded builtins are excluded", not
+  "An embedded builtin is not on disk". The singular generic ("A cook reads...", "An axis holds...") reads
+  like a statute.
+- **Tie the purpose to the code.** Say what the code is for, with "This is used to", "so that", or "we do
+  X so that Y". Do not state a consequence as a freestanding fact and leave the reader to connect it.
+- **Give a reason only when a reader would ask why.** Do not attach a "so" or "because" to every statement.
+- **No rhythm devices.** No echoed phrases ("once, in one spelling"), no three-part lists for cadence, no
+  short closing sentence for effect, no colon that reveals a point. A colon before a real list is fine.
+- **Keep the normal word order.** Write "every source read by the root module" or "every source that the
+  root module read", not "every source the root module read". Do not frame a thing by what it is not when
+  a positive statement works.
+- **Voice.** "we" and "I" are fine. Passive voice is fine when the actor is obvious or unimportant
+  ("Embedded builtins are excluded"). Do not force an active subject.
+- **Two registers.** A doc comment (`/** */`, `@brief`) uses full, capitalized sentences, and starts a
+  function's brief with its action ("Returns..."). An inline `//` comment inside a body can be casual: a
+  lowercase start, a fragment, an informal aside.
+
+Examples, each written first in the style these rules replace:
+
+```cpp
+// Before:
+/** The disk file of every source the module read. The depfile names them, so a build re-cooks when one
+ * changes. An embedded builtin is not on disk and is not in the list. */
+// After:
+/** Returns the file path of every input source the module read, excluding embedded builtins. We write
+ * these to the depfile so that the build step re-cooks when any input source changes. */
+
+// Before:
+// Every source file the cook read, for the depfile. Each target compiles the same files again, so the
+// list repeats until the sort and unique below.
+// After:
+// input source paths for the depfile. each target reads the same files, so this has duplicates until
+// the sort below
+
+// Before:
+/** @brief The one variant the query names. A query never chooses between variants in silence. */
+// After:
+/** @brief Returns the variant that matches this query. Fails when no variant or more than one variant
+  * matches, instead of picking one. */
+```
+
 ### **Anonymous Namespace Usage**
 
 Helper functions placed in the anonymous namespace *must* be declared at the top of the file *only*, unless they are templates that cannot be defined elsewhere. The definition then *must* be at the bottom of the file. This avoids making the majority of a file that a user reads a wall of implementation details: seeing the declarations first tells them what the code will use, but focuses on the actual implementation in the object or `.cpp` as it's presented from the interfaces.

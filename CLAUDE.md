@@ -45,7 +45,13 @@ Clang-CL with the MSVC frontend variant is a hard configure error.
 the client library, the JSON writer, `tools/suggest`, and `manifest_dump`, and nothing more: no Vulkan SDK,
 no Slang, no Tint. `cmake/LodestoneCooker.cmake` holds the cooker half, and the root file includes it only
 when the option is ON. Every test links the cooker, so `LODESTONE_BUILD_TESTS` follows the option, and
-tests ON with the cooker OFF fail the configure. The preset `ninja-msvc-client` turns the cooker off:
+tests ON with the cooker OFF fail the configure.
+
+`lodestone_add_shader_cook(<name> OUTPUT_DIR <dir> TARGETS <profile>... MODULES <file>... [POLICY_FILE <file>]
+[OPTIONS <arg>...])` (in `cmake/LodestoneShaderCook.cmake`) runs one cook as a build step, with `--depfile`, so
+an edit to any file a module reads re-cooks. It runs the `lodestone_cooker_console` target, or the host cooker
+that `LODESTONE_COOKER_EXECUTABLE` names. A build with no cooker (Emscripten) must set that variable. The
+target property `LODESTONE_MANIFEST` gives the manifest path. The console builds whenever the cooker does. The preset `ninja-msvc-client` turns the cooker off:
 `scripts\configure.bat ninja-msvc-client`, then `scripts\build.bat RelWithDebInfo ninja-msvc-client`.
 
 `LODESTONE_ENABLE_WGSL` (default ON) pulls in Tint from the Dawn submodule at `third_party/dawn`,
@@ -165,8 +171,9 @@ that `tests/CMakeLists.txt` supplies.
 
 `ParseCommandLine` in `src/driver/CookerOptions.cpp` parses the flags, and `GetUsageText` prints them:
 `--output/-o`, `--cache-dir`, `--O0` to `--O3`, `--target=<name>`, `--no-validate`, `--quiet`,
-`--single-threaded`, `--no-dedupe`, `--verify-deterministic`, `--dump-stage=<name>`, and
-`--dump-sources`. `--dump-sources` writes every unique compiled source to a subfolder
+`--single-threaded`, `--no-dedupe`, `--verify-deterministic`, `--dump-stage=<name>`, `--dump-sources`,
+and `--depfile`. `--depfile` writes `ShaderLibrary.d`, a Makefile-form depfile that names every file Slang
+read, `import` and `__include` included. `--dump-sources` writes every unique compiled source to a subfolder
 `<module>_<target>_sources`, beside a `SourceTable.json` that names each variant by its axis description
 and its source hashes. Each file holds the target code only (`.wgsl` or `.spv`), so Tint, `spirv-dis`,
 and `spirv-val` read it directly. The output sink creates the subfolder.

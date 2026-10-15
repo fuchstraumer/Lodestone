@@ -38,10 +38,10 @@ then the larger design work.
 | L2 | **Done** (2026-10-14). Add a `Single()` terminal. Success only for exactly one variant. Otherwise an error that names the axes that still vary across the result. | The graph must never choose a variant in silence. `First` returns the smallest key, which is an arbitrary choice. | `ManifestIndexTest` rows: one match, zero matches, and two matches that name the axis. |
 | L9 | Add `ModuleView::FindEntryPoint(name)`, beside `BundleView::FindModule`. | A graph node names its entry point. | `ManifestIndexTest` rows: a found name, and an unknown name. |
 | L13 | **Done** (2026-10-14): `lodestone::NearestName` in `ShaderManifestIndex.hpp`. Expose the nearest-name suggestion (`tools/suggest`) through the client headers. | A binding-name typo in the graph gets the same "did you mean" as a query. | `SuggestTest` covers the function. A client test calls it through the client header only. |
-| L12 | Decide who owns `ResourceFlags.hpp`. The client carries Velox's creation vocabulary (`BufferUsageFlags`, `TextureUsageFlags`), and the names already differ from Velox's copy (`RGBA8Unorm` against `Rgba8Unorm`). Recommendation: Lodestone keeps the shader-facing types (`TextureFormat`, `TextureViewDimension`). Velox owns the usage flags. | One definition. Today the values agree by position only. | Velox builds against the Lodestone `TextureFormat`, and the Velox copy is gone. Decision D-R1 first. |
-| — | A cook as a build step. A CMake function that runs `lodestone_cooker_console` with `add_custom_command`, with the `.slang` files as dependencies, and a cache path (for example `LODESTONE_COOKER_EXECUTABLE`) for a host cooker in a cross build. | A shader edit must re-cook. The Emscripten build needs a cooker that a native build made. | Velox edits one `.slang` file and the next build re-cooks it. A second build with no edit does not. |
+| L12 | **Decided (D-R1), no change yet.** Lodestone keeps the usage flags for now: they will become shader annotations, a condensed set over Vulkan and WebGPU (see L17). Decide who owns `ResourceFlags.hpp`. The client carries Velox's creation vocabulary (`BufferUsageFlags`, `TextureUsageFlags`), and the names already differ from Velox's copy (`RGBA8Unorm` against `Rgba8Unorm`). Recommendation: Lodestone keeps the shader-facing types (`TextureFormat`, `TextureViewDimension`). Velox owns the usage flags. | One definition. Today the values agree by position only. | Velox builds against the Lodestone `TextureFormat`, and the Velox copy is gone. Decision D-R1 first. |
+| — | **Done** (2026-10-14). A cook as a build step. A CMake function that runs `lodestone_cooker_console` with `add_custom_command`, with the `.slang` files as dependencies, and a cache path (for example `LODESTONE_COOKER_EXECUTABLE`) for a host cooker in a cross build. | A shader edit must re-cook. The Emscripten build needs a cooker that a native build made. | Velox edits one `.slang` file and the next build re-cooks it. A second build with no edit does not. |
 
-Done in this slice:
+Done in this slice:l
 
 - **L10, the client-only configure** (2026-10-14). `LODESTONE_BUILD_COOKER` defaults to `NOT EMSCRIPTEN`.
   With it OFF, the build adds `tools/suggest`, `client`, `tools/json`, and `manifest_dump` only.
@@ -97,6 +97,14 @@ no allocation.
   its digit differs between two matches (D-R5: inert axes count until L3). L13 done: `NearestName` is
   public in `ShaderManifestIndex.hpp`. The query errors already used it for an unknown axis and for an
   enum or type value. `ManifestIndexTest` has 87 checks. Next: L12 (D-R1), then the cook build step.
+- 2026-10-14. L12: the usage flags stay in Lodestone (D-R1). The cook build step is done:
+  `lodestone_add_shader_cook` (`cmake/LodestoneShaderCook.cmake`), and a cooker switch `--depfile` that
+  writes `ShaderLibrary.d` with every file Slang read (`emit/Depfile`). The cooker console now builds
+  whenever the cooker does, because a parent turns the tools off. `LODESTONE_COOKER_EXECUTABLE` names a
+  host cooker for a build with no cooker. Proof, measured: a scratch consumer with a client-only Lodestone
+  and a host cooker cooks once; a second build does nothing; an edit to the `__include`d fragment alone
+  re-cooks; an edit to the root module re-cooks. The in-tree path (the `lodestone_cooker_console` target)
+  cooked once and did nothing on the second build. R1 is complete. Next: R2, from L15.
 
 ## 5. Phase F, paused
 
@@ -117,7 +125,7 @@ decide how a pointer or a handle names its container before a merge can read it.
 
 | # | Question | Recommendation |
 |---|---|---|
-| D-R1 | L12: which side owns which type in `ResourceFlags.hpp`? | Lodestone keeps the shader-facing types. Velox owns the usage flags. |
+| D-R1 | L12: which side owns which type in `ResourceFlags.hpp`? | **Answered:** Lodestone keeps the usage flags too, for now. Annotations will cover most of them, as a condensed set over the union of the Vulkan and WebGPU usages. |
 | D-R2 | L4: what does a preset do with an axis a module does not declare? | Skip it. The graph fails when no module in the graph declares it. |
 | D-R3 | L10: the option name, and its default when Lodestone is not the top-level project. | **Answered:** `LODESTONE_BUILD_COOKER`, default `NOT EMSCRIPTEN`. |
 | D-R4 | L1: how `First` reports "no constraints" against "no match". | **Moot:** `First` is removed. |
