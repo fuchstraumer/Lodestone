@@ -83,10 +83,12 @@ set(LODESTONE_DRIVER_SOURCES
 
 set(LODESTONE_EMIT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/DedupeReport.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/DepFile.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/OutputSink.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/ShaderManifestEmitter.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/StageDump.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/DedupeReport.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/DepFile.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/OutputSink.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/ShaderManifestEmitter.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/StageDump.cpp")
