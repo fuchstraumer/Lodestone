@@ -305,7 +305,7 @@ namespace
         return ReportError(sink, CookError::AxisDefaultUnreadable, message);
     }
 
-    CookResult<uint32_t> ResolveDeclaredDefaultIntegralType(int64_t comparable_value,
+    CookResult<uint32_t> ResolveDeclaredDefaultIntegralType(int64_t& comparable_value,
                                                             const RawAxisDeclaration& raw_axis,
                                                             const PermutationAxis& axis,
                                                             const std::string_view module_name,
@@ -442,6 +442,11 @@ namespace
             break;
         case AxisValueDomain::None:
             std::unreachable();
+        }
+
+        if (!index)
+        {
+            return std::unexpected(index.error());
         }
 
         // two independent readers: the source text decides, and reflection checks it where it can read a value
