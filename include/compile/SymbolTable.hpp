@@ -56,11 +56,16 @@ namespace lodestone
                                                                   std::span<const std::string_view> tokens) const;
         /** @brief Returns the set of extern constant declarations not found in the symbol tables for the given module */
         [[nodiscard]] std::vector<ExternConstantDeclaration> ExternConstantsForModule(std::string_view module_name) const;
+        /** @brief Returns the `extern struct <Name> : <Interface> = <Default>;` declarations of a module. `Name` is
+          * the struct, and `Value` is the default type as written. These are kept apart from the extern constants,
+          * because a type default is not an expression and must never be evaluated as one. */
+        [[nodiscard]] std::vector<ExternConstantDeclaration> ExternTypeDefaultsForModule(std::string_view module_name) const;
     private:
         using TokenSet = std::unordered_set<std::string_view>;
         std::unordered_map<std::string_view, TokenSet, TransparentStringHash, std::equal_to<>> tokenMap;
         using ExternConstSet = std::unordered_set<ExternConstantDeclaration, ExternConstHash>;
         std::unordered_map<std::string_view, ExternConstSet> externConstMap;
+        std::unordered_map<std::string_view, ExternConstSet> externTypeDefaultMap;
     };
 }
 

@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cctype>
 #include <cstddef>
+#include <optional>
 #include <ranges>
 #include <span>
 #include <string_view>
@@ -99,6 +100,42 @@ namespace lodestone
             const std::string_view value = ExtractValueAssignment(line, assignmentIndex);
             return ExternConstantDeclaration{ .Name=identifier, .Value=value };
         }
+
+        /**@brief Reads `extern struct <Name> : <Interface> = <Default>;` from one line, or returns nothing when the
+         * line is not such a declaration. The identifier just before `=` is the interface, not the struct, so the
+         * name is the token after the `struct` keyword. Keywords are matched as whole tokens, so a type named
+         * `MyStruct` does not count as the `struct` keyword. */
+        std::optional<ExternConstantDeclaration> ExtractExternTypeDefault(std::string_view line)
+        {
+            const size_t assignmentIndex = line.find('=');
+            if (assignmentIndex == std::string_view::npos)
+            {
+                return std::nullopt;
+            }
+
+            bool sawExtern = false;
+            bool sawStruct = false;
+            for (auto chunk : line.substr(0, assignmentIndex) | std::views::chunk_by(ChunkSeparator))
+            {
+                const std::string_view token(std::ranges::data(chunk), std::ranges::size(chunk));
+                if (!IsValidIdentifier(token))
+                {
+                    continue;
+                }
+                if (sawStruct)
+                {
+                    if (!sawExtern)
+                    {
+                        return std::nullopt;
+                    }
+                    return ExternConstantDeclaration{ .Name = token,
+                                                      .Value = ExtractValueAssignment(line, assignmentIndex) };
+                }
+                sawExtern = sawExtern || token == "extern";
+                sawStruct = token == "struct";
+            }
+            return std::nullopt;
+        }
     }
 
     // Reserved words and built-in type names, so a token that can never be a user identifier does not
@@ -144,6 +181,7 @@ namespace lodestone
         // several sources, due to how slang handles `__include` directives.
         TokenSet& tokens = tokenMap[module_name];
         ExternConstSet& externConsts = externConstMap[module_name];
+        ExternConstSet& externTypeDefaults = externTypeDefaultMap[module_name];
         size_t lineStart = 0u;
 
         while (std::cmp_less(lineStart, source_code.size()))
@@ -156,6 +194,12 @@ namespace lodestone
 
             std::string_view line = source_code.substr(lineStart, lineEnd - lineStart);
             lineStart = lineEnd + 1;
+
+            // no `continue` here: the struct name still counts as a token, the same as before we read defaults
+            if (const std::optional<ExternConstantDeclaration> typeDefault = ExtractExternTypeDefault(line))
+            {
+                externTypeDefaults.emplace(*typeDefault);
+            }
 
             // We check for these individually to avoid ordering dependencies:
             // `extern static const` passes and so does `static extern const` etc
@@ -211,6 +255,16 @@ namespace lodestone
         }
         
         return missing;
+    }
+
+    std::vector<ExternConstantDeclaration> SymbolTable::ExternTypeDefaultsForModule(std::string_view module_name) const
+    {
+        const auto iter = externTypeDefaultMap.find(module_name);
+        if (iter != externTypeDefaultMap.end())
+        {
+            return std::vector<ExternConstantDeclaration>(iter->second.begin(), iter->second.end());
+        }
+        return {};
     }
 
     std::vector<ExternConstantDeclaration> SymbolTable::ExternConstantsForModule(std::string_view module_name) const
