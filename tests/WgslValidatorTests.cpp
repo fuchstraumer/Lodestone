@@ -108,7 +108,7 @@ ResourceShape MakeBufferShape(bool is_structured)
     return is_structured ? ResourceShape::StructuredBuffer : ResourceShape::ByteAddressBuffer;
 }
 
-// The reflection that agrees with `k_Wgsl` on every used binding. A sampler carries no shape or
+// The reflection that agrees with `k_Wgsl` on every used binding. Samplers have no shape or
 // access, so it takes `Invalid` for both; the validator reads neither for a sampler.
 std::vector<ReflectedBinding> MakeAgreeingReflection()
 {

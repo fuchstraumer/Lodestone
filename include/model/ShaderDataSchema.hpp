@@ -11,9 +11,9 @@
 #include <variant>
 #include <vector>
 
-/** The schema the cooker extracts and the rendergraph eventually consumes. It names no Slang, WebGPU,
- * or filesystem type. It is the contract between the offline tool and the runtime. A compiler type
- * that leaks into it becomes a dependency the engine must carry.
+/** The schema that the cooker extracts and the rendergraph eventually consumes. This is the contract
+ * between the offline tool and the runtime, so it must not use any Slang, WebGPU, or filesystem type:
+ * any compiler type that leaks in here becomes a dependency the engine has to carry.
  *
  * The enums live in shader/ShaderLibraryTypes.hpp, because the graph reads the same vocabulary. This
  * schema adds only the parts that the offline tool needs: owning strings, and the raw expression text
@@ -49,7 +49,7 @@ const BoundPlacement* GetBoundPlacement(const ResourcePlacement& placement) noex
  * bound resources, but not really relevant for the others since those switch their "locations" to runtime */
 bool PlacementLess(const ResourcePlacement& lhs, const ResourcePlacement& rhs) noexcept;
 
-/**@brief How many elements a buffer holds, dynamically evaluated from a `[ls_element_count]` attribute. */
+/**@brief How many elements a buffer contains, dynamically evaluated from a `[ls_element_count]` attribute. */
 struct BufferFootprint
 {
     uint64_t ElementCount{ 0u };
@@ -225,16 +225,17 @@ struct ReflectedRasterState
 
 /** What the compiler says about one entry point.
  *
- * The binding list is not here. Slang reports the program-scope bindings, so every entry point of one
- * variant sees the same set, and a copy for each entry point states the same fact three times. The set
- * lives once on `CompiledVariant::Bindings`, and this record says only which of those bindings
- * this entry point reads.
+ * The binding list is not stored here. Slang reports the program-scope bindings, so every entry point of
+ * one variant sees the same set, and copying it for each entry point would duplicate it. The set is stored
+ * once on `CompiledVariant::Bindings`, and this record only lists which of those bindings this entry point
+ * reads.
  * todo-ship: That's not always going to be true, especially with entrypoint parameter blocks. This will
  * need revision.
  *
- * `UsedBindingIndices` holds indices into that shared list, in placement order (`PlacementLess`), so a
- * client merges the lists of several stages in one pass. `EnvironmentView::Open` checks it. A list rather than a
- * bit mask, because a mask caps a module at the width of the mask. */
+ * `UsedBindingIndices` contains indices into that shared list, in placement order (`PlacementLess`), so
+ * that clients can merge the lists of several stages in one pass. `EnvironmentView::Open` validates the
+ * order. This is a list rather than a bit mask, because a mask would limit a module to the width of the
+ * mask. */
 struct EntryPointReflection
 {
     std::string Name;

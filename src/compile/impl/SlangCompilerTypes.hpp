@@ -250,16 +250,16 @@ constexpr bool IsDepthSemantic(std::string_view semantic_name) noexcept
 }
 
 /**
- * Where one parameter scope starts, and what Slang emits around the bindings inside it.
+ * The starting placement of one parameter scope, and the name Slang emits around the bindings inside it.
  *
- * The global scope starts at group 0 and binding 0, and it adds no name. Every other scope takes
- * each answer from reflection. A nested scope carries the whole chain in `Name`, so the emitted
- * name of a binding stays `<Name>_<binding>` at any depth.
+ * The global scope starts at group 0 and binding 0, and adds no name. Other scopes read these values
+ * from reflection. Nested scopes store the whole chain in `Name`, so the emitted name of a binding is
+ * `<Name>_<binding>` at any depth.
  *
- * `Base` and `SpaceBase` are two different numbers, and reading one for the other costs a cook.
- * `Base` is where a binding declared directly in this scope sits. `SpaceBase` is where a
- * parameter block declared in this scope starts counting spaces. The entry point scope of a probe
- * reported a slot offset of 0 and a sub-element space offset of 1, and its block took space 1.
+ * `Base` and `SpaceBase` are different numbers, and mixing them up breaks the cook. `Base` is the
+ * placement of bindings declared directly in this scope. `SpaceBase` is the first space used by
+ * parameter blocks declared in this scope. In one probe, the entry point scope reported a slot offset
+ * of 0 and a sub-element space offset of 1, and its block used space 1.
  */
 struct BindingScope
 {
@@ -268,9 +268,8 @@ struct BindingScope
     std::string Name;
 };
 
-/** One binding, plus the `[vx_*]` annotations of that binding. The annotations travel beside the
- * binding until the order is settled, because a sort of the bindings alone would leave every
- * annotation against the wrong one. */
+/** One binding, plus its `[ls_*]` annotations. The annotations are kept next to the binding until the
+ * order is final, because sorting the bindings alone would attach each annotation to the wrong binding. */
 struct RawBindingDraft
 {
     RawBinding Binding;
@@ -279,8 +278,8 @@ struct RawBindingDraft
 
 /** One parameter block, as the sub-object range of its parent describes it.
  *
- * `UniformSize` is zero when the block holds resources alone. Slang emits no container for such a
- * block, so drafting one would report a binding the shader has not got. */
+ * `UniformSize` is zero when the block contains only resources. Slang emits no constant buffer for those
+ * blocks, so drafting one would report a binding that the shader does not have. */
 struct ParameterBlockInfo
 {
     slang::TypeLayoutReflection* ElementLayout{ nullptr };
@@ -329,9 +328,9 @@ struct CompilerOptionRow
 
 constexpr const char* k_AllWarningsAsErrors = "all";
 // 41012: "profile implicitly upgraded". Slang checks the entry point before specialization, so a
-// capability behind a capability axis fails every variant. A device capability is ours to record, not
-// Slang's to reject. The SPIR-V `OpCapability` list states each variant's exact need (phase F plan, O7).
-// Nothing records that need yet: `todo.md` holds the work.
+// capability behind a capability axis fails every variant. Device capabilities are ours to record, not
+// Slang's to reject. The SPIR-V `OpCapability` list contains the exact needs of each variant.
+// nothing records them yet: the work is tracked in `todo.md`.
 constexpr const char* k_DisabledWarnings = "31010,41012";
 // Order reaches Slang, and the two warning level rows must stay in this order.
 constexpr std::array<CompilerOptionRow, 8u> k_CompilerOptionRows{
@@ -380,8 +379,8 @@ constexpr SlangOptimizationLevel ToSlangOptimizationLevel(uint32_t level) noexce
 
 slang::CompilerOptionEntry ToOptionEntry(const CompilerOptionRow& row) noexcept;
 
-/** Every option this cook sets. Only the optimization level comes from a caller, so it is the one
- * row the table cannot hold. */
+/** Returns every compiler option this cook sets. The optimization level comes from the caller, so it is
+ * the only option that is not in the static table. */
 std::vector<slang::CompilerOptionEntry> MakeCompilerOptions(uint32_t optimization_level);
 
 std::vector<std::byte> BlobToBytes(slang::IBlob* blob);

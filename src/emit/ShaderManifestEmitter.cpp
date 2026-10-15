@@ -36,9 +36,9 @@ namespace lodestone
 namespace
 {
 
-    /** Collects strings once and hands back the index of each. Two equal strings share one entry, so
-     * the blob holds each binding name a single time however many layouts name it. One builder serves the
-     * whole cook, so a name that several modules or profiles share is stored once. */
+    /** Deduplicates strings and returns the index of each one. Equal strings share one entry, so the blob
+     * stores each binding name once, no matter how many layouts use it. One builder is used for the whole
+     * cook, so names shared by several modules or profiles are also stored once. */
     // todo-ship: There are better ways to do this, and we should absolutely explore them since strings
     // will rapidly become a huge cost as variant count increases
     class StringTableBuilder
@@ -57,8 +57,8 @@ namespace
         std::vector<std::byte> blob;
     };
 
-    /** One axis in the vocabulary of the manifest. A named value (a type or an enum case) is already a
-     * string index here, so two modules that name the same case hold the same value. */
+    /** One axis in the vocabulary of the manifest. Named values (types and enum cases) are already string
+     * indices here, so two modules that use the same case store the same value. */
     struct EncodedAxis
     {
         uint32_t NameString{};
@@ -70,7 +70,7 @@ namespace
         bool operator==(const EncodedAxis& other) const = default;
     };
 
-    /** What a module states, independent of the profile it was cooked for. */
+    /** The parts of a module that do not depend on the profile it was cooked for. */
     struct ModuleShape
     {
         std::vector<manifest::EntryPoint> EntryPoints;
@@ -119,7 +119,7 @@ namespace
     /** @brief Writes the actual bytes to the given `out` string. */
     void AppendBytes(std::vector<std::byte>& out, const void* data, size_t size);
 
-    /** Pads to the next 8-byte boundary. Binding records and axis values hold 64-bit fields, and the
+    /** Pads to the next 8-byte boundary. Binding records and axis values contain 64-bit fields, and the
      * reader maps them in place, so every section must start aligned. */
     void AlignTo8(std::vector<std::byte>& out);
 
@@ -184,8 +184,8 @@ namespace
     manifest::VertexInput MakeVertexInputRecord(const ReflectedVertexInput& input, StringTableBuilder& strings);
     manifest::ColorTarget MakeColorTargetRecord(const ReflectedColorTarget& target) noexcept;
 
-    /** The module's axes and entry points, as the manifest states them. Every profile of one module must
-     * give the same shape, because the key of a variant packs against the module's axes. */
+    /** The module's axes and entry points, as written to the manifest. Every profile of one module must
+     * produce the same shape, because variant keys are packed against the module's axes. */
     ModuleShape EncodeModuleShape(const CookedModule& module, StringTableBuilder& strings);
     bool SameModuleShape(const ModuleShape& lhs, const ModuleShape& rhs) noexcept;
     /** Adds a module's axis to the root axis table. A root axis with the same name, kind, domain, and binding
@@ -248,7 +248,7 @@ namespace
                                   const manifest::EnvironmentView& view,
                                   const LibraryVariant& variant,
                                   size_t entry_point_index);
-    /** Every fact the manifest states about one entry point of one variant. */
+    /** Checks every field the manifest stores for one entry point of one variant. */
     CookError CheckManifestSlot(const CookedModule& module,
                                 const manifest::EnvironmentView& view,
                                 const manifest::ShaderSourceProvider& provider,
@@ -323,8 +323,8 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
                                               .CodeFormat = profile.CodeFormat });
     }
 
-    // Build every extent before the header region, because an extent adds binding names and suffixes to
-    // the string table, and the header region holds that table.
+    // build every extent before the header region: extents add binding names and suffixes to the string
+    // table, and the string table is part of the header region
     std::vector<std::vector<std::byte>> extents(library.Environments.size());
     for (size_t environmentIndex = 0u; environmentIndex < library.Environments.size(); ++environmentIndex)
     {
@@ -558,7 +558,7 @@ namespace
         record.ByteSize = binding.ByteSize;
         record.NameString = strings.Add(binding.Name);
         record.ScopeString = strings.Add(binding.ScopeName);
-        // A bound placement is the only one the cooker produces today. Its payload is a group and a binding.
+        // the cooker only produces bound placements today, so the payload is a group and a binding
         record.Placement = manifest::PlacementPayload{ .Word0 = GroupOf(binding), .Word1 = BindingOf(binding) };
         record.ElementStride = binding.ElementStride;
         record.ArrayCount = binding.ArrayCount;

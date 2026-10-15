@@ -334,7 +334,7 @@ void WriteSlot(lodestone::JsonWriter& writer,
 
     if (with_sources)
     {
-        // SPIR-V is binary, so the dump states its size only. Run spirv-dis on a --dump-sources file to read it.
+        // SPIR-V is binary, so the dump only reports its size. run spirv-dis on a --dump-sources file to read it
         if (view.CodeFormat() == lodestone::ShaderCodeFormat::Spirv)
         {
             writer.KeyUInt("spirvBytes", instance.SpirvWords().size_bytes());

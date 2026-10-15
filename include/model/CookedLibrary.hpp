@@ -20,12 +20,12 @@
 
 /** The frozen model every emitter reads.
  *
- * One cook builds this once. The C++ emitter, the binary manifest emitter, and the dedup report all
- * read the same object, so two artifacts of one cook cannot describe different shaders.
+ * Each cook builds this once. The manifest emitter and the dedup report read the same object, so that
+ * two artifacts of one cook cannot describe different shaders.
  *
- * A variant does not hold its source text. It holds an index into the module's source table. Today
- * that table has one entry for each artifact, so the indices are an identity mapping. Dedup replaces
- * how the table gets filled, and nothing else changes: the emitters already read through the index.
+ * Variants store an index into the module's source table, not the source text. With dedup, equal sources
+ * share one entry. With `--no-dedupe`, every artifact gets its own entry. The emitters read through the
+ * index either way.
  */
 namespace lodestone
 {

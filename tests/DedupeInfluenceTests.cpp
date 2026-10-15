@@ -155,7 +155,7 @@ VariantDescriptor MakeAssignment(const PermutationSpace& space,
                                                   .Value = PermutationValue{ second_axis_value } } });
 }
 
-/** `ConditionalCS` reads the first axis only when the second axis is true. So the variants that hold
+/** `ConditionalCS` reads the first axis only when the second axis is true. So the variants that have
  * the second axis false all share one source, and only the other group can find the first axis
  * Active. A measurement that reads one group and drops the next reports Inert here. */
 CompiledVariant MakeConditionalVariant(uint64_t index, bool first_axis_value, bool second_axis_value)

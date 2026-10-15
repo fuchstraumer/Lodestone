@@ -34,17 +34,17 @@ namespace
 
 using namespace lodestone;
 
-/** What Slang names the scope it moves each entry point `uniform` parameter into.
+/** The name Slang gives the scope that it moves entry point `uniform` parameters into.
  *
- * `slang-ir-entry-point-uniforms.cpp` writes this string as a name hint, and reflection reports it
- * nowhere. It is a Slang convention, so it lives behind the Slang wall and reaches no other
- * folder. Every emitted name of an entry point parameter starts with it. */
+ * `slang-ir-entry-point-uniforms.cpp` writes this string as a name hint, and reflection never reports
+ * it. Every emitted name of an entry point parameter starts with it. This is a Slang convention, so we
+ * keep it behind the Slang wall. */
 constexpr std::string_view k_EntryPointScopeName = "entryPointParams";
 
 constexpr SlangUInt k_WorkgroupAxisCount = 3u;
 
-// The shader-side attribute names live on RawSizeAttributeKind, so one table states the contract
-// and this file asks it for the spelling. Slang drops the `Attribute` suffix from the struct name,
+// the shader-side attribute names are defined on RawSizeAttributeKind, so that one table defines the
+// contract and this file reads the spelling from it. Slang drops the `Attribute` suffix from the struct name,
 // so those strings match the declarations in tests/assets/LodestoneAttributes.slang.
 constexpr std::array<RawSizeAttributeKind, 3u> k_SizeAttributeKinds{ RawSizeAttributeKind::ElementCount,
                                                                      RawSizeAttributeKind::Extent2d,
@@ -113,9 +113,9 @@ void ReadVaryingShape(slang::TypeLayoutReflection* type_layout,
 
 /** One leaf of a varying or uniform tree, as the walker found it.
  *
- * `Path` holds the var layout of every field from the root to this leaf. That is what a caller
- * needs to build a qualified name, and a caller that names nothing ignores it. Building the name
- * in the walker would make three of the four callers pay for a string none of them reads. */
+ * `Path` contains the var layout of every field from the root to this leaf. Callers use it to build a
+ * qualified name. We do not build the name in the walker, because three of the four callers never read
+ * it. */
 struct LeafVisit
 {
     slang::VariableLayoutReflection* Var{ nullptr };
@@ -127,9 +127,8 @@ struct LeafVisit
 
 /** Calls `visit` for each leaf of one varying or uniform tree.
  *
- * Slang states each field's offset against its parent, so the offset accumulates down the tree,
- * and `category` selects which offset that is. A caller that wants no offset ignores the one it
- * gets. */
+ * Slang reports each field's offset relative to its parent, so the walker sums the offsets down the
+ * tree. `category` selects which offset is summed. Callers that do not need an offset ignore it. */
 template<typename LeafVisitor> // NOLINTNEXTLINE(misc-no-recursion)
 void VisitLeaves(slang::VariableLayoutReflection* var_layout,
                  SlangParameterCategory category,
@@ -180,8 +179,8 @@ void WalkVaryingTree(slang::VariableLayoutReflection* var_layout,
     VisitLeaves(var_layout, category, 0u, path, visit);
 }
 
-/** Joins the field names of one path with dots. Empty when a field on the path has no name, so a
- * caller that needs a full name can refuse a partial one. */
+/** Joins the field names of one path with dots. Returns an empty string when a field on the path has no
+ * name, so that callers that need a full name can reject a partial one. */
 std::string JoinFieldNames(std::span<slang::VariableLayoutReflection* const> path)
 {
     if (path.empty())
@@ -273,9 +272,9 @@ void CollectDepthWrites(slang::VariableLayoutReflection* var_layout, ReflectedRa
 
 /** One reflected number, or nothing.
  *
- * Slang answers `SLANG_UNKNOWN_SIZE` when a value depends on an unresolved generic parameter or
- * on a link-time constant. That answer is not a number, and a cook that carried it would place a
- * binding at a location no shader holds. Every read of a placement number goes through here. */
+ * Slang returns `SLANG_UNKNOWN_SIZE` when a value depends on an unresolved generic parameter or a
+ * link-time constant. If we cooked that value, the binding would be placed at a location that no shader
+ * uses. Every read of a placement number goes through this function. */
 constexpr std::optional<uint32_t> ResolvedNumber(size_t value) noexcept
 {
     if (value == SLANG_UNKNOWN_SIZE)
@@ -292,8 +291,8 @@ std::optional<uint32_t> ReadOffset(slang::VariableLayoutReflection* var_layout,
     return var_layout != nullptr ? ResolvedNumber(var_layout->getOffset(category)) : std::nullopt;
 }
 
-/** Says that one range holds a number reflection could not resolve. Both walks report the same
- * fact about different ranges, so both report it in the same words. */
+/** Reports a range that contains a number reflection could not resolve. Both walks use this function, so
+ * that they report the error with the same message. */
 void ReportUnresolvedLocation(std::string_view range_kind, SlangInt range_index)
 {
     std::println(stderr,
@@ -303,8 +302,8 @@ void ReportUnresolvedLocation(std::string_view range_kind, SlangInt range_index)
                  range_index);
 }
 
-/** Adds one name to a scope chain. Slang joins a scope to what it holds with an underscore, and
- * a chain that starts empty takes the name alone. */
+/** Appends one name to a scope chain. Slang joins a scope to its contents with an underscore. An empty
+ * chain becomes the name alone. */
 std::string JoinScopeName(std::string_view prefix, const char* name)
 {
     if (name == nullptr)
@@ -459,9 +458,9 @@ void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
 
 /** Asks the metadata of one entry point which global bindings that entry point reads.
  *
- * `global_bindings` holds the global scope alone. Slang generates each entry point as its own
- * artifact, so two entry points can place different resources at one group and binding. A placement
- * query over the entry point rows would then let one entry point claim the parameter of another. */
+ * `global_bindings` contains only the global scope. Slang generates each entry point as its own
+ * artifact, so two entry points can place different resources at the same group and binding. If we
+ * queried placements across all entry point rows, one entry point could claim the parameter of another. */
 std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_variant,
                                                 SlangInt entry_point_index,
                                                 std::span<const RawBinding> global_bindings,
@@ -751,8 +750,8 @@ CookError SlangReflector::applyLeafTypeTexelBufferLayout(slang::TypeLayoutReflec
 
 /** Reads the size, shape, and type facts off one binding range's leaf type layout.
  *
- * Slang wraps a resource type around the type it carries, so the useful facts sit one level down.
- * A structured buffer reports its element layout. A texture reports the type it returns. */
+ * Slang wraps a resource type around its element type, so the useful facts are one level down.
+ * Structured buffers report their element layout, and textures report the type they return. */
 CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* containing_layout,
                                               SlangInt range_index,
                                               RawBinding& binding) const
@@ -1028,11 +1027,11 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
     return collectSubObjectDrafts(containing_layout, scope, out_drafts);
 }
 
-/** The constant buffer Slang adds to hold the ordinary data of a block. Neither range list holds
- * it, and a client must create it, so it becomes a binding that carries the name of the block.
+/** The constant buffer that Slang adds to store the ordinary data of a block. Neither range list contains
+ * it, and clients must create it, so we draft it as a binding with the name of the block.
  *
- * A block of resources alone holds no such data and gets no such slot, so the caller asks only
- * when `UniformSize` is not zero. Drafting one anyway reports a binding the shader has not got. */
+ * Blocks that contain only resources have no ordinary data and no such buffer, so callers only ask when
+ * `UniformSize` is not zero. Otherwise we would report a binding that the shader does not have. */
 CookResult<RawBindingDraft> SlangReflector::readBlockContainer(const ParameterBlockInfo& block, std::string_view scope_name) const
 {
     const std::optional<uint32_t> containerBinding =
@@ -1063,10 +1062,10 @@ CookResult<RawBindingDraft> SlangReflector::readBlockContainer(const ParameterBl
 
 /**@brief Walks the parameter blocks of one scope, and drafts the container and the contents of each.
  *
- * @note Slang gives a parent scope only descriptor ranges for a block, so the binding range of the block
- * carries a descriptor set index of -1 and the range walk drops it. The contents live in a sub-object
- * range instead, and this is the only walk that reaches them. `ReadParameterBlock` reads one range, and
- * `ReadBlockContainer` reads the slot Slang adds to hold the ordinary data. */
+ * @note Slang describes a block to its parent scope with descriptor ranges only, so the binding range of
+ * the block has a descriptor set index of -1, and the range walk skips it. The contents are in a sub-object
+ * range instead, and this is the only walk that reads them. `ReadParameterBlock` reads one range, and
+ * `ReadBlockContainer` reads the buffer that Slang adds to store the ordinary data. */
 CookError SlangReflector::collectSubObjectDrafts(slang::TypeLayoutReflection* containing_layout,
                                                  const BindingScope& scope,
                                                  std::vector<RawBindingDraft>& out_drafts) const
@@ -1106,14 +1105,14 @@ CookError SlangReflector::collectSubObjectDrafts(slang::TypeLayoutReflection* co
 
 // NOLINTEND(misc-no-recursion)
 
-/** The parameter scope of one entry point: where it starts, and the name Slang emits around it.
+/** The parameter scope of one entry point: its starting offset, and the name Slang emits around it.
  *
- * Slang reports an unresolved offset as `SLANG_UNKNOWN_SIZE`. That answer cannot be a placement, and
- * a cook that carried it would emit a binding at a location no shader holds.
+ * Slang reports an unresolved offset as `SLANG_UNKNOWN_SIZE`. That value is not a valid placement, and
+ * cooking it would emit a binding at a location that no shader uses.
  *
- * The scope name is the parameter's own name when the entry point declares one parameter of a struct
- * type. Slang collects loose `uniform` parameters into a synthetic struct instead, and names that
- * `entryPointParams`. Both answers come from the same call, so neither is a special case here. */
+ * When the entry point declares one parameter of a struct type, the scope name is the parameter's name.
+ * Otherwise Slang collects the loose `uniform` parameters into a synthetic struct named
+ * `entryPointParams`. Both names come from the same call, so neither needs special handling here. */
 CookResult<BindingScope> SlangReflector::entryPointScope(slang::EntryPointReflection* entry_point_layout,
                                                          std::string_view entry_point_name) const
 {

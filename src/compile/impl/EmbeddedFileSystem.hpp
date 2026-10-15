@@ -18,10 +18,10 @@ struct EmbeddedBuiltinModule;
  * session: the worker could not load the serialized root module, and Slang reported nothing.
  *
  * This implements the extended interface on purpose. Slang wraps a plain `ISlangFileSystem` in a cache that
- * reports a content hash in place of a path, and `getDependencyFilePath` then names no readable file.
+ * reports a content hash instead of a path, and `getDependencyFilePath` then returns no readable file path.
  *
- * The object holds no state, so one instance serves every session on every thread. It lives for the whole
- * process, so its reference count does not change.
+ * The object has no state, so one instance serves every session on every thread. It lives for the whole
+ * process, so its reference count never changes.
  */
 class EmbeddedFileSystem final : public ISlangFileSystemExt
 {
@@ -52,8 +52,8 @@ public:
 
 [[nodiscard]] EmbeddedFileSystem& GetEmbeddedFileSystem() noexcept;
 
-/** @brief The builtin module that `path` names, or null. A path names a builtin when it ends with
- * `k_BuiltinSearchPath/<file name>`, with either separator. */
+/** @brief Returns the builtin module that `path` refers to, or null. Paths refer to a builtin when they end
+ * with `k_BuiltinSearchPath/<file name>`, with either separator. */
 [[nodiscard]] const EmbeddedBuiltinModule* FindEmbeddedBuiltin(std::string_view path) noexcept;
 
 } // namespace lodestone

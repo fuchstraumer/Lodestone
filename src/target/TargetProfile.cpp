@@ -51,7 +51,8 @@ namespace
 
     // Slang has no WGSL profile. It ignores a profile that does not imply the target, so the old
     // `spirv_1_4` changed nothing (measured on KitchenSink, 2026-09-25).
-    // Vulkan 1.2 guarantees SPIR-V 1.5 (decision O5).
+    // we target Vulkan 1.2 for now (to be re-measured against device coverage), and Vulkan 1.2
+    // guarantees SPIR-V 1.5
     const std::array<TargetProfile, 2u> k_TargetProfiles
     {
         TargetProfile{ .Name = k_WgslName,

@@ -25,7 +25,7 @@ namespace
 // will fix this, but for now bring everything from lodestone into scope
 using namespace lodestone;
 
-// Each session holds one target (SlangModuleContext::Initialize), so its index is always 0.
+// each session has one target (SlangModuleContext::Initialize), so its index is always 0
 constexpr SlangInt k_TargetIndex = 0;
 constexpr uint32_t k_SpirvMagicNumber = 0x07230203u;
 constexpr size_t k_SpirvHeaderBytes = 5u * sizeof(uint32_t);

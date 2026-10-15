@@ -17,10 +17,10 @@
 /**
  * @brief A read-only view over one cook bundle, stored as a flat byte span.
  *
- * Every cross-reference in the file is an index or an offset, never a pointer. The header region uses
- * absolute 64-bit offsets. An environment extent uses 32-bit offsets relative to its own start. The
- * reader is therefore a set of spans over one byte span. It allocates nothing to open a file, and it
- * relocates nothing.
+ * Every cross-reference in the file is an index or an offset, not a pointer. The header region uses
+ * absolute 64-bit offsets, and environment extents use 32-bit offsets relative to their own start. This
+ * lets the reader work as a set of spans over one byte span, so opening a file needs no allocation and
+ * no pointer fixup.
  *
  * The byte span must outlive every view and every provider that reads it. Names and shader text point
  * into that span.
@@ -149,7 +149,8 @@ using ManifestResult = std::expected<T, ErrorState>;
 std::string_view ToString(ErrorCode error) noexcept;
 
 /** @brief A human-readable, one-line description of a manifest error, for a log or the console. It
- * folds in the table, record index, and `Detail` field, so the reader states where the file is bad */
+ * includes the table, record index, and `Detail` field, so that the message shows where the file is
+ * malformed. */
 std::string DescribeShaderManifestError(const ErrorState& error);
 
 /**@brief A run in an index table. Kind of like a span: it specifies a contiguous subrange of entries.
@@ -176,9 +177,9 @@ struct alignas(8) TableRef64
 
 /** @brief The whole-cook header, at offset zero. Every offset in it is absolute.
  *
- * The file is ordered by profile, then by module. The header region (`HeaderSize` bytes) holds this
- * record, the whole-cook tables, the module headers, and the environment directory. A reader loads the
- * header region, then one contiguous run of environment extents. */
+ * The file is ordered by profile, then by module. The header region (`HeaderSize` bytes) contains this
+ * record, the whole-cook tables, the module headers, and the environment directory. Readers load the
+ * header region first, then one contiguous run of environment extents for their profile. */
 struct alignas(8) Header
 {
     uint32_t Magic{ 0u };
@@ -274,10 +275,10 @@ struct alignas(8) EntryPoint
 
 /** @brief The first record of one environment extent: one module, cooked for one profile.
  *
- * Every offset is relative to the start of the extent, so an extent can load into its own buffer with
- * no fixup. Three tables have no count, because the data already fixes their size:
+ * Every offset is relative to the start of the extent, so that each extent can be loaded into its own
+ * buffer without fixups. Three tables store no count, since other counts determine their size:
  * - Variant keys and variant records share a size
- * - The axis mask table holds one bitmask per variant. The length of the individual records
+ * - The axis mask table contains one bitmask per variant. The length of the individual records
  *   is somewhat unique though: ceil(ModuleAxisCount / 64) words per variant, since it's a bitmask
  * - The EntryPointInstance table is `VariantCount * EntryPointCount` records.
  *   Thus, the entry point instance for (variant V, entry point E) is at `V * EntryPointCount + E`. */
@@ -317,7 +318,8 @@ struct alignas(8) Variant
     uint32_t CapabilityRequirement{ 0u };
 };
 
-/** @brief Where a shader reaches one resource. `Binding::PlacementKind` selects how to read it:
+/** @brief The location of one resource, as the shader accesses it. `Binding::PlacementKind` selects how
+ * to read it:
  * - Bound: `Word0` is the group, and `Word1` is the binding.
  * - Indexed: `Word0` is the heap index. `Word1` is zero.
  * - Pointer: `Word0` is the low half and `Word1` the high half of a byte offset.
@@ -398,7 +400,7 @@ struct alignas(8) UniformMember
 };
 
 /** @brief One specialization constant (a WGSL `override`). Reserved: the cooker does not write this
- * table yet. `DefaultBits` holds the default value as raw bits of `ScalarType`. */
+ * table yet. `DefaultBits` stores the default value as raw bits of `ScalarType`. */
 struct alignas(8) SpecializationConstant
 {
     uint64_t DefaultBits{ 0u };
@@ -416,8 +418,9 @@ struct alignas(8) ColorTarget
     uint32_t Reserved{ 0u };
 };
 
-/** @brief Runs of vertex inputs and color targets. A compute entry point names a raster record whose
-* counts are both zero, so every EntryPointInstance can name one and no accessor needs a stage test. */
+/** @brief Runs of vertex inputs and color targets. Compute entry points refer to a raster record with
+* both counts at zero, so that every EntryPointInstance has a raster record and accessors do not need to
+* check the stage. */
 struct alignas(8) RasterState
 {
     uint32_t FirstVertexInput{ 0u };
@@ -517,8 +520,9 @@ private:
     std::span<const UniformMember> members;
 };
 
-/** One resource as one entry point sees it: the binding record and its footprint.
- * @note A view points at its `EnvironmentView`. Keep that environment alive, and do not move it. */
+/** A resource as seen by one entry point: its binding record and its footprint.
+ * @note Views point into their `EnvironmentView`, so keep that environment alive and do not move it
+ * while a view exists. */
 class ResolvedResource
 {
 public:
@@ -539,10 +543,10 @@ public:
     /** @brief The size of a uniform block, in bytes. Zero for every other binding kind. */
     [[nodiscard]] uint64_t ByteSize() const noexcept;
     /** @brief The element count from `[ls_element_count]`, for this variant. Zero when the shader does not
-     * give one, or when the resource has no footprint. Then the caller must give the size. */
+     * declare one, or when the resource has no footprint. In that case, the caller must provide the size. */
     [[nodiscard]] uint64_t ElementCount() const noexcept;
     /** @brief The texture extent from `[ls_extent_2d]` or `[ls_extent_3d]`. Zero when the shader does not
-     * give one, or when the resource has no footprint. Then the caller must give the size. */
+     * declare one, or when the resource has no footprint. In that case, the caller must provide the size. */
     [[nodiscard]] uint32_t ExtentX() const noexcept;
     [[nodiscard]] uint32_t ExtentY() const noexcept;
     [[nodiscard]] uint32_t ExtentZ() const noexcept;
@@ -572,12 +576,12 @@ struct MergedResource
     ShaderStageKind Stages{ ShaderStageKind::Invalid };
 };
 
-/** The resources one entry point of one variant uses, in placement order. `EnvironmentView::Open` checks
- * the order: the Bound resources come first, in strictly ascending (group, binding) order. */
+/** The resources used by one entry point of one variant, in placement order. `EnvironmentView::Open`
+ * validates this order: Bound resources come first, in strictly ascending (group, binding) order. */
 class LayoutRange
 {
 public:
-    /** An empty range. `MergedLayoutView` holds a fixed array of ranges, and needs this. */
+    /** An empty range. This is used by `MergedLayoutView`, which stores a fixed array of ranges. */
     LayoutRange() noexcept = default;
 
     class Iterator
@@ -677,7 +681,7 @@ private:
 };
 
 /** One entry point of one variant.
- * @note An iterator points at its range. Keep the range from `Layout()` alive while you iterate it. */
+ * @note Iterators point into their range, so keep the range returned by `Layout()` alive while iterating. */
 class EntryPointInstanceView
 {
 public:
@@ -726,14 +730,14 @@ private:
 
 /** @brief The merged resources of the entry point instances of one pipeline, in placement order.
  *
- * A pipeline layout needs each resource once, with every stage that reads it. `Merge` takes the instances,
- * one for each stage, and checks every shared placement once. Iteration after that runs unchecked, and it
- * gives one `MergedResource` for each (group, binding). A change of group in the sequence starts the next
- * bind group layout or descriptor set layout.
+ * Pipeline layouts need each resource once, with every stage that reads it. `Merge` takes one instance
+ * for each stage and validates every shared placement once, so that iteration afterwards runs unchecked.
+ * Iteration returns one `MergedResource` for each (group, binding). Each change of group in the sequence
+ * marks the start of the next bind group layout (or descriptor set layout).
  *
  * The instances can come from different variants, modules, or environments.
- * @note The view points at the environments of its instances. Keep them alive, and do not move them. An
- * iterator points at its view, so keep the view alive while you iterate it. */
+ * @note This view points into the environments of its instances, so keep them alive and do not move
+ * them. Iterators point into the view, so keep the view alive while iterating. */
 class MergedLayoutView
 {
 public:
@@ -778,9 +782,10 @@ public:
      * - two instances have the same stage (`MergedLayoutDuplicateStage`)
      * - a resource is not Bound (`MergedLayoutPlacementUnsupported`) (other binding/layout forms coming later)
      * - two resources at one (group, binding) differ in kind, shape, access, storage format, sample type,
-     *   comparison, array count, or byte size (`MergedLayoutConflict`). The names do not take part.
+     *   comparison, array count, or byte size (`MergedLayoutConflict`). Names are not compared.
      *
-     * A failure names the binding record in `RecordIndex` and the position of the instance in `Detail`. */
+     * On failure, `RecordIndex` stores the index of the binding record, and `Detail` stores the position of
+     * the instance. */
     [[nodiscard]] static ManifestResult<MergedLayoutView> Merge(
         std::span<const EntryPointInstanceView> entry_points) noexcept;
 
@@ -799,13 +804,13 @@ private:
 /**
 * @brief Spans over the header region of one cook bundle, checked once when it opens.
 *
-* The header region holds every whole-cook table and every module header: strings, axes, profiles, the
+* The header region contains every whole-cook table and every module header: strings, axes, profiles, the
 * environment directory, and each module's entry points and axis runs. Open() checks all of it, so every
 * accessor after it runs unchecked (effectively meaning it's branch-free).
 *
-* The span given to Open() can hold the whole file, or only the header region. A renderer that reads the
-* header region first, and then reads the extents of one profile, opens each extent with
-* `EnvironmentView::Open`. A caller that holds the whole file uses `OpenEnvironment`.
+* The span given to Open() can contain the whole file, or only the header region. Renderers that read the
+* header region first and then the extents of one profile open each extent with `EnvironmentView::Open`.
+* Callers with the whole file in memory use `OpenEnvironment`.
 * @note This stays purely in the vocabulary of the manifest itself. For the vocabulary of authorship,
 * use `ManifestIndex`.
 *
@@ -852,7 +857,7 @@ private:
 /**
 * @brief One module of a bundle: its name, its entry points, and its axes. Nothing here varies by profile.
 *
-* A module axis is a view of one root axis through the module's value mask. Digit D of a variant key
+* Module axes are views of one root axis through the module's value mask. Digit D of a variant key
 * selects the D-th set bit of that mask, so the radix of the axis in this module is the count of set bits.
 */
 class ModuleView
@@ -887,7 +892,8 @@ private:
 /**
 * @brief One module, cooked for one profile: spans over one environment extent, checked once when it opens.
 *
-* Every offset inside an extent is relative to the extent start, so the extent can sit in its own buffer.
+* Every offset inside an extent is relative to the extent start, so that each extent can be loaded into
+* its own buffer.
 * The variant keys, the variant records, and the axis masks are parallel: the position of a key is the
 * index of its variant. The EntryPointInstance for (variant V, entry point E) is at `V * EntryPointCount + E`.
 */
@@ -931,7 +937,7 @@ public:
     [[nodiscard]] const Binding& BindingRecord(uint32_t binding_index) const noexcept;
     /** @brief The resources one variant declares. Indices into Bindings(). */
     [[nodiscard]] std::span<const uint32_t> ResourceList(uint32_t list_index) const noexcept;
-    /** @brief How much of each resource, in the same order as the resource list. */
+    /** @brief The footprint of each resource, in the same order as the resource list. */
     [[nodiscard]] std::span<const Footprint> FootprintList(uint32_t list_index) const noexcept;
     /** @brief Which of a variant's resources one entry point reads. Indices into the resource list. */
     [[nodiscard]] std::span<const uint32_t> VisibilityList(uint32_t list_index) const noexcept;
@@ -970,9 +976,8 @@ private:
 /**
  * @brief Serves shader sources out of one environment of a manifest.
  *
- * The provider allocates nothing. Each accessor reads the environment when you call it.
- * `Bindings()` returns a range that points into this provider, so do not move the provider while you
- * hold a range from it.
+ * The provider does not allocate. Each accessor reads the environment when called. `Bindings()` returns
+ * a range that points into this provider, so do not move the provider while a range from it is in use.
  *
  * `Generation()` is the future hot-reload hook. A provider for baked data will always return the same value,
  * but a live provider can increment the value when any source changes - allowing users to reload

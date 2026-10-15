@@ -33,7 +33,7 @@ bool DeclarationMatches(const std::vector<ExternConstantDeclaration>& externs,
     return iter != externs.end();
 }
 
-// A whole `extern static const` line is dropped, in any keyword order. A line that carries only some of
+// A whole `extern static const` line is dropped, in any keyword order. A line that has only some of
 // the three keywords is an ordinary declaration, and its name stays a token.
 void TestExternStaticConstStripping(TestRunner& runner)
 {
@@ -120,14 +120,14 @@ void csMain(uint3 tid : SV_DispatchThreadID)
     runner.Check(Missing(table, { "main" }, { "USE_WAVE_OPS", "FFT_SIZE" }).empty(),
                  "an axis used in a module is found when that module is in scope");
 
-    // The crux: the declaring module holds only its own tokens, and the declaration line was skipped, so
+    // The crux: the declaring module contains only its own tokens, and the declaration line was skipped, so
     // the axis is NOT a use in the module that declares it. Without this, every axis would read as used.
     runner.Check(Missing(table, { "common" }, { "USE_WAVE_OPS" }).size() == 1u,
                  "a declaration alone does not count as a use in the declaring module");
 }
 
 // A module can be fed several sources, which pool under its name (a root plus its __include'd
-// fragments). An unknown module holds no tokens, so every queried token is missing.
+// fragments). Unknown modules contain no tokens, so every queried token is missing.
 void TestAccumulationAndUnknownModule(TestRunner& runner)
 {
     runner.BeginSection("accumulation and unknown module");

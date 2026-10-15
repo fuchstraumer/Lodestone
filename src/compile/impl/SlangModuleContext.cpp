@@ -48,8 +48,8 @@ namespace
         return result;
     }
 
-    // Map the enum's Slang scalar type to the Slang-free tag kind. This is the wall: it names the
-    // Slang type, and `DecodeEnumTag` (in compile/EnumTagDecode.hpp) does the read. An enum tag is
+    // map the enum's Slang scalar type to the Slang-free tag kind. this function uses the Slang type, so
+    // it stays behind the wall, and `DecodeEnumTag` (in compile/EnumTagDecode.hpp) does the actual read. An enum tag is
     // always an integer scalar, so the default is a can't-happen.
     EnumTagKind ScalarTypeToEnumTagKind(slang::TypeReflection::ScalarType scalar)
     {
@@ -80,7 +80,7 @@ namespace
 
     // Pick a tag kind from the case value blob's width, for when Slang will not report the enum's
     // scalar type. An enum an axis reaches through an `import` reflects with `ScalarType::None`
-    // (measured), but its case value blob still carries the tag at its real width. Slang enums default
+    // (measured), but its case value blob still contains the tag at its real width. Slang enums default
     // to a signed `int`, so assume signed here. The same-module path uses the real scalar type and
     // never reaches this fallback.
     EnumTagKind EnumTagKindFromByteWidth(size_t byte_width)
@@ -208,9 +208,9 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
 
     const std::filesystem::path canonicalModulePath = std::filesystem::canonical(create_info.ModulePath);
     const std::string sourceDirectory = canonicalModulePath.parent_path().string();
-    // The shared modules a shader imports sit one level above the per-stage directory, so the asset root
-    // resolves without a command-line switch. The builtin search path names no directory on disk: the
-    // embedded file system serves it from memory.
+    // shared modules imported by a shader are one level above the per-stage directory, so the asset root
+    // resolves without a command-line switch. the builtin search path is not a directory on disk: the
+    // embedded file system serves it from memory
     const std::string sharedDirectory = canonicalModulePath.parent_path().parent_path().string();
     cacheDirectory = create_info.ModuleCacheDirectory.string();
     const std::array<const char*, 4> searchPaths
@@ -335,9 +335,8 @@ CookError SlangModuleContext::collectAxesFromDecl(slang::DeclReflection* reflect
 
         if (child->getKind() == slang::DeclReflection::Kind::Variable)
         {
-            // A variable is an axis candidate. buildAxisDecl returns nullopt for a variable that
-            // carries no axis attribute, which is the common case, so a nullopt is skipped and never
-            // an error.
+            // every variable is an axis candidate. buildAxisDecl returns nullopt for variables without
+            // an axis attribute, which is the common case, so nullopt is skipped and is not an error
             CookResult<std::optional<RawAxisDeclaration>> axisDeclResult = buildAxisDecl(child, module_name);
             if (!axisDeclResult)
             {

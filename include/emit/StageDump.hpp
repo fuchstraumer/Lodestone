@@ -8,17 +8,17 @@
 #include <string>
 #include <string_view>
 
-/** Writes one point between two stages as JSON, so a change between two stages is a diff and not a
- * search.
+/** Writes the data between two stages as JSON, so that a change to a stage shows up as a diff.
  *
- * A dump goes through the `OutputSink` like every other artifact. That means three key things:
+ * Dumps are written through the `OutputSink` like every other artifact. This means:
  *
- * - `MemoryOutputSink` captures a dump, so a test reads one without touching a disk.
- * - `--verify-deterministic` compares every artifact the sink holds, so it compares the dumps. An
- *   unordered container that reaches a dump then fails the cook.
- * - A dump file is named the way every other artifact is named.
+ * - `MemoryOutputSink` captures dumps, so tests can read them without touching the disk.
+ * - `--verify-deterministic` compares every artifact in the sink, including the dumps, so an unordered
+ *   container that reaches a dump fails the cook.
+ * - Dump files are named the same way as every other artifact.
  *
- * A dump holds no shader source code. A source appears as an index, a byte length, and a content hash.
+ * Dumps contain no shader source code. Each source is written as an index, a byte length, and a content
+ * hash.
  * That's all we need to diff and verify idempotence */
 namespace lodestone
 {
@@ -45,7 +45,7 @@ std::string DumpRawModule(const RawModule& module);
  * todo-ship: Resolved may be overloaded or misleading, I might change that. We really do evaluate more than
  * resolve */
 std::string DumpResolvedModule(std::string_view module_name, std::span<const CompiledVariant> variants);
-/**@brief The tables while the interners still hold them, plus the provenance that the freeze
+/**@brief The tables while they are still in the interners, plus the provenance that the freeze
  * discards. `cooked` shows what collapsed as a whole; this shows where each collapsed item came from */
 std::string DumpInternedModule(const InternedModule& module);
 /** @brief The frozen tables, indices used to key into each table, and the measurements from the interner per
@@ -53,8 +53,8 @@ std::string DumpInternedModule(const InternedModule& module);
 std::string DumpCookedModule(const CookedModule& module);
 /** @brief Dumps the shader source strings to the given subdir under the output sink, keyed by the 
   * module name on the input cooked module. */
-/** Writes each unique source of one module to `subdir`, beside a `SourceTable.json`. A WGSL file starts with a
- * comment that names its variants. A SPIR-V file holds the words only, so a tool can read it. */
+/** Writes each unique source of one module to `subdir`, next to a `SourceTable.json`. WGSL files start with
+ * a comment that lists their variants. SPIR-V files contain only the words, so that tools can read them. */
 CookError DumpShaderSources(const CookedModule& module,
                             std::string_view subdir,
                             ShaderCodeFormat code_format,

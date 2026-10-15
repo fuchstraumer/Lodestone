@@ -70,7 +70,7 @@ private:
 
     // Walks one reflection node and every node beneath it, collecting each axis-carrying variable into
     // `axisDeclarations`. A `__include`d file declared with `implementing` reflects as an Unsupported
-    // node that holds the real declarations as its children, so the walk must descend, not stop at the
+    // node that contains the real declarations as its children, so the walk must descend, not stop at the
     // module's top level.
 
     struct AxesBuildContext

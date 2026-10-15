@@ -5,7 +5,7 @@
 //
 // Links only against slang. Build the target directly:
 //   cmake --build build/<preset> --config Debug --target SlangPrelinkRepro
-// Run it with the directory that holds Material.slang and Shading.slang:
+// Run it with the directory that contains Material.slang and Shading.slang:
 //   SlangPrelinkRepro.exe <repro directory>
 // Exit code 0: the module loaded. Exit code 1: the module did not load, and the diagnostics print.
 #include <slang.h>

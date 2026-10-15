@@ -93,6 +93,11 @@ usage" rule above still applies, and most comments that break the rules below sh
   file", and a normalized path is not "one spelling".
 - **Use literal verbs.** Write returns, contains, stores, lists, points to, is written to. Do not use data
   verbs as metaphors: "names", "holds", "gives", "states", "carries", and "owns" (outside its C++ meaning).
+  - "holds" is replaced everywhere, even for a container: "the table contains", "the field stores".
+  - "names" is fine when something is literally given a name ("Slang names every entry point `main`").
+    When it means "identifies" or "refers to", rewrite it: "`RecordIndex` stores the index of the record".
+  - Inline `//` comments can use ordinary idiom ("Tint gives us this for free"). The verb rules apply
+    fully to doc comments.
 - **Speak about a category in the plural, or state the fact.** Write "Embedded builtins are excluded", not
   "An embedded builtin is not on disk". The singular generic ("A cook reads...", "An axis holds...") reads
   like a statute.
@@ -106,6 +111,20 @@ usage" rule above still applies, and most comments that break the rules below sh
   a positive statement works.
 - **Voice.** "we" and "I" are fine. Passive voice is fine when the actor is obvious or unimportant
   ("Embedded builtins are excluded"). Do not force an active subject.
+- **Sardonic is allowed, for the right occasion.** When C++, a third-party library, or a legacy interface
+  forces something unfortunate or horrid, say so in the author's voice. For example: "This is truly,
+  eminently, plainly, horribly bad, but I assure you: it's required", or "Thanks to the brilliant decisions
+  of those who came before us, there's no better way to handle this". Keep it for the cases that earn
+  it, and still say what the constraint is, so the next reader knows what not to "fix". Do not use it on
+  ordinary code.
+- **History notes are allowed, judiciously.** A note on what the code used to do ("the previous version
+  was quadratic", "fixed: we used `getType()` here") explains the shape of the code and helps stop a
+  regression. Keep these short, and keep them true: when the code changes again, update the note.
+- **Reference only `todo.md`.** Code comments may point at `todo.md`, which is tracked. Do not reference
+  anything under `docs/` (plans, phases, decision IDs such as "O7" or "F2.7"): that folder is gitignored,
+  and its files move or are deleted. State the fact itself in the comment instead.
+- **These rules bind what agents write.** Do not rewrite the author's own comments to fit them unless
+  she asks.
 - **Two registers.** A doc comment (`/** */`, `@brief`) uses full, capitalized sentences, and starts a
   function's brief with its action ("Returns..."). An inline `//` comment inside a body can be casual: a
   lowercase start, a fragment, an informal aside.

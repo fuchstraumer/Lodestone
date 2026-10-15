@@ -65,8 +65,8 @@ namespace
     /**@brief Printed marker specifying what influence an axis had (if any) in the influence table we print. */
     char InfluenceMarker(AxisInfluence influence) noexcept;
     std::string EmitInfluenceTable(const CookedModule& module, const ModuleInfluence& influence);
-    /** One pass over the variants. The earlier form searched the whole variant list again for each
-     * distinct source, which is quadratic and gives the same answer. */
+    /** Makes one pass over the variants. The previous version searched the whole variant list again for
+     * each distinct source, which was quadratic and returned the same result. */
     std::vector<SourceCollapse> CollectSourceCollapses(const CookedModule& module, size_t entry_point_index);
     std::string EmitProvenance(const CookedModule& module);
 

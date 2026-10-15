@@ -179,9 +179,9 @@ add_library(lodestone STATIC ${LODESTONE_COMMON_SOURCES} ${LODESTONE_COMPILE_SOU
                              ${LODESTONE_TARGET_SOURCES} ${LODESTONE_COMPILE_IMPL_SOURCES})
 add_library(lodestone::lodestone ALIAS lodestone)
 set_target_properties(lodestone PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
-# The engine include path carries shader/ShaderLibraryTypes.hpp and resource/ResourceFlags.hpp. The
-# cooker and the rendergraph share that vocabulary, so neither can drift from the other. Neither
-# header pulls in Dawn: ResourceFlagConversions.hpp is the only file that names a WebGPU type.
+# client/include contains the vocabulary shared by the cooker and the renderer (ShaderLibraryTypes.hpp,
+# ResourceFlags.hpp), so that the two cannot drift apart. None of those headers include a WebGPU or
+# Vulkan header.
 target_include_directories(lodestone PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/client/include"

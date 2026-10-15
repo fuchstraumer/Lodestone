@@ -24,7 +24,7 @@ function(add_lodestone_unit_test NAME)
     add_test(NAME ${NAME} COMMAND ${NAME} ${UNIT_TEST_TEST_ARGS})
     copy_slang_dlls_to_target(${NAME})
 endfunction()
-# The same driver, on the probe module that phase E step E0a needed. `EntryPointParams.slang`
+# The same driver, on the probe module added for the entry point scope walk. `EntryPointParams.slang`
 # declares a `uniform` parameter on two of its three entry points. A cooker that reads the global
 # scope alone gives those parameters no binding, and the cross-check then fails the cook.
 #
@@ -36,7 +36,7 @@ add_lodestone_unit_test(EntryPointParamsCookTest CookTest.cpp
               --target=spirv
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/EntryPointParams.slang")
-# The same driver, on the probe module that phase E step E0b needed. `ParameterBlocks.slang` declares
+# The same driver, on the probe module added for the parameter block walk. `ParameterBlocks.slang` declares
 # a block of resources, a block of ordinary data, a block inside a block, and a block on each of two
 # entry points. Slang describes a block with descriptor ranges alone, so a cooker that walks the
 # binding ranges gives every content of every block no binding at all.
@@ -46,11 +46,11 @@ add_lodestone_unit_test(ParameterBlocksCookTest CookTest.cpp
               --target=spirv
               --verify-deterministic
               "${CMAKE_SOURCE_DIR}/tests/assets/ParameterBlocks.slang")
-# The same driver, on the module that phase E step E7 needed. `InterfaceAxisTest.slang` declares an
+# The same driver, on the module added with interface axes. `InterfaceAxisTest.slang` declares an
 # interface axis: an `extern struct SHADE_MODE : IShadeMode` that a per-variant `export struct` makes
 # concrete. Its three implementations are tagged `ls_axis_interface_impl` and reach the module through
 # an `__include`d fragment, so the axis read must recurse and match the extern to the impls by
-# conformance. Crossed with the boolean axis it is a real product of six variants. Exit code 0 states
+# conformance. Crossed with the boolean axis it is a real product of six variants. Exit code 0 means
 # that every variant linked, the cross-check agreed, both round trips read back, and two cooks matched.
 add_lodestone_unit_test(InterfaceAxisCookTest CookTest.cpp
     TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/interface_axis_output"
@@ -84,14 +84,14 @@ add_lodestone_unit_test(KitchenSinkCookTest CookTest.cpp
               "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KsMaterial.slang"
               "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KsVolume.slang"
               "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KsPost.slang")
-# The one test in this suite that asserts a cook FAILS. Phase E step E0c needed it.
+# The one test in this suite that asserts a cook FAILS.
 #
-# Every other cook test states that a good module cooks. A check that never fires and a check that
+# Every other cook test checks that a good module cooks. A check that never fires and a check that
 # always fires both leave those tests green, so only a module that must fail can separate them.
-# The table in the source holds a control row for that reason.
+# The table in the source contains a control row for that reason.
 #
 # CMake writes the asset directory in, so the test needs no command line and the run-tests script
-# can run it directly. The table names a file inside that directory, so a later rejection costs one
+# can run it directly. The table refers to a file inside that directory, so a later rejection costs one
 # module and one line, and no new target.
 add_lodestone_unit_test(AccessModelRejectTest AccessModelRejectTests.cpp)
 target_compile_definitions(AccessModelRejectTest PRIVATE

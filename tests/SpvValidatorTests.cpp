@@ -38,7 +38,7 @@ using lodestone::SpvValidator;
 namespace
 {
 
-// The interface list holds a builtin (gl_GlobalInvocationID), which has no DescriptorSet. The validator must
+// The interface list contains a builtin (gl_GlobalInvocationID), which has no DescriptorSet. The validator must
 // skip it, not read it as set 0 binding 0.
 constexpr std::string_view k_ShadeCs = R"(
                OpCapability Shader

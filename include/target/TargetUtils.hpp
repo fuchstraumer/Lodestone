@@ -14,7 +14,8 @@ struct ReflectedBinding;
 /** Removes the numeric suffix Slang appends to an emitted identifier (`IfftParams` ->
  * `IfftParams_0`), so comparison is on locations first and on de-mangled names second. */
 std::string_view StripSlangNameMangling(std::string_view mangled_name) noexcept;
-/** The name the WGSL emitter gives a scoped binding: `<scope>_<name>`. Only `WgslValidator` uses it. */
+/** Returns the name the WGSL emitter uses for a scoped binding: `<scope>_<name>`. Only used by
+ * `WgslValidator`. */
 std::string MakeScopedName(const ReflectedBinding& binding);
 
 }

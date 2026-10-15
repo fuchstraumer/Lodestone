@@ -15,9 +15,9 @@ namespace lodestone
 
 /** One point between two stages that a cook can write out as JSON.
  *
- * A dump is a diagnostic, not a shipped format. It has no version field and nothing reads it back.
- * Every check that uses one is a byte comparison: against a golden file, or against the second cook
- * that `--verify-deterministic` runs.*/
+ * Dumps are diagnostics, not a shipped format. They have no version field, and nothing reads them back.
+ * Every check that uses them is a byte comparison, either against a golden file or against the second
+ * cook that `--verify-deterministic` runs. */
 enum class StageDumpKind : uint8_t
 {
     Invalid = 0,

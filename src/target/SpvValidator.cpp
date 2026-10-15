@@ -37,7 +37,7 @@ namespace
         // uses, in every storage class. It is not sorted.
         std::vector<uint32_t> Interfaces;
         bool LocalSizeFromIds{ false };
-        // holds the LocalSize directly, or the IDs of the size constants otherwise
+        // stores the LocalSize directly, or the IDs of the size constants otherwise
         uint32_t LocalSizeX{ 0u };
         uint32_t LocalSizeY{ 0u };
         uint32_t LocalSizeZ{ 0u };
@@ -66,8 +66,9 @@ namespace
         std::string_view Name;
     };
 
-    /** How an id holds a value. Only a `Spec` record with a SpecId is a pipeline input. `SpecDerived` is an
-     * expression over other constants (OpSpecConstantOp, OpSpecConstantComposite), with no value here. */
+    /** How an id defines its value. Only `Spec` records with a SpecId are pipeline inputs. `SpecDerived`
+     * values are expressions over other constants (OpSpecConstantOp, OpSpecConstantComposite), so they
+     * have no value here. */
     enum class ConstantKind : uint8_t
     {
         None = 0,
@@ -102,7 +103,7 @@ namespace
         // OpTypeInt / OpTypeFloat
         uint32_t ScalarWidth{ 0u };
         bool ScalarSigned{ false };
-        // OpTypeArray / OpTypeRuntimeArray. LengthId names a constant, and is 0 for a runtime array.
+        // OpTypeArray / OpTypeRuntimeArray. LengthId is the id of a constant, and 0 for a runtime array
         uint32_t ElementType{ 0u };
         uint32_t LengthId{ 0u };
         uint32_t ArrayStride{ 0u };
@@ -138,8 +139,8 @@ namespace
 
     void ApplyPendingMembers(ParseState& parse_state);
 
-    /** One resource the SPIR-V declares for the entry point, classified from its variable, pointer, and
-     * pointee records. `Unsupported` names a form this validator does not read yet. */
+    /** One resource that the SPIR-V declares for the entry point, classified from its variable, pointer,
+     * and pointee records. `Unsupported` marks a form that this validator does not read yet. */
     struct DeclaredBinding
     {
         uint32_t Group{ 0u };
@@ -639,8 +640,8 @@ namespace
         case spv::Op::OpSpecConstantOp:
         case spv::Op::OpSpecConstantComposite:
             // an expression over other constants: no value and no SpecId. SPIRV-Tools-opt can fold these
-            // (CreateFreezeSpecConstantValuePass, CreateFoldSpecConstantOpAndCompositePass) when phase F
-            // needs the numbers.
+            // (CreateFreezeSpecConstantValuePass, CreateFoldSpecConstantOpAndCompositePass) once we need
+            // the numbers
             parseState->Ids[resultId].Constant = ConstantKind::SpecDerived;
             break;
         case spv::Op::OpFunction:
@@ -763,9 +764,9 @@ namespace
         return declared;
     }
 
-    /** The shape and the access are compared only where both sides state them. SPIR-V states the shape of
-     * an image only. It states the access of a storage buffer and a storage image only: reflection writes
-     * ReadOnly on every sampled texture, and SPIR-V has no word for that. */
+    /** Shape and access are only compared where both sides record them. SPIR-V only records the shape of
+     * images, and only records the access of storage buffers and storage images. Reflection writes ReadOnly
+     * on every sampled texture, and SPIR-V has no equivalent for that. */
     bool ShapeIsStated(BindingKind kind) noexcept
     {
         return (kind == BindingKind::Texture) || (kind == BindingKind::StorageTexture);
@@ -776,9 +777,10 @@ namespace
         return (kind == BindingKind::StorageBuffer) || (kind == BindingKind::StorageTexture);
     }
 
-    /** SPIR-V names a scoped variable with dots (`Surface.Material.Albedo`). Reflection joins a scope with
-     * underscores, which is the WGSL spelling (`todo.md` holds the scope question). Set and binding already
-     * agree when this runs, so the last segment is enough to find a wrong resource at the right slot. */
+    /** SPIR-V names scoped variables with dots (`Surface.Material.Albedo`). Reflection joins scopes with
+     * underscores, as WGSL does (the scope question is open in `todo.md`). Set and binding already match
+     * when this runs, so comparing the last segment is enough to catch a wrong resource at the right
+     * location. */
     std::string_view LastNameSegment(std::string_view spirv_name) noexcept
     {
         const size_t lastDot = spirv_name.rfind('.');

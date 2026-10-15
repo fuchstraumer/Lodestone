@@ -27,7 +27,7 @@
 // The query surface (`ManifestIndex` + `ManifestQueryBuilder`) is the one client object a renderer
 // drives by hand, so it must reject a bad query with an error, never a crash. This test builds a
 // manifest inline through the real emitter, so it exercises the true emit -> read -> query path with
-// no asset and no compiler. The module carries one axis of each value domain: a Boolean axis, an Enum
+// no asset and no compiler. The module has one axis of each value domain: a Boolean axis, an Enum
 // axis (with explicit non-ascending case values), an Integral axis, and a Type axis. The full cross
 // product is 2 * 3 * 3 * 2 = 36 variants, and the keys pack densely to 0..35.
 
@@ -261,7 +261,7 @@ std::vector<std::byte> BuildManifestBytes()
     return BuildManifest(&KeepAll, &AllActive);
 }
 
-// Opens one environment of a bundle. The views hold spans into `bytes`, so the bytes must outlive them.
+// Opens one environment of a bundle. The views contain spans into `bytes`, so the bytes must outlive them.
 ManifestResult<EnvironmentView> OpenEnvironment(std::span<const std::byte> bytes,
                                                 uint32_t profile_index,
                                                 uint32_t module_index)
@@ -605,7 +605,7 @@ int main()
         runner.Check(gatedOff.IsValid(), "the gated-off combination uses two valid values");
         runner.Check(KeyCount(gatedOff) == 0u, "yet it names no variant");
 
-        // The gated-off variants hold SHADE at its default digit (Lambert), but SHADE is inactive there.
+        // The gated-off variants store SHADE at its default digit (Lambert), but SHADE is inactive there.
         // A digit test alone returns them for a Lambert query. The axis-active mask removes them.
         runner.Check(KeyCount(gated.Query().Where("SHADE", AxisValueDomain::Type, "Lambert")) == 9u,
                      "a gated axis at its default value matches only where the axis is active");

@@ -27,8 +27,8 @@ struct QueryAxisValue
     // for Interface axes, the name of the specific implementation
     // for Enum axes, the name of the specific case
     std::string_view Name;
-    /** @brief Decode output only. False when the variant does not use this axis. The value is then the
-     * canonical default, which the key packs but the shader never reads. `==` ignores this field. */
+    /** @brief Only set by decoding. False when the variant does not use this axis: the value is then the
+     * canonical default, which is packed into the key but never read by the shader. Not compared by `==`. */
     bool Active{ true };
 
     constexpr bool operator==(const QueryAxisValue& other) const noexcept
@@ -157,10 +157,11 @@ private:
     std::vector<QueryAxisRange> constraints;
 };
 
-/** @brief The accepted name nearest to a mistyped one, or empty when no name is near enough. The query
-  * errors use this to fill `QueryError::Suggestion`, so a renderer that rejects a name of its own (a binding,
-  * an entry point) gives the same "did you mean" as a query. The budget is one edit per three characters
-  * of `input`, and at least one edit. The result is a view into `candidates`. */
+/** @brief Returns the candidate closest to a mistyped name, or an empty view when none is close enough.
+  * The query errors use this to fill `QueryError::Suggestion`. Renderers can use it for their own names
+  * (bindings, entry points), so that every "did you mean" suggestion follows the same rule. The edit budget
+  * is one edit per three characters of `input`, with a minimum of one. The result is a view into
+  * `candidates`. */
 [[nodiscard]] std::string_view NearestName(std::string_view input, std::span<const std::string_view> candidates) noexcept;
 
 /** @brief This object represents an "index" in the database and relational query sense,
@@ -168,8 +169,8 @@ private:
   * interface to simply retrieve all keys and related data - to precache pipelines or layouts
   * - while querying for concrete subsets based on permutation values is left to the query
   * objects spawned by the index.
-  * @note An index reads one environment: one module, cooked for one profile. Variant keys are per
-  * module, and each profile can cook a different subset of them, so a query always names both. */
+  * @note Each index reads one environment: one module, cooked for one profile. Variant keys are per
+  * module, and each profile can cook a different subset of them, so a query needs both. */
 class ManifestIndex
 {
 public:
@@ -184,10 +185,11 @@ public:
     [[nodiscard]] std::vector<DecodedVariant> Enumerate() const;
     /** @brief Opens a new query, used to retrieve specific variants for actual runtime rendering or use */
     [[nodiscard]] ManifestQueryBuilder Query() const noexcept;
-    /** @brief The axis names of this module, in axis order. Use them to build a query UI or a preset. */
+    /** @brief Returns the axis names of this module, in axis order. This is useful for building a query UI
+      * or a preset. */
     [[nodiscard]] std::vector<std::string_view> AxisNames() const;
-    /** @brief Every value one axis declares, in digit order, or `UnknownAxis`. A value is declared even when
-      * this environment cooked no variant that uses it. */
+    /** @brief Returns every value declared by one axis, in digit order, or `UnknownAxis`. Values are listed
+      * even when this environment cooked no variant that uses them. */
     [[nodiscard]] QueryResult<std::vector<QueryAxisValue>> AxisValues(std::string_view axis_name) const;
 
 private:
@@ -213,7 +215,8 @@ private:
       * that's better bounded based on the input constraints, to reduce iteration complexity. */
     [[nodiscard]] std::span<const VariantKey> filterKeys(std::span<const ScanConstraint> constraints) const;
     /** @brief True when every constraint allows the key's digit, and its axis is active in the variant.
-      * An inactive axis holds its canonical default digit, so the digit test alone over-returns. */
+      * Inactive axes store their canonical default digit, so testing the digit alone matches too many
+      * variants. */
     [[nodiscard]] bool matches(uint32_t variant_index,
                                VariantKey key,
                                std::span<const ScanConstraint> constraints) const noexcept;
@@ -221,14 +224,14 @@ private:
     [[nodiscard]] std::vector<VariantKey> scan(std::span<const ScanConstraint> constraints) const;
     /** @brief The digit of one axis in a key, in the mixed radix of this module. */
     [[nodiscard]] uint32_t digitOf(VariantKey key, uint32_t axis_index) const noexcept;
-    /** @brief The axes whose digit differs between two of the keys, in axis order. Two distinct keys differ
-      * in at least one digit, so more than one key always gives at least one axis. */
+    /** @brief Returns the axes whose digit differs between any two of the keys, in axis order. Distinct keys
+      * differ in at least one digit, so the result is never empty for two or more keys. */
     [[nodiscard]] std::vector<uint32_t> varyingAxes(std::span<const VariantKey> keys) const;
 
     [[nodiscard]] std::vector<std::string_view> stringTableForAxis(uint32_t axis_index) const;
     manifest::EnvironmentView environment;
-    /** @brief The values each module axis uses, in digit order. A module axis selects its values from a
-     * root axis through a mask, so they are not one contiguous run of the root table. */
+    /** @brief The values used by each module axis, in digit order. Module axes select their values from a
+     * root axis through a mask, so these are not one contiguous run of the root table. */
     std::vector<std::vector<AxisValueType>> axisValues;
     std::vector<uint32_t> radices;
     std::vector<uint64_t> placeValues;

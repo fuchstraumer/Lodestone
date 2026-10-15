@@ -320,7 +320,7 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
         return std::nullopt;
     }
 
-    // Confirm the axis actually declares the requested value. A Boolean axis always holds both
+    // Confirm the axis actually declares the requested value. A Boolean axis always contains both
     // 0 and 1, so only Type and Integral/Enum axes need the lookup.
     // we use just linear searches here bc the value vectors should, at MOST, be ~1 dozen entries
     if (axis.Domain == AxisValueDomain::Type || axis.Domain == AxisValueDomain::Enum)
@@ -443,7 +443,7 @@ const manifest::EnvironmentView& ManifestIndex::View() const noexcept
 
 std::vector<QueryAxisValue> ManifestIndex::Decode(VariantKey key) const
 {
-    // scratch holds the indices for each value in the manifest, sized to the 
+    // scratch stores the indices for each value in the manifest, sized to the 
     // count of axes (so, radices.size())
     std::vector<uint32_t> scratch(radices.size());
     UnpackVariantKey(key, radices, scratch);

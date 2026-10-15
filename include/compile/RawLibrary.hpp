@@ -26,8 +26,8 @@
 namespace lodestone
 {
 
-/** Placement is vocabulary rather than a stage 3 idea, so it lives on the data schema and stage 4
- * carries it across without flattening it. */
+/** Placement is shared vocabulary rather than a stage 3 concept, so it is defined in the data schema, and
+ * stage 4 passes it through unchanged. */
 using RawPlacement = ResourcePlacement;
 
 enum class RawSizeAttributeKind : uint8_t

@@ -420,8 +420,8 @@ void CheckCookedDump(lodestone::tests::TestRunner& runner)
     runner.Check(dump == second, "two dumps of one module agree byte for byte");
 }
 
-/** Stage 6 has a boundary type as of D8, so `interned` is no longer a name that parses and writes
- * nothing. The dump earns its place by showing the one thing the freeze destroys. */
+/** Stage 6 has its own boundary type (`InternedModule`), so the `interned` dump now writes real data.
+ * This dump is useful because it shows the provenance that the freeze discards. */
 void CheckInternedDump(lodestone::tests::TestRunner& runner)
 {
     runner.BeginSection("interned dump");

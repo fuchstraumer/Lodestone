@@ -169,8 +169,9 @@ void TestValidationAgainstSpace(TestRunner& runner)
 
 } // namespace
 
-// The policy is opt-in (phase F decision O4). A module with no entry, or an entry with no targets table, has
-// no opinion. Only a module that states a policy for some target and not the cooked one is suspicious.
+// The policy is opt-in. Modules with no entry, or with an entry that has no targets
+// table, apply no policy. Only modules that declare a policy for some other target, but not for the cooked
+// one, are suspicious.
 void TestTargetCoverage(TestRunner& runner)
 {
     runner.BeginSection("target coverage");

@@ -20,9 +20,9 @@
 
 
 // Stage 4 is a pure function of a `RawVariant` and a symbol table. This test is the proof of that
-// claim: it links against no Slang type, it reads no asset, and it runs in milliseconds. Before phase
-// D step D5 nobody could write it, because the arithmetic lived inside the file that talks to the
-// compiler.
+// claim: it links against no Slang type, it reads no asset, and it runs in milliseconds. This test could
+// not be written before stage 3 and stage 4 were separated, because the arithmetic used to live inside
+// the file that talks to the compiler.
 //
 // Every buffer size the engine allocates comes out of this arithmetic, so a wrong answer here is a
 // wrong allocation with no other symptom. That is why the rejections get as much surface as the
@@ -58,7 +58,7 @@ using lodestone::tests::TestRunner;
 namespace
 {
 
-// The axes and the defaults are file scope because `ResolveContext` holds `std::string_view` names.
+// The axes and the defaults are file scope because `ResolveContext` stores `std::string_view` names.
 // The strings must outlive every context this file builds.
 const PermutationSpace k_Space{ { PermutationAxis{ "IFFT_SIZE",
                                                    { PermutationValue{ 256u }, PermutationValue{ 512u } },
@@ -110,7 +110,7 @@ RawSizeAttribute MakeAttribute(RawSizeAttributeKind kind, std::vector<std::strin
     return RawSizeAttribute{ .BindingIndex = 0u, .Kind = kind, .Arguments = std::move(arguments) };
 }
 
-/** Resolves a variant that carries one annotation, and gives back the derived size of binding 0. */
+/** Resolves a variant with one annotation, and returns the derived size of binding 0. */
 CookResult<lodestone::ResourceFootprint> ResolveOneAttribute(RawSizeAttribute attribute, DiagnosticSink& sink)
 {
     RawVariant variant = MakeVariantWithOneBuffer();

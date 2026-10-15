@@ -1001,8 +1001,8 @@ bool LayoutRange::Empty() const noexcept
 
 ResolvedResource LayoutRange::operator[](uint32_t position) const noexcept
 {
-    // A visibility entry is a position in the resource list of the variant, and the footprint list has
-    // the same order. This is the one place that resolves that chain.
+    // visibility entries are positions in the variant's resource list, and the footprint list has the
+    // same order. this is the only place that resolves that chain
     const uint32_t local = visible[position];
     // recall that footprints can be null, this is expected behavior - some resources may not have compile-time sizing info
     const Footprint* footprint = local < footprints.size() ? &footprints[local] : nullptr;
@@ -1163,8 +1163,8 @@ namespace
         return count;
     }
 
-    /** True when two resources at one placement can share one layout entry. The fields are the ones a bind
-     * group layout entry or a descriptor set layout binding reads. The names do not take part. */
+    /** True when two resources at one placement can share one layout entry. Compares the fields read by a
+     * bind group layout entry or a descriptor set layout binding. Names are not compared. */
     bool SameLayoutBinding(const ResolvedResource& lhs, const ResolvedResource& rhs) noexcept
     {
         // one binding record: the same environment and the same resource, so we can shortcut
@@ -1524,7 +1524,7 @@ namespace
             return { .Code = ErrorCode::SizeMismatch, .Detail = static_cast<uint32_t>(parsed.HeaderSize) };
         }
 
-        // A caller can hold the header region alone, or the whole file. Anything past the file is wrong.
+        // the span can contain only the header region, or the whole file. anything past the file is invalid
         if (span_size < parsed.HeaderSize)
         {
             return { .Code = ErrorCode::TooSmall, .Detail = static_cast<uint32_t>(span_size) };
@@ -1596,8 +1596,8 @@ namespace
 
     ErrorState ValidateAxes(const Header& parsed, std::span<const std::byte> bytes) noexcept
     {
-        // Each axis names a string and owns a run of values in the axis value table. A literal value has
-        // nothing to reference, so only the name, the run, and a named value need checking.
+        // each axis stores a name string and a run in the axis value table. literal values reference
+        // nothing, so we only check the name, the run, and named values
         const std::span<const Axis> axisSpan = Map<Axis>(bytes, parsed.Axes);
         const std::span<const AxisValueType> allAxesValueSpan = Map<AxisValueType>(bytes, parsed.AxesValues);
         for (uint32_t i = 0; i < axisSpan.size(); ++i)
@@ -1762,7 +1762,7 @@ namespace
                              .Detail = moduleAxis.AxisIndex };
                 }
 
-                // An empty mask gives the axis a radix of zero, and a bit past the root values selects nothing.
+                // an empty mask would give the axis a radix of zero, and a bit past the root values selects nothing
                 const uint32_t valueCount = axisSpan[moduleAxis.AxisIndex].ValueCount;
                 const bool maskPastValues = valueCount < 32u && (moduleAxis.LiveValuesMask >> valueCount) != 0u;
                 if (moduleAxis.LiveValuesMask == 0u || maskPastValues)
@@ -1792,8 +1792,8 @@ namespace
                 continue;
             }
 
-            // An extent starts past the header region, on an 8-byte boundary, and stays inside the file. It
-            // checks against the size the header states, because the span may hold the header region alone.
+            // extents start past the header region, on an 8-byte boundary, and stay inside the file. we check
+            // against the file size from the header, because the span may contain only the header region
             const bool valid = entry.ExtentOffset >= parsed.HeaderSize && (entry.ExtentOffset % 8u) == 0u &&
                                entry.ExtentSize >= sizeof(EnvironmentHeader) &&
                                entry.ExtentOffset <= parsed.FileSize &&
@@ -1864,7 +1864,7 @@ namespace
     {
         const EnvironmentHeader& environment = context.Environment;
         const std::span<const SourceRef> sourceSpan = Map<SourceRef>(context.Extent, environment.Sources);
-        // A SPIR-V source is read as words, so the blob, each offset, and each length must be multiples of 4.
+        // SPIR-V sources are read as words, so the blob, each offset, and each length must be multiples of 4
         const bool readAsWords = context.CodeFormat == ShaderCodeFormat::Spirv;
         if (readAsWords && (environment.SourceBlob.Offset % sizeof(uint32_t)) != 0u)
         {
@@ -2101,7 +2101,7 @@ namespace
             {
                 const std::span<const uint32_t> slotVisibilityIndices =
                     RunOf(visibilityLists, visibilityIndices, slot.Visibility);
-                // absolute offset of this run into the visibility index table, so a bad entry names its row
+                // absolute offset of this run into the visibility index table, so errors can report the row
                 const uint32_t runOffset = static_cast<uint32_t>(slotVisibilityIndices.data() - visibilityIndices.data());
 
                 // The placement order is checked for each instance, not once for each visibility list: an

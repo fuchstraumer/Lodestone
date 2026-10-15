@@ -85,10 +85,10 @@ namespace
         }
         writer.EndArray();
 
-        // An enum axis carries the integer tag of each case, in declaration order. The values array
-        // above holds the case names, like a Type axis, so this parallel array is the only place a
-        // dump records what the reflection read of the enum tag produced. A known-good baseline pins
-        // it, which is the end-to-end check that the EnumTagDecode unit test cannot give alone.
+        // enum axes store the integer tag of each case, in declaration order. the values array above
+        // contains the case names, like a Type axis, so this parallel array is the only place a dump
+        // records the enum tags read from reflection. the known-good baseline pins it, which gives us
+        // the end-to-end check that the EnumTagDecode unit test cannot provide on its own
         if (axis.ValueDomain == AxisValueDomain::Enum)
         {
             writer.Key("enumCaseValues");
