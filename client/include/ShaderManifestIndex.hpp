@@ -62,7 +62,8 @@ enum class QueryErrorCode : uint8_t
     ValueNotInAxis,
     IncorrectValueDomain, // e.g, tried to use a uint with a bool axis
     EmptyConstraintSet, // you can't provide an empty value set to a constraint function
-    NoVariantForConstraints, // if query.First() returns invalid variant, it's bc the constraints are invalid
+    NoVariantForConstraints, // Single() matched no variant
+    AmbiguousVariant, // Single() matched more than one variant. AxisName lists the axes that still vary
     Count
 };
 
@@ -125,6 +126,13 @@ struct ManifestQueryBuilder
     /** @brief If you've already built Keys(), then this will be a (slightly) cheaper way to get the variants 
       * Returns without using QueryResult because Keys() can fail, but Variants() cannot. */
     [[nodiscard]] std::vector<DecodedVariant> VariantsFromKeys(const std::vector<VariantKey>& keys) const noexcept;
+    /** @brief The one variant the query names. A query will only return a result if it has *exactly* one
+      * matching variant.
+      * @return The key when exactly one variant matches. Otherwise the error: the first builder error, with
+      * its suggestion; `NoVariantForConstraints` for no match; or `AmbiguousVariant` for more than one.
+      * @note `AmbiguousVariant` puts the varying axis names in `AxisName` ("A, B", in axis order) and the match
+      * count in `Detail`.  */
+    [[nodiscard]] std::expected<VariantKey, QueryError> Single() const noexcept;
 
     [[nodiscard]] bool IsValid() const noexcept;
     [[nodiscard]] std::span<const QueryError> Errors() const noexcept;
@@ -148,6 +156,12 @@ private:
     // Kept in insertion order here; Select sorts the derived scan constraints by axis index.
     std::vector<QueryAxisRange> constraints;
 };
+
+/** @brief The accepted name nearest to a mistyped one, or empty when no name is near enough. The query
+  * errors use this to fill `QueryError::Suggestion`, so a renderer that rejects a name of its own (a binding,
+  * an entry point) gives the same "did you mean" as a query. The budget is one edit per three characters
+  * of `input`, and at least one edit. The result is a view into `candidates`. */
+[[nodiscard]] std::string_view NearestName(std::string_view input, std::span<const std::string_view> candidates) noexcept;
 
 /** @brief This object represents an "index" in the database and relational query sense,
   * returning objects used to actually run queries for VariantKey values. It offers an 
@@ -205,6 +219,11 @@ private:
                                std::span<const ScanConstraint> constraints) const noexcept;
     void markInactiveAxes(uint32_t variant_index, std::span<QueryAxisValue> values) const noexcept;
     [[nodiscard]] std::vector<VariantKey> scan(std::span<const ScanConstraint> constraints) const;
+    /** @brief The digit of one axis in a key, in the mixed radix of this module. */
+    [[nodiscard]] uint32_t digitOf(VariantKey key, uint32_t axis_index) const noexcept;
+    /** @brief The axes whose digit differs between two of the keys, in axis order. Two distinct keys differ
+      * in at least one digit, so more than one key always gives at least one axis. */
+    [[nodiscard]] std::vector<uint32_t> varyingAxes(std::span<const VariantKey> keys) const;
 
     [[nodiscard]] std::vector<std::string_view> stringTableForAxis(uint32_t axis_index) const;
     manifest::EnvironmentView environment;

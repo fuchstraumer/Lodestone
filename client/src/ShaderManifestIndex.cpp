@@ -37,16 +37,14 @@ namespace
             QueryAxisValue{ .Type = AxisValueDomain::Boolean, .IntegralValue = 1u, .Name = axis_name }
         };
     }
+}
 
-    // The nearest accepted name to a mistyped one, or empty when nothing is close enough. The distance
-    // budget follows clang and rust: one edit per three characters, and at least one.
-    std::string_view NearestName(std::string_view input,
-                                 std::span<const std::string_view> candidates) noexcept
-    {
-        const int32_t maxDistance = std::max<int32_t>(1, static_cast<int32_t>(input.size() / 3u));
-        const std::vector<Suggestion> suggestions = FindSuggestions(input, candidates, maxDistance);
-        return suggestions.empty() ? std::string_view{} : suggestions.front().Text;
-    }
+std::string_view NearestName(std::string_view input, std::span<const std::string_view> candidates) noexcept
+{
+    // The distance budget follows clang and rust: one edit per three characters, and at least one.
+    const int32_t maxDistance = std::max<int32_t>(1, static_cast<int32_t>(input.size() / 3u));
+    const std::vector<Suggestion> suggestions = FindSuggestions(input, candidates, maxDistance);
+    return suggestions.empty() ? std::string_view{} : suggestions.front().Text;
 }
 
 ManifestQueryBuilder::ManifestQueryBuilder(const class ManifestIndex& _index) noexcept : index(&_index)
@@ -236,6 +234,41 @@ std::vector<DecodedVariant> ManifestQueryBuilder::VariantsFromKeys(const std::ve
         results.emplace_back(key, index->Decode(key));
     }
     return results;
+}
+
+std::expected<VariantKey, QueryError> ManifestQueryBuilder::Single() const noexcept
+{
+    if (!errors.empty())
+    {
+        // the whole first error, not only its code, so the suggestion reaches the caller
+        return std::unexpected(errors.front());
+    }
+
+    const std::vector<VariantKey> keys = index->select(constraints);
+    if (keys.empty())
+    {
+        return std::unexpected(QueryError{ .Code = QueryErrorCode::NoVariantForConstraints });
+    }
+    else if (keys.size() == 1u)
+    {
+        return keys.front();
+    }
+
+    // more than one match: name every axis the caller must still pin
+    const manifest::ModuleView& module = index->environment.Module();
+    std::string varyingNames;
+    for (const uint32_t axisIndex : index->varyingAxes(keys))
+    {
+        if (!varyingNames.empty())
+        {
+            varyingNames += ", ";
+        }
+        varyingNames += index->environment.String(module.AxisData(axisIndex).NameString);
+    }
+
+    return std::unexpected(QueryError{ .Code = QueryErrorCode::AmbiguousVariant,
+                                       .AxisName = std::move(varyingNames),
+                                       .Detail = static_cast<uint32_t>(keys.size()) });
 }
 
 bool ManifestQueryBuilder::IsValid() const noexcept
@@ -668,17 +701,37 @@ bool ManifestIndex::matches(uint32_t variant_index,
                             VariantKey key,
                             std::span<const ScanConstraint> constraints) const noexcept
 {
-    const uint64_t keyValue = std::to_underlying(key);
     auto matchFn = [&](const ScanConstraint& constraint) -> bool
     {
-        // the digit of this axis, in the mixed radix of the key
-        const uint32_t digit =
-            static_cast<uint32_t>((keyValue / placeValues[constraint.AxisIndex]) % radices[constraint.AxisIndex]);
+        const uint32_t digit = digitOf(key, constraint.AxisIndex);
         return std::ranges::contains(constraint.AllowedValueIndices, digit) &&
                environment.IsAxisActive(variant_index, constraint.AxisIndex);
     };
 
     return std::ranges::all_of(constraints, matchFn);
+}
+
+uint32_t ManifestIndex::digitOf(VariantKey key, uint32_t axis_index) const noexcept
+{
+    return static_cast<uint32_t>((std::to_underlying(key) / placeValues[axis_index]) % radices[axis_index]);
+}
+
+std::vector<uint32_t> ManifestIndex::varyingAxes(std::span<const VariantKey> keys) const
+{
+    std::vector<uint32_t> result;
+    for (uint32_t axisIndex = 0u; std::cmp_less(axisIndex, radices.size()); ++axisIndex)
+    {
+        const uint32_t firstDigit = digitOf(keys.front(), axisIndex);
+        auto differsFromFirst = [&](VariantKey key) -> bool
+        {
+            return digitOf(key, axisIndex) != firstDigit;
+        };
+        if (std::ranges::any_of(keys, differsFromFirst))
+        {
+            result.push_back(axisIndex);
+        }
+    }
+    return result;
 }
 
 void ManifestIndex::markInactiveAxes(uint32_t variant_index, std::span<QueryAxisValue> values) const noexcept
