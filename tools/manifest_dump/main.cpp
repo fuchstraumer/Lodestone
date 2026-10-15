@@ -154,9 +154,7 @@ void WriteModuleAxes(lodestone::JsonWriter& writer, const manifest::ModuleView& 
         writer.KeyString("name", module.Bundle().String(axis.NameString));
         writer.KeyUInt("rootAxis", module.ModuleAxes()[axisIndex].AxisIndex);
         writer.KeyString("domain", magic_enum::enum_name(axis.Domain));
-        writer.Key("values");
-        writer.BeginArray();
-        for (uint32_t digit = 0u; digit < module.AxisValueCount(axisIndex); digit++)
+        auto writeValueAtDigit = [&](uint32_t digit)
         {
             const lodestone::AxisValueType value = module.AxisValue(axisIndex, digit);
             if (namedValues)
@@ -167,8 +165,16 @@ void WriteModuleAxes(lodestone::JsonWriter& writer, const manifest::ModuleView& 
             {
                 writer.Int(static_cast<int64_t>(value));
             }
+        };
+        writer.Key("values");
+        writer.BeginArray();
+        for (uint32_t digit = 0u; digit < module.AxisValueCount(axisIndex); digit++)
+        {
+            writeValueAtDigit(digit);
         }
         writer.EndArray();
+        writer.Key("default");
+        writeValueAtDigit(module.AxisDefaultDigit(axisIndex));
         writer.EndObject();
     }
     writer.EndArray();

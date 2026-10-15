@@ -21,7 +21,8 @@ earlier update. Git history holds the full text.
 - Phases D and E are complete. E8 closed Phase E. Their plans were removed on 2026-10-14. Read them
   from history: `git show e113d8c:docs/phase-e-data-driven-permutations.md` (§11a holds the final
   measurements).
-- The manifest is one bundle for each cook, format version 7. Version 7 added `Profile::CodeFormat`. `CLAUDE.md` ("One output form") holds the
+- The manifest is one bundle for each cook, format version 8. Version 7 added `Profile::CodeFormat`, and
+  version 8 added `ModuleAxis::DefaultDigit` (2026-10-15, task L15). `CLAUDE.md` ("One output form") holds the
   layout.
 - The client reads the bundle through `BundleView`, `ModuleView`, `EnvironmentView`, and the view types
   (`VariantView`, `EntryPointInstanceView`, `LayoutRange`, `ResolvedResource`, `UniformMemberRange`).

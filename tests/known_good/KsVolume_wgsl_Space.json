@@ -15,6 +15,7 @@
                 "QualityTier::High",
                 "QualityTier::Ultra"
             ],
+            "default": "QualityTier::Low",
             "enumCaseValues": [
                 3,
                 1,
@@ -33,6 +34,7 @@
                 "64",
                 "128"
             ],
+            "default": "32",
             "activeWhen": null
         },
         {
@@ -44,6 +46,7 @@
                 "false",
                 "true"
             ],
+            "default": "true",
             "activeWhen": null
         },
         {
@@ -56,6 +59,7 @@
                 "32",
                 "64"
             ],
+            "default": "32",
             "activeWhen": "USE_WAVE_OPS == 1"
         },
         {
@@ -67,6 +71,7 @@
                 "false",
                 "true"
             ],
+            "default": "false",
             "activeWhen": null
         },
         {
@@ -79,6 +84,7 @@
                 "ValueNoise",
                 "WorleyNoise"
             ],
+            "default": "ValueNoise",
             "activeWhen": null
         }
     ],

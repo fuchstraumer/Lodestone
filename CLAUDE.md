@@ -95,10 +95,11 @@ it exits 1 on `NoOutputSpecified`, which reads like a failure rather than a usag
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
-Twenty-four test targets exist. Nineteen are unit tests, and each one proves a claim the repository
+Twenty-five test targets exist. Twenty are unit tests, and each one proves a claim the repository
 makes. Eighteen need no Slang and no asset, and together they run in about half a second.
-`WgslValidatorTest` links Tint to read WGSL. `SpvValidatorTest` links SPIRV-Tools to assemble SPIR-V. `AccessModelRejectTest` cooks two small modules through
-Slang, and it takes about one second.
+`WgslValidatorTest` links Tint to read WGSL. `SpvValidatorTest` links SPIRV-Tools to assemble SPIR-V.
+`AccessModelRejectTest` and `AxisDefaultTest` cook small modules through Slang, and each takes about one
+second.
 
 | Target | Proves |
 |---|---|
@@ -115,6 +116,7 @@ Slang, and it takes about one second.
 | `DedupeInfluenceTest` | Dedup changes what the tables cost and never what the cook measures. It builds one module in both arms and checks that the axis influence agrees, and that the measurement reads every group of variants. |
 | `DiagnosticParserTest` | The parser reads Slang's machine-readable diagnostic form into a record, and counts the records whose severity is a failure. Codegen reads that count. It names no Slang type, so it needs no compiler. |
 | `ResolveStageTest` | Stage 4 resolves a hand-built `RawVariant` with no Slang present. This test is the proof that the stage 3 and stage 4 split worked, and before phase D step D5 it could not be written at all. |
+| `AxisDefaultTest` | The declared default of each axis, from the shader initializer to `ManifestIndex::AxisDefault`. `tests/assets/AxisDefaults/AxisDefaults.slang` declares every default as a value other than the first, in all four domains, with a literal initializer (which reflection also reads, so the two readers are compared) and an expression initializer (which only the source text can read). It proves that a missing default and a default outside the declared values each fail the cook, and that a policy which drops the default cooks, keeps the default in the manifest, and leaves no variant for it. |
 | `AccessModelRejectTest` | The table of cooks that must fail. A pointer member under a bound access model, a reflection mismatch, and a codegen error each fail the cook with their own error. A control module still cooks. |
 | `PermutationConstraintTest` | The axis constraint engine. `ActiveWhen` gates an axis the way the old parent link did, `Require` prunes a forbidden combination, and the load check rejects a forward reference, an unknown symbol, and a malformed expression. |
 | `SuggestTest` | The nearest-name suggestion. It measures the edit distance between a mistyped name and the accepted names, and returns the closest one. The cooker and the client both use it for a name rejection. |
@@ -617,7 +619,15 @@ Two modules share a root axis when the name, kind, domain, and binding time agre
 values fit the root values in order. Otherwise the axis gets a root record of its own. A root axis is a
 storage and dedup optimization only: keys are per module, so no key crosses a module boundary.
 
-Each profile records its `ShaderCodeFormat` (format version 7). A SPIR-V source is read as words, so
+Each module axis records the default that the shader declares, as `ModuleAxis::DefaultDigit`, a digit of the
+module's own key (format version 8). It is per module and not on the root axis, because two modules can
+share a root axis and declare different defaults. The cook reads the default from the initializer text
+(the symbol table), and compares it with Slang reflection where reflection can read it: reflection returns
+literal initializers only, and never the `= Impl` of an `extern struct`. An axis with no readable default
+fails the cook. The declared default is not the canonical value: canonicalization still fills an unused
+axis with the first value (`PermutationAxis::GetCanonicalValue`), so the default does not change any key.
+
+Each profile records its `ShaderCodeFormat` (since format version 7). A SPIR-V source is read as words, so
 `Open` rejects a SPIR-V source that is not on a 4-byte boundary or not whole words. The sources are packed
 with no padding: every SPIR-V module is whole words, so each offset stays aligned. Codegen fails a SPIR-V
 payload that is not whole words or has no SPIR-V magic number.

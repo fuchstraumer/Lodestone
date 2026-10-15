@@ -111,6 +111,8 @@ PermutationSpace MakeSpace()
     const std::array<uint32_t, 3> tileValues{ 8u, 16u, 32u };
     axes.emplace_back("TILE", IntegralValues(tileValues), AxisKind::Tuning,
                       EarliestBindingTime::Cook, AxisValueDomain::Integral);
+    // the declared default is 16, not the first value, so the default cannot be confused with the canonical value
+    axes.back().SetDeclaredDefaultIndex(1u);
 
     axes.emplace_back("SHADE", OrdinalValues(2u, /*as_enum=*/false), AxisKind::Technique,
                       EarliestBindingTime::Cook, AxisValueDomain::Type,
@@ -377,6 +379,40 @@ int main()
         runner.Check(!index.AxisValues("TIEL").has_value() &&
                          index.AxisValues("TIEL").error() == QueryErrorCode::UnknownAxis,
                      "AxisValues reports an unknown axis");
+    }
+
+    runner.BeginSection("the index reads the declared default of each axis");
+    {
+        runner.Check(index.View().Module().AxisDefaultDigit(k_TileAxis) == 1u,
+                     "the module stores the default as a digit of its own key");
+        const lodestone::QueryResult<lodestone::QueryAxisValue> tileDefault = index.AxisDefault("TILE");
+        runner.Check(tileDefault.has_value() && tileDefault->IntegralValue == 16u,
+                     "AxisDefault returns the declared default, not the first value");
+        const lodestone::QueryResult<lodestone::QueryAxisValue> qualityDefault = index.AxisDefault("QUALITY");
+        runner.Check(qualityDefault.has_value() && qualityDefault->Name == "Low",
+                     "an axis declared with its first value as the default reads that value");
+        runner.Check(!index.AxisDefault("TIEL").has_value() &&
+                         index.AxisDefault("TIEL").error() == QueryErrorCode::UnknownAxis,
+                     "AxisDefault reports an unknown axis");
+
+        // damage the default digit of TILE so that it reaches past the axis radix
+        const ManifestResult<BundleView> bundle = BundleView::Open(bytes);
+        if (bundle.has_value())
+        {
+            const lodestone::manifest::ModuleView module = bundle->Module(0u);
+            const std::span<const lodestone::manifest::ModuleAxis> moduleAxes = module.ModuleAxes();
+            const lodestone::manifest::ModuleAxis* tileRecord = &moduleAxes[k_TileAxis];
+            const size_t recordOffset = static_cast<size_t>(reinterpret_cast<const std::byte*>(tileRecord) - bytes.data());
+            std::vector<std::byte> badDefault = bytes;
+            const uint32_t pastRadix = k_Radices[k_TileAxis];
+            std::memcpy(badDefault.data() + recordOffset + offsetof(lodestone::manifest::ModuleAxis, DefaultDigit),
+                        &pastRadix,
+                        sizeof(pastRadix));
+            const ManifestResult<BundleView> damaged = BundleView::Open(badDefault);
+            runner.Check(!damaged.has_value() &&
+                             damaged.error().Code == lodestone::manifest::ErrorCode::InvalidModuleAxisDefault,
+                         "a default digit at or past the radix is rejected when the bundle opens");
+        }
     }
 
     runner.BeginSection("an empty query matches every variant");

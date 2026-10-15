@@ -15,6 +15,7 @@
                 "QualityTier::High",
                 "QualityTier::Ultra"
             ],
+            "default": "QualityTier::Low",
             "enumCaseValues": [
                 3,
                 1,
@@ -32,6 +33,7 @@
                 "false",
                 "true"
             ],
+            "default": "false",
             "activeWhen": null
         },
         {
@@ -43,6 +45,7 @@
                 "false",
                 "true"
             ],
+            "default": "false",
             "activeWhen": "USE_NORMAL_MAP == 1"
         },
         {
@@ -54,6 +57,7 @@
                 "false",
                 "true"
             ],
+            "default": "false",
             "activeWhen": null
         },
         {
@@ -67,6 +71,7 @@
                 "8",
                 "16"
             ],
+            "default": "1",
             "activeWhen": null
         },
         {
@@ -79,6 +84,7 @@
                 "Lambert",
                 "OrenNayar"
             ],
+            "default": "Lambert",
             "activeWhen": null
         }
     ],

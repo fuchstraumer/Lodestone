@@ -110,6 +110,8 @@ int main()
     // empty string until the range was widened.
     runner.Check(ToString(CookError::ReflectionMismatch) == "ReflectionMismatch", "a low error names itself");
     runner.Check(ToString(CookError::PolicyAxisNotDeclared) == "PolicyAxisNotDeclared", "the policy band has names");
+    runner.Check(ToString(CookError::AxisDefaultNotDeclared) == "AxisDefaultNotDeclared",
+                 "the axis default band has names");
     runner.Check(ToString(CookError::FileNotFound) == "FileNotFound", "the system band has names");
     runner.Check(ToString(CookError::SlangCachedModuleWriteFailed) == "SlangCachedModuleWriteFailed",
                  "the Slang band has names");

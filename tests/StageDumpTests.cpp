@@ -272,6 +272,7 @@ void CheckSpaceDump(lodestone::tests::TestRunner& runner)
                 "false",
                 "true"
             ],
+            "default": "false",
             "activeWhen": null
         }
     ],

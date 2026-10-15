@@ -143,6 +143,39 @@ void TestAccumulationAndUnknownModule(TestRunner& runner)
                  "an unknown module holds no tokens, so the token is missing");
 }
 
+// Interface axes are `extern struct` declarations. The identifier just before `=` is the interface, so the
+// struct name has to come from the token after `struct`, and type defaults are kept apart from the constants
+// so that nothing evaluates a type name as an expression.
+void TestExternTypeDefaultExtraction(TestRunner& runner)
+{
+    runner.BeginSection("extern struct defaults");
+
+    constexpr std::string_view k_Source = R"(module Shading;
+
+    public extern struct SHADE_MODE : IShadeMode = Passthrough;
+    extern struct BRDF : IBrdf = Shading::Lambert; // a qualified default
+    extern struct NO_DEFAULT : IBrdf;
+    struct NotExtern : IBrdf = Lambert;
+    extern static const MyStructType COUNT = 4;
+    )";
+
+    SymbolTable table;
+    table.AddSource("Shading", k_Source);
+
+    const std::vector<ExternConstantDeclaration> types = table.ExternTypeDefaultsForModule("Shading");
+    runner.Check(types.size() == 2u, "only extern struct declarations with an initializer are recognized");
+    runner.Check(DeclarationMatches(types, "SHADE_MODE", "Passthrough"),
+                 "the struct name comes from after `struct`, not from before `=`");
+    runner.Check(DeclarationMatches(types, "BRDF", "Shading::Lambert"), "a qualified default keeps its qualifier");
+
+    const std::vector<ExternConstantDeclaration> constants = table.ExternConstantsForModule("Shading");
+    runner.Check(constants.size() == 1u && DeclarationMatches(constants, "COUNT", "4"),
+                 "a type named like MyStructType does not count as the struct keyword");
+
+    runner.Check(Missing(table, { "Shading" }, { "SHADE_MODE" }).empty(),
+                 "an extern struct name still counts as a token, as it did before defaults were read");
+}
+
 // Now the symbol table does double duty as the extern const scanner, make sure it matches the expected behavior
 // that used to be in the ExternConstScanner.
 void TestExternConstExtraction(TestRunner& runner)
@@ -188,5 +221,6 @@ int main()
     TestAxisReachability(runner);
     TestAccumulationAndUnknownModule(runner);
     TestExternConstExtraction(runner);
+    TestExternTypeDefaultExtraction(runner);
     return runner.Report();
 }

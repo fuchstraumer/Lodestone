@@ -61,7 +61,7 @@ no allocation.
 
 | # | Task | Why the graph needs it | Proof |
 |---|---|---|---|
-| L15 | Record the declared default of each axis. `PermutationAxis::GetDefault()` returns the first listed value, not the initializer in the shader (`IFFT_SIZE` declares `= 512u` and lists 128 first). Read the initializer at the bootstrap compile, and store it on the manifest `Axis` record. | The graph fills an unpinned axis with the default (Velox decision V3). Without this, the warning names one value and the graph uses another. | A test module whose initializer is not its first value. The manifest default equals the initializer. Manifest format version 8. |
+| L15 | **Done 2026-10-15** (format 8, `AxisDefaultTest`). **Decided 2026-10-15:** `DefaultDigit` on `ModuleAxis` (per module, because root axes are shared), format 8. An axis with no initializer fails the cook. A default outside the declared values fails the cook. A profile whose policy drops the default gets a warning. `GetDefault()` becomes `GetCanonicalValue()`, beside a new `GetDeclaredDefault()`; keys do not change. Measured 2026-10-15: `getDefaultValueBlob` returns literal initializers only (bool, `uint` 512, the enum tag 5 for `QualityLevel::Low`). It fails on an expression (`2u * 2u`), and reflection does not expose the `= Passthrough` of an `extern struct` (Slang keeps it in `StructDecl::aliasedType`, which no reflection call returns). So the symbol table text is the primary reader for all four domains, and the reflection blob is a second opinion where it returns a value. Record the declared default of each axis. `PermutationAxis::GetDefault()` returns the first listed value, not the initializer in the shader (`IFFT_SIZE` declares `= 512u` and lists 128 first). Read the initializer at the bootstrap compile, and store it on the manifest `Axis` record. | The graph fills an unpinned axis with the default (Velox decision V3). Without this, the warning names one value and the graph uses another. | A test module whose initializer is not its first value. The manifest default equals the initializer. Manifest format version 8. |
 | L3 | Per-entry-point axis relevance in the manifest. The cook already measures axis influence for each entry point. Emit one mask for each (module, entry point). | An exact ambiguity check: two variants that differ only in an inert axis give one entry point instance. The graph pins only the axes that matter for a node. | The emitted mask equals the measured influence. `DedupeInfluenceTest` holds the measurement, so compare against it. |
 | L4 | Query presets, with a match rule, and a "constrain when active" form for a gated axis. The rule that the source note proposes: a preset skips an axis that a module does not declare, and the graph fails when no module in the graph declares it. | Graph pins are presets. Today a pin on a gated axis removes every variant where the gate is off. | `ManifestIndexTest` rows on the gated manifest: a "when active" pin keeps the gated-off variants. Decision D-R2 first. |
 | L7 | Sampler and texture pairs. WebGPU needs a non-filtering sampler for an `unfilterable-float` texture. Tint's inspector gives the pairs. Store them in the manifest. | Explicit bind group layouts. Without the pairs, Velox must guess the sampler type. | The `WgslValidator` reads the pairs from Tint. The manifest pairs equal Tint's pairs for KitchenSink. |
@@ -105,6 +105,15 @@ no allocation.
   and a host cooker cooks once; a second build does nothing; an edit to the `__include`d fragment alone
   re-cooks; an edit to the root module re-cooks. The in-tree path (the `lodestone_cooker_console` target)
   cooked once and did nothing on the second build. R1 is complete. Next: R2, from L15.
+- 2026-10-15. L15 done. `ModuleAxis::DefaultDigit`, format version 8. The symbol table reads the initializer
+  text, including `extern struct NAME : I = Impl;` in a table of its own. Reflection (`getDefaultValueBlob`)
+  is the second opinion for literal initializers, and a disagreement fails the cook (`AxisDefaultMismatch`).
+  New errors 140 to 144 and `ManifestAxisDefaultMismatch` (108). `VerifyManifestRoundTrip` reads each default
+  back as a client does. `GetDefault()` is now `GetCanonicalValue()`. Client: `ModuleView::AxisDefaultDigit`,
+  `ManifestIndex::AxisDefault`, and a `"default"` key in `manifest_dump` and the space stage dump (the eight
+  KitchenSink space known-good dumps were accepted: one added line for each axis, nothing else). Every
+  existing asset resolves its defaults. Not covered by a test: the mismatch error itself, because no shader
+  makes the two readers disagree. Next: L3.
 
 ## 5. Phase F, paused
 
