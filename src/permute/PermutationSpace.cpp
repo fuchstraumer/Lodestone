@@ -168,14 +168,14 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetCookPolic
 
 // Canonicalization is another expansion: for every axis in the space, we need to find the concrete
 // value of it bound in *this* assignment. If the axis is not present in the assignment, we will
-// retrieve the default value (the first value) of the axis. This equalizes each assignment to the
+// retrieve the canonical value (the first value) of the axis. This equalizes each assignment to the
 // same length, and allows us to compute a unique index for each assignment.
 CanonicalAssignment PermutationSpace::CanonicalizeAssignment(const PermutationAssignment& assignment) const
 {
     auto findBinding = [&assignment](const PermutationAxis& axis) -> PermutationBinding
     {
         auto foundIter = std::ranges::find(assignment, &axis, &PermutationBinding::Axis);
-        const PermutationValue value = foundIter != assignment.end() ? foundIter->Value : axis.GetDefault();
+        const PermutationValue value = foundIter != assignment.end() ? foundIter->Value : axis.GetCanonicalValue();
         return PermutationBinding{ .Axis = &axis, .Value = value };
     };
     auto canonical = axes | std::views::transform(findBinding) | std::ranges::to<PermutationAssignment>();

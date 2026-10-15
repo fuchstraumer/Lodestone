@@ -52,7 +52,14 @@ struct PermutationAxis
 
     [[nodiscard]] size_t NumValues() const noexcept;
     [[nodiscard]] std::span<const PermutationValue> GetValues() const noexcept;
-    [[nodiscard]] const PermutationValue& GetDefault() const noexcept;
+    /** @brief Returns the first value. Canonicalization uses it to fill an axis that a variant does not use, so
+      * that every key packs the same number of digits. This is not the default the shader declares. */
+    [[nodiscard]] const PermutationValue& GetCanonicalValue() const noexcept;
+    /** @brief Returns the value the shader declares as the axis initializer. */
+    [[nodiscard]] const PermutationValue& GetDeclaredDefault() const noexcept;
+    /** @brief The position of the declared default in `GetValues()`. */
+    [[nodiscard]] uint32_t DeclaredDefaultIndex() const noexcept;
+    void SetDeclaredDefaultIndex(uint32_t value_index) noexcept;
     
     void SetEnumCaseParams(std::string enum_type_name, std::vector<RawEnumCase> enum_cases) noexcept;
     void SetInterfaceAxisParams(std::string interface_name, std::vector<RawInterfaceImpl> interface_impls) noexcept;
@@ -76,6 +83,8 @@ private:
     std::string rootModule;
     std::vector<RawInterfaceImpl> interfaceImpls;
     std::vector<RawEnumCase> enumCases;
+    // the space builder sets this from the shader initializer. axes built by hand (tests) keep the first value
+    uint32_t declaredDefaultIndex{ 0u };
 };
 
 }

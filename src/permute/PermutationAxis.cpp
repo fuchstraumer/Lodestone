@@ -2,6 +2,7 @@
 #include "ShaderLibraryTypes.hpp"
 #include "permute/PermutationTypes.hpp"
 #include "permute/PermutationValue.hpp"
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -83,9 +84,25 @@ std::span<const PermutationValue> PermutationAxis::GetValues() const noexcept
     return std::span<const PermutationValue>{ values.data(), values.size() };
 }
 
-const PermutationValue& PermutationAxis::GetDefault() const noexcept
+const PermutationValue& PermutationAxis::GetCanonicalValue() const noexcept
 {
     return values.front();
+}
+
+const PermutationValue& PermutationAxis::GetDeclaredDefault() const noexcept
+{
+    return values[declaredDefaultIndex];
+}
+
+uint32_t PermutationAxis::DeclaredDefaultIndex() const noexcept
+{
+    return declaredDefaultIndex;
+}
+
+void PermutationAxis::SetDeclaredDefaultIndex(uint32_t value_index) noexcept
+{
+    assert(value_index < values.size());
+    declaredDefaultIndex = value_index;
 }
 
 void PermutationAxis::SetEnumCaseParams(std::string enum_type_name, std::vector<RawEnumCase> enum_cases) noexcept
