@@ -97,6 +97,11 @@ add_lodestone_unit_test(AccessModelRejectTest AccessModelRejectTests.cpp)
 target_compile_definitions(AccessModelRejectTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${CMAKE_SOURCE_DIR}/tests/assets")
 add_lodestone_unit_test(AttributeExpressionTest AttributeExpressionTests.cpp)
+# The declared default of each axis, from the shader initializer to the client query layer. It cooks through
+# Slang, so it takes about one second.
+add_lodestone_unit_test(AxisDefaultTest AxisDefaultTests.cpp)
+target_compile_definitions(AxisDefaultTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${CMAKE_SOURCE_DIR}/tests/assets/AxisDefaults")
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)
 add_lodestone_unit_test(PermutationIndexTest PermutationIndexTests.cpp)
 add_lodestone_unit_test(ShaderManifestRejectTest ShaderManifestRejectTests.cpp)

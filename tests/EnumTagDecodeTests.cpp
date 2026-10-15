@@ -54,5 +54,11 @@ int main()
     runner.Check(Decode<uint64_t>(EnumTagKind::UInt64, 0xFFFFFFFFFFFFFFFFull) == -1, "the UInt64 maximum wraps to -1");
     runner.Check(Decode<uint64_t>(EnumTagKind::UInt64, 42ull) == 42, "a small UInt64 reads its value");
 
+    runner.BeginSection("each kind reports the width DecodeEnumTag reads");
+    runner.Check(lodestone::EnumTagByteWidth(EnumTagKind::UInt8) == sizeof(uint8_t), "8-bit kinds are one byte");
+    runner.Check(lodestone::EnumTagByteWidth(EnumTagKind::Int16) == sizeof(int16_t), "16-bit kinds are two bytes");
+    runner.Check(lodestone::EnumTagByteWidth(EnumTagKind::UInt32) == sizeof(uint32_t), "32-bit kinds are four bytes");
+    runner.Check(lodestone::EnumTagByteWidth(EnumTagKind::Int64) == sizeof(int64_t), "64-bit kinds are eight bytes");
+
     return runner.Report();
 }

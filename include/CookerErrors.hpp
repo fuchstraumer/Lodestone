@@ -74,6 +74,7 @@ enum class CookError : uint16_t
     ManifestVariantKeyMismatch = 105, // a key decodes through the module axes to a different assignment
     ManifestDuplicateVariantKey = 106,
     ManifestVariantAxisMaskMismatch = 107,
+    ManifestAxisDefaultMismatch = 108, // a module axis default reads back as a different value than the space declares
 
     ManifestShaderLayoutVariantIndicesInvalid = 110,
     ManifestShaderLayoutVisiblityIndexInvalid = 111,
@@ -93,6 +94,13 @@ enum class CookError : uint16_t
     PolicyDocumentLoadFailed = 133,
     PolicyInertAxisNotInertWhenCooked = 134,
     PolicyUnknownTargetName = 135,
+
+    // the declared default of an axis, read from its initializer in the shader
+    AxisDefaultMissing = 140, // the axis declaration has no initializer
+    AxisDefaultUnreadable = 141, // the initializer could not be evaluated or resolved to a value
+    AxisDefaultNotDeclared = 142, // the initializer is not one of the values the axis declares
+    AxisDefaultMismatch = 143, // the source text and Slang reflection disagree on the initializer
+    AxisDefaultAmbiguous = 144, // the module's sources declare the axis with two different initializers
 
     // start system errors
     SystemError = 200,

@@ -175,7 +175,7 @@ int main()
         const lodestone::PermutationBinding* canonicalWaveSize =
             FindBinding(waveOpsOff->Canonical, &k_WaveSizeAxis);
         runner.Check(canonicalWaveSize != nullptr &&
-                         canonicalWaveSize->Value == k_WaveSizeAxis.GetDefault(),
+                         canonicalWaveSize->Value == k_WaveSizeAxis.GetCanonicalValue(),
                      "a disabled axis takes its first value in Canonical");
     }
 

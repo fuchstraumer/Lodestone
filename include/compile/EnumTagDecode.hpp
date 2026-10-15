@@ -1,6 +1,7 @@
 #pragma once
 #ifndef LODESTONE_ENUM_TAG_DECODE_HPP
 #define LODESTONE_ENUM_TAG_DECODE_HPP
+#include <cstddef>
 #include <cstdint>
 
 // The integer read of a Slang enum case tag, factored out from behind the Slang wall.
@@ -34,6 +35,10 @@ enum class EnumTagKind : uint8_t
  * tag at or above 2^63 wraps to a negative `int64_t`. The caller accepts this wrap, because a size
  * expression evaluates an enum tag as a signed 64-bit value. */
 int64_t DecodeEnumTag(EnumTagKind kind, const void* bytes) noexcept;
+
+/** Returns the width in bytes of the integer type that `kind` names. Callers use this to check that a blob
+ * from Slang is wide enough before `DecodeEnumTag` reads it. */
+size_t EnumTagByteWidth(EnumTagKind kind) noexcept;
 
 } // namespace lodestone
 

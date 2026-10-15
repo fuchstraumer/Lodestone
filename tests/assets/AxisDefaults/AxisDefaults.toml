@@ -1,0 +1,4 @@
+# The wgsl policy for AxisDefaults drops IFFT_SIZE = 512, which is the declared default. AxisDefaultTest cooks
+# with this file to show that a policy which excludes a default is a warning, and not a cook failure.
+[AxisDefaults.targets.wgsl.CookValues]
+IFFT_SIZE = [128, 256]

@@ -42,4 +42,24 @@ int64_t DecodeEnumTag(EnumTagKind kind, const void* bytes) noexcept
     return 0;
 }
 
+size_t EnumTagByteWidth(EnumTagKind kind) noexcept
+{
+    switch (kind)
+    {
+    case EnumTagKind::Int8:
+    case EnumTagKind::UInt8:
+        return 1u;
+    case EnumTagKind::Int16:
+    case EnumTagKind::UInt16:
+        return 2u;
+    case EnumTagKind::Int32:
+    case EnumTagKind::UInt32:
+        return 4u;
+    case EnumTagKind::Int64:
+    case EnumTagKind::UInt64:
+        return 8u;
+    }
+    return 0u;
+}
+
 } // namespace lodestone
