@@ -287,7 +287,6 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
 {
     // this exists mostly because there was a bunch of work duplicated between the where and wherenoneof
     // functions, which otherwise differ enough by input contract that that we couldn't just reuse `whereAnyOf`
-    // verify axis_name is valid, push an error if not
     auto indexIter = index->axisNameToIndex.find(axis_name);
     if (indexIter == index->axisNameToIndex.end())
     {
@@ -373,12 +372,10 @@ void ManifestQueryBuilder::insertConstraint(std::string_view axis_name,
     if (constraintIter != constraints.end() &&
         constraintIter->AxisIndex == axis_index)
     {
-        // add value to existing
         QueryAxisRange& constraint = *constraintIter;
         // if we wanted to validate against duplicate values, this would be where to do it
         // for now, I'm not doing it as it's a real mess and I'm not really sure it warrants an error
-        // pretty sure this move is also totally pointless, it's going to just be a copy nmw
-        constraint.Values.append_range(std::move(allowed));
+        constraint.Values.append_range(allowed);
     }
     else
     {
@@ -398,7 +395,6 @@ ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name
         return result;
     }
 
-    // see if axis_name is already in the constraints
     const uint32_t axisIndex = *axisIndexOpt;
     result.insertConstraint(axis_name, axisIndex, std::move(values));
     return result;
@@ -583,10 +579,9 @@ QueryAxisValue ManifestIndex::decodeAxis(uint32_t axis_index, uint32_t value_ind
         result.IntegralValue = currValue;
         break;
     case AxisValueDomain::Enum:
-        // enums handled like interface strings, it's the case name
         [[fallthrough]];
     case AxisValueDomain::Type:
-        // read type name from string table
+        // read type or enum case name directly from string table
         result.Name = environment.String(currValue);
         break;
     case AxisValueDomain::None:

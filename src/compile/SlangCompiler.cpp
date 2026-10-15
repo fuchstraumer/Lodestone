@@ -40,7 +40,6 @@ CookError SlangCompiler::Initialize(SlangCompilerCreateInfo create_info, Diagnos
     bootstrapContext = std::make_unique<SlangModuleContext>();
     if (create_info.InheritedSymbolTable)
     {
-        // inherit initial set of symbols
         symbolTable = *create_info.InheritedSymbolTable;
     }
 

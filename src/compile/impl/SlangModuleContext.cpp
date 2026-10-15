@@ -187,7 +187,6 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
         }
         else
         {
-            // attempt to build core module
             const SlangResult built = globalSession->compileCoreModule(0);
             if (SLANG_FAILED(built))
             {
@@ -245,13 +244,11 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
     sessionDesc.compilerOptionEntries = compileOptions.data();
     sessionDesc.compilerOptionEntryCount = static_cast<uint32_t>(compileOptions.size());
     
-    // create session attached to each threads global session
     if (SLANG_FAILED(globalSession->createSession(sessionDesc, session.writeRef())))
     {
         return CookError::SessionCreationFailed;
     }
 
-    // extract module name from module path
     moduleName = canonicalModulePath.stem().string();
 
     return CookError::Success;

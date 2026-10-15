@@ -47,7 +47,6 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input) cons
 {
     SharedCookState result;
     result.Options = std::move(input);
-    // build the diagnostics sink
     result.Diagnostics = std::make_unique<StderrDiagnosticSink>();
 
     // gonna reuse this for a few steps, whenever we touch the filesystem (the third rail)

@@ -30,7 +30,6 @@ namespace lodestone
 
 namespace
 {
-    // just adds the stats from `variant` to the running cook statistics
     void RecordVariantStatistics(const CompiledVariant& variant, CookStatistics& statistics);
     // writes a bunch of information to the diagnostics sink about the given variant's entry point reflection
     void ReportEntryPointReflection(const CompiledVariant& variant,
@@ -64,7 +63,6 @@ CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& share
                                                     const PermutationSpace& space,
                                                     const VariantSet& variants) const
 {
-    // Implementation goes here
     InternedModule internedModule;
     if (!shared_state.Options.DedupeEnabled)
     {

@@ -83,7 +83,6 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
         return std::unexpected(preparedCookResult.error());
     }
 
-    // now, read options from preparedCookResult
     const PreparedCook& preparedCook = *preparedCookResult;
     const SharedCookState& cookState = preparedCook.SharedState;
 
@@ -349,7 +348,6 @@ namespace
             }
             else
             {
-                // mismatch in artifact names
                 const std::string errStr = std::format("Determinism failed - mismatch in artifact names: '{}' vs '{}'",
                                                        mismatchIterFirst->first,
                                                        mismatchIterSecond->first);

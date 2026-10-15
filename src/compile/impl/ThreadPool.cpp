@@ -136,7 +136,6 @@ SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDe
 
     done.wait();
 
-    // merge per variant diagnostics into the main diagnostic sink
     for (auto&& sink : diagnosticSinks)
     {
         for (auto&& record : sink.Records())

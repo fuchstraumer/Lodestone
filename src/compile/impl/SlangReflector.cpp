@@ -598,7 +598,6 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
                                      return binding.Placement;
                                  });
 
-        // set suffix, and copy over the target text
         rawEntryPoint.VariantSuffix = rawVariant.VariantSuffix;
         rawEntryPoint.TargetCode = std::move(linked_variant.EntryPointCode[static_cast<size_t>(i)]);
         // weird quirk: dereferencing a std::expected with * directly returns an rvalue. otherwise
@@ -759,7 +758,6 @@ CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* conta
     slang::TypeLayoutReflection* leafLayout = containing_layout->getBindingRangeLeafTypeLayout(range_index);
     if (leafLayout == nullptr)
     {
-        // just reached end of leaf
         return CookError::Success;
     }
 
@@ -824,7 +822,6 @@ CookError SlangReflector::collectRawSizeAttributes(slang::VariableReflection* le
 {
     if (leaf_variable == nullptr)
     {
-        // end of leaf/chain
         return CookError::Success;
     }
 
