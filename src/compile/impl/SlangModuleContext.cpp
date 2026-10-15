@@ -368,6 +368,58 @@ CookResult<std::vector<RawAxisDeclaration>> SlangModuleContext::BuildDeclaredAxe
     return std::move(axesBuildContext.AxisDeclarations);
 }
 
+namespace
+{
+    // NOLINTBEGIN(misc-no-recursion)
+    // only fragment nodes are walked into: those are `__include`d files, whose declarations are still at module
+    // scope. structs, functions, generics, and namespaces are skipped, because their variables are not
+    void CollectModuleScopeVariableNames(slang::DeclReflection* reflection, std::vector<std::string>& names)
+    {
+        const unsigned int childCount = reflection->getChildrenCount();
+        for (unsigned int i = 0u; i < childCount; ++i)
+        {
+            slang::DeclReflection* child = reflection->getChild(i);
+            if (child == nullptr)
+            {
+                continue;
+            }
+
+            if (child->getKind() == slang::DeclReflection::Kind::Variable)
+            {
+                const char* name = child->getName();
+                if (name != nullptr)
+                {
+                    names.emplace_back(name);
+                }
+            }
+            else if (child->getKind() == slang::DeclReflection::Kind::Unsupported && child->getChildrenCount() > 0u)
+            {
+                CollectModuleScopeVariableNames(child, names);
+            }
+        }
+    }
+    // NOLINTEND(misc-no-recursion)
+}
+
+std::vector<std::string> SlangModuleContext::BuildModuleScopeVariableNames() const
+{
+    std::vector<std::string> names;
+    const int64_t loadedModuleCount = static_cast<int64_t>(session->getLoadedModuleCount());
+    for (int64_t i = 0; i < loadedModuleCount; ++i)
+    {
+        slang::DeclReflection* moduleReflection = session->getLoadedModule(i)->getModuleReflection();
+        if (moduleReflection != nullptr)
+        {
+            CollectModuleScopeVariableNames(moduleReflection, names);
+        }
+    }
+
+    std::ranges::sort(names);
+    const auto [duplicatesBegin, duplicatesEnd] = std::ranges::unique(names);
+    names.erase(duplicatesBegin, duplicatesEnd);
+    return names;
+}
+
 //NOLINTBEGIN(misc-no-recursion)
 CookError SlangModuleContext::collectAxesFromDecl(slang::DeclReflection* reflection,
                                                   std::string_view module_name,
@@ -454,6 +506,11 @@ std::string_view SlangModuleContext::ModuleName() const noexcept
 const std::vector<std::string>& SlangModuleContext::ModuleSourceStrings() const noexcept
 {
     return moduleSourceStrings;
+}
+
+const std::vector<std::string>& SlangModuleContext::ModuleSourcePaths() const noexcept
+{
+    return moduleSourcePaths;
 }
 
 const std::vector<std::string>& SlangModuleContext::DependencyFilePaths() const noexcept
@@ -582,6 +639,7 @@ CookError SlangModuleContext::readDependencySourceStrings()
 {
     const SlangInt32 dependencyCount = rootModule->getDependencyFileCount();
     moduleSourceStrings.reserve(static_cast<size_t>(dependencyCount));
+    moduleSourcePaths.reserve(static_cast<size_t>(dependencyCount));
 
     for (SlangInt32 i = 0; i < dependencyCount; ++i)
     {
@@ -596,6 +654,7 @@ CookError SlangModuleContext::readDependencySourceStrings()
         {
             //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
             moduleSourceStrings.emplace_back(reinterpret_cast<const char*>(builtin->Source), builtin->SourceSize);
+            moduleSourcePaths.emplace_back(dependencyPath);
             continue;
         }
 
@@ -611,6 +670,7 @@ CookError SlangModuleContext::readDependencySourceStrings()
 
         moduleSourceStrings.emplace_back(std::istreambuf_iterator<char>(file),
                                          std::istreambuf_iterator<char>());
+        moduleSourcePaths.emplace_back(dependencyPath);
         dependencyFilePaths.emplace_back(dependencyPath);
     }
 

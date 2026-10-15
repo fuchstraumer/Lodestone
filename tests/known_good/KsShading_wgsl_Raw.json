@@ -4,6 +4,7 @@
     "variantCount": 1,
     "entryPointNames": [],
     "externDefaults": [],
+    "derivedConstants": [],
     "variants": [
         {
             "index": 0,

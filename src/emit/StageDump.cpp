@@ -523,6 +523,28 @@ namespace
         writer.EndArray();
     }
 
+    // the source file is written as a file name only: a full path would make the dump depend on where the
+    // repository is checked out, and the known-good dumps must not
+    void WriteDerivedConstants(JsonWriter& writer, const RawModule& module)
+    {
+        writer.Key("derivedConstants");
+        writer.BeginArray();
+        for (const RawDerivedConstant& constant : module.DerivedConstants)
+        {
+            const size_t separator = constant.SourceFile.find_last_of("/\\");
+            const std::string_view fileName = separator == std::string::npos
+                                                  ? std::string_view{ constant.SourceFile }
+                                                  : std::string_view{ constant.SourceFile }.substr(separator + 1u);
+            writer.BeginObject();
+            writer.KeyString("name", constant.Name);
+            writer.KeyString("expression", constant.Expression);
+            writer.KeyString("sourceFile", fileName);
+            writer.KeyUInt("sourceLine", constant.SourceLine);
+            writer.EndObject();
+        }
+        writer.EndArray();
+    }
+
     void WriteExternDefaults(JsonWriter& writer, const RawModule& module)
     {
         writer.Key("externDefaults");
@@ -625,6 +647,7 @@ std::string DumpRawModule(const RawModule& module)
     writer.EndArray();
 
     WriteExternDefaults(writer, module);
+    WriteDerivedConstants(writer, module);
 
     writer.Key("variants");
     writer.BeginArray();

@@ -34,6 +34,11 @@ public:
     [[nodiscard]] CookError Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink);
     [[nodiscard]] CookError RunBootstrap();
     [[nodiscard]] CookResult<std::vector<RawAxisDeclaration>> BuildDeclaredAxes() const;
+    /**@brief Returns the names of every variable declared at module scope in the loaded modules, sorted. This
+      * includes variables declared in `__include` fragments, and excludes struct members and function locals.
+      * The symbol table scans lines and cannot tell scopes apart, so its derived constants are filtered by
+      * this list. */
+    [[nodiscard]] std::vector<std::string> BuildModuleScopeVariableNames() const;
     [[nodiscard]] slang::IGlobalSession* GlobalSession() const noexcept;
     [[nodiscard]] slang::ISession* Session() const noexcept;
     [[nodiscard]] std::vector<slang::IComponentType*> BaseComponents() const noexcept;
@@ -41,6 +46,9 @@ public:
     [[nodiscard]] const std::vector<std::string>& EntryPointNames() const noexcept;
     [[nodiscard]] std::string_view ModuleName() const noexcept;
     [[nodiscard]] const std::vector<std::string>& ModuleSourceStrings() const noexcept;
+    /**@brief Returns the path of each source in `ModuleSourceStrings()`, at the same position. Embedded builtins
+      * are listed by their search path, so this list is not the same as `DependencyFilePaths()`. */
+    [[nodiscard]] const std::vector<std::string>& ModuleSourcePaths() const noexcept;
     [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
     /**@brief The file path of every input source read by the root module. Embedded builtins are excluded.
       *This is used to make sure the build step re-cooks when any of the input sources change. */
@@ -104,6 +112,7 @@ private:
     std::vector<std::string> entryPointNames;
     std::string moduleName;
     std::vector<std::string> moduleSourceStrings;
+    std::vector<std::string> moduleSourcePaths;
     std::vector<std::string> dependencyFilePaths;
     PlacementKind placementKind{ PlacementKind::None };
     TargetLanguage language{ TargetLanguage::Invalid };

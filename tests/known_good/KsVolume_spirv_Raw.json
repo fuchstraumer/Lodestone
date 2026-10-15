@@ -7,6 +7,14 @@
         "BlurCS"
     ],
     "externDefaults": [],
+    "derivedConstants": [
+        {
+            "name": "TILE",
+            "expression": "64u",
+            "sourceFile": "KsVolume.slang",
+            "sourceLine": 39
+        }
+    ],
     "variants": [
         {
             "index": 0,

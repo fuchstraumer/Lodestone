@@ -7,6 +7,7 @@
         "MainFS"
     ],
     "externDefaults": [],
+    "derivedConstants": [],
     "variants": [
         {
             "index": 0,

@@ -11,9 +11,11 @@
 #include "permute/PermutationSpace.hpp"
 
 
+#include <algorithm>
 #include <cstddef>
 #include <expected>
 #include <memory>
+#include <ranges>
 #include <slang.h>
 #include <span>
 #include <string>
@@ -66,9 +68,10 @@ CookError SlangCompiler::Initialize(SlangCompilerCreateInfo create_info, Diagnos
     // todo-ship: With multi-module builds, we'll absolutely want to have a way to "inherit" or share
     // symbol tables with multiple compilers. can probably pass this as optional createInfo member
     const std::string_view moduleName = bootstrapContext->ModuleName();
-    for (const std::string& sourceStr : bootstrapContext->ModuleSourceStrings())
+    const std::vector<std::string>& sourcePaths = bootstrapContext->ModuleSourcePaths();
+    for (const auto&& [sourceIndex, sourceStr] : std::views::enumerate(bootstrapContext->ModuleSourceStrings()))
     {
-        symbolTable.AddSource(moduleName, sourceStr);
+        symbolTable.AddSource(moduleName, sourcePaths[static_cast<size_t>(sourceIndex)], sourceStr);
     }
     
     return initResult;
@@ -92,6 +95,21 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
     module.Name = bootstrapContext->ModuleName();
     module.EntryPointNames = bootstrapContext->EntryPointNames();
     module.ExternDefaults = std::move(defaults.value());
+
+    // hybrid read: the symbol table supplies each expression, and reflection decides which names are module
+    // scope, so that a function-local `static const` is never mistaken for a derived constant
+    const std::vector<std::string> moduleScopeNames = bootstrapContext->BuildModuleScopeVariableNames();
+    for (const DerivedConstantDeclaration& declaration : symbolTable.DerivedConstantsForModule(ModuleName()))
+    {
+        if (!std::ranges::binary_search(moduleScopeNames, declaration.Name))
+        {
+            continue;
+        }
+        module.DerivedConstants.push_back(RawDerivedConstant{ .Name = std::string{ declaration.Name },
+                                                              .Expression = std::string{ declaration.Expression },
+                                                              .SourceFile = std::string{ declaration.SourcePath },
+                                                              .SourceLine = declaration.SourceLine });
+    }
     return module;
 }
 

@@ -131,6 +131,18 @@ struct RawVariant
     std::vector<RawEntryPoint> EntryPoints;
 };
 
+/** A module-scope `static const` that is not `extern`, with its initializer as written. Size expressions can
+ * name these. The expression can depend on axis values, so stage 3 does not evaluate it: stage 4 evaluates it
+ * for each variant that needs it. The source location is used in error messages, because nothing else
+ * checks the value. */
+struct RawDerivedConstant
+{
+    std::string Name;
+    std::string Expression;
+    std::string SourceFile;
+    uint32_t SourceLine{ 0u };
+};
+
 /** Stage 3's per-module output.
  *
  * `ExternDefaults` is easy to miss and stage 4 cannot work without it. A size expression may name an
@@ -141,6 +153,7 @@ struct RawModule
     std::string Name;
     std::vector<std::string> EntryPointNames;
     std::vector<ExternConstantDefault> ExternDefaults;
+    std::vector<RawDerivedConstant> DerivedConstants;
     std::vector<RawVariant> Variants;
 };
 
