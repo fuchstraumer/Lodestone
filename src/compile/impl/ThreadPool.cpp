@@ -63,6 +63,11 @@ CookError ThreadPool::Initialize(SlangCompilerCreateInfo create_info, std::vecto
     return CookError::Success;
 }
 
+std::span<const SerializedModule> ThreadPool::SerializedModules() const noexcept
+{
+    return serializedModules;
+}
+
 SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDescriptor>& variants,
                                                      DiagnosticSink& diagnostic_sink)
 {

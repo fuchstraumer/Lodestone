@@ -38,6 +38,74 @@ earlier update. Git history holds the full text.
 `docs/rendergraph-integration-tasks.md`. RelWithDebInfo: 24 of 24 tests, 60 of 60 known-good dumps
 (`wgsl` and `spirv`), when the PC has free commit (section 3, item 8).
 
+**2026-10-15.** R1 is complete (L10, L9, L1 removed with `First`, L2 `Single`, L13 `NearestName`, the cook
+build step with `--depfile`). L15 (declared axis defaults, format 8) is done. 25 of 25 tests, 60 of 60
+known-good dumps. The author is now writing the stage 4 half of derived constants (section 2a). After
+that: L3.
+
+**2026-10-16.** Derived constants are done (section 2a). 26 of 26 tests (RelWithDebInfo), 60 of 60
+known-good dumps. Next: L3.
+
+## 2a. Derived constants: notes for the stage 4 work (2026-10-15)
+
+`todo.md` ("Permutation system") holds the item. Size expressions may name a module-scope `static const`
+whose value is computed from axes, for example `VTF_CLUSTER_COUNT = GRID_X * GRID_Y * GRID_Z`.
+
+**Done (capture and carry).**
+
+- `SymbolTable::DerivedConstantsForModule` returns each non-`extern` `static const NAME = <expr>;` line, with
+  the expression text, the source path, and the line number, in source order. `AddSource` takes the source
+  path. One keyword scan (`ScanDeclarationKeywords`, whole tokens) classifies every line for all three
+  extractors.
+- The line scan cannot tell scopes apart, so `SlangModuleContext::BuildModuleScopeVariableNames`
+  (reflection) lists the module-scope variable names, and `PrepareRawModule` keeps only the matches. The
+  walk enters `__include` fragment nodes only, and skips structs, functions, generics, and namespaces.
+- `RawModule::DerivedConstants` (`RawDerivedConstant`: name, expression, file, line) carries them to stage 4.
+  The Raw stage dump lists them (file name only). KitchenSink has one: `TILE = 64u` in KsVolume.
+- Probe asset: `tests/assets/DerivedConstants/` (module scope, a constant that names another, an
+  `__include` fragment, a struct member, a function local).
+
+**Done 2026-10-16 (the agent wrote it, on the author's request).** The shape differs from the plan in two ways. `MakeDerivedConstantTable` runs once for each module, before the variant compile, and checks the names: a derived constant with the name of an axis or an extern constant is an error (the author's decision), and so is an ambiguous name, even when nothing reaches it. `MakeResolveContext` takes the table and the `RawVariant`, so its messages can name the binding. Errors: 150 shadows, 151 ambiguous, 152 cycle, 153 unreadable. Measured: Slang rejects a constant cycle itself (E39999), so the cycle check fires only when the text reader and Slang disagree. The original plan follows.
+
+**The plan:**
+
+1. `MakeResolveContext` (`model/ResolveStage.cpp`, called once per variant from `BuildModuleStep.cpp`)
+   also takes `raw_module.DerivedConstants` and the variant's `SizeAttributes`, takes the sink, and returns
+   `CookResult<ResolveContext>`.
+2. Roots: call `CollectExpressionIdentifiers` on each `RawSizeAttribute::Arguments` string. These strings are
+   the expressions as written (`"IFFT_SIZE * 4"`); an attribute has no name of its own.
+3. Precedence: `context.Symbols` already contains the axes and the extern defaults, so it is the exclusion
+   set. A name found there is a leaf. A name that is a derived constant is visited. A name that is neither
+   is left for `EvaluateExpression` to report as `AttributeExpressionUnknownSymbol`. No separate axis set is
+   needed.
+4. Lookup: index the derived constants by name once per module (a sorted vector of indices and
+   `equal_range`). A reached name with two different expressions is ambiguous: report every `file:line`.
+   This is real: a function-local constant can share a name with a module-scope one, because reflection
+   filters by name only.
+5. Order: depth-first search with three-color marking. Edges come from `CollectExpressionIdentifiers` on
+   each constant's own expression. Reaching a gray node is a cycle: report the chain with each `file:line`.
+   Post-order is a topological order, and black nodes are skipped, so a diamond is evaluated once. The walk
+   reaches only what an attribute names, so a constant that cannot be evaluated (a `float`, a function call)
+   is harmless while nothing names it.
+6. Evaluate in post-order with `EvaluateExpression(expression, context.Symbols, sink)`, and push each result
+   as an `AttrExprSymbol`. Names are views into `RawModule` strings, which outlive the loop.
+7. Errors: bands 40 and 140 are full, so use a new band (150 is free): cycle, ambiguous, unreadable. The
+   author wants verbose messages with source locations, because nothing checks the value independently
+   (reflection cannot fold an expression, and the element count is not in the emitted bindings).
+   `BuildModuleStep` already adds the variant description.
+8. Docs: the header comment of `ResolveStage.hpp` ("two halves"), the `ResolveContext` row and "Attribute
+   expressions" in `CLAUDE.md`, and the `todo.md` item.
+
+**Tests.** `ResolveStageTest` rows with no Slang: one level, two levels, a diamond, a cycle, an ambiguous
+name, an unused constant that cannot be evaluated, and axis precedence. End to end: add
+`[ls_element_count("LIGHT_SLOTS")]` to `gLightIndices` in the probe asset. `GRID_X` is 4 or 8 and `GRID_Y`
+is 2 or 4, so `LIGHT_SLOTS = X * Y * 16` gives 128, 256, 256, and 512. Read the counts back through the
+manifest, as `AxisDefaultTest` reads defaults.
+
+**Not in scope.** An axis initializer that names another constant (`= BASE * 2u`) still fails as
+unreadable. Axis defaults are resolved before any variant exists, so only axis-independent constants
+could be used there.
+
 ## 2. Next work, in order
 
 0. **The rendergraph tasks** (`docs/rendergraph-integration-tasks.md`), from R1 down. Phase F waits.
@@ -71,7 +139,14 @@ Ordered by what can write wrong output first.
    returns instead, but its thread sink is not merged, so the Slang diagnostic is lost. Measured on
    2026-09-24 during step F0.3. Return a `CookError`, and merge the thread sinks on every path.
    On 2026-10-14 a stale module cache caused it. `%TEMP%\LodestoneShaderCooker` held IR version 32
-   modules from Slang `6eb89786c`, and the `ac945e5` build reads version 31 only. Every Slang test
+   modules from Slang `6eb89786c`, and the `ac945e5` build reads version 31 only. **Found 2026-10-16:** the
+   writer is our own stale Debug tree. `build/ninja-msvc` Debug was last built on 2026-10-01 from
+   `6eb89786c`, its DLL still carries the `ac945e5` tag string, and `run-tests.bat` defaulted to Debug. Each
+   bare run poisoned the cache for the next RelWithDebInfo cook. The script now defaults to RelWithDebInfo.
+   `build/ninja-msvc-nowgsl` is also on `6eb89786c`. Rebuild or delete both trees. The cache-folder fix
+   below would also make this harmless. A second defect is in the same place: every worker thread calls
+   `WriteModuleCache` (`ThreadPool.cpp`) and writes the same files at once, while other sessions can read
+   them through the cache search path. No failure is measured from that yet. Every Slang test
    crashed with 0xC0000409 and no message. A `--single-threaded` cook prints the cause (E00131). Rename
    the folder to clear it. The cache path must name the Slang build tag
    (`docs/rendergraph-integration-tasks.md`, found items).
@@ -320,3 +395,11 @@ One line for each update. Git history holds the full text.
   Phase F paused for the rendergraph tasks.
 - **2026-10-14.** L10: `LODESTONE_BUILD_COOKER` and the client-only preset. The Slang checkout is
   `ac945e5` since 2026-10-12. A stale module cache from `6eb89786c` stopped every cook.
+- **2026-10-15.** L1 (removed `First`), L2 `Single`, L13 `NearestName`, the cook build step and
+  `--depfile`, L15 axis defaults (format 8, `AxisDefaultTest`), the comment style rules in
+  `.github/copilot-instructions.md`, and the capture half of derived constants (section 2a). Two bugs in the
+  refactored L15 resolver were fixed: a by-value output parameter, and `index.value()` on an error.
+- **2026-10-16.** Derived constants, stage 4: `MakeDerivedConstantTable`, the three-color walk in
+  `MakeResolveContext`, errors 150 to 153, `DerivedConstantTest`, and `ResolveStageTest` rows. The hang
+  and E00131 failures came from the stale Debug test binaries (Slang `6eb89786c`), which `run-tests.bat`
+  ran by default. The default is now RelWithDebInfo.

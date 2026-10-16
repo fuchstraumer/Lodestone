@@ -51,6 +51,10 @@ public:
                                        std::vector<SerializedModule> serialized_modules);
     [[nodiscard]] SlangCompiler::CompileResultList Compile(const std::vector<VariantDescriptor>& variants,
                                                            DiagnosticSink& diagnostic_sink);
+    /**@brief Returns the serialized modules that the workers prime their sessions from. Callers only read the
+     * blob bytes and never copy the `ComPtr` values, because a copy changes the blob's reference count while
+     * the workers are using it. */
+    [[nodiscard]] std::span<const SerializedModule> SerializedModules() const noexcept;
 
 private:
 

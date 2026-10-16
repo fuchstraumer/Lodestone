@@ -59,15 +59,17 @@ CookError SlangCompiler::Initialize(SlangCompilerCreateInfo create_info, Diagnos
 
     // bootstrap completed, retrieve serialized modules and initialize the thread pool with them
     std::vector<SerializedModule> serializedModules = bootstrapContext->SerializeModules();
-    // one writer, from the bootstrap blobs. the workers used to write the cache too, each one writing the same
-    // files at once while other sessions read the cache folder as a search path. a failure is only a warning,
-    // because the cache is an optimization, and WriteModuleCache reports it
-    static_cast<void>(WriteModuleCache(serializedModules, sink));
     initResult = compilePool->Initialize(std::move(create_info), std::move(serializedModules));
     if (initResult != CookError::Success)
     {
         return initResult;
     }
+
+    // one writer, from the bootstrap blobs. the workers used to write the cache too, each one writing the same
+    // files at once while other sessions read the cache folder as a search path. we write after the workers
+    // start, so that the write overlaps their session setup instead of delaying it. a failure is only a
+    // warning, because the cache is an optimization, and WriteModuleCache reports it
+    static_cast<void>(WriteModuleCache(compilePool->SerializedModules(), sink));
 
     // todo-ship: With multi-module builds, we'll absolutely want to have a way to "inherit" or share
     // symbol tables with multiple compilers. can probably pass this as optional createInfo member

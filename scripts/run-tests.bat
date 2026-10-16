@@ -1,6 +1,10 @@
 @echo off
 REM Runs every test executable and prints one line for each. Usage: scripts\run-tests.bat [Debug|RelWithDebInfo] [preset]
 REM
+REM The configuration defaults to RelWithDebInfo. The old Debug binaries were built by an older Slang. They
+REM write module files that the current Slang rejects, into the shared module cache folder. CLAUDE.md
+REM ("Build and test") has the measurement.
+REM
 REM Each test runs directly, and not through ctest. A direct run prints as it goes. A run behind a
 REM pager or behind PowerShell `Select-Object` prints nothing until the end, which looks like a
 REM deadlock, and a test that stops with an assertion loses its buffered output.
@@ -14,7 +18,7 @@ REM crashing cook tests as passes.
 setlocal enabledelayedexpansion
 
 set "CONFIG=%~1"
-if "%CONFIG%"=="" set "CONFIG=Debug"
+if "%CONFIG%"=="" set "CONFIG=RelWithDebInfo"
 set "PRESET=%~2"
 if "%PRESET%"=="" set "PRESET=ninja-msvc"
 

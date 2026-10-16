@@ -75,8 +75,16 @@ failed build then looks like a success.
 Run every test:
 
 ```bash
-scripts\run-tests.bat
+scripts\run-tests.bat RelWithDebInfo
 ```
+
+The configuration argument defaults to `RelWithDebInfo`. Until 2026-10-16 it defaulted to `Debug`. The
+Debug test binaries in `build/ninja-msvc` were last built on 2026-10-01 from Slang `6eb89786c`, which
+writes IR module version 32. They share the module cache folder `%TEMP%\LodestoneShaderCooker` with the
+RelWithDebInfo build, and `ac945e5` reads version 31 only. So one Debug run poisoned the cache, and every
+later RelWithDebInfo cook then failed with E00131, crashed with 0xC0000409, or hung. Measured on
+2026-10-16: the two files differ in one byte, the version field. Do not run the Debug tests until that
+tree is rebuilt, and rename the cache folder after any run of an old binary.
 
 It runs each executable directly and prints one line for each. A failing target is run a second time
 with its output shown. The script compares each exit code with 0. A crash exits with a negative code
@@ -95,11 +103,11 @@ it exits 1 on `NoOutputSpecified`, which reads like a failure rather than a usag
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
-Twenty-five test targets exist. Twenty are unit tests, and each one proves a claim the repository
+Twenty-six test targets exist. Twenty-one are unit tests, and each one proves a claim the repository
 makes. Eighteen need no Slang and no asset, and together they run in about half a second.
 `WgslValidatorTest` links Tint to read WGSL. `SpvValidatorTest` links SPIRV-Tools to assemble SPIR-V.
-`AccessModelRejectTest` and `AxisDefaultTest` cook small modules through Slang, and each takes about one
-second.
+`AccessModelRejectTest`, `AxisDefaultTest`, and `DerivedConstantTest` cook small modules through Slang,
+and each takes about one second.
 
 | Target | Proves |
 |---|---|
@@ -117,6 +125,7 @@ second.
 | `DiagnosticParserTest` | The parser reads Slang's machine-readable diagnostic form into a record, and counts the records whose severity is a failure. Codegen reads that count. It names no Slang type, so it needs no compiler. |
 | `ResolveStageTest` | Stage 4 resolves a hand-built `RawVariant` with no Slang present. This test is the proof that the stage 3 and stage 4 split worked, and before phase D step D5 it could not be written at all. |
 | `AxisDefaultTest` | The declared default of each axis, from the shader initializer to `ManifestIndex::AxisDefault`. `tests/assets/AxisDefaults/AxisDefaults.slang` declares every default as a value other than the first, in all four domains, with a literal initializer (which reflection also reads, so the two readers are compared) and an expression initializer (which only the source text can read). It proves that a missing default and a default outside the declared values each fail the cook, and that a policy which drops the default cooks, keeps the default in the manifest, and leaves no variant for it. |
+| `DerivedConstantTest` | Derived constants in size expressions, from the shader source to the element count in the manifest. `tests/assets/DerivedConstants/DerivedConstants.slang` sizes a buffer with `LIGHT_SLOTS`, which uses another derived constant, two axes, and a constant from an `__include`d fragment. The test compares each variant's count with a hand-computed value, because nothing else checks it: reflection cannot fold the expression. It proves that a function-local constant with the name of an axis fails the cook, and that Slang rejects a cycle of constants before stage 4 runs (E39999). |
 | `AccessModelRejectTest` | The table of cooks that must fail. A pointer member under a bound access model, a reflection mismatch, and a codegen error each fail the cook with their own error. A control module still cooks. |
 | `PermutationConstraintTest` | The axis constraint engine. `ActiveWhen` gates an axis the way the old parent link did, `Require` prunes a forbidden combination, and the load check rejects a forward reference, an unknown symbol, and a malformed expression. |
 | `SuggestTest` | The nearest-name suggestion. It measures the edit distance between a mistyped name and the accepted names, and returns the closest one. The cooker and the client both use it for a name rejection. |
@@ -476,7 +485,7 @@ unordered container reached the output.
 | `CompiledVariant`, `CompiledEntryPoint` | `model/ShaderDataSchema.hpp` | Compiler output: WGSL text plus reflection. Owns its strings. |
 | `ReflectedBinding` | `model/ShaderDataSchema.hpp` | What the shader states about one resource. The CPU side never writes any of it. `Name` and `ScopeName` together are the identity: two entry points can each declare `albedoMap`. |
 | `RawVariant`, `RawModule` | `compile/RawLibrary.hpp` | Stage 3 output. Everything Slang says, with no opinion about any of it. A `[ls_*]` argument is still the string the author wrote. |
-| `ResolveContext` | `model/ResolveStage.hpp` | Stage 4 input. The axis values of one variant, plus the extern constant defaults that stage 3 carried out. |
+| `ResolveContext` | `model/ResolveStage.hpp` | Stage 4 input. The axis values of one variant, the extern constant defaults that stage 3 carried out, and the derived constants that the variant's size attributes reach. `MakeDerivedConstantTable` indexes the derived constants once for each module. |
 | `TargetProfile` | `target/TargetProfile.hpp` | A target name, an access model, and an optional validator. `--target` names one. |
 | `DiagnosticRecord`, `DiagnosticSink` | `compile/Diagnostics.hpp` | One compiler message as a record, and where it goes. Compilation never formats a string. |
 | `ContentInterner<T>` | `model/ContentInterner.hpp` | Collapses equal payloads, keeps provenance, counts collisions. |
@@ -553,6 +562,21 @@ untouched, and `EvaluateExpression` does the arithmetic once for each variant. T
 reads an axis constraint expression as well, which is why it lives in `permute/AttributeExpression.hpp`
 and not the old `SizeExpression.hpp`. Phase E step E1 gave it comparison and logical operators for the
 constraint language.
+
+A size expression can also name a derived constant: a module-scope `static const` whose initializer is
+computed from axes, such as `static const uint CLUSTER_COUNT = GRID_X * GRID_Y;`. The symbol table reads
+the initializer text, and reflection filters it to module scope (`RawModule::DerivedConstants`). Stage 4
+evaluates the text per variant, so the value follows the axes. A value folded by reflection would stay at
+the declared defaults. `MakeResolveContext` walks depth first from the size attribute arguments, with
+three-color marking: a gray constant reached again is a cycle, and a black one is already evaluated. Each
+constant is evaluated in post-order, after the constants it uses. Only reached constants are evaluated, so
+an unused `static const float` is harmless. A derived constant with the name of an axis or of an extern
+constant fails the module (`DerivedConstantShadowsSymbol`), and so do two declarations of one name with
+different expressions (`DerivedConstantAmbiguous`), even when no attribute reaches them. The errors are
+150 to 153, and each error prints the `file:line` and expression of every constant involved. Slang
+rejects a real cycle itself (E39999), so the cycle check fires only when the text reader and Slang
+disagree. An axis default cannot use a derived constant, because defaults are read before any variant
+exists.
 
 The attribute declarations are in `builtins/LodestoneAttributes.slang`: `ls_element_count`,
 `ls_extent_2d`, `ls_extent_3d`. Slang has no optional attribute parameters, so each arity needs its

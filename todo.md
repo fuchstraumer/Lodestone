@@ -1,21 +1,12 @@
 # Phase F preparation/edge case fixes
 - add query presets, which are module-agnostic
 - make the query system very clearly single-module-only. it can reuse a preset across modules, though
-- make it clear that variant keys are per-session use only. to save or persist a variant, save something 
-  like `DecodedVariant` from the index, which can be expanded back into a valid variant key even if
-  the manifest changed underneath us (invalidating previous keys)
-    - a load of persisted variants will then need to first decode it's `Values` vector, to compute
-      the key, and see if it matches. The `Key` field is somewhat redundant, I suppose, at least in
-      persisted data
 - Decide the persisted form of a variant. `DecodedVariant` holds string views into one manifest and
   no axis names, so it cannot outlive that manifest. A persisted form needs (axis name, value) pairs
   with owned strings, and a load that re-keys them through a query.
-- Done 2026-09-24: `AxisNames()` and `AxisValues(axis)` on the index. `QueryFor(profile)` is obsolete,
-  because an index now reads one environment (one module, one profile).
 # SlangCompiler
 - Right now, we map to a super small subset of formats and features. We should support the full range, and extract them untouched
-    - Then, during output format mapping we collapse to what that platform
-    actually supports
+    - Then, during output format mapping we collapse to what that platform actually supports
     - Alternatively, use foresight about output target to fail builds if unsupported
 # Resource Layer
 - Reflection joins a scope with `_` (`JoinScopeName` in `SlangReflector.cpp`), which is the WGSL
@@ -38,20 +29,11 @@
   - Approach: capture each module-scope `const` name together with its defining *expression string* (not a folded value) during the same source scan that reads the extern defaults. The `SymbolTable` already tokenizes every source line (it absorbed the old `ExternConstantScanner`), so it is the natural place to grab these too.
   - Add them to the evaluator as derived symbols. When a name resolves to a derived symbol, evaluate its stored expression recursively against the same context, so the leaves bottom out at axes and extern defaults and the value tracks the per-variant axis values. A folded value captured from reflection would be wrong: it freezes at the declaration defaults and ignores the axes.
   - Guard against a cycle in the derived-symbol graph (a derived const that names another), and cache a name's evaluated result per variant so a diamond is not recomputed.
+  - 2026-10-15: capture and carry done. `SymbolTable::DerivedConstantsForModule` reads the text, `SlangModuleContext::BuildModuleScopeVariableNames` (reflection) filters it to module scope, and `RawModule::DerivedConstants` carries name, expression, file, and line to stage 4. The Raw dump lists them. Open: the stage 4 evaluation (`MakeResolveContext`), its errors, and a cook test on `tests/assets/DerivedConstants/`.
+  - 2026-10-16: done. `MakeDerivedConstantTable` (once per module) and a three-color depth-first walk in `MakeResolveContext`, errors 150 to 153, `ResolveStageTest` rows, and `DerivedConstantTest` end to end. Shadowing an axis or an extern constant is an error. Not done: an axis default that uses a derived constant.
 - Let a module policy section inherit another target section, for example `inherit = "wgsl"`. Phase F
   step F1.5 makes a missing section fail the cook.
 # Cook driver and manifest
-- Resolve a synthetic module's required import statements for type and enum axes as the declaring
-  module for the type being used. Currently `RawAxisDeclaration::RootModule` holds that, but it's
-  just captured as where the variable was found during the bootstrap (not where type is defined).
-    - We can find this by reflecting the type as a DeclReflection, then walking that chain up
-      until we hit the declaring module.
-    - This should be what both enum and interface axes use for finding the definitions.
-- Clean up cookerdriver. This is getting a bit ridiculous: it's a hugely complex.cpp, all the anonymous
-  namespace functions are declared and defined together, it could all be condensed considerably. Might be
-  worth using the FSM approach we tried in VeloxRhi, where we use a variant of discrete states and step
-  through them. Then each state and it's functionality could go in a file, and it would help make control
-  flow more clear.
 - Add a guard that fails loudly if a cook emits no manifest, so this validator cannot be orphaned again
   without a test going red. (2026-09-24: `--target` is now required, which closes the zero-target
   case. A guard in the emit path is still open.)

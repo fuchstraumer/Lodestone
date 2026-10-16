@@ -248,4 +248,8 @@ function(copy_slang_dlls_to_target TARGET_NAME)
         COMMENT "Copying the Slang library to the ${TARGET_NAME} output directory"
         VERBATIM
     )
+    # a POST_BUILD step runs only when the target links, and a new Slang DLL with the same import library
+    # does not make the target link again. so the copy beside a test kept an old Slang (measured
+    # 2026-10-16). this makes the target link again, and copy again, whenever the DLL changes
+    set_property(TARGET ${TARGET_NAME} APPEND PROPERTY LINK_DEPENDS "$<TARGET_FILE:slang>")
 endfunction()

@@ -115,6 +115,9 @@ no allocation.
   existing asset resolves its defaults. Not covered by a test: the mismatch error itself, because no shader
   makes the two readers disagree. Next: L3.
 
+- 2026-10-15. Digression: derived constants in size expressions (`todo.md`). Capture and carry done; the author writes the stage 4 evaluation (`docs/agent-handoff.md` section 2a). Then L3.
+- 2026-10-16. Derived constants done (stage 4, errors 150 to 153, `DerivedConstantTest`). 26 of 26 tests, 60 of 60 known-good dumps. Next: L3.
+
 ## 5. Phase F, paused
 
 The graph shapes phase F, so these tasks must not decide a phase F question alone:
