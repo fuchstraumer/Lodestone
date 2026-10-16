@@ -102,6 +102,12 @@ enum class CookError : uint16_t
     AxisDefaultMismatch = 143, // the source text and Slang reflection disagree on the initializer
     AxisDefaultAmbiguous = 144, // the module's sources declare the axis with two different initializers
 
+    // the derived constants (module-scope `static const` values) that size expressions use
+    DerivedConstantShadowsSymbol = 150, // a derived constant has the name of an axis or an extern constant
+    DerivedConstantAmbiguous = 151, // two declarations of one name have different expressions
+    DerivedConstantCycle = 152, // a derived constant reaches itself through the constants its expression uses
+    DerivedConstantUnreadable = 153, // a derived constant that a size attribute reaches does not parse or evaluate
+
     // start system errors
     SystemError = 200,
     DirectoryDoesNotExist = 201,

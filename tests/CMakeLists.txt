@@ -102,6 +102,11 @@ add_lodestone_unit_test(AttributeExpressionTest AttributeExpressionTests.cpp)
 add_lodestone_unit_test(AxisDefaultTest AxisDefaultTests.cpp)
 target_compile_definitions(AxisDefaultTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${CMAKE_SOURCE_DIR}/tests/assets/AxisDefaults")
+# Derived constants in size expressions, from the shader source to the element count in the manifest. It cooks
+# through Slang, so it takes about one second.
+add_lodestone_unit_test(DerivedConstantTest DerivedConstantTests.cpp)
+target_compile_definitions(DerivedConstantTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${CMAKE_SOURCE_DIR}/tests/assets/DerivedConstants")
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)
 add_lodestone_unit_test(PermutationIndexTest PermutationIndexTests.cpp)
 add_lodestone_unit_test(ShaderManifestRejectTest ShaderManifestRejectTests.cpp)

@@ -53,6 +53,7 @@ namespace
                                                                    const VariantSet& variant_set,
                                                                    InternedModule& interned_module,
                                                                    RawModule& raw_module,
+                                                                   const DerivedConstantTable& derived_constants,
                                                                    std::vector<CompiledVariant>& out_module_variants);
 }
 
@@ -92,14 +93,25 @@ CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& share
         // this should not happen, since we also look this up during bootstrap, but I've been wrong before
         return std::unexpected(targetProfileResult.error());
     }
+
+    // points into rawModule.DerivedConstants, which the variant compile below does not change
+    const CookResult<DerivedConstantTable> derivedConstants =
+        MakeDerivedConstantTable(rawModule.DerivedConstants, space.Axes(), rawModule.ExternDefaults, *shared_state.Diagnostics);
+    if (!derivedConstants)
+    {
+        const std::string errStr = std::format("module '{}' failed: {}", module_name, ToString(derivedConstants.error()));
+        return std::unexpected(ReportError(*shared_state.Diagnostics, derivedConstants.error(), errStr));
+    }
+
     CookResult<CookStatistics> compileVariantsResult = CompileModuleVariants(shared_state,
                                                                              *targetProfileResult,
                                                                              *compiler,
                                                                              variants,
                                                                              internedModule,
                                                                              rawModule,
+                                                                             derivedConstants.value(),
                                                                              compiledVariants);
-    
+
     if (!compileVariantsResult)
     {
         return std::unexpected(compileVariantsResult.error());
@@ -235,8 +247,8 @@ namespace
 
             if (!comparison)
             {
-                // because most validators load a backend for parsing the source code, there are 
-                // failures not related to reflection mismatches that may occur 
+                // because most validators load a backend for parsing the source code, there are
+                // failures not related to reflection mismatches that may occur
                 // (e.g, the backend parser failed to parse the entry point code)
                 return std::unexpected(comparison.error());
             }
@@ -297,6 +309,7 @@ namespace
                                                                    const VariantSet& variant_set,
                                                                    InternedModule& interned_module,
                                                                    RawModule& raw_module,
+                                                                   const DerivedConstantTable& derived_constants,
                                                                    std::vector<CompiledVariant>& out_module_variants)
     {
         const bool keepRawVariants = IsStageDumpRequested(shared_state.Options, StageDumpKind::Raw);
@@ -314,9 +327,21 @@ namespace
                 return std::unexpected(ReportError(*shared_state.Diagnostics, result.error(), errStr));
             }
 
-            const ResolveContext context =
-                MakeResolveContext(currVariant.Canonical, raw_module.ExternDefaults);
-            CookResult<CompiledVariant> variantResult = ResolveVariant(result.value(), context, *shared_state.Diagnostics);
+            const RawVariant& currRawVariant = result.value();
+            CookResult<ResolveContext> contextResult = MakeResolveContext(currVariant.Canonical,
+                                                                          raw_module.ExternDefaults,
+                                                                          derived_constants,
+                                                                          currRawVariant,
+                                                                          *shared_state.Diagnostics);
+            if (!contextResult)
+            {
+                const std::string errStr = std::format("variant [{}] failed: {}",
+                                                       DescribeAssignment(currVariant.Canonical),
+                                                       ToString(contextResult.error()));
+                return std::unexpected(ReportError(*shared_state.Diagnostics, contextResult.error(), errStr));
+            }
+
+            CookResult<CompiledVariant> variantResult = ResolveVariant(currRawVariant, contextResult.value(), *shared_state.Diagnostics);
             if (!variantResult)
             {
                 const std::string errStr = std::format("variant [{}] failed: {}",

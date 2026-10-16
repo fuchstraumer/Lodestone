@@ -9,7 +9,9 @@
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "permute/PermutationValue.hpp"
+#include <algorithm>
 #include <array>
+#include <span>
 #include <cstdint>
 #include <expected>
 #include <string>
@@ -42,6 +44,9 @@ using lodestone::PermutationAxis;
 using lodestone::PermutationBinding;
 using lodestone::PermutationSpace;
 using lodestone::PermutationValue;
+using lodestone::RawDerivedConstant;
+using lodestone::DerivedConstantTable;
+using lodestone::MakeDerivedConstantTable;
 using lodestone::RawBinding;
 using lodestone::RawEntryPoint;
 using lodestone::RawSizeAttribute;
@@ -84,9 +89,13 @@ PermutationAssignment MakeAssignment()
     };
 }
 
+const lodestone::DerivedConstantTable k_NoDerivedConstants{};
+
+/** Returns the symbol table of one variant with no derived constants. */
 ResolveContext MakeContext()
 {
-    return MakeResolveContext(MakeAssignment(), k_ExternDefaults);
+    StderrDiagnosticSink sink;
+    return MakeResolveContext(MakeAssignment(), k_ExternDefaults, k_NoDerivedConstants, RawVariant{}, sink).value();
 }
 
 /** One storage buffer, placed at group 0 binding 0, with no annotation. Each test adds what it needs. */
@@ -379,6 +388,184 @@ void TestEntryPoints(TestRunner& runner, DiagnosticSink& sink)
                  "visibility passes through as indices into the shared binding list");
 }
 
+RawDerivedConstant MakeDerived(std::string name, std::string expression, uint32_t line)
+{
+    return RawDerivedConstant{ .Name = std::move(name),
+                               .Expression = std::move(expression),
+                               .SourceFile = "Derived.slang",
+                               .SourceLine = line };
+}
+
+/** Builds the derived constant table, then resolves one element count attribute with `expression` against it.
+ * Returns the element count, or the first error of the three steps. */
+CookResult<uint64_t> ResolveDerivedCount(std::span<const RawDerivedConstant> constants,
+                                         std::string expression,
+                                         DiagnosticSink& sink)
+{
+    const CookResult<DerivedConstantTable> table =
+        MakeDerivedConstantTable(constants, k_Space.Axes(), k_ExternDefaults, sink);
+    if (!table)
+    {
+        return std::unexpected(table.error());
+    }
+
+    RawVariant variant = MakeVariantWithOneBuffer();
+    variant.SizeAttributes.push_back(MakeAttribute(RawSizeAttributeKind::ElementCount, { std::move(expression) }));
+    const CookResult<ResolveContext> context =
+        MakeResolveContext(MakeAssignment(), k_ExternDefaults, table.value(), variant, sink);
+    if (!context)
+    {
+        return std::unexpected(context.error());
+    }
+
+    const CookResult<CompiledVariant> resolved = ResolveVariant(variant, context.value(), sink);
+    if (!resolved)
+    {
+        return std::unexpected(resolved.error());
+    }
+
+    const BufferFootprint* buffer = std::get_if<BufferFootprint>(&resolved.value().Footprints.front());
+    return buffer != nullptr ? buffer->ElementCount : 0u;
+}
+
+void CheckDerivedCount(TestRunner& runner,
+                       std::span<const RawDerivedConstant> constants,
+                       std::string expression,
+                       uint64_t expected,
+                       std::string_view description,
+                       DiagnosticSink& sink)
+{
+    const CookResult<uint64_t> count = ResolveDerivedCount(constants, std::move(expression), sink);
+    runner.Check(count.has_value() && count.value() == expected, description);
+}
+
+void CheckDerivedRejection(TestRunner& runner,
+                           std::span<const RawDerivedConstant> constants,
+                           std::string expression,
+                           CookError expected,
+                           std::string_view description,
+                           DiagnosticSink& sink)
+{
+    const CookResult<uint64_t> count = ResolveDerivedCount(constants, std::move(expression), sink);
+    runner.Check(!count.has_value() && count.error() == expected, description);
+}
+
+/** Returns how many entries of the symbol table of `TOP` in the diamond below have the name `BASE`. */
+size_t CountDiamondBaseSymbols(std::span<const RawDerivedConstant> diamond, DiagnosticSink& sink)
+{
+    const CookResult<DerivedConstantTable> table =
+        MakeDerivedConstantTable(diamond, k_Space.Axes(), k_ExternDefaults, sink);
+    if (!table)
+    {
+        return 0u;
+    }
+
+    RawVariant variant = MakeVariantWithOneBuffer();
+    variant.SizeAttributes.push_back(MakeAttribute(RawSizeAttributeKind::ElementCount, { "TOP" }));
+    const CookResult<ResolveContext> context =
+        MakeResolveContext(MakeAssignment(), k_ExternDefaults, table.value(), variant, sink);
+    if (!context)
+    {
+        return 0u;
+    }
+
+    return static_cast<size_t>(std::ranges::count(context.value().Symbols,
+                                                  std::string_view{ "BASE" },
+                                                  &lodestone::AttrExprSymbol::Name));
+}
+
+// in this file IFFT_SIZE is 512, IFFT_USE_WAVE_OPS is 1, and the extern IFFT_NUM_WAVE_CASCADES is 4
+void TestDerivedConstants(TestRunner& runner, DiagnosticSink& sink)
+{
+    runner.BeginSection("derived constants");
+
+    const std::array oneLevel{ MakeDerived("HALF", "IFFT_SIZE / 2u", 1u) };
+    CheckDerivedCount(runner, oneLevel, "HALF", 256u, "a derived constant of an axis", sink);
+    CheckDerivedCount(runner, oneLevel, "HALF * 2", 512u, "a derived constant inside a larger expression", sink);
+
+    // SLOTS is declared before CLUSTER, so declaration order cannot be the evaluation order
+    const std::array twoLevels{ MakeDerived("SLOTS", "CLUSTER * 16u", 1u),
+                                MakeDerived("CLUSTER", "IFFT_SIZE * IFFT_NUM_WAVE_CASCADES", 2u) };
+    CheckDerivedCount(runner,
+                      twoLevels,
+                      "SLOTS",
+                      32768u,
+                      "a derived constant of a derived constant, declared before it",
+                      sink);
+
+    const std::array diamond{ MakeDerived("TOP", "LEFT + RIGHT", 1u),
+                              MakeDerived("LEFT", "BASE * 2u", 2u),
+                              MakeDerived("RIGHT", "BASE + 1u", 3u),
+                              MakeDerived("BASE", "IFFT_SIZE", 4u) };
+    CheckDerivedCount(runner, diamond, "TOP", 1537u, "a diamond: two constants use one base", sink);
+    runner.Check(CountDiamondBaseSymbols(diamond, sink) == 1u,
+                 "the base of a diamond is evaluated once, though two paths reach it");
+
+    const std::array sameTwice{ MakeDerived("N", "4u", 1u), MakeDerived("N", "4u", 9u) };
+    CheckDerivedCount(runner, sameTwice, "N", 4u, "two declarations with one expression are one constant", sink);
+
+    const std::array unusedFloat{ MakeDerived("PI", "3.14159", 1u), MakeDerived("HALF", "IFFT_SIZE / 2u", 2u) };
+    CheckDerivedCount(runner,
+                      unusedFloat,
+                      "HALF",
+                      256u,
+                      "a constant that cannot be evaluated is harmless while no attribute reaches it",
+                      sink);
+
+    runner.BeginSection("derived constant rejections");
+
+    CheckDerivedRejection(runner,
+                          unusedFloat,
+                          "PI",
+                          CookError::DerivedConstantUnreadable,
+                          "a reached constant that does not parse",
+                          sink);
+
+    const std::array unknownName{ MakeDerived("BAD", "NOT_DECLARED * 2u", 1u) };
+    CheckDerivedRejection(runner,
+                          unknownName,
+                          "BAD",
+                          CookError::DerivedConstantUnreadable,
+                          "a reached constant that uses an unknown symbol",
+                          sink);
+
+    const std::array cycle{ MakeDerived("A", "B + 1u", 1u), MakeDerived("B", "A * 2u", 2u) };
+    CheckDerivedRejection(runner, cycle, "A", CookError::DerivedConstantCycle, "two constants that use each other", sink);
+
+    const std::array selfCycle{ MakeDerived("A", "A + 1u", 1u) };
+    CheckDerivedRejection(runner, selfCycle, "A", CookError::DerivedConstantCycle, "a constant that uses itself", sink);
+
+    const std::array ambiguous{ MakeDerived("N", "4u", 3u), MakeDerived("N", "8u", 9u) };
+    CheckDerivedRejection(runner,
+                          ambiguous,
+                          "N",
+                          CookError::DerivedConstantAmbiguous,
+                          "two declarations of one name with different expressions",
+                          sink);
+    CheckDerivedRejection(runner,
+                          ambiguous,
+                          "IFFT_SIZE",
+                          CookError::DerivedConstantAmbiguous,
+                          "an ambiguous name fails the module even when no attribute uses it",
+                          sink);
+
+    const std::array shadowsAxis{ MakeDerived("IFFT_SIZE", "64u", 1u) };
+    CheckDerivedRejection(runner,
+                          shadowsAxis,
+                          "IFFT_SIZE",
+                          CookError::DerivedConstantShadowsSymbol,
+                          "a derived constant with the name of an axis",
+                          sink);
+
+    const std::array shadowsExtern{ MakeDerived("IFFT_NUM_WAVE_CASCADES", "2u", 1u) };
+    CheckDerivedRejection(runner,
+                          shadowsExtern,
+                          "1",
+                          CookError::DerivedConstantShadowsSymbol,
+                          "a derived constant with the name of an extern constant, even when no attribute uses it",
+                          sink);
+}
+
 } // namespace
 
 int main()
@@ -394,6 +581,7 @@ int main()
     TestAttributeTargeting(runner, sink);
     TestPlacementAndPassthrough(runner, sink);
     TestEntryPoints(runner, sink);
+    TestDerivedConstants(runner, sink);
 
     return runner.Report();
 }
