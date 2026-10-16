@@ -217,6 +217,9 @@ if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     # process must first use the release CRT, slang included.
     target_compile_options(lodestone PRIVATE "$<$<CONFIG:Debug>:-fcolor-diagnostics;-fansi-escape-codes;-fstandalone-debug;-fno-limit-debug-info;-fno-omit-frame-pointer>")
 endif()
+# The module cache folder is named by the Slang build tag and this configuration, so that a Debug build and
+# a RelWithDebInfo build (which can be on different Slang builds) never read each other's module files.
+target_compile_definitions(lodestone PRIVATE "LODESTONE_BUILD_CONFIG=\"$<CONFIG>\"")
 
 source_group("common" FILES ${LODESTONE_COMMON_SOURCES})
 source_group("compile" FILES ${LODESTONE_COMPILE_SOURCES})

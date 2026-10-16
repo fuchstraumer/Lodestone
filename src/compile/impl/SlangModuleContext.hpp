@@ -59,7 +59,6 @@ public:
     /**@brief Serialized every module this session loaded, in depdency order, into the returned list
       *of serialized modules. Order must be preserved in order for this to work as a shortcut */
     [[nodiscard]] std::vector<SerializedModule> SerializeModules() const;
-    [[nodiscard]] CookError WriteModuleCache() const;
 
     /**@brief The main thread will call RunBootstrap, retrieve the serialized modules, and then initialize
       * sub-contexts for each worker thread with the serialized modules. */
@@ -118,6 +117,12 @@ private:
     TargetLanguage language{ TargetLanguage::Invalid };
     DiagnosticSink* diagnosticSink{ nullptr };
 };
+
+/**@brief Writes each serialized module to its cache path, so that the next cook loads it instead of compiling
+ * it. Only the calling thread runs this, once for each compiler, from the blobs of the bootstrap session. The
+ * worker sessions load the same modules from those blobs, so one writer covers every module that a later
+ * import can find. A file that cannot be written is a warning, because the cache is an optimization. */
+CookError WriteModuleCache(std::span<const SerializedModule> serialized_modules, DiagnosticSink& sink);
 
 }
 

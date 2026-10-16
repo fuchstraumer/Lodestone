@@ -50,6 +50,13 @@ function(add_slang_subdirectory SLANG_DIR)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}${SUPPRESS_FLAGS}")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}${SUPPRESS_FLAGS}")
     
+    # Slang's GitVersion.cmake runs `git describe` only when SLANG_VERSION_FULL is not defined, and it
+    # stores the result in the cache. So a cached tag survived every later submodule checkout, and a build
+    # of new Slang sources reported an old tag (measured 2026-10-16: a DLL that wrote IR version 32 named
+    # ac945e5, which writes 31). The module cache folder is named by this tag, so it must be read again on
+    # every configure.
+    unset(SLANG_VERSION_FULL CACHE)
+
     # Add Slang subdirectory - all targets will inherit the suppression flags
     add_subdirectory(${SLANG_DIR} EXCLUDE_FROM_ALL)
     

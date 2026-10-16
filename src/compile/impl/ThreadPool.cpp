@@ -219,11 +219,6 @@ void ThreadPool::workerFunction(const std::stop_token& stop_token,
             batch->Results[jobIndexU] = variantBuildResult ? variantReflector.Reflect(*variantBuildResult, batch->Variants[jobIndexU]) : std::unexpected(variantBuildResult.error());
         }
 
-        const CookError writeCacheError = moduleContext.WriteModuleCache();
-        if (writeCacheError != CookError::Success)
-        {
-            ReportWarning(batch->ThreadSinks[thread_idx], "Failed to write module cache");
-        }
         batch->DoneLatch->count_down();
     }
 }
