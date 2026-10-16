@@ -1,4 +1,4 @@
-#include "emit/Depfile.hpp"
+#include "emit/DepFile.hpp"
 #include <span>
 #include <string>
 #include <string_view>
