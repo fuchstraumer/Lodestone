@@ -17,6 +17,7 @@
 #include <iterator>
 #include <limits>
 #include <magic_enum/magic_enum.hpp>
+#include <memory>
 #include <optional>
 #include <ranges>
 #include <span>
@@ -497,15 +498,37 @@ std::span<const EntryPoint> ModuleView::EntryPoints() const noexcept
 
 ManifestResult<const EntryPoint*> ModuleView::FindEntryPoint(std::string_view name) const noexcept
 {
-    for (const EntryPoint& entryPoint : entryPoints)
+    auto findFn = [&](const EntryPoint& entryPoint) -> bool
     {
-        std::string_view epName = bundle.String(entryPoint.NameString);
-        if (epName == name)
-        {
-            return &entryPoint;
-        }
+        return bundle.String(entryPoint.NameString) == name;
+    };
+
+    auto findIter = std::ranges::find_if(entryPoints, findFn);
+    if (findIter != entryPoints.end())
+    {
+        return std::to_address(findIter);
     }
     
+    return std::unexpected(ErrorState{ .Code = ErrorCode::EntryPointInvalidName,
+                                       .Table = ShaderManifestTable::EntryPoints,
+                                       .RecordIndex = moduleIndex,
+                                       .Detail = 0 });
+}
+
+ManifestResult<uint32_t> ModuleView::FindEntryPointIndex(std::string_view name) const noexcept
+{
+    auto findFn = [&](const EntryPoint& entryPoint) -> bool
+    {
+        return bundle.String(entryPoint.NameString) == name;
+    };
+
+    auto findIter = std::ranges::find_if(entryPoints, findFn);
+    if (findIter != entryPoints.end())
+    {
+        const std::ptrdiff_t index = std::distance(entryPoints.begin(), findIter);
+        return static_cast<uint32_t>(index);
+    }
+
     return std::unexpected(ErrorState{ .Code = ErrorCode::EntryPointInvalidName,
                                        .Table = ShaderManifestTable::EntryPoints,
                                        .RecordIndex = moduleIndex,
