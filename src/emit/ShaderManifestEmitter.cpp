@@ -1,5 +1,6 @@
 #include "emit/ShaderManifestEmitter.hpp"
 #include "VariantKey.hpp"
+#include "model/AxisInfluence.hpp"
 #include "model/CookedLibrary.hpp"
 #include "CookerErrors.hpp"
 #include "permute/PermutationAxis.hpp"
@@ -222,6 +223,7 @@ namespace
     CookError CheckVariantKeyDecode(const manifest::EnvironmentView& view,
                                     const LibraryVariant& variant,
                                     VariantKey key);
+    CookError CheckAxisRelevance(const CookedModule& module, const manifest::EnvironmentView& view);
     CookError CheckVariantAxisMask(const CookedModule& module,
                                    const LibraryVariant& variant,
                                    manifest::VariantView read_variant);
@@ -937,6 +939,40 @@ namespace
         return tables;
     }
 
+    /** Returns one axis relevance mask for each entry point, in the word layout of the axis mask table. Bit k is
+     * set when `model/AxisInfluence` measures axis k as Active or Undetermined for that entry point. */
+    CookResult<std::vector<uint64_t>> BuildAxisRelevanceTable(const CookedModule& module)
+    {
+        const size_t axisCount = module.Space != nullptr ? module.Space->AxisCount() : 0u;
+        const size_t maskWordCount = (axisCount + k_AxisMaskWordBits - 1u) / k_AxisMaskWordBits;
+        std::vector<uint64_t> relevance(module.EntryPoints.size() * maskWordCount, 0u);
+        if (axisCount == 0u)
+        {
+            return relevance;
+        }
+
+        const CookResult<ModuleInfluence> influence = ComputeActualInfluence(module);
+        if (!influence)
+        {
+            return std::unexpected(influence.error());
+        }
+
+        for (auto&& [entryPointIndex, entryPoint] : std::views::enumerate(influence->EntryPoints))
+        {
+            for (auto&& [axisIndex, axisInfluence] : std::views::enumerate(entryPoint.Axes))
+            {
+                if (IsAxisRelevant(axisInfluence))
+                {
+                    const size_t wordIndex = (static_cast<size_t>(entryPointIndex) * maskWordCount) +
+                                             (static_cast<size_t>(axisIndex) / k_AxisMaskWordBits);
+                    relevance[wordIndex] |= uint64_t{ 1u } << (static_cast<size_t>(axisIndex) % k_AxisMaskWordBits);
+                }
+            }
+        }
+
+        return relevance;
+    }
+
     CookResult<std::vector<std::byte>> BuildExtent(const CookedModule& module, StringTableBuilder& strings)
     {
         CookResult<VariantTables> variantsResult = BuildVariantTables(module, strings);
@@ -946,6 +982,11 @@ namespace
         }
 
         const VariantTables& variants = *variantsResult;
+        const CookResult<std::vector<uint64_t>> relevance = BuildAxisRelevanceTable(module);
+        if (!relevance)
+        {
+            return std::unexpected(relevance.error());
+        }
         const LayoutTables layouts = BuildLayoutTables(module, strings);
         const RasterTables rasters = BuildRasterTables(module, strings);
         SourceTables sources = BuildSourceTables(module);
@@ -960,6 +1001,8 @@ namespace
         environment.VariantTableOffset = AppendTable(extent, variants.Variants).Offset;
         environment.AxisMaskTableOffset = AppendTable(extent, variants.AxisMasks).Offset;
         environment.EntryPointInstanceTableOffset = AppendTable(extent, variants.Slots).Offset;
+        // the entry point count and the module's axis count size this table, so it keeps its offset only
+        environment.AxisRelevanceTableOffset = AppendTable(extent, relevance.value()).Offset;
 
         environment.Sources = AppendTable(extent, sources.Refs);
         // The count of the blob is in bytes.
@@ -1064,6 +1107,12 @@ namespace
         if (defaultsError != CookError::Success)
         {
             return defaultsError;
+        }
+
+        const CookError relevanceError = CheckAxisRelevance(module, view);
+        if (relevanceError != CookError::Success)
+        {
+            return relevanceError;
         }
 
         const manifest::ShaderSourceProvider provider{ view, 0u };
@@ -1203,6 +1252,43 @@ namespace
                              axis.Name,
                              digit);
                 return CookError::ManifestAxisDefaultMismatch;
+            }
+        }
+
+        return CookError::Success;
+    }
+
+    CookError CheckAxisRelevance(const CookedModule& module, const manifest::EnvironmentView& view)
+    {
+        if (module.Space == nullptr)
+        {
+            return CookError::Success;
+        }
+
+        const CookResult<ModuleInfluence> influence = ComputeActualInfluence(module);
+        if (!influence)
+        {
+            return influence.error();
+        }
+
+        const std::span<const PermutationAxis> axes = module.Space->Axes();
+        for (auto&& [entryPointIndex, entryPoint] : std::views::enumerate(influence->EntryPoints))
+        {
+            for (uint32_t axisIndex = 0u; axisIndex < axes.size(); ++axisIndex)
+            {
+                const bool expected = IsAxisRelevant(entryPoint.Axes[axisIndex]);
+                if (view.IsAxisRelevant(static_cast<uint32_t>(entryPointIndex), axisIndex) != expected)
+                {
+                    std::println(stderr,
+                                 "[lodestone] manifest marks axis '{}' {} for entry point '{}' of module '{}', the "
+                                 "measured influence is {}",
+                                 axes[axisIndex].Name,
+                                 expected ? "irrelevant" : "relevant",
+                                 entryPoint.EntryPointName,
+                                 module.Name,
+                                 ToString(entryPoint.Axes[axisIndex]));
+                    return CookError::ManifestAxisRelevanceMismatch;
+                }
             }
         }
 

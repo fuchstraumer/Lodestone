@@ -319,6 +319,121 @@ lodestone::CookedModule BuildTileModule(std::string name, const PermutationSpace
     return module;
 }
 
+// Two boolean axes and two entry points. `FogCS` has one source for each value of FOG, and `PlainCS` has one
+// source for every variant. DEBUG changes nothing. So FOG is relevant to FogCS only, and DEBUG is relevant to
+// nothing. `keep_debug_on` false cooks only DEBUG = false, which leaves DEBUG with one cooked value.
+PermutationSpace MakeRelevanceSpace()
+{
+    std::vector<PermutationAxis> axes;
+    axes.emplace_back("FOG", BoolValues(), AxisKind::Technique, EarliestBindingTime::Cook, AxisValueDomain::Boolean);
+    axes.emplace_back("DEBUG", BoolValues(), AxisKind::Technique, EarliestBindingTime::Cook, AxisValueDomain::Boolean);
+    return PermutationSpace{ std::move(axes) };
+}
+
+lodestone::CookedModule BuildRelevanceModule(const PermutationSpace& space, bool keep_debug_on)
+{
+    lodestone::CookedModule module;
+    module.Name = "RelevanceModule";
+    module.Space = &space;
+    module.EntryPoints.push_back(
+        lodestone::LibraryEntryPoint{ .Name = "FogCS", .Stage = lodestone::ShaderStageKind::Compute });
+    module.EntryPoints.push_back(
+        lodestone::LibraryEntryPoint{ .Name = "PlainCS", .Stage = lodestone::ShaderStageKind::Compute });
+    module.Sources.emplace_back(lodestone::tests::BytesOf("// fog off"));
+    module.Sources.emplace_back(lodestone::tests::BytesOf("// fog on"));
+    module.Sources.emplace_back(lodestone::tests::BytesOf("// plain"));
+    module.ResourceLists.emplace_back();
+    module.FootprintLists.emplace_back();
+    module.VisibilityLists.emplace_back();
+    module.RasterStates.emplace_back();
+
+    uint32_t index = 0u;
+    for (const bool fog : { false, true })
+    {
+        for (const bool debug : { false, true })
+        {
+            if (debug && !keep_debug_on)
+            {
+                continue;
+            }
+
+            lodestone::LibraryVariant variant;
+            variant.Index = index++;
+            variant.Active = lodestone::PermutationAssignment{
+                lodestone::PermutationBinding{ .Axis = &space.Axes()[0], .Value = PermutationValue{ fog } },
+                lodestone::PermutationBinding{ .Axis = &space.Axes()[1], .Value = PermutationValue{ debug } } };
+            variant.Canonical = space.CanonicalizeAssignment(variant.Active);
+            module.VariantKeys.push_back(space.ComputeVariantKey(variant.Canonical));
+            variant.SourceIndices = { fog ? 1u : 0u, 2u };
+            variant.VisibilityIndices = { 0u, 0u };
+            variant.RasterIndices = { 0u, 0u };
+            variant.Workgroups = { lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u },
+                                   lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u } };
+            module.Variants.emplace_back(std::move(variant));
+        }
+    }
+
+    module.SpaceSize = 4u;
+    return module;
+}
+
+void CheckAxisRelevance(lodestone::tests::TestRunner& runner)
+{
+    runner.BeginSection("axis relevance for each entry point");
+
+    // local axis 0 is FOG, 1 is DEBUG. entry point 0 is FogCS, 1 is PlainCS
+    const PermutationSpace space = MakeRelevanceSpace();
+    for (const bool keepDebugOn : { true, false })
+    {
+        lodestone::CookedLibrary library;
+        library.ModuleNames = { "RelevanceModule" };
+        library.Profiles = { MakeProfile("wgsl") };
+        library.Environments.emplace_back(BuildRelevanceModule(space, keepDebugOn));
+        const std::vector<std::byte> bytes = EmitBytes(library);
+        const ManifestResult<EnvironmentView> opened = OpenEnvironment(bytes, 0u, 0u);
+        runner.Check(opened.has_value(), "the relevance module opens");
+        if (!opened.has_value())
+        {
+            return;
+        }
+
+        const EnvironmentView& view = opened.value();
+        if (keepDebugOn)
+        {
+            runner.Check(view.IsAxisRelevant(0u, 0u), "an axis that changes the code is relevant to that entry point");
+            runner.Check(!view.IsAxisRelevant(1u, 0u), "the same axis is not relevant to an entry point it never changes");
+            runner.Check(!view.IsAxisRelevant(0u, 1u) && !view.IsAxisRelevant(1u, 1u),
+                         "an axis that changes nothing is relevant to no entry point");
+
+            // a bit past the module's two axes is damage, and the reader rejects it when the environment opens
+            lodestone::manifest::Header header;
+            std::memcpy(&header, bytes.data(), sizeof(header));
+            lodestone::manifest::EnvironmentDirectoryEntry entry;
+            std::memcpy(&entry, bytes.data() + header.EnvironmentDirectoryOffset, sizeof(entry));
+            lodestone::manifest::EnvironmentHeader environment;
+            std::memcpy(&environment, bytes.data() + entry.ExtentOffset, sizeof(environment));
+            const size_t wordOffset = entry.ExtentOffset + environment.AxisRelevanceTableOffset;
+
+            std::vector<std::byte> damaged = bytes;
+            uint64_t word = 0u;
+            std::memcpy(&word, damaged.data() + wordOffset, sizeof(word));
+            word |= uint64_t{ 1u } << 63u;
+            std::memcpy(damaged.data() + wordOffset, &word, sizeof(word));
+            const ManifestResult<EnvironmentView> damagedOpen = OpenEnvironment(damaged, 0u, 0u);
+            runner.Check(!damagedOpen.has_value() &&
+                             damagedOpen.error().Code == lodestone::manifest::ErrorCode::InvalidAxisRelevance,
+                         "a relevance bit past the module's axes is rejected when the environment opens");
+        }
+        else
+        {
+            runner.Check(view.IsAxisRelevant(0u, 1u) && view.IsAxisRelevant(1u, 1u),
+                         "an axis with one cooked value cannot show a difference, so it counts as relevant");
+            runner.Check(view.IsAxisRelevant(0u, 0u) && !view.IsAxisRelevant(1u, 0u),
+                         "the other axis is still measured");
+        }
+    }
+}
+
 // Counts the keys of a query, or returns SIZE_MAX when the query is in an error state.
 size_t KeyCount(const ManifestQueryBuilder& query)
 {
@@ -745,6 +860,8 @@ int main()
                          "the reversed module keeps its own value order");
         }
     }
+
+    CheckAxisRelevance(runner);
 
     return runner.Report();
 }

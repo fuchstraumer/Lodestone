@@ -35,6 +35,7 @@ namespace
 constexpr std::string_view k_ActiveEntryPoint = "ActiveCS";
 constexpr std::string_view k_InertEntryPoint = "InertCS";
 constexpr std::string_view k_ConditionalEntryPoint = "ConditionalCS";
+constexpr std::string_view k_FootprintEntryPoint = "FootprintCS";
 
 // This used to be in DedupeReport.hpp/.cpp, but it's oddly specific and isn't really often
 // a useful metric in library code (in most cases). It's a useful test case though, so it's
@@ -172,6 +173,22 @@ CompiledVariant MakeConditionalVariant(uint64_t index, bool first_axis_value, bo
     return variant;
 }
 
+/** `FootprintCS` has the same code in every variant. The first axis changes only the element count of its
+ * buffer, the way an axis that appears only in a size attribute does. So the first axis is Active and the
+ * second is Inert, and a measurement that reads the code alone reports both as Inert. */
+CompiledVariant MakeFootprintVariant(uint64_t index, bool first_axis_value, bool second_axis_value)
+{
+    CompiledVariant variant;
+    variant.VariantIndex = index;
+    variant.VariantSuffix = std::format("_{}_{}", first_axis_value, second_axis_value);
+    variant.VariantDescription = std::format("AXIS_A={} AXIS_B={}", first_axis_value, second_axis_value);
+    variant.Bindings.push_back(MakeSharedBinding());
+    variant.Footprints.push_back(
+        BufferFootprint{ .ElementCount = first_axis_value ? 512u : 256u, .Expression = "AXIS_A ? 512 : 256" });
+    variant.EntryPoints.push_back(MakeEntryPoint(k_FootprintEntryPoint, "// this text never changes\n"));
+    return variant;
+}
+
 CookedModule BuildModule(const PermutationSpace& space, bool dedupe_enabled)
 {
     InternedModule module;
@@ -280,6 +297,43 @@ CookedModule BuildConditionalModule(const PermutationSpace& space)
     return FreezeModuleTables(std::move(module));
 }
 
+CookedModule BuildFootprintModule(const PermutationSpace& space, bool dedupe_enabled)
+{
+    InternedModule module;
+    module.Name = "FootprintModule";
+    module.Space = &space;
+    module.SpaceSize = 4u;
+    module.EntryPoints.push_back(
+        LibraryEntryPoint{ .Name = std::string{ k_FootprintEntryPoint }, .Stage = ShaderStageKind::Compute });
+
+    if (!dedupe_enabled)
+    {
+        DisableDedupe(module);
+    }
+
+    uint32_t index = 0u;
+    for (const bool firstAxisValue : { false, true })
+    {
+        for (const bool secondAxisValue : { false, true })
+        {
+            const CompiledVariant variant = MakeFootprintVariant(index, firstAxisValue, secondAxisValue);
+            const VariantDescriptor descriptor =
+                MakeAssignment(space, space.Axes()[0], space.Axes()[1], firstAxisValue, secondAxisValue);
+
+            const CookError appended = AppendVariantToModule(module, variant, descriptor);
+            if (appended != CookError::Success)
+            {
+                module.Variants.clear();
+                return FreezeModuleTables(std::move(module));
+            }
+
+            ++index;
+        }
+    }
+
+    return FreezeModuleTables(std::move(module));
+}
+
 AxisInfluence InfluenceOf(const ModuleInfluence& influence,
                           std::string_view entry_point_name,
                           size_t axis_index)
@@ -325,8 +379,15 @@ void CheckInfluenceAgrees(lodestone::tests::TestRunner& runner,
 {
     runner.BeginSection("influence does not depend on dedup");
 
-    const ModuleInfluence dedupedInfluence = ComputeActualInfluence(deduped);
-    const ModuleInfluence rawInfluence = ComputeActualInfluence(raw);
+    const CookResult<ModuleInfluence> dedupedResult = ComputeActualInfluence(deduped);
+    const CookResult<ModuleInfluence> rawResult = ComputeActualInfluence(raw);
+    runner.Check(dedupedResult.has_value() && rawResult.has_value(), "both arms measure the influence");
+    if (!dedupedResult || !rawResult)
+    {
+        return;
+    }
+    const ModuleInfluence& dedupedInfluence = dedupedResult.value();
+    const ModuleInfluence& rawInfluence = rawResult.value();
 
     runner.Check(InfluenceOf(dedupedInfluence, k_ActiveEntryPoint, 0u) == AxisInfluence::Active,
                  "with dedup on, the axis the shader reads is Active");
@@ -393,12 +454,40 @@ void CheckEveryGroupIsMeasured(lodestone::tests::TestRunner& runner, const Permu
     runner.BeginSection("influence reads every group");
 
     const CookedModule module = BuildConditionalModule(space);
-    const ModuleInfluence influence = ComputeActualInfluence(module);
+    const CookResult<ModuleInfluence> influenceResult = ComputeActualInfluence(module);
+    runner.Check(influenceResult.has_value(), "the conditional module measures its influence");
+    if (!influenceResult)
+    {
+        return;
+    }
+    const ModuleInfluence& influence = influenceResult.value();
 
     runner.Check(InfluenceOf(influence, k_ConditionalEntryPoint, 0u) == AxisInfluence::Active,
                  "the first axis is Active, and only the second group of variants says so");
     runner.Check(InfluenceOf(influence, k_ConditionalEntryPoint, 1u) == AxisInfluence::Active,
                  "the second axis decides whether the text changes, so it is Active as well");
+}
+
+void CheckFootprintIsPartOfTheInstance(lodestone::tests::TestRunner& runner, const PermutationSpace& space)
+{
+    runner.BeginSection("a footprint is part of the entry point instance");
+
+    for (const bool dedupeEnabled : { true, false })
+    {
+        const CookedModule module = BuildFootprintModule(space, dedupeEnabled);
+        const CookResult<ModuleInfluence> influenceResult = ComputeActualInfluence(module);
+        runner.Check(influenceResult.has_value(), "the footprint module measures its influence");
+        if (!influenceResult)
+        {
+            return;
+        }
+
+        const std::string_view arm = dedupeEnabled ? "with dedup" : "with --no-dedupe";
+        runner.Check(InfluenceOf(influenceResult.value(), k_FootprintEntryPoint, 0u) == AxisInfluence::Active,
+                     std::format("an axis that changes only a buffer size is Active, {}", arm));
+        runner.Check(InfluenceOf(influenceResult.value(), k_FootprintEntryPoint, 1u) == AxisInfluence::Inert,
+                     std::format("an axis that changes nothing is Inert, {}", arm));
+    }
 }
 
 } // namespace
@@ -417,6 +506,7 @@ int main()
     CheckSharedLayoutAgrees(runner, space);
     CheckSharedLayoutRejectsADifference(runner, space);
     CheckEveryGroupIsMeasured(runner, space);
+    CheckFootprintIsPartOfTheInstance(runner, space);
 
     return runner.Report();
 }

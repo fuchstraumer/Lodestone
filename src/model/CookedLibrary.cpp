@@ -50,37 +50,39 @@ ContentHashValue HashVisibilityList(const std::vector<uint32_t>& visibility) noe
     return HashIndexList(visibility);
 }
 
+void AppendFootprintHash(StreamingHash& hasher, const ResourceFootprint& footprint) noexcept
+{
+    // at most 4 scalar values per footprint
+    std::array<uint64_t, 4> footprintScalars{ 0u, 0u, 0u, 0u };
+    if (const BufferFootprint* buffer = std::get_if<BufferFootprint>(&footprint))
+    {
+        footprintScalars[0] = static_cast<uint64_t>(footprint.index());
+        footprintScalars[1] = static_cast<uint64_t>(buffer->ElementCount);
+        hasher.Append(std::span{ footprintScalars.data(), 2u });
+        hasher.Append(std::string_view{ buffer->Expression });
+    }
+    else if (const TextureFootprint* texture = std::get_if<TextureFootprint>(&footprint))
+    {
+        footprintScalars[0] = static_cast<uint64_t>(footprint.index());
+        footprintScalars[1] = static_cast<uint64_t>(texture->ExtentX);
+        footprintScalars[2] = static_cast<uint64_t>(texture->ExtentY);
+        footprintScalars[3] = static_cast<uint64_t>(texture->ExtentZ);
+        hasher.Append(std::span{ footprintScalars.data(), footprintScalars.size() });
+        hasher.Append(std::string_view{ texture->Expression });
+    }
+    else
+    {
+        hasher.Append(static_cast<uint64_t>(footprint.index()));
+    }
+}
+
 ContentHashValue HashFootprintList(const std::vector<ResourceFootprint>& footprints) noexcept
 {
     thread_local StreamingHash compositeHasher;
-    compositeHasher.Reset(); // originally wanted to use local array
-    // reusable array for at most 4 scalar values per footprint
-    std::array<uint64_t, 4> footprintScalars{ 0u, 0u, 0u, 0u }; 
-    // can we construct this using ranges?
+    compositeHasher.Reset();
     for (const ResourceFootprint& footprint : footprints)
     {
-        footprintScalars.fill(0u);
-
-        if (const BufferFootprint* buffer = std::get_if<BufferFootprint>(&footprint))
-        {
-            footprintScalars[0] = static_cast<uint64_t>(footprint.index());
-            footprintScalars[1] = static_cast<uint64_t>(buffer->ElementCount);
-            compositeHasher.Append(std::span{ footprintScalars.data(), 2u });
-            compositeHasher.Append(std::string_view{ buffer->Expression });
-        }
-        else if (const TextureFootprint* texture = std::get_if<TextureFootprint>(&footprint))
-        {
-            footprintScalars[0] = static_cast<uint64_t>(footprint.index());
-            footprintScalars[1] = static_cast<uint64_t>(texture->ExtentX);
-            footprintScalars[2] = static_cast<uint64_t>(texture->ExtentY);
-            footprintScalars[3] = static_cast<uint64_t>(texture->ExtentZ);
-            compositeHasher.Append(std::span{ footprintScalars.data(), footprintScalars.size() });
-            compositeHasher.Append(std::string_view{ texture->Expression });
-        }
-        else
-        {
-            compositeHasher.Append(static_cast<uint64_t>(footprint.index()));
-        }
+        AppendFootprintHash(compositeHasher, footprint);
     }
 
     return compositeHasher.Finalize();

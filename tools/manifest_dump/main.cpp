@@ -392,6 +392,28 @@ void WriteVariants(lodestone::JsonWriter& writer,
     writer.EndArray();
 }
 
+/** For each entry point, the names of the axes that can change its instance in this environment. */
+void WriteAxisRelevance(lodestone::JsonWriter& writer, const manifest::EnvironmentView& view) noexcept
+{
+    const std::span<const manifest::EntryPoint> entryPoints = view.Module().EntryPoints();
+    writer.Key("relevantAxes");
+    writer.BeginObject();
+    for (uint32_t entryPointIndex = 0u; entryPointIndex < entryPoints.size(); entryPointIndex++)
+    {
+        writer.Key(view.String(entryPoints[entryPointIndex].NameString));
+        writer.BeginArray();
+        for (uint32_t axisIndex = 0u; axisIndex < view.Module().AxisCount(); axisIndex++)
+        {
+            if (view.IsAxisRelevant(entryPointIndex, axisIndex))
+            {
+                writer.String(view.String(view.Module().AxisData(axisIndex).NameString));
+            }
+        }
+        writer.EndArray();
+    }
+    writer.EndObject();
+}
+
 /** One module: its profile-invariant facts, then one object for each profile that cooked it. */
 DumpError WriteModule(lodestone::JsonWriter& writer,
                       const manifest::BundleView& bundle,
@@ -427,6 +449,7 @@ DumpError WriteModule(lodestone::JsonWriter& writer,
 
         writer.BeginObject();
         writer.KeyString("target", bundle.String(bundle.Profiles()[profileIndex].TargetNameString));
+        WriteAxisRelevance(writer, *view);
         WriteBindingsFlat(writer, *view);
         WriteVariants(writer, *view, with_sources);
         writer.EndObject();

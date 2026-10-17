@@ -121,7 +121,7 @@ and each takes about one second.
 | `StageDumpTest` | A stage dump holds the model and no target text, it names itself the way `--dump-stage` names it, and two dumps of one input agree byte for byte. |
 | `SymbolTableTest` | The tokenizer that powers axis-reachability pruning: it strips `extern static const` declarations and reserved keywords, and reports the axis names no reachable source uses. |
 | `PolicyDocumentTest` | The TOML policy reader, its query surface, and its validation of every axis name and value against the declared space. It also proves the four coverage answers (no module entry, no target sections, present, and other targets only) and the rejection of a target name the build does not know. |
-| `DedupeInfluenceTest` | Dedup changes what the tables cost and never what the cook measures. It builds one module in both arms and checks that the axis influence agrees, and that the measurement reads every group of variants. |
+| `DedupeInfluenceTest` | Dedup changes what the tables cost and never what the cook measures. It also proves that an axis which changes only a buffer size, with the same code, is Active (`model/AxisInfluence` compares the whole entry point instance). It builds one module in both arms and checks that the axis influence agrees, and that the measurement reads every group of variants. |
 | `DiagnosticParserTest` | The parser reads Slang's machine-readable diagnostic form into a record, and counts the records whose severity is a failure. Codegen reads that count. It names no Slang type, so it needs no compiler. |
 | `ResolveStageTest` | Stage 4 resolves a hand-built `RawVariant` with no Slang present. This test is the proof that the stage 3 and stage 4 split worked, and before phase D step D5 it could not be written at all. |
 | `AxisDefaultTest` | The declared default of each axis, from the shader initializer to `ManifestIndex::AxisDefault`. `tests/assets/AxisDefaults/AxisDefaults.slang` declares every default as a value other than the first, in all four domains, with a literal initializer (which reflection also reads, so the two readers are compared) and an expression initializer (which only the source text can read). It proves that a missing default and a default outside the declared values each fail the cook, and that a policy which drops the default cooks, keeps the default in the manifest, and leaves no variant for it. |
@@ -222,7 +222,7 @@ is therefore a visible word in a diff: the day a file in `emit/` writes
 |---|---|---|
 | `permute/` | `PermutationValue`, `PermutationAxis`, `PermutationAssignment`, `PermutationSpace`, `PolicyDocument`, `AttributeExpression` | The authoring parameter domain. Stages 1 and 2. Phase E filled this folder. |
 | `compile/` | `SlangCompiler`, `SlangDiagnosticParser`, `RawLibrary`, `Diagnostics`, and `src/compile/impl/` | **The Slang wall. No file outside this folder names a Slang type.** |
-| `model/` | `ResolveStage`, `ShaderDataSchema`, `ContentHash`, `ContentInterner`, `CookedLibrary` | The data that flows, interns, and freezes. Stages 4, 6, and 7. |
+| `model/` | `ResolveStage`, `ShaderDataSchema`, `ContentHash`, `ContentInterner`, `CookedLibrary`, `AxisInfluence` | The data that flows, interns, and freezes. Stages 4, 6, and 7. |
 | `target/` | `TargetProfile`, `TargetUtils`, `WgslValidator`, `SpvValidator` | A target, its access model, and its validator. Phase F fills this folder. |
 | `emit/` | `ShaderLibraryEmitter`, `ShaderManifestEmitter`, `OutputSink`, `StageDump`, `DedupeReport` | Everything that writes through a sink. Stage 8, plus the two reports. |
 | `driver/` | `CookerDriver`, `CookerOptions` | The loop and its command line. |
@@ -650,6 +650,18 @@ share a root axis and declare different defaults. The cook reads the default fro
 literal initializers only, and never the `= Impl` of an `extern struct`. An axis with no readable default
 fails the cook. The declared default is not the canonical value: canonicalization still fills an unused
 axis with the first value (`PermutationAxis::GetCanonicalValue`), so the default does not change any key.
+
+Each environment records the axis relevance of each entry point (format version 9, task L3): one bitmask per
+entry point, in the word layout of the axis-active mask, at `EnvironmentHeader::AxisRelevanceTableOffset`.
+Bit k is set when axis k can change that entry point's instance: its source, its layout (each visible resource
+and its footprint), its raster state, or its workgroup size. `model/AxisInfluence` measures it from the frozen
+tables by content, so `--no-dedupe` gives the same mask. The source alone is not enough: an axis that appears
+only in a size attribute changes a footprint and leaves the code the same. An axis with one cooked value is
+Undetermined and counts as relevant. The emitter computes the mask from the module it writes, so a hand-built
+`CookedModule` gets a correct mask, and `VerifyManifestRoundTrip` reads it back (`ManifestAxisRelevanceMismatch`).
+The client reads it with `EnvironmentView::AxisRelevance` and `IsAxisRelevant`, and `manifest_dump` writes a
+`"relevantAxes"` object for each environment. The query surface does not use it yet: the `Single` change and an
+independent second derivation (a validator) are open decisions.
 
 Each profile records its `ShaderCodeFormat` (since format version 7). A SPIR-V source is read as words, so
 `Open` rejects a SPIR-V source that is not on a 4-byte boundary or not whole words. The sources are packed

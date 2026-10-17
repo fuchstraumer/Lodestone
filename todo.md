@@ -9,6 +9,7 @@
     - Then, during output format mapping we collapse to what that platform actually supports
     - Alternatively, use foresight about output target to fail builds if unsupported
 # Resource Layer
+- The WGSL cross-check does not compare a storage texture format. Slang `ac945e5` reflected `RWTexture3D<float>` (no `[format]`) as `Invalid` while the emitted WGSL said `r32float`, and nothing failed. Slang `e9fc02c8d` reflects `R32Float`. Compare the format against Tint's inspector, so the next disagreement fails the cook.
 - Reflection joins a scope with `_` (`JoinScopeName` in `SlangReflector.cpp`), which is the WGSL
   spelling. SPIR-V uses `.`. Store `.`, and let each validator make its own form. `SpvValidator` compares
   the last name segment only until then.

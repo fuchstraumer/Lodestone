@@ -103,6 +103,38 @@ def cook(cooker: pathlib.Path, module: pathlib.Path, target: str, out_directory:
         raise SystemExit(f"the cook failed with exit code {result.returncode}")
 
 
+def diff_report(left: list, right: list, from_name: str, to_name: str, context: int) -> list:
+    """Returns a unified diff of two dumps as a list of lines.
+
+    difflib's matcher is slow on long JSON with many repeated lines (`},` and `],`): when thousands of lines
+    differ, one file took minutes. A dump whose values change keeps its line count, so two files with the same
+    count are compared line by line, which is linear. Only the report uses this. The pass or fail decision is
+    the exact comparison of the two line lists."""
+    if len(left) != len(right):
+        return list(difflib.unified_diff(left, right, fromfile=from_name, tofile=to_name, n=context, lineterm=""))
+
+    changed = [i for i, (a, b) in enumerate(zip(left, right)) if a != b]
+    report = [f"--- {from_name}", f"+++ {to_name}"]
+    position = 0
+    while position < len(changed):
+        # one hunk: changed lines closer than 2 * context apart share their context lines
+        end = position
+        while end + 1 < len(changed) and changed[end + 1] - changed[end] <= 2 * context:
+            end += 1
+        first = max(changed[position] - context, 0)
+        last = min(changed[end] + context, len(left) - 1)
+        count = last - first + 1
+        report.append(f"@@ -{first + 1},{count} +{first + 1},{count} @@")
+        for i in range(first, last + 1):
+            if left[i] == right[i]:
+                report.append(f" {left[i]}")
+            else:
+                report.append(f"-{left[i]}")
+                report.append(f"+{right[i]}")
+        position = end + 1
+    return report
+
+
 def check_module(cooker: pathlib.Path, module: pathlib.Path, target: str, known_good: pathlib.Path,
                  context: int, accept: bool) -> list:
     """Cooks one module for one target and compares its six dumps. Returns a label for each stage
@@ -139,14 +171,12 @@ def check_module(cooker: pathlib.Path, module: pathlib.Path, target: str, known_
                 print(f"  same      {stem} {stage}")
                 continue
 
-            changed = sum(1 for line in difflib.ndiff(left, right) if line[0] in "+-")
+            report = diff_report(left, right, f"known_good/{name}", f"cooked/{name}", context)
+            changed = sum(1 for line in report if line[:1] in "+-" and not line.startswith(("+++", "---")))
             print(f"  DIFFERS   {stem} {stage:<9} {changed} lines")
             differing.append(f"{stem}/{stage}")
 
-            for line in difflib.unified_diff(
-                left, right, fromfile=f"known_good/{name}", tofile=f"cooked/{name}",
-                n=context, lineterm="",
-            ):
+            for line in report:
                 print(f"      {line}")
 
             if accept:

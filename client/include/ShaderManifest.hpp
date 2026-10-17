@@ -29,7 +29,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 8u;
+inline constexpr uint32_t k_ShaderManifestVersion = 9u;
 
 // clang-tidy complains about enums being too big, but uint32_t means
 // the error struct is 16bytes, which is great alignment and still compact
@@ -86,6 +86,7 @@ enum class ErrorCode : uint32_t
     MergedLayoutPlacementUnsupported = 47,
     MergedLayoutConflict = 48,
     InvalidModuleAxisDefault = 49,
+    InvalidAxisRelevance = 50,
     Count
 };
 
@@ -117,6 +118,7 @@ enum class ShaderManifestTable : uint32_t
     ColorTargets,
     UniformMembers,
     SpecializationConstants,
+    AxisRelevance,
     Count
 };
 //NOLINTEND(readability-enum-initial-value, performance-enum-size)
@@ -285,7 +287,10 @@ struct alignas(8) EntryPoint
  * - The axis mask table contains one bitmask per variant. The length of the individual records
  *   is somewhat unique though: ceil(ModuleAxisCount / 64) words per variant, since it's a bitmask
  * - The EntryPointInstance table is `VariantCount * EntryPointCount` records.
- *   Thus, the entry point instance for (variant V, entry point E) is at `V * EntryPointCount + E`. */
+ *   Thus, the entry point instance for (variant V, entry point E) is at `V * EntryPointCount + E`.
+ * - The axis relevance table has one bitmask for each entry point, in the same word layout as the axis mask
+ *   table: `EntryPointCount * ceil(ModuleAxisCount / 64)` words. Bit k is set when axis k can change that
+ *   entry point's instance in this environment, so a consumer must pin it. */
 struct alignas(8) EnvironmentHeader
 {
     uint32_t VariantCount{ 0u };
@@ -293,7 +298,7 @@ struct alignas(8) EnvironmentHeader
     uint32_t VariantTableOffset{ 0u };
     uint32_t AxisMaskTableOffset{ 0u };
     uint32_t EntryPointInstanceTableOffset{ 0u };
-    uint32_t Reserved{ 0u };
+    uint32_t AxisRelevanceTableOffset{ 0u };
 
     TableRef Sources{ 0u, 0u };
     TableRef SourceBlob{ 0u, 0u };
@@ -933,6 +938,10 @@ public:
     [[nodiscard]] VariantView VariantAt(uint32_t variant_index) const noexcept;
     [[nodiscard]] std::span<const uint64_t> AxisMask(uint32_t variant_index) const noexcept;
     [[nodiscard]] bool IsAxisActive(uint32_t variant_index, uint32_t local_axis) const noexcept;
+    /** @brief The axis relevance mask of one entry point: bit k is set when axis k can change that entry point's
+     * instance in this environment. An axis with only one cooked value counts as relevant. */
+    [[nodiscard]] std::span<const uint64_t> AxisRelevance(uint32_t entry_point_index) const noexcept;
+    [[nodiscard]] bool IsAxisRelevant(uint32_t entry_point_index, uint32_t local_axis) const noexcept;
 
     [[nodiscard]] std::span<const EntryPointInstance> EntryPointInstanceTable() const noexcept;
     [[nodiscard]] std::span<const EntryPointInstance> VariantEntryPoints(uint32_t variant_index) const noexcept;
@@ -963,6 +972,7 @@ private:
     std::span<const VariantKey> variantKeys;
     std::span<const Variant> variants;
     std::span<const uint64_t> axisMasks;
+    std::span<const uint64_t> axisRelevance;
     std::span<const EntryPointInstance> entryPointInstances;
     std::span<const SourceRef> sources;
     std::span<const char> sourceBlob;

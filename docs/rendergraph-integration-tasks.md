@@ -117,6 +117,20 @@ no allocation.
 
 - 2026-10-15. Digression: derived constants in size expressions (`todo.md`). Capture and carry done; the author writes the stage 4 evaluation (`docs/agent-handoff.md` section 2a). Then L3.
 - 2026-10-16. Derived constants done (stage 4, errors 150 to 153, `DerivedConstantTest`). 26 of 26 tests, 60 of 60 known-good dumps. Next: L3.
+- 2026-10-16. Slang moved to `v2026.19-87-ge9fc02c8d` (IR module versions 34 to 35). The module cache folder is now
+  `%TEMP%\LodestoneShaderCooker\<Slang tag>-<config>`, the bootstrap thread writes the cache once (temporary file,
+  then rename), `SLANG_VERSION_FULL` is cleared on each configure, and the Slang DLL copies refresh. 15 known-good
+  dumps differ, all from the new Slang: code length and hash, and `OutVolume` storage format `Invalid` -> `R32Float`
+  (the emitted WGSL always said `r32float`). Not accepted yet: the author decides.
+- 2026-10-16. L3, decisions D1 to D4 agreed and built (D5 to D7 wait for the author). D1: relevance compares the
+  whole entry point instance (source, layout with footprints, raster, workgroup), in `model/AxisInfluence`, moved
+  out of `emit/DedupeReport`. D2: per environment. D3: Undetermined counts as relevant. D4: format 9,
+  `EnvironmentHeader::AxisRelevanceTableOffset` (was `Reserved`), `EntryPointCount * AxisMaskWordCount` words,
+  client `AxisRelevance` and `IsAxisRelevant`, `Open` error `InvalidAxisRelevance` (50), round-trip error
+  `ManifestAxisRelevanceMismatch` (109), `manifest_dump` key `"relevantAxes"`. Proof: a `DedupeInfluenceTest` row
+  that fails under the old code-only measurement (verified), `ManifestIndexTest` rows (100 checks), 26 of 26 tests.
+  KitchenSink cook time unchanged (7.05 to 7.17 s). Open: D5 (`Single` scoped to entry points), D6 (a validator that
+  derives relevance from the written manifest), D7.
 
 ## 5. Phase F, paused
 

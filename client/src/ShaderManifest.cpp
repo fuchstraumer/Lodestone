@@ -100,6 +100,7 @@ namespace
             "a merged layout got a resource that is not Bound",
             "a merged layout got two different resources at one group and binding",
             "a module axis declares a default digit that is not below the axis radix",
+            "an entry point's axis relevance mask sets a bit past the module's axes",
         });
 
     static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ErrorCode::Count),
@@ -232,6 +233,7 @@ namespace
     ErrorState ValidateVariantKeys(const EnvironmentContext& context) noexcept;
     ErrorState ValidateVariants(const EnvironmentContext& context) noexcept;
     ErrorState ValidateAxisMasks(const EnvironmentContext& context) noexcept;
+    ErrorState ValidateAxisRelevance(const EnvironmentContext& context) noexcept;
     ErrorState ValidateRasterStates(const EnvironmentContext& context) noexcept;
     ErrorState ValidateVertexInputs(const EnvironmentContext& context) noexcept;
     ErrorState ValidateUniformMembers(const EnvironmentContext& context) noexcept;
@@ -249,12 +251,12 @@ namespace
         &ValidateModuleHeaders,  &ValidateEntryPoints,  &ValidateModuleAxes, &ValidateDirectory,
     };
 
-    constexpr std::array<EnvironmentValidator, 13u> k_EnvironmentValidators{
+    constexpr std::array<EnvironmentValidator, 14u> k_EnvironmentValidators{
         &ValidateEnvironmentSections, &ValidateSources,      &ValidateBindings,
         &ValidateResourceIndices,     &ValidateRunTables,    &ValidateSlots,
         &ValidateVariantKeys,         &ValidateVariants,     &ValidateAxisMasks,
-        &ValidateRasterStates,        &ValidateVertexInputs, &ValidateUniformMembers,
-        &ValidateSpecializationConstants,
+        &ValidateAxisRelevance,       &ValidateRasterStates, &ValidateVertexInputs,
+        &ValidateUniformMembers,      &ValidateSpecializationConstants,
     };
 
 } // namespace
@@ -591,6 +593,9 @@ ManifestResult<EnvironmentView> EnvironmentView::Open(const BundleView& bundle,
     view.variants = Map<Variant>(extent_bytes, TableRef{ .Offset = parsed.VariantTableOffset, .Count = parsed.VariantCount });
     const TableRef64 axisMaskTableRef{ .Offset = static_cast<uint64_t>(parsed.AxisMaskTableOffset), .Count = maskWordCount };
     view.axisMasks = Map<uint64_t>(extent_bytes, axisMaskTableRef);
+    const TableRef64 axisRelevanceTableRef{ .Offset = static_cast<uint64_t>(parsed.AxisRelevanceTableOffset),
+                                            .Count = context.EntryPointCount * context.AxisMaskWordCount };
+    view.axisRelevance = Map<uint64_t>(extent_bytes, axisRelevanceTableRef);
     const TableRef64 entryPointInstanceTableRef{
         .Offset = static_cast<uint64_t>(parsed.EntryPointInstanceTableOffset), .Count = slotCount };
     view.entryPointInstances = Map<EntryPointInstance>(extent_bytes, entryPointInstanceTableRef);
@@ -703,6 +708,19 @@ std::span<const uint64_t> EnvironmentView::AxisMask(uint32_t variant_index) cons
 bool EnvironmentView::IsAxisActive(uint32_t variant_index, uint32_t local_axis) const noexcept
 {
     const std::span<const uint64_t> mask = AxisMask(variant_index);
+    const uint64_t word = mask[local_axis / k_AxisMaskWordBits];
+    return ((word >> (local_axis % k_AxisMaskWordBits)) & 1u) != 0u;
+}
+
+std::span<const uint64_t> EnvironmentView::AxisRelevance(uint32_t entry_point_index) const noexcept
+{
+    const size_t wordCount = module.AxisMaskWordCount();
+    return axisRelevance.subspan(static_cast<size_t>(entry_point_index) * wordCount, wordCount);
+}
+
+bool EnvironmentView::IsAxisRelevant(uint32_t entry_point_index, uint32_t local_axis) const noexcept
+{
+    const std::span<const uint64_t> mask = AxisRelevance(entry_point_index);
     const uint64_t word = mask[local_axis / k_AxisMaskWordBits];
     return ((word >> (local_axis % k_AxisMaskWordBits)) & 1u) != 0u;
 }
@@ -1849,8 +1867,11 @@ namespace
         const TableRef varsLoc{ environment.VariantTableOffset, environment.VariantCount };
         const TableRef axisMasksLoc{ environment.AxisMaskTableOffset,
                                      environment.VariantCount * context.AxisMaskWordCount };
-        const std::array<Section, 17u> sections
+        const TableRef axisRelevanceLoc{ environment.AxisRelevanceTableOffset,
+                                         static_cast<uint32_t>(context.EntryPointCount) * context.AxisMaskWordCount };
+        const std::array<Section, 18u> sections
         {
+            Section{ ShaderManifestTable::AxisRelevance, axisRelevanceLoc, sizeof(uint64_t) },
             Section{ ShaderManifestTable::VariantKeys, varKeysLoc, sizeof(VariantKey) },
             Section{ ShaderManifestTable::Variants, varsLoc, sizeof(Variant) },
             Section{ ShaderManifestTable::AxisMasks, axisMasksLoc, sizeof(uint64_t) },
@@ -2183,6 +2204,34 @@ namespace
             {
                 return { .Code = ErrorCode::InvalidVariantAxisMask,
                          .Table = ShaderManifestTable::AxisMasks,
+                         .RecordIndex = static_cast<uint32_t>(i) };
+            }
+        }
+
+        return k_ManifestOk;
+    }
+
+    ErrorState ValidateAxisRelevance(const EnvironmentContext& context) noexcept
+    {
+        const uint32_t wordCount = context.AxisMaskWordCount;
+        const auto usedBitsInLastWord = static_cast<uint32_t>(context.ModuleAxisCount % k_AxisMaskWordBits);
+        if (wordCount == 0u || usedBitsInLastWord == 0u)
+        {
+            return k_ManifestOk;
+        }
+
+        const EnvironmentHeader& environment = context.Environment;
+        const TableRef relevanceLoc{ environment.AxisRelevanceTableOffset,
+                                     static_cast<uint32_t>(context.EntryPointCount) * wordCount };
+        const std::span<const uint64_t> relevanceSpan = Map<uint64_t>(context.Extent, relevanceLoc);
+        // only the last word of each mask can hold a bit past the module's axes
+        for (int32_t i = 0; std::cmp_less(i, context.EntryPointCount); ++i)
+        {
+            const uint64_t lastWord = relevanceSpan[(static_cast<size_t>(i) * wordCount) + wordCount - 1u];
+            if ((lastWord >> usedBitsInLastWord) != 0u)
+            {
+                return { .Code = ErrorCode::InvalidAxisRelevance,
+                         .Table = ShaderManifestTable::AxisRelevance,
                          .RecordIndex = static_cast<uint32_t>(i) };
             }
         }
