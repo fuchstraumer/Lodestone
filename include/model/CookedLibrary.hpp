@@ -71,8 +71,6 @@ ContentHashValue HashSourceCode(const std::vector<std::byte>& source) noexcept;
 ContentHashValue HashResourceList(const ResourceList& resources) noexcept;
 ContentHashValue HashVisibilityList(const VisibilityList& visibility) noexcept;
 ContentHashValue HashFootprintList(const FootprintList& footprints) noexcept;
-/**@brief Appends one footprint to a streaming hash. `HashFootprintList` and the entry point instance hash both use
- * it, so that a footprint has one hash definition. */
 void AppendFootprintHash(StreamingHash& hasher, const ResourceFootprint& footprint) noexcept;
 
 /**@brief The hash that generated a table, whether or not it used dedupe logic,
