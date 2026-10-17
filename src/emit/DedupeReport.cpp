@@ -33,16 +33,6 @@ namespace lodestone
 namespace
 {
 
-    struct SourceHashTable
-    {
-        SourceHashTable(size_t num_sources, size_t num_entry_points);
-        void Add(ContentHashValue hash) noexcept;
-        [[nodiscard]] ContentHashValue At(size_t variant_index, size_t entry_point_index) const noexcept;
-    private:
-        std::vector<ContentHashValue> sourceStrHashes;
-        size_t numEntryPoints;
-    };
-
      /**@brief `SourceIndex` gives the unique index of a source string, and `MappedCount` tells how many
        * times something mapped to that index instead of duplicating into another source blob string */
     struct SourceCollapse
@@ -52,16 +42,6 @@ namespace
         std::string_view FirstDescription;
     };
 
-    SourceHashTable BuildSourceHashTable(const CookedModule& module);
-    bool AssignmentComparatorExcludingAxis(const PermutationAssignment& lhs,
-                                           const PermutationAssignment& rhs,
-                                           size_t excluded_axis_index) noexcept;
-    std::vector<uint32_t> OrderByOtherAxes(const CookedModule& module, const size_t axis_index);
-    /**@brief Checks if all variants in the given group share the same source for the specified entry point. */
-    bool GroupSharesOneSource(const CookedModule& module,
-                              const SourceHashTable& hashes,
-                              std::span<const uint32_t> group,
-                              size_t entry_point);
     /**@brief Printed marker specifying what influence an axis had (if any) in the influence table we print. */
     char InfluenceMarker(AxisInfluence influence) noexcept;
     std::string EmitInfluenceTable(const CookedModule& module, const ModuleInfluence& influence);
@@ -71,100 +51,6 @@ namespace
     std::string EmitProvenance(const CookedModule& module);
 
 } // namespace
-
-std::string_view ToString(AxisInfluence influence) noexcept
-{
-    switch (influence)
-    {
-    case AxisInfluence::Inert:
-        return "Inert";
-    case AxisInfluence::Active:
-        return "Active";
-    case AxisInfluence::Undetermined:
-        return "Undetermined";
-    case AxisInfluence::Invalid:
-        return "Invalid";
-    }
-
-    return "Invalid";
-}
-
-ModuleInfluence ComputeActualInfluence(const CookedModule& module)
-{
-    ModuleInfluence influence;
-    influence.ModuleName = module.Name;
-
-    if (module.Space == nullptr)
-    {
-        return influence;
-    }
-
-    const size_t axisCount = module.Space->AxisCount();
-    const size_t entryPointCount = module.EntryPoints.size();
-
-    influence.EntryPoints.reserve(entryPointCount);
-    for (const LibraryEntryPoint& entryPoint : module.EntryPoints)
-    {
-        influence.EntryPoints.emplace_back(entryPoint.Name,
-                                           std::vector<AxisInfluence>(axisCount, AxisInfluence::Inert));
-    }
-
-    const SourceHashTable hashes = BuildSourceHashTable(module);
-
-    for (size_t k = 0u; k < axisCount; ++k)
-    {
-        const std::vector<uint32_t> orderedIndices = OrderByOtherAxes(module, k);
-        bool foundPair = false;
-        // A while, not a for: `begin` already moves to the next group, and a for header would then
-        // increment past that group's first element and drop the group.
-        size_t begin = 0u;
-        while (begin < orderedIndices.size())
-        {
-            const PermutationAssignment& beginCanonical = module.Variants[orderedIndices[begin]].Canonical;
-
-            // The order puts variants that agree on every other axis next to each other, so a group
-            // ends at the first one that disagrees. Read `end` inside the condition: on the last
-            // group it is out of range until the range test runs.
-            size_t end = begin + 1u;
-            while (end < orderedIndices.size() &&
-                   !AssignmentComparatorExcludingAxis(beginCanonical,
-                                                      module.Variants[orderedIndices[end]].Canonical,
-                                                      k))
-            {
-                ++end;
-            }
-
-            const std::span<const uint32_t> group{ orderedIndices.data() + begin, end - begin };
-            begin = end;
-
-            if (group.size() < 2u)
-            {
-                continue;
-            }
-
-            foundPair = true;
-
-            for (size_t entryPointIndex = 0u; entryPointIndex < entryPointCount; ++entryPointIndex)
-            {
-                if (influence.EntryPoints[entryPointIndex].Axes[k] != AxisInfluence::Active &&
-                    !GroupSharesOneSource(module, hashes, group, entryPointIndex))
-                {
-                    influence.EntryPoints[entryPointIndex].Axes[k] = AxisInfluence::Active;
-                }
-            }
-        }
-
-        if (!foundPair)
-        {
-            for (EntryPointInfluence& epInfluence : influence.EntryPoints)
-            {
-                epInfluence.Axes[k] = AxisInfluence::Undetermined;
-            }
-        }
-    }
-
-    return influence;
-}
 
 CookError EnforceModulePolicy(const CookedModule& module,
                               const ModulePolicyEntry& policy,
@@ -192,8 +78,14 @@ CookError EnforceModulePolicy(const CookedModule& module,
     
     // get the influence information for every entry point in the module
     // todo-ship: simplify ComputeActualInfluence's work by using inertEntrryPoints as a filter there as well
-    ModuleInfluence actualInfluence = ComputeActualInfluence(module);
-    auto relevantEntryPoints = actualInfluence.EntryPoints |
+    const CookResult<ModuleInfluence> actualInfluence = ComputeActualInfluence(module);
+    if (!actualInfluence)
+    {
+        return ReportError(diagnostics,
+                           actualInfluence.error(),
+                           std::format("cannot measure the axis influence of module '{}'", module.Name));
+    }
+    auto relevantEntryPoints = actualInfluence->EntryPoints |
                                std::views::filter([&](const EntryPointInfluence& enpt)
                                {
                                    return std::ranges::binary_search(inertEntryPoints, std::string_view{ enpt.EntryPointName });
@@ -302,8 +194,9 @@ std::string GenerateDedupeReport(const CookedLibrary& library)
         }
         report += std::format("  capabilities observed: {}\n\n", capabilities.empty() ? "(none)" : capabilities);
 
-        const ModuleInfluence influence = ComputeActualInfluence(module);
-        report += EmitInfluenceTable(module, influence);
+        const CookResult<ModuleInfluence> influence = ComputeActualInfluence(module);
+        report += influence ? EmitInfluenceTable(module, influence.value())
+                            : std::format("  axis influence: not measured ({})\n", ToString(influence.error()));
         report += "\n";
     }
 
@@ -312,97 +205,6 @@ std::string GenerateDedupeReport(const CookedLibrary& library)
 
 namespace
 {
-    SourceHashTable::SourceHashTable(size_t num_sources, size_t num_entry_points) : numEntryPoints(num_entry_points)
-    {
-        // its semantically easier to still emplace_back new entries,
-        // rather than pre-allocating and indexing into the vector.
-        // but reserving here exactly should make that cost the same anyways
-        sourceStrHashes.reserve(num_sources * num_entry_points);
-    }
-
-    void SourceHashTable::Add(ContentHashValue hash) noexcept
-    {
-        sourceStrHashes.emplace_back(hash);
-    }
-
-    ContentHashValue SourceHashTable::At(size_t variant_index, size_t entry_point_index) const noexcept
-    {
-        // indices are strided by numEntryPoints
-        return sourceStrHashes[(variant_index * numEntryPoints) + entry_point_index];
-    }
-
-    SourceHashTable BuildSourceHashTable(const CookedModule& module)
-    {
-        SourceHashTable table(module.Variants.size(), module.EntryPoints.size());
-        for (const LibraryVariant& variant : module.Variants)
-        {
-            for (size_t i = 0; i < module.EntryPoints.size(); ++i)
-            {
-                const std::span<const std::byte> sourceBytes = ResolveSource(module, variant, i);
-                const ContentHashValue hash = HashBytes(sourceBytes);
-                table.Add(hash);
-            }
-        }
-        return table;
-    }
-
-    bool AssignmentComparatorExcludingAxis(const PermutationAssignment& lhs,
-                                           const PermutationAssignment& rhs,
-                                           size_t excluded_axis_index) noexcept
-    {
-        for (size_t k = 0; k < lhs.size(); ++k)
-        {
-            if (k != excluded_axis_index && lhs[k].Value != rhs[k].Value)
-            {
-                return lhs[k].Value < rhs[k].Value;
-            }
-        }
-        return false;
-    }
-
-    std::vector<uint32_t> OrderByOtherAxes(const CookedModule& module, const size_t axis_index)
-    {
-        std::vector<uint32_t> order(module.Variants.size());
-        std::ranges::iota(order, 0u);
-        std::ranges::stable_sort(order,
-                                 [&](uint32_t lhs, uint32_t rhs)
-                                 {
-                                     return AssignmentComparatorExcludingAxis(module.Variants[lhs].Canonical,
-                                                                              module.Variants[rhs].Canonical,
-                                                                              axis_index);
-                                 });
-        return order;
-    }
-
-    bool GroupSharesOneSource(const CookedModule& module,
-                              const SourceHashTable& hashes,
-                              std::span<const uint32_t> group,
-                              size_t entry_point)
-    {
-        const ContentHashValue firstHash = hashes.At(group.front(), entry_point);
-        for (size_t i = 1; i < group.size(); ++i)
-        {
-            if (hashes.At(group[i], entry_point) != firstHash)
-            {
-                return false;
-            }
-        }
-        // as with the rest of our library: equal hashes don't prove anything. now we will fallback
-        // to actual comparisons. with xxhash3 though, our chance of a collision is miniscule.
-        // like something on the order of 1 in 2^128 for xxhash3.
-        // (again, we shouldn't hit this, and this is for a statistical tool, but it's still important to be
-        // thorough)
-        const std::span<const std::byte> code = ResolveSource(module, module.Variants[group.front()], entry_point);
-        return std::ranges::all_of(
-            group.subspan(1u),
-            [&module, &entry_point, &code](uint32_t variant_index)
-            {
-                const std::span<const std::byte> epSrc =
-                    ResolveSource(module, module.Variants[variant_index], entry_point);
-                return std::ranges::equal(epSrc, code);
-            });
-    }
-
     char InfluenceMarker(AxisInfluence influence) noexcept
     {
         switch (influence)
