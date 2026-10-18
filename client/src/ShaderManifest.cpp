@@ -1247,7 +1247,7 @@ ManifestResult<MergedLayoutView> MergedLayoutView::Merge(std::span<const EntryPo
         {
             return std::unexpected(ErrorState{ .Code = ErrorCode::MergedLayoutDuplicateStage,
                                                .Table = ShaderManifestTable::EntryPoints,
-                                               .Detail = i });
+                                               .Detail = static_cast<uint32_t>(i) });
         }
         seenStages |= stage;
 
@@ -1628,7 +1628,7 @@ namespace
     ErrorState ValidateStrings(const Header& parsed, std::span<const std::byte> bytes) noexcept
     {
         const std::span<const StringRef> stringSpan = Map<StringRef>(bytes, parsed.Strings);
-        for (int32_t i = 0; std::cmp_less(i, stringSpan.size()); ++i)
+        for (int32_t i = 0; i < std::ssize(stringSpan); ++i)
         {
             const StringRef& reference = stringSpan[i];
             if (reference.Length > parsed.StringBlobs.Count || reference.Offset > parsed.StringBlobs.Count - reference.Length)
@@ -1648,14 +1648,14 @@ namespace
         // nothing, so we only check the name, the run, and named values
         const std::span<const Axis> axisSpan = Map<Axis>(bytes, parsed.Axes);
         const std::span<const AxisValueType> allAxesValueSpan = Map<AxisValueType>(bytes, parsed.AxesValues);
-        for (int32_t i = 0; std::cmp_less(i, axisSpan.size()); ++i)
+        for (int32_t i = 0; i < std::ssize(axisSpan); ++i)
         {
             const Axis& axis = axisSpan[i];
             if (axis.NameString >= parsed.Strings.Count)
             {
                 return { .Code = ErrorCode::InvalidAxisName,
                          .Table = ShaderManifestTable::Axes,
-                         .RecordIndex = i,
+                         .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = axis.NameString };
             }
 
@@ -1663,7 +1663,7 @@ namespace
             {
                 return { .Code = ErrorCode::InvalidAxisValueRange,
                          .Table = ShaderManifestTable::Axes,
-                         .RecordIndex = i,
+                         .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = axis.ValueCount };
             }
 
@@ -1679,7 +1679,7 @@ namespace
                 {
                     return { .Code = ErrorCode::InvalidAxisTypeStrIndex,
                              .Table = ShaderManifestTable::Axes,
-                             .RecordIndex = i,
+                             .RecordIndex = static_cast<uint32_t>(i),
                              .Detail = value };
                 }
             }
@@ -1691,14 +1691,14 @@ namespace
     ErrorState ValidateProfiles(const Header& parsed, std::span<const std::byte> bytes) noexcept
     {
         const std::span<const Profile> profileSpan = Map<Profile>(bytes, parsed.Profiles);
-        for (int32_t i = 0; std::cmp_less(i, profileSpan.size()); ++i)
+        for (int32_t i = 0; i < std::ssize(profileSpan); ++i)
         {
             const Profile& profile = profileSpan[i];
             if (profile.TargetNameString >= parsed.Strings.Count)
             {
                 return { .Code = ErrorCode::InvalidProfileTargetName,
                          .Table = ShaderManifestTable::Profiles,
-                         .RecordIndex = i,
+                         .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = profile.TargetNameString };
             }
 
@@ -1706,7 +1706,7 @@ namespace
             {
                 return { .Code = ErrorCode::InvalidProfileAccessModel,
                          .Table = ShaderManifestTable::Profiles,
-                         .RecordIndex = i,
+                         .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = static_cast<uint32_t>(profile.AccessModel) };
             }
 
@@ -1714,7 +1714,7 @@ namespace
             {
                 return { .Code = ErrorCode::InvalidProfileCodeFormat,
                          .Table = ShaderManifestTable::Profiles,
-                         .RecordIndex = i,
+                         .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = static_cast<uint32_t>(profile.CodeFormat) };
             }
         }
@@ -1726,7 +1726,7 @@ namespace
     {
         const TableRef64 modulesLoc{ sizeof(Header), parsed.ModuleCount };
         const std::span<const ModuleRootHeader> moduleSpan = Map<ModuleRootHeader>(bytes, modulesLoc);
-        for (int32_t i = 0; std::cmp_less(i, moduleSpan.size()); ++i)
+        for (int32_t i = 0; i < std::ssize(moduleSpan); ++i)
         {
             const ModuleRootHeader& moduleHeader = moduleSpan[i];
             if (moduleHeader.ModuleNameString >= parsed.Strings.Count)
@@ -1765,7 +1765,7 @@ namespace
         for (const ModuleRootHeader& moduleHeader : Map<ModuleRootHeader>(bytes, modulesLoc))
         {
             const std::span<const EntryPoint> entryPoints = Map<EntryPoint>(bytes, moduleHeader.EntryPoints);
-            for (int32_t i = 0; std::cmp_less(i, entryPoints.size()); ++i)
+            for (int32_t i = 0; i < std::ssize(entryPoints); ++i)
             {
                 const EntryPoint& entryPoint = entryPoints[i];
                 if (entryPoint.NameString >= parsed.Strings.Count)
@@ -1799,7 +1799,7 @@ namespace
         for (const ModuleRootHeader& moduleHeader : Map<ModuleRootHeader>(bytes, modulesLoc))
         {
             const std::span<const ModuleAxis> moduleAxisSpan = Map<ModuleAxis>(bytes, moduleHeader.ModuleAxes);
-            for (int32_t i = 0u; std::cmp_less(i, moduleAxisSpan.size()); ++i)
+            for (int32_t i = 0u; i < std::ssize(moduleAxisSpan); ++i)
             {
                 const ModuleAxis& moduleAxis = moduleAxisSpan[i];
                 if (moduleAxis.AxisIndex >= axisSpan.size())
@@ -1840,7 +1840,7 @@ namespace
         const TableRef64 directoryLoc{ parsed.EnvironmentDirectoryOffset, dirCount };
         const std::span<const EnvironmentDirectoryEntry> directorySpan =
             Map<EnvironmentDirectoryEntry>(bytes, directoryLoc);
-        for (int32_t i = 0; std::cmp_less(i, directorySpan.size()); ++i)
+        for (int32_t i = 0; i < std::ssize(directorySpan); ++i)
         {
             const EnvironmentDirectoryEntry& entry = directorySpan[i];
             if (entry.ExtentSize == 0u)
@@ -1932,7 +1932,7 @@ namespace
                                .Detail = environment.SourceBlob.Offset };
         }
 
-        for (int32_t i = 0; std::cmp_less(i, sourceSpan.size()); ++i)
+        for (int32_t i = 0; i < std::ssize(sourceSpan); ++i)
         {
             const SourceRef& reference = sourceSpan[i];
             if (reference.Length > environment.SourceBlob.Count ||
@@ -1959,7 +1959,7 @@ namespace
     {
         const EnvironmentHeader& environment = context.Environment;
         const std::span<const Binding> bindingSpan = Map<Binding>(context.Extent, environment.Bindings);
-        for (int32_t i = 0; std::cmp_less(i, bindingSpan.size()); ++i)
+        for (int32_t i = 0; i < std::ssize(bindingSpan); ++i)
         {
             const Binding& binding = bindingSpan[i];
             if (binding.NameString >= context.StringCount || binding.ScopeString >= context.StringCount)
@@ -1987,7 +1987,7 @@ namespace
         const EnvironmentHeader& environment = context.Environment;
         const std::span<const uint32_t> resourceIndexList =
             Map<uint32_t>(context.Extent, environment.ResourceIndices);
-        for (int32_t i = 0; std::cmp_less(i, resourceIndexList.size()); ++i)
+        for (int32_t i = 0; i < std::ssize(resourceIndexList); ++i)
         {
             if (resourceIndexList[i] >= environment.Bindings.Count)
             {
@@ -2031,7 +2031,7 @@ namespace
         for (const RunTable& runTable : runTables)
         {
             const std::span<const Run> runSpan = Map<Run>(context.Extent, runTable.Loc);
-            for (int32_t i = 0; std::cmp_less(i, runSpan.size()); ++i)
+            for (int32_t i = 0; i < std::ssize(runSpan); ++i)
             {
                 // <= on the sum for the edge case: an empty trailing list starts at the payload count
                 const Run& run = runSpan[i];
@@ -2054,7 +2054,7 @@ namespace
         const TableRef64 slotsLoc{ environment.EntryPointInstanceTableOffset, numSlots };
         const std::span<const EntryPointInstance> slotSpan = Map<EntryPointInstance>(context.Extent,
                                                                                      slotsLoc);
-        for (int32_t i = 0u; std::cmp_less(i, slotSpan.size()); ++i)
+        for (int32_t i = 0u; i < std::ssize(slotSpan); ++i)
         {
             const EntryPointInstance& slot = slotSpan[i];
             if (slot.Source >= environment.Sources.Count)
@@ -2122,7 +2122,7 @@ namespace
         const std::span<const EntryPointInstance> entryPointInstanceSpan = Map<EntryPointInstance>(extent, slotsLoc);
         const size_t entryPointCount = static_cast<size_t>(context.EntryPointCount);
 
-        for (int32_t variantIdx = 0; std::cmp_less(variantIdx, variantSpan.size()); ++variantIdx)
+        for (int32_t variantIdx = 0; variantIdx < std::ssize(variantSpan); ++variantIdx)
         {
             const Variant& variant = variantSpan[variantIdx];
             if (variant.SuffixString >= context.StringCount)
@@ -2168,7 +2168,7 @@ namespace
                 bool hasPreviousBound = false;
                 bool seenNotBound = false;
                 uint64_t previousKey = 0u;
-                for (int32_t j = 0; std::cmp_less(j, slotVisibilityIndices.size()); ++j)
+                for (int32_t j = 0; j < std::ssize(slotVisibilityIndices); ++j)
                 {
                     // the entry indexes the variant's resource list, and the resource list was checked
                     // against the binding table already
@@ -2267,7 +2267,7 @@ namespace
     {
         const EnvironmentHeader& environment = context.Environment;
         const std::span<const RasterState> rasterSpan = Map<RasterState>(context.Extent, environment.Rasters);
-        for (int32_t i = 0; std::cmp_less(i, rasterSpan.size()); ++i)
+        for (int32_t i = 0; i < std::ssize(rasterSpan); ++i)
         {
             const RasterState& raster = rasterSpan[i];
             if (raster.FirstVertexInput + raster.VertexInputCount > environment.VertexInputs.Count)
@@ -2292,7 +2292,7 @@ namespace
     {
         const EnvironmentHeader& environment = context.Environment;
         const std::span<const VertexInput> vertexInputSpan = Map<VertexInput>(context.Extent, environment.VertexInputs);
-        for (int32_t i = 0; std::cmp_less(i, vertexInputSpan.size()); ++i)
+        for (int32_t i = 0; i < std::ssize(vertexInputSpan); ++i)
         {
             if (vertexInputSpan[i].SemanticNameString >= context.StringCount)
             {
@@ -2310,7 +2310,7 @@ namespace
     {
         const EnvironmentHeader& environment = context.Environment;
         const std::span<const UniformMember> uniformMemberSpan = Map<UniformMember>(context.Extent, environment.UniformMembers);
-        for (int32_t i = 0; std::cmp_less(i, uniformMemberSpan.size()); ++i)
+        for (int32_t i = 0; i < std::ssize(uniformMemberSpan); ++i)
         {
             if (uniformMemberSpan[i].NameString >= context.StringCount)
             {
@@ -2329,7 +2329,7 @@ namespace
         const EnvironmentHeader& environment = context.Environment;
         const std::span<const SpecializationConstant> constantSpan =
             Map<SpecializationConstant>(context.Extent, environment.SpecConstants);
-        for (int32_t i = 0; std::cmp_less(i, constantSpan.size()); ++i)
+        for (int32_t i = 0; i < std::ssize(constantSpan); ++i)
         {
             if (constantSpan[i].NameString >= context.StringCount)
             {

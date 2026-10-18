@@ -488,7 +488,7 @@ ManifestIndex::ManifestIndex(manifest::EnvironmentView view) : environment(view)
         // the module's radix for an axis is the count of values it uses, not the root axis value count
         radices[axisIndex] = module.AxisValueCount(axisIndex);
         axisValues[axisIndex].reserve(radices[axisIndex]);
-        for (uint32_t digit = 0u; digit < radices[axisIndex]; ++digit)
+        for (int32_t digit = 0u; std::cmp_less(digit, radices[axisIndex]); ++digit)
         {
             axisValues[axisIndex].push_back(module.AxisValue(axisIndex, digit));
         }
