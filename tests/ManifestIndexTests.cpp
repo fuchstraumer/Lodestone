@@ -12,11 +12,13 @@
 #include "permute/PermutationValue.hpp"
 #include "TestHarness.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <expected>
+#include <numeric>
 #include <optional>
 #include <span>
 #include <string>
@@ -405,6 +407,39 @@ void CheckAxisRelevance(lodestone::tests::TestRunner& runner)
             runner.Check(!view.IsAxisRelevant(0u, 1u) && !view.IsAxisRelevant(1u, 1u),
                          "an axis that changes nothing is relevant to no entry point");
 
+            // SingleFor counts only the axes the named entry points read
+            const ManifestIndex index{ view };
+            const std::array<std::string_view, 1u> fog{ "FogCS" };
+            const std::array<std::string_view, 1u> plain{ "PlainCS" };
+            const std::array<std::string_view, 2u> pipeline{ "FogCS", "PlainCS" };
+            const std::expected<VariantKey, lodestone::QueryError> allAxes = index.Query().Where("FOG", true).Single();
+            runner.Check(!allAxes.has_value() && allAxes.error().Code == lodestone::QueryErrorCode::AmbiguousVariant &&
+                             allAxes.error().AxisName == "DEBUG",
+                         "Single still counts an axis that changes nothing");
+            const std::expected<VariantKey, lodestone::QueryError> fogPinned = index.Query().Where("FOG", true).SingleFor(fog);
+            const lodestone::QueryResult<std::vector<VariantKey>> fogKeys = index.Query().Where("FOG", true).Keys();
+            runner.Check(fogPinned.has_value() && fogKeys.has_value() && fogPinned.value() == std::ranges::min(*fogKeys),
+                         "SingleFor ignores an irrelevant axis and returns the smallest matching key");
+            const std::expected<VariantKey, lodestone::QueryError> fogUnpinned = index.Query().SingleFor(fog);
+            runner.Check(!fogUnpinned.has_value() &&
+                             fogUnpinned.error().Code == lodestone::QueryErrorCode::AmbiguousVariant &&
+                             fogUnpinned.error().AxisName == "FOG" && fogUnpinned.error().Detail == 4u,
+                         "SingleFor names only the relevant axes that still vary");
+            runner.Check(index.Query().SingleFor(plain).has_value(),
+                         "an entry point that no axis changes needs no pin at all");
+            const std::expected<VariantKey, lodestone::QueryError> joined = index.Query().SingleFor(pipeline);
+            runner.Check(!joined.has_value() && joined.error().AxisName == "FOG",
+                         "a pipeline counts every axis that any of its entry points reads");
+            const std::array<std::string_view, 1u> typo{ "FogC" };
+            const std::expected<VariantKey, lodestone::QueryError> unknown = index.Query().SingleFor(typo);
+            runner.Check(!unknown.has_value() && unknown.error().Code == lodestone::QueryErrorCode::UnknownEntryPoint &&
+                             unknown.error().AxisName == "FogC" && unknown.error().Suggestion == "FogCS",
+                         "an unknown entry point name is an error with a suggestion");
+            const std::expected<VariantKey, lodestone::QueryError> empty =
+                index.Query().SingleFor(std::span<const std::string_view>{});
+            runner.Check(!empty.has_value() && empty.error().Code == lodestone::QueryErrorCode::EmptyEntryPointSet,
+                         "SingleFor with no entry point is an error");
+
             // a bit past the module's two axes is damage, and the reader rejects it when the environment opens
             lodestone::manifest::Header header;
             std::memcpy(&header, bytes.data(), sizeof(header));
@@ -432,6 +467,127 @@ void CheckAxisRelevance(lodestone::tests::TestRunner& runner)
                          "the other axis is still measured");
         }
     }
+}
+
+// Three boolean axes, and a sparse set of cooked variants: (0,0,0), (1,1,0), (0,0,1), (1,0,1), (0,1,1). Only
+// (1,1,0) has different code. A and B each have a pair that differs in that axis alone, (x,x,1), and that pair
+// shares one instance. C has one such pair, (0,0,0) and (0,0,1), and it shares one instance too. So the per-axis
+// measurement finds every axis Inert. But (0,0,0) and (1,1,0) differ in their code, and no cooked variant links
+// them. This is what a sparse cook policy can leave.
+PermutationSpace MakeChainSpace()
+{
+    std::vector<PermutationAxis> axes;
+    for (const std::string_view name : { "A", "B", "C" })
+    {
+        axes.emplace_back(std::string{ name }, BoolValues(), AxisKind::Technique, EarliestBindingTime::Cook,
+                          AxisValueDomain::Boolean);
+    }
+    return PermutationSpace{ std::move(axes) };
+}
+
+lodestone::CookedModule BuildChainModule(const PermutationSpace& space)
+{
+    lodestone::CookedModule module;
+    module.Name = "ChainModule";
+    module.Space = &space;
+    module.EntryPoints.push_back(
+        lodestone::LibraryEntryPoint{ .Name = "MainCS", .Stage = lodestone::ShaderStageKind::Compute });
+    module.Sources.emplace_back(lodestone::tests::BytesOf("// common"));
+    module.Sources.emplace_back(lodestone::tests::BytesOf("// only A and B together"));
+    module.ResourceLists.emplace_back();
+    module.FootprintLists.emplace_back();
+    module.VisibilityLists.emplace_back();
+    module.RasterStates.emplace_back();
+
+    constexpr std::array<std::array<bool, 3u>, 5u> k_Cooked{ { { false, false, false },
+                                                               { true, true, false },
+                                                               { false, false, true },
+                                                               { true, false, true },
+                                                               { false, true, true } } };
+    uint32_t index = 0u;
+    for (const std::array<bool, 3u>& values : k_Cooked)
+    {
+        lodestone::LibraryVariant variant;
+        variant.Index = index++;
+        for (uint32_t axis = 0u; axis < 3u; ++axis)
+        {
+            variant.Active.push_back(
+                lodestone::PermutationBinding{ .Axis = &space.Axes()[axis], .Value = PermutationValue{ values[axis] } });
+        }
+        variant.Canonical = space.CanonicalizeAssignment(variant.Active);
+        module.VariantKeys.push_back(space.ComputeVariantKey(variant.Canonical));
+        variant.SourceIndices = { (values[0] && values[1] && !values[2]) ? 1u : 0u };
+        variant.VisibilityIndices = { 0u };
+        variant.RasterIndices = { 0u };
+        variant.Workgroups = { lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u } };
+        module.Variants.emplace_back(std::move(variant));
+    }
+
+    // the emitter wants the variants in key order
+    std::vector<size_t> order(module.Variants.size());
+    std::ranges::iota(order, size_t{ 0u });
+    std::ranges::sort(order, {}, [&](size_t i) { return module.VariantKeys[i]; });
+    std::vector<lodestone::LibraryVariant> sortedVariants;
+    std::vector<VariantKey> sortedKeys;
+    for (const size_t i : order)
+    {
+        sortedVariants.push_back(module.Variants[i]);
+        sortedKeys.push_back(module.VariantKeys[i]);
+    }
+    for (size_t i = 0u; i < sortedVariants.size(); ++i)
+    {
+        sortedVariants[i].Index = i;
+    }
+    module.Variants = std::move(sortedVariants);
+    module.VariantKeys = std::move(sortedKeys);
+    module.SpaceSize = 8u;
+    return module;
+}
+
+void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
+{
+    runner.BeginSection("the axis relevance validator reads the written manifest");
+
+    // a stored mask that the written instances contradict
+    const PermutationSpace relevanceSpace = MakeRelevanceSpace();
+    lodestone::CookedLibrary relevanceLibrary;
+    relevanceLibrary.ModuleNames = { "RelevanceModule" };
+    relevanceLibrary.Profiles = { MakeProfile("wgsl") };
+    relevanceLibrary.Environments.emplace_back(BuildRelevanceModule(relevanceSpace, true));
+    const std::vector<std::byte> bytes = EmitBytes(relevanceLibrary);
+    runner.Check(lodestone::VerifyManifestRoundTrip(relevanceLibrary, bytes) == lodestone::CookError::Success,
+                 "the relevance module passes the validator");
+
+    lodestone::manifest::Header header;
+    std::memcpy(&header, bytes.data(), sizeof(header));
+    lodestone::manifest::EnvironmentDirectoryEntry entry;
+    std::memcpy(&entry, bytes.data() + header.EnvironmentDirectoryOffset, sizeof(entry));
+    lodestone::manifest::EnvironmentHeader environment;
+    std::memcpy(&environment, bytes.data() + entry.ExtentOffset, sizeof(environment));
+    const size_t fogWordOffset = entry.ExtentOffset + environment.AxisRelevanceTableOffset;
+    std::vector<std::byte> damaged = bytes;
+    uint64_t word = 0u;
+    std::memcpy(&word, damaged.data() + fogWordOffset, sizeof(word));
+    word &= ~uint64_t{ 1u }; // FOG, for FogCS
+    std::memcpy(damaged.data() + fogWordOffset, &word, sizeof(word));
+    runner.Check(lodestone::VerifyManifestRoundTrip(relevanceLibrary, damaged) ==
+                     lodestone::CookError::ManifestAxisRelevanceMismatch,
+                 "a stored mask that calls a code-changing axis irrelevant fails the validator");
+
+    // a class of variants that agree on every relevant axis and hold two different instances
+    const PermutationSpace chainSpace = MakeChainSpace();
+    lodestone::CookedLibrary chainLibrary;
+    chainLibrary.ModuleNames = { "ChainModule" };
+    chainLibrary.Profiles = { MakeProfile("wgsl") };
+    chainLibrary.Environments.emplace_back(BuildChainModule(chainSpace));
+    const std::vector<std::byte> chainBytes = EmitBytes(chainLibrary);
+    const ManifestResult<EnvironmentView> chainView = OpenEnvironment(chainBytes, 0u, 0u);
+    runner.Check(chainView.has_value() && !chainView->IsAxisRelevant(0u, 0u) && !chainView->IsAxisRelevant(0u, 1u) &&
+                     !chainView->IsAxisRelevant(0u, 2u),
+                 "the per-axis measurement finds every axis Inert on the broken chain, so it claims no pin is needed");
+    runner.Check(lodestone::VerifyManifestRoundTrip(chainLibrary, chainBytes) ==
+                     lodestone::CookError::ManifestAxisRelevanceIncomplete,
+                 "two variants that agree on every relevant axis and differ in code fail the validator");
 }
 
 // Counts the keys of a query, or returns SIZE_MAX when the query is in an error state.
@@ -862,6 +1018,8 @@ int main()
     }
 
     CheckAxisRelevance(runner);
+
+    CheckAxisRelevanceValidator(runner);
 
     return runner.Report();
 }

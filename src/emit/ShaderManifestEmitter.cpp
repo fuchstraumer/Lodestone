@@ -223,7 +223,9 @@ namespace
     CookError CheckVariantKeyDecode(const manifest::EnvironmentView& view,
                                     const LibraryVariant& variant,
                                     VariantKey key);
-    CookError CheckAxisRelevance(const CookedModule& module, const manifest::EnvironmentView& view);
+    /** The axis relevance validator. It reads the written environment only, through the client views, and
+     * derives relevance a second time */
+    CookError VerifyAxisRelevance(const manifest::EnvironmentView& view);
     CookError CheckVariantAxisMask(const CookedModule& module,
                                    const LibraryVariant& variant,
                                    manifest::VariantView read_variant);
@@ -1109,7 +1111,7 @@ namespace
             return defaultsError;
         }
 
-        const CookError relevanceError = CheckAxisRelevance(module, view);
+        const CookError relevanceError = VerifyAxisRelevance(view);
         if (relevanceError != CookError::Success)
         {
             return relevanceError;
@@ -1258,36 +1260,226 @@ namespace
         return CookError::Success;
     }
 
-    CookError CheckAxisRelevance(const CookedModule& module, const manifest::EnvironmentView& view)
+    /** Returns the bytes of one source in the profile's code format. */
+    std::span<const std::byte> SourceBytes(const manifest::EnvironmentView& view, uint32_t source_index)
     {
-        if (module.Space == nullptr)
+        if (view.CodeFormat() == ShaderCodeFormat::Spirv)
         {
-            return CookError::Success;
+            return std::as_bytes(view.SpirvWords(source_index));
+        }
+        return std::as_bytes(std::span{ view.Source(source_index) });
+    }
+
+    template<typename RecordType>
+    bool RecordsEqual(std::span<const RecordType> lhs, std::span<const RecordType> rhs) noexcept
+    {
+        // manifest records are trivially copyable bags of bytes with zeroed reserved fields, and every string
+        // they name is an index into a deduplicated string table, so equal bytes are equal content
+        return lhs.size() == rhs.size() && std::memcmp(lhs.data(), rhs.data(), lhs.size_bytes()) == 0;
+    }
+
+    /** Compares one resource of two layouts by content. `FirstUniformMember` is an index that `--no-dedupe`
+     * makes unique, so the members are compared instead. */
+    bool ResourcesEqual(const manifest::EnvironmentView& view,
+                        const manifest::ResolvedResource& lhs,
+                        const manifest::ResolvedResource& rhs) noexcept
+    {
+        manifest::Binding lhsBinding = lhs.Record();
+        manifest::Binding rhsBinding = rhs.Record();
+        lhsBinding.FirstUniformMember = 0u;
+        rhsBinding.FirstUniformMember = 0u;
+        if (std::memcmp(&lhsBinding, &rhsBinding, sizeof(manifest::Binding)) != 0 ||
+            !RecordsEqual(view.UniformMembers(lhs.Record()), view.UniformMembers(rhs.Record())))
+        {
+            return false;
         }
 
-        const CookResult<ModuleInfluence> influence = ComputeActualInfluence(module);
-        if (!influence)
+        const manifest::Footprint* lhsFootprint = lhs.FootprintRecord();
+        const manifest::Footprint* rhsFootprint = rhs.FootprintRecord();
+        if (lhsFootprint == nullptr || rhsFootprint == nullptr)
         {
-            return influence.error();
+            return lhsFootprint == rhsFootprint;
         }
 
-        const std::span<const PermutationAxis> axes = module.Space->Axes();
-        for (auto&& [entryPointIndex, entryPoint] : std::views::enumerate(influence->EntryPoints))
+        return std::memcmp(lhsFootprint, rhsFootprint, sizeof(manifest::Footprint)) == 0;
+    }
+
+    /** Compares the instance of one entry point in two variants by content: source, layout, raster state, and
+     * workgroup size. Equal record indices are a shortcut only: unequal indices still compare content. */
+    bool InstancesEqual(const manifest::EnvironmentView& view, uint32_t lhs_variant, uint32_t rhs_variant, uint32_t entry_point)
+    {
+        const manifest::EntryPointInstanceView lhs = view.VariantAt(lhs_variant).EntryPoint(entry_point);
+        const manifest::EntryPointInstanceView rhs = view.VariantAt(rhs_variant).EntryPoint(entry_point);
+        const manifest::EntryPointInstance& lhsRecord = lhs.Record();
+        const manifest::EntryPointInstance& rhsRecord = rhs.Record();
+
+        if (lhsRecord.WorkgroupX != rhsRecord.WorkgroupX || lhsRecord.WorkgroupY != rhsRecord.WorkgroupY ||
+            lhsRecord.WorkgroupZ != rhsRecord.WorkgroupZ)
         {
-            for (uint32_t axisIndex = 0u; axisIndex < axes.size(); ++axisIndex)
+            return false;
+        }
+
+        if (lhsRecord.Raster != rhsRecord.Raster &&
+            (!RecordsEqual(view.VertexInputs(lhsRecord.Raster), view.VertexInputs(rhsRecord.Raster)) ||
+             !RecordsEqual(view.ColorTargets(lhsRecord.Raster), view.ColorTargets(rhsRecord.Raster)) ||
+             view.WritesFragDepth(lhsRecord.Raster) != view.WritesFragDepth(rhsRecord.Raster)))
+        {
+            return false;
+        }
+
+        const manifest::LayoutRange lhsLayout = lhs.Layout();
+        const manifest::LayoutRange rhsLayout = rhs.Layout();
+        if (lhsLayout.Size() != rhsLayout.Size())
+        {
+            return false;
+        }
+
+        for (uint32_t position = 0u; position < lhsLayout.Size(); ++position)
+        {
+            if (!ResourcesEqual(view, lhsLayout[position], rhsLayout[position]))
             {
-                const bool expected = IsAxisRelevant(entryPoint.Axes[axisIndex]);
-                if (view.IsAxisRelevant(static_cast<uint32_t>(entryPointIndex), axisIndex) != expected)
+                return false;
+            }
+        }
+
+        return lhsRecord.Source == rhsRecord.Source ||
+               std::ranges::equal(SourceBytes(view, lhsRecord.Source), SourceBytes(view, rhsRecord.Source));
+    }
+
+    /** Groups the variants into classes that agree on every axis whose bit is set in `kept_axes`, and returns
+     * each class as a run of variant indices, in `order`. */
+    std::vector<std::span<const uint32_t>> GroupVariants(std::span<const std::vector<uint32_t>> digits,
+                                                         std::span<const uint8_t> kept_axes,
+                                                         std::vector<uint32_t>& order)
+    {
+        auto lessOnKept = [&](uint32_t lhs, uint32_t rhs)
+        {
+            for (size_t axis = 0u; axis < kept_axes.size(); ++axis)
+            {
+                if (kept_axes[axis] != 0u && digits[lhs][axis] != digits[rhs][axis])
+                {
+                    return digits[lhs][axis] < digits[rhs][axis];
+                }
+            }
+            return false;
+        };
+
+        order.resize(digits.size());
+        std::ranges::iota(order, 0u);
+        std::ranges::stable_sort(order, lessOnKept);
+
+        std::vector<std::span<const uint32_t>> classes;
+        size_t begin = 0u;
+        while (begin < order.size())
+        {
+            size_t end = begin + 1u;
+            while (end < order.size() && !lessOnKept(order[begin], order[end]))
+            {
+                ++end;
+            }
+            classes.emplace_back(order.data() + begin, end - begin);
+            begin = end;
+        }
+        return classes;
+    }
+
+    CookError VerifyAxisRelevance(const manifest::EnvironmentView& view)
+    {
+        const manifest::ModuleView& module = view.Module();
+        const uint32_t axisCount = module.AxisCount();
+        const auto entryPointCount = static_cast<uint32_t>(module.EntryPoints().size());
+        const auto variantCount = static_cast<uint32_t>(view.Variants().size());
+
+        std::vector<uint32_t> radices(axisCount);
+        for (uint32_t axis = 0u; axis < axisCount; ++axis)
+        {
+            radices[axis] = module.AxisValueCount(axis);
+        }
+
+        std::vector<std::vector<uint32_t>> digits(variantCount, std::vector<uint32_t>(axisCount, 0u));
+        for (uint32_t variant = 0u; variant < variantCount; ++variant)
+        {
+            UnpackVariantKey(view.VariantKeys()[variant], radices, digits[variant]);
+        }
+
+        auto describe = [&](uint32_t axis) { return view.String(module.AxisData(axis).NameString); };
+        auto entryPointName = [&](uint32_t entry_point)
+        {
+            return view.String(module.EntryPoints()[entry_point].NameString);
+        };
+
+        // first derivation: an axis is relevant when two variants that differ only in it hold different
+        // instances, or when no two variants differ only in it (one cooked value is undetermined)
+        std::vector<uint32_t> order;
+        std::vector<uint8_t> allButOne(axisCount, uint8_t{ 1u });
+        for (uint32_t axis = 0u; axis < axisCount; ++axis)
+        {
+            allButOne[axis] = 0u;
+            const std::vector<std::span<const uint32_t>> classes = GroupVariants(digits, allButOne, order);
+            allButOne[axis] = 1u;
+            const bool determined = std::ranges::any_of(classes, [](std::span<const uint32_t> group) { return group.size() > 1u; });
+
+            for (uint32_t entryPoint = 0u; entryPoint < entryPointCount; ++entryPoint)
+            {
+                bool relevant = !determined;
+                for (const std::span<const uint32_t> group : classes)
+                {
+                    if (relevant)
+                    {
+                        break;
+                    }
+                    
+                    auto relevantPredicate = [&](uint32_t variant)
+                    {
+                        return !InstancesEqual(view, group.front(), variant, entryPoint);
+                    };
+
+                    relevant = std::ranges::any_of(group.subspan(1u), relevantPredicate);
+                }
+
+                if (view.IsAxisRelevant(entryPoint, axis) != relevant)
                 {
                     std::println(stderr,
-                                 "[lodestone] manifest marks axis '{}' {} for entry point '{}' of module '{}', the "
-                                 "measured influence is {}",
-                                 axes[axisIndex].Name,
-                                 expected ? "irrelevant" : "relevant",
-                                 entryPoint.EntryPointName,
-                                 module.Name,
-                                 ToString(entryPoint.Axes[axisIndex]));
+                                 "[lodestone] AXIS RELEVANCE: the manifest stores axis '{}' as {} for entry point '{}', "
+                                 "and the written instances say {}",
+                                 describe(axis),
+                                 relevant ? "irrelevant" : "relevant",
+                                 entryPointName(entryPoint),
+                                 relevant ? "relevant" : "irrelevant");
                     return CookError::ManifestAxisRelevanceMismatch;
+                }
+            }
+        }
+
+        // second check: SingleFor treats variants that agree on every relevant axis as one answer, so each
+        // such class must hold one instance. the per-axis derivation only proves this along chains of cooked
+        // variants, and a sparse policy can remove a link of a chain
+        for (uint32_t entryPoint = 0u; entryPoint < entryPointCount; ++entryPoint)
+        {
+            std::vector<uint8_t> relevantAxes(axisCount, uint8_t{ 0u });
+            for (uint32_t axis = 0u; axis < axisCount; ++axis)
+            {
+                relevantAxes[axis] = view.IsAxisRelevant(entryPoint, axis) ? 1u : 0u;
+            }
+            
+            for (const std::span<const uint32_t> group : GroupVariants(digits, relevantAxes, order))
+            {
+                auto differsPredicate = [&](uint32_t variant)
+                {
+                    return !InstancesEqual(view, group.front(), variant, entryPoint);
+                };
+
+                const auto differs = std::ranges::find_if(group.subspan(1u), differsPredicate);
+
+                if (differs != group.end())
+                {
+                    std::println(stderr,
+                                 "[lodestone] AXIS RELEVANCE: variants {} and {} agree on every relevant axis of entry "
+                                 "point '{}', and their instances differ",
+                                 std::to_underlying(view.VariantKeys()[group.front()]),
+                                 std::to_underlying(view.VariantKeys()[*differs]),
+                                 entryPointName(entryPoint));
+                    return CookError::ManifestAxisRelevanceIncomplete;
                 }
             }
         }

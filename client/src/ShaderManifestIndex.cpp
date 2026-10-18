@@ -8,6 +8,7 @@
 #include <expected>
 #include <functional>
 #include <iterator>
+#include <limits>
 #include <numeric>
 #include <cstdint>
 #include <optional>
@@ -32,7 +33,8 @@ namespace
 {
     std::vector<QueryAxisValue> AllBooleanValues(std::string_view axis_name)
     {
-        return {
+        return
+        {
             QueryAxisValue{ .Type = AxisValueDomain::Boolean, .IntegralValue = 0u, .Name = axis_name },
             QueryAxisValue{ .Type = AxisValueDomain::Boolean, .IntegralValue = 1u, .Name = axis_name }
         };
@@ -238,6 +240,64 @@ std::vector<DecodedVariant> ManifestQueryBuilder::VariantsFromKeys(const std::ve
 
 std::expected<VariantKey, QueryError> ManifestQueryBuilder::Single() const noexcept
 {
+    // every axis counts, so two matches are always two answers
+    const manifest::ModuleView& module = index->environment.Module();
+    std::vector<uint64_t> allAxes(module.AxisMaskWordCount(), ~uint64_t{ 0u });
+    return singleOver(allAxes);
+}
+
+std::expected<VariantKey, QueryError> ManifestQueryBuilder::SingleFor(
+    std::span<const std::string_view> entry_point_names) const noexcept
+{
+    if (!errors.empty())
+    {
+        return std::unexpected(errors.front());
+    }
+
+    if (entry_point_names.empty())
+    {
+        return std::unexpected(QueryError{ .Code = QueryErrorCode::EmptyEntryPointSet });
+    }
+
+    const manifest::EnvironmentView& environment = index->environment;
+    const manifest::ModuleView& module = environment.Module();
+    const std::span<const manifest::EntryPoint> entryPoints = module.EntryPoints();
+
+    // a pipeline reads every axis that any of its stages reads, so the masks are joined
+    std::vector<uint64_t> relevant(module.AxisMaskWordCount(), 0u);
+    for (const std::string_view name : entry_point_names)
+    {
+        const manifest::ManifestResult<uint32_t> found = module.FindEntryPointIndex(name);
+        if (!found)
+        {
+            auto getNameStrView = [&](const manifest::EntryPoint& entry_point)->std::string_view
+            {
+                return environment.String(entry_point.NameString);
+            };
+
+            const std::vector<std::string_view> names =
+                entryPoints |
+                std::views::transform(getNameStrView) |
+                std::ranges::to<std::vector>();
+
+            return std::unexpected(QueryError{ .Code = QueryErrorCode::UnknownEntryPoint,
+                                               .AxisName = std::string(name),
+                                               .Suggestion = NearestName(name, names) });
+        }
+
+        
+        const std::span<const uint64_t> mask = environment.AxisRelevance(*found);
+        for (size_t word = 0u; word < relevant.size(); ++word)
+        {
+            relevant[word] |= mask[word];
+        }
+    }
+
+    return singleOver(relevant);
+}
+
+std::expected<VariantKey, QueryError> ManifestQueryBuilder::singleOver(std::span<const uint64_t> relevant_axes) const noexcept
+{
     if (!errors.empty())
     {
         // the whole first error, not only its code, so the suggestion reaches the caller
@@ -254,16 +314,30 @@ std::expected<VariantKey, QueryError> ManifestQueryBuilder::Single() const noexc
         return keys.front();
     }
 
-    // more than one match: name every axis the caller must still pin
+    // more than one match: name every relevant axis the caller must still pin
     const manifest::ModuleView& module = index->environment.Module();
+    constexpr size_t k_WordBits = std::numeric_limits<decltype(relevant_axes)::value_type>::digits;
     std::string varyingNames;
     for (const uint32_t axisIndex : index->varyingAxes(keys))
     {
+        const bool relevant = ((relevant_axes[axisIndex / k_WordBits] >> (axisIndex % k_WordBits)) & 1u) != 0u;
+        if (!relevant)
+        {
+            continue;
+        }
         if (!varyingNames.empty())
         {
             varyingNames += ", ";
         }
         varyingNames += index->environment.String(module.AxisData(axisIndex).NameString);
+    }
+
+    if (varyingNames.empty())
+    {
+        // the matches differ only in axes that cannot change the instances, so they are one answer. the
+        // smallest key keeps the answer the same from one call to the next
+        // (e.g, if you were retrieving a common prepass or shadow rendering pass that does not vary by these axes)
+        return std::ranges::min(keys);
     }
 
     return std::unexpected(QueryError{ .Code = QueryErrorCode::AmbiguousVariant,
@@ -321,7 +395,7 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
 
     // Confirm the axis actually declares the requested value. A Boolean axis always contains both
     // 0 and 1, so only Type and Integral/Enum axes need the lookup.
-    // we use just linear searches here bc the value vectors should, at MOST, be ~1 dozen entries
+    // we use just linear searches here bc the value vectors should, at MOST, be a dozen entries or so
     if (axis.Domain == AxisValueDomain::Type || axis.Domain == AxisValueDomain::Enum)
     {
         const std::vector<std::string_view> axisValueNames = index->stringTableForAxis(axisIndex);
@@ -373,8 +447,8 @@ void ManifestQueryBuilder::insertConstraint(std::string_view axis_name,
         constraintIter->AxisIndex == axis_index)
     {
         QueryAxisRange& constraint = *constraintIter;
-        // if we wanted to validate against duplicate values, this would be where to do it
-        // for now, I'm not doing it as it's a real mess and I'm not really sure it warrants an error
+        // todo-ship: validate against duplicate values, but add a warning that can be printed 
+        // when the query is finally resolved: it's not critical, but we should make users aware
         constraint.Values.append_range(allowed);
     }
     else
@@ -409,7 +483,7 @@ ManifestIndex::ManifestIndex(manifest::EnvironmentView view) : environment(view)
     placeValues.resize(axisCount);
     axisNameToIndex.reserve(axisCount);
 
-    for (uint32_t axisIndex = 0u; axisIndex < axisCount; ++axisIndex)
+    for (int32_t axisIndex = 0u; std::cmp_less(axisIndex, axisCount); ++axisIndex)
     {
         // the module's radix for an axis is the count of values it uses, not the root axis value count
         radices[axisIndex] = module.AxisValueCount(axisIndex);

@@ -64,6 +64,8 @@ enum class QueryErrorCode : uint8_t
     EmptyConstraintSet, // you can't provide an empty value set to a constraint function
     NoVariantForConstraints, // Single() matched no variant
     AmbiguousVariant, // Single() matched more than one variant. AxisName lists the axes that still vary
+    UnknownEntryPoint, // SingleFor() got an entry point name the module does not declare. AxisName holds the name
+    EmptyEntryPointSet, // SingleFor() got no entry point names
     Count
 };
 
@@ -133,6 +135,15 @@ struct ManifestQueryBuilder
       * @note `AmbiguousVariant` puts the varying axis names in `AxisName` ("A, B", in axis order) and the match
       * count in `Detail`.  */
     [[nodiscard]] std::expected<VariantKey, QueryError> Single() const noexcept;
+    /** @brief The one entry point instance per named entry point that the query names, for use in a pipeline
+      * of those entry points. An axis that cannot change any of them (`EnvironmentView::IsAxisRelevant`) does
+      * not count: matches that differ only in such axes give the same instances, so they are one answer, and
+      * the smallest of their keys is returned.
+      * @return The key, or the error: the first builder error; `EmptyEntryPointSet`; `UnknownEntryPoint` with
+      * the name in `AxisName` and a suggestion; `NoVariantForConstraints`; or `AmbiguousVariant`, which lists
+      * only the varying axes that are relevant to the named entry points. */
+    [[nodiscard]] std::expected<VariantKey, QueryError> SingleFor(
+        std::span<const std::string_view> entry_point_names) const noexcept;
 
     [[nodiscard]] bool IsValid() const noexcept;
     [[nodiscard]] std::span<const QueryError> Errors() const noexcept;
@@ -147,6 +158,10 @@ private:
     void insertConstraint(std::string_view axis_name,
                           uint32_t axis_index,
                           std::vector<QueryAxisValue> allowed);
+
+    // the shared body of Single and SingleFor: one answer when the matches agree on every axis whose bit is
+    // set in `relevant_axes` (in the word layout of EnvironmentView::AxisRelevance)
+    [[nodiscard]] std::expected<VariantKey, QueryError> singleOver(std::span<const uint64_t> relevant_axes) const noexcept;
 
     // overload to coalesce work for WhereAnyOf functions, assuming shared value domain
     [[nodiscard]] ManifestQueryBuilder whereAnyOf(std::string_view axis_name, std::vector<QueryAxisValue> value) const noexcept;
@@ -208,7 +223,7 @@ private:
     };
     
     [[nodiscard]] std::vector<ScanConstraint> convertToScanConstraints(std::span<const QueryAxisRange> query) const;
-    /** @brief Effectively the form and system that Query() uses when closed: ever axis absent from input 
+    /** @brief Effectively the form and system that Query() uses when closed: every axis absent from input 
       * constraints is considered unconstrained and uses just the default value (canonical value, effectively) */
     [[nodiscard]] std::vector<VariantKey> select(std::span<const QueryAxisRange> constraints) const;
     [[nodiscard]] QueryAxisValue decodeAxis(uint32_t axis_index, uint32_t value_index) const noexcept;

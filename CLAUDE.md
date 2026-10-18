@@ -130,7 +130,7 @@ and each takes about one second.
 | `PermutationConstraintTest` | The axis constraint engine. `ActiveWhen` gates an axis the way the old parent link did, `Require` prunes a forbidden combination, and the load check rejects a forward reference, an unknown symbol, and a malformed expression. |
 | `SuggestTest` | The nearest-name suggestion. It measures the edit distance between a mistyped name and the accepted names, and returns the closest one. The cooker and the client both use it for a name rejection. |
 | `EnumTagDecodeTest` | The enum tag-blob decode (`compile/EnumTagDecode`). It reads each integer width, sign-extends a signed tag, zero-extends an unsigned tag, and accepts the `UInt64` wrap above 2^63. It names no Slang type, so the reflection read of an enum case value has a proof that needs no compiler. |
-| `ManifestIndexTest` | The client query surface, end to end. It builds a bundle inline through the emitter, with one axis of each domain, then drives `ManifestQueryBuilder` through every valid construction and every error path, plus a sparse manifest and an `ActiveWhen`-gated one. On the gated manifest, a constraint on the gated axis selects only the variants where that axis is active, and `Decode` marks the inactive axis. It proves that two profiles of one module each key their own subset, and that two modules share a root axis only when their values agree in order. It also covers `AxisNames` and `AxisValues`. It needs no Slang. |
+| `ManifestIndexTest` | The client query surface, end to end. It builds a bundle inline through the emitter, with one axis of each domain, then drives `ManifestQueryBuilder` through every valid construction and every error path, plus a sparse manifest and an `ActiveWhen`-gated one. On the gated manifest, a constraint on the gated axis selects only the variants where that axis is active, and `Decode` marks the inactive axis. It proves that two profiles of one module each key their own subset, and that two modules share a root axis only when their values agree in order. It also covers `AxisNames` and `AxisValues`, the axis relevance of each entry point, `SingleFor` (an irrelevant axis is not ambiguous, a pipeline joins the masks of its stages), and both failures of the relevance validator. It needs no Slang. |
 | `MergedLayoutTest` | The merged layout of one pipeline. It builds a bundle inline through the emitter, with a vertex, a fragment, and a compute entry point. It proves that a resource both stages read appears once with both stage bits, that the order is (group, binding), and that instances from two variants merge. It proves a conflict of kind and of byte size, a duplicate stage, and too many stages. It also proves that `Open` rejects a visibility list that is not in placement order. It needs no Slang. |
 
 An error check prints a diagnostic to `stderr` on purpose. Read the last line for the result.
@@ -463,6 +463,11 @@ Four validators run inside that loop. None of them is a stage.
 - **The manifest round trip**, inside stage 8. `VerifyManifestRoundTrip` reads each manifest back and
   compares it against the module it came from. `CheckManifestLayout` walks the manifest the way a
   consumer walks it, from variant to resource list to footprint list to visibility list.
+  `VerifyAxisRelevance` derives the axis relevance a second time from the written environment alone, through
+  the client views, and compares content, not record indices. It fails the cook when the derived mask differs
+  from the stored one (`ManifestAxisRelevanceMismatch`), or when two variants agree on every relevant axis of
+  an entry point and hold different instances of it (`ManifestAxisRelevanceIncomplete`). `SingleFor` rests on
+  that second claim.
 
 `--verify-deterministic` runs stages 1 to 8 twice into two `MemoryOutputSink` objects, compares every
 artifact byte for byte, then writes the first result to the real sink. A difference means an
@@ -492,7 +497,7 @@ unordered container reached the output.
 | `InternedModule` | `model/CookedLibrary.hpp` | The stage 6 builder. It holds the six interners, and it is the only place the provenance of a collapse survives. |
 | `CookedModule`, `CookedLibrary` | `model/CookedLibrary.hpp` | The frozen model. Every emitter reads this and nothing earlier. |
 | `BundleView`, `ModuleView`, `EnvironmentView` | `client/include/ShaderManifest.hpp` | Read-only spans over the bundle bytes, one type for each scope: the whole cook, one module, and one module cooked for one profile. Each `Open` validates its scope once and allocates nothing. |
-| `ManifestIndex`, `ManifestQueryBuilder` | `client/include/ShaderManifestIndex.hpp` | The client query surface, frozen. `ManifestIndex` decodes and enumerates variants and hands out a value-semantic builder. The builder resolves axis names and values by name, and its terminals are `Keys`, `Variants`, and `Single`. `Keys` and `Variants` return a set or an error code: a malformed query is an error, and a valid query with no variant is an empty set. `Single` returns one key or a whole `QueryError`, and never chooses between two matches: more than one match is `AmbiguousVariant`, which names the axes that still vary. `NearestName` is the "did you mean" that the query errors use, public so a renderer can use it for its own names. | |
+| `ManifestIndex`, `ManifestQueryBuilder` | `client/include/ShaderManifestIndex.hpp` | The client query surface, frozen. `ManifestIndex` decodes and enumerates variants and hands out a value-semantic builder. The builder resolves axis names and values by name, and its terminals are `Keys`, `Variants`, `Single`, and `SingleFor`. `SingleFor(entry_points)` is `Single` for a pipeline: an axis that cannot change any of the named entry points does not count, matches that differ only in such axes are one answer, and the smallest key is returned. `Keys` and `Variants` return a set or an error code: a malformed query is an error, and a valid query with no variant is an empty set. `Single` returns one key or a whole `QueryError`, and never chooses between two matches: more than one match is `AmbiguousVariant`, which names the axes that still vary. `NearestName` is the "did you mean" that the query errors use, public so a renderer can use it for its own names. | |
 | `ShaderSourceProvider` | `client/include/ShaderManifest.hpp` | Where a renderer gets code, bindings, and workgroup size. `Source()` gives WGSL text, and `SpirvWords()` gives SPIR-V words. Each asserts the profile's `ShaderCodeFormat`. `Bindings()` returns a `LayoutRange` of `ResolvedResource` views, built on demand, so the provider allocates nothing. `Generation()` is the hot-reload hook. |
 | `MergedLayoutView`, `MergedResource` | `client/include/ShaderManifest.hpp` | The layout of one pipeline. `Merge` takes one `EntryPointInstanceView` for each stage, checks every shared (group, binding) once, and gives each resource once with a mask of the stages that read it, in placement order. No template and no allocation: a fixed array of up to `k_MaxPipelineStages` ranges. It rests on the placement order of each visibility list, which the cooker sorts and `Open` checks. |
 | `LayoutRange`, `ResolvedResource`, `VariantView`, `EntryPointInstanceView` | `client/include/ShaderManifest.hpp` | Views over one environment. `LayoutRange::operator[]` is the one place that resolves `resources[visible[i]]`. A view points at its `EnvironmentView`, so keep that environment alive and do not move it. |
@@ -658,10 +663,15 @@ and its footprint), its raster state, or its workgroup size. `model/AxisInfluenc
 tables by content, so `--no-dedupe` gives the same mask. The source alone is not enough: an axis that appears
 only in a size attribute changes a footprint and leaves the code the same. An axis with one cooked value is
 Undetermined and counts as relevant. The emitter computes the mask from the module it writes, so a hand-built
-`CookedModule` gets a correct mask, and `VerifyManifestRoundTrip` reads it back (`ManifestAxisRelevanceMismatch`).
-The client reads it with `EnvironmentView::AxisRelevance` and `IsAxisRelevant`, and `manifest_dump` writes a
-`"relevantAxes"` object for each environment. The query surface does not use it yet: the `Single` change and an
-independent second derivation (a validator) are open decisions.
+`CookedModule` gets a correct mask. The validator `VerifyAxisRelevance` (see the data flow section) derives it
+again from the written bytes. The client reads it with `EnvironmentView::AxisRelevance` and `IsAxisRelevant`,
+`ManifestQueryBuilder::SingleFor(entry_points)` uses it, and `manifest_dump` writes a `"relevantAxes"` object
+for each environment.
+
+The per-axis measurement compares variants that differ in one axis. It proves that a class of variants which
+agree on the relevant axes holds one instance only along chains of cooked variants, and a sparse policy can
+remove a link. The validator then fails the cook with `ManifestAxisRelevanceIncomplete`
+(`ManifestIndexTest` builds such a cook).
 
 Each profile records its `ShaderCodeFormat` (since format version 7). A SPIR-V source is read as words, so
 `Open` rejects a SPIR-V source that is not on a 4-byte boundary or not whole words. The sources are packed

@@ -75,11 +75,12 @@ enum class CookError : uint16_t
     ManifestDuplicateVariantKey = 106,
     ManifestVariantAxisMaskMismatch = 107,
     ManifestAxisDefaultMismatch = 108, // a module axis default reads back as a different value than the space declares
-    ManifestAxisRelevanceMismatch = 109, // an entry point's axis relevance reads back different from the measured influence
+    ManifestAxisRelevanceMismatch = 109, // the axis relevance derived from the written manifest differs from the stored mask
 
     ManifestShaderLayoutVariantIndicesInvalid = 110,
     ManifestShaderLayoutVisiblityIndexInvalid = 111,
     ManifestShaderLayoutResourceListIndexInvalid = 112,
+    ManifestAxisRelevanceIncomplete = 113, // two variants agree on every relevant axis of an entry point, and its instances differ
 
     // output and diagnostic sink operation errors
     OutputPathInvalid = 120,

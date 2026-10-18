@@ -131,6 +131,19 @@ no allocation.
   that fails under the old code-only measurement (verified), `ManifestIndexTest` rows (100 checks), 26 of 26 tests.
   KitchenSink cook time unchanged (7.05 to 7.17 s). Open: D5 (`Single` scoped to entry points), D6 (a validator that
   derives relevance from the written manifest), D7.
+- 2026-10-17. L3 done. D5: `ManifestQueryBuilder::SingleFor(entry_points)` (the author chose a separate terminal).
+  It joins the relevance masks of the named entry points, ignores the other axes, and returns the smallest key
+  when the matches differ only in those. New query errors `UnknownEntryPoint` (with a suggestion) and
+  `EmptyEntryPointSet`. `Single` is unchanged. D6: `VerifyAxisRelevance` in `VerifyManifestRoundTrip` reads the
+  written environment only. It derives the mask again (content comparison through the views: source bytes,
+  binding records except `FirstUniformMember`, uniform members, footprint, raster records, workgroup) and checks
+  that each class of variants that agree on an entry point's relevant axes holds one instance
+  (`ManifestAxisRelevanceIncomplete`, 113). It replaced the plain read-back comparison. Found: the per-axis
+  measurement is incomplete when a sparse cook breaks a chain (a `ManifestIndexTest` fixture shows it), and such a
+  cook now fails. Decision for the author: keep failing, or make the cooker close the mask (mark every axis that
+  varies inside an inconsistent class, until no class is inconsistent). `ShaderManifestRejectTest`'s fixture had
+  two variants and no axis, which the validator rejects, so it got the one axis it modelled. 26 of 26 tests,
+  `ManifestIndexTest` 111 checks; KitchenSink passes with and without `--no-dedupe`. Next: R2 continues with L4.
 
 ## 5. Phase F, paused
 

@@ -564,7 +564,8 @@ AxisValueType ModuleView::AxisValue(uint32_t local_axis, uint32_t digit) const n
 {
     const ModuleAxis& moduleAxis = moduleAxes[local_axis];
     const uint32_t rootValueIndex = SelectSetBit(moduleAxis.LiveValuesMask, digit);
-    return bundle.AxisValues(moduleAxis.AxisIndex)[rootValueIndex];
+    std::span<const AxisValueType> axisValues = bundle.AxisValues(moduleAxis.AxisIndex);
+    return axisValues[rootValueIndex];
 }
 
 uint32_t ModuleView::AxisMaskWordCount() const noexcept
@@ -1238,7 +1239,7 @@ ManifestResult<MergedLayoutView> MergedLayoutView::Merge(std::span<const EntryPo
 
     // don't allow duplicate stages
     ShaderStageKind seenStages = ShaderStageKind::Invalid;
-    for (uint32_t i = 0u; i < view.stageCount; ++i)
+    for (int32_t i = 0u; std::cmp_less(i, view.stageCount); ++i)
     {
         const EntryPointInstanceView& instance = entry_points[i];
         const ShaderStageKind stage = instance.Stage();
@@ -1306,7 +1307,7 @@ MergedLayoutView::Iterator MergedLayoutView::begin() const noexcept
 MergedLayoutView::Iterator MergedLayoutView::end() const noexcept
 {
     std::array<uint32_t, k_MaxPipelineStages> positions{};
-    for (uint32_t i = 0u; i < stageCount; ++i)
+    for (std::ptrdiff_t i = 0u; std::cmp_less(i, stageCount); ++i)
     {
         const LayoutRange& range = layoutRanges[i];
         positions[i] = range.Size();
@@ -1505,7 +1506,7 @@ namespace
 
     uint32_t SelectSetBit(uint32_t mask, uint32_t rank) noexcept
     {
-        for (uint32_t cleared = 0u; cleared < rank; ++cleared)
+        for (int32_t cleared = 0u; std::cmp_less(cleared, rank); ++cleared)
         {
             mask &= mask - 1u;
         }
@@ -1647,7 +1648,7 @@ namespace
         // nothing, so we only check the name, the run, and named values
         const std::span<const Axis> axisSpan = Map<Axis>(bytes, parsed.Axes);
         const std::span<const AxisValueType> allAxesValueSpan = Map<AxisValueType>(bytes, parsed.AxesValues);
-        for (uint32_t i = 0; i < axisSpan.size(); ++i)
+        for (int32_t i = 0; std::cmp_less(i, axisSpan.size()); ++i)
         {
             const Axis& axis = axisSpan[i];
             if (axis.NameString >= parsed.Strings.Count)
@@ -1690,7 +1691,7 @@ namespace
     ErrorState ValidateProfiles(const Header& parsed, std::span<const std::byte> bytes) noexcept
     {
         const std::span<const Profile> profileSpan = Map<Profile>(bytes, parsed.Profiles);
-        for (uint32_t i = 0; i < profileSpan.size(); ++i)
+        for (int32_t i = 0; std::cmp_less(i, profileSpan.size()); ++i)
         {
             const Profile& profile = profileSpan[i];
             if (profile.TargetNameString >= parsed.Strings.Count)

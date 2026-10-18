@@ -1,5 +1,9 @@
 #include "model/CookedLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
+#include "permute/PermutationAssignment.hpp"
+#include "permute/PermutationAxis.hpp"
+#include "permute/PermutationSpace.hpp"
+#include "permute/PermutationValue.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifest.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
@@ -45,11 +49,21 @@ using lodestone::manifest::ManifestResult;
 namespace
 {
 
+// One boolean axis, so that the two variants of the small module differ in something. A module with no axis has
+// one variant, and the axis relevance validator rejects two variants that nothing tells apart. File scope,
+// because the module points into the space.
+const lodestone::PermutationSpace k_SmallSpace{ { lodestone::PermutationAxis{
+    "VARIANT",
+    { lodestone::PermutationValue{ false }, lodestone::PermutationValue{ true } },
+    lodestone::AxisKind::Technique,
+    lodestone::EarliestBindingTime::Cook,
+    lodestone::AxisValueDomain::Boolean } } };
+
 CookedModule MakeSmallModule()
 {
     CookedModule module;
     module.Name = "TestModule";
-    module.Space = nullptr;
+    module.Space = &k_SmallSpace;
     module.SpaceSize = 2u;
 
     module.EntryPoints.push_back(
@@ -79,6 +93,9 @@ CookedModule MakeSmallModule()
         variant.Index = i;
         variant.Suffix = i == 0u ? "_A" : "_B";
         variant.Description = i == 0u ? "first" : "second";
+        variant.Active = lodestone::PermutationAssignment{ lodestone::PermutationBinding{
+            .Axis = &k_SmallSpace.Axes()[0], .Value = lodestone::PermutationValue{ i == 1u } } };
+        variant.Canonical = k_SmallSpace.CanonicalizeAssignment(variant.Active);
         variant.SourceIndices.push_back(i);
         variant.VisibilityIndices.push_back(0u);
         variant.RasterIndices.push_back(0u);
@@ -86,8 +103,8 @@ CookedModule MakeSmallModule()
         module.Variants.emplace_back(std::move(variant));
     }
 
-    // One variant key per variant, strictly ascending and parallel to the variant table. This hand-built
-    // module has no axis, so give it keys the reader accepts.
+    // One variant key per variant, strictly ascending and parallel to the variant table. The key of a one-axis
+    // module is its digit.
     module.VariantKeys = { VariantKey{ 0u }, VariantKey{ 1u } };
 
     return module;
