@@ -7,9 +7,12 @@
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifest.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
+#include "emit/ShaderManifestVerify.hpp"
 #include "VariantKey.hpp"
+#include "ManifestFixtures.hpp"
 #include "TestHarness.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -86,25 +89,20 @@ CookedModule MakeSmallModule()
         lodestone::FootprintList{ lodestone::BufferFootprint{ .ElementCount = 256u } });
     module.VisibilityLists.push_back(lodestone::VisibilityList{ 0u });
 
-    module.RasterStates.emplace_back();
-
-    module.SamplerPairLists.emplace_back();
+    lodestone::tests::AddDefaultInstanceTables(module);
 
     for (uint32_t i = 0u; i < 2u; ++i)
     {
-        lodestone::LibraryVariant variant;
-        variant.Index = i;
+        const std::array instances{ lodestone::tests::ComputeInstance(i, 0u) };
+        lodestone::LibraryVariant variant = lodestone::tests::MakeFixtureVariant(
+            k_SmallSpace,
+            i,
+            lodestone::PermutationAssignment{ lodestone::PermutationBinding{
+                .Axis = &k_SmallSpace.Axes()[0], .Value = lodestone::PermutationValue{ i == 1u } } },
+            instances);
         variant.Suffix = i == 0u ? "_A" : "_B";
         variant.Description = i == 0u ? "first" : "second";
-        variant.Active = lodestone::PermutationAssignment{ lodestone::PermutationBinding{
-            .Axis = &k_SmallSpace.Axes()[0], .Value = lodestone::PermutationValue{ i == 1u } } };
-        variant.Canonical = k_SmallSpace.CanonicalizeAssignment(variant.Active);
-        variant.SourceIndices.push_back(i);
-        variant.VisibilityIndices.push_back(0u);
-        variant.RasterIndices.push_back(0u);
-        variant.SamplerPairIndices.push_back(0u);
-        variant.Workgroups.emplace_back(lodestone::WorkgroupSize{ .X=64u, .Y=1u, .Z=1u });
-        module.Variants.emplace_back(std::move(variant));
+        module.Variants.push_back(std::move(variant));
     }
 
     // One variant key per variant, strictly ascending and parallel to the variant table. The key of a one-axis
@@ -143,7 +141,7 @@ CookedLibrary MakeSpirvLibrary()
     return library;
 }
 
-/** The small module with a texture and a sampler that its entry point samples together (task L7). The pair
+/** The small module with a texture and a sampler that its entry point samples together. The pair
  * list names the two visibility positions. */
 CookedModule MakeSampledModule(lodestone::SamplerPairList pairs)
 {

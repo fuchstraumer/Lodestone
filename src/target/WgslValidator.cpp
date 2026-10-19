@@ -159,6 +159,9 @@ namespace
         case ResourceAccess::Feedback:
             return static_cast<tResourceType>(-1); // invalid access
         }
+
+        // a value outside the enum reaches here, since the switch covers every named value
+        return static_cast<tResourceType>(-1);
     }
 
     // our frontend pulls out the kind, shape, and access (nicely) into separate fields, so going back to a discrete binding type
@@ -214,6 +217,9 @@ namespace
             // separate function bc it's another switch (3 separate values, potentially)
             return ToTintStorageTextureType(access);
         }
+
+        // a value outside the enum reaches here, since the switch covers every named value
+        return static_cast<tResourceType>(-1);
     }
 
     bool TintTypeAgreesWithReflectionKind(tint::inspector::ResourceBinding::ResourceType tint_kind,

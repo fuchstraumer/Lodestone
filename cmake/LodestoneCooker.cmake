@@ -57,6 +57,7 @@ set(LODESTONE_COMPILE_IMPL_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangCompilerTypes.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangModuleContext.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangModuleContext.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangModuleContextAxes.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangReflector.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangReflector.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile/impl/SlangVariantCompiler.hpp"
@@ -86,11 +87,13 @@ set(LODESTONE_EMIT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/DepFile.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/OutputSink.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/ShaderManifestEmitter.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/ShaderManifestVerify.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/StageDump.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/DedupeReport.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/DepFile.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/OutputSink.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/ShaderManifestEmitter.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/ShaderManifestVerify.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/StageDump.cpp")
 
 set(LODESTONE_MODEL_SOURCES
@@ -127,7 +130,9 @@ set(LODESTONE_TARGET_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/target/TargetUtils.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/target/SpvValidator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetProfile.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetUtils.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetUtils.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/impl/SpvModuleReader.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/impl/SpvModuleReader.hpp")
 
 # OFF removes Tint and the WGSL validator. The wgsl profile stays, with no validator, so a wgsl cook in
 # that build fails unless the command line passes --no-validate.

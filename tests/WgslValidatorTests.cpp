@@ -177,7 +177,7 @@ int main()
     runner.Check(match.has_value() && match->Matches, "reflection that agrees with the emitted text passes");
     runner.Check(match.has_value() && match->Report.empty(), "a passing comparison reports nothing");
 
-    // The pairs are cook output, read from Tint's inspector (task L7). `MainCS` samples the height texture with the
+    // The pairs are cook output, read from Tint's inspector. `MainCS` samples the height texture with the
     // linear sampler, and the depth texture with the comparison sampler, so Tint names two pairs. The read path
     // that `--no-validate` uses must give the same pairs as the validate path.
     runner.BeginSection("the sampler and texture pairs come from Tint");

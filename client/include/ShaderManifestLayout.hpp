@@ -288,7 +288,7 @@ public:
     [[nodiscard]] ShaderStageKind Stage() const noexcept;
     [[nodiscard]] WorkgroupSize Workgroup() const noexcept;
     [[nodiscard]] LayoutRange Layout() const noexcept;
-    /** @brief The textures and samplers this entry point samples together, sorted. Each pair holds two positions
+    /** @brief The textures and samplers this entry point samples together, sorted. Each pair stores two positions
      * in `Layout()`. Empty when the profile did not record pairs (`EnvironmentView::HasSamplerTexturePairs`). */
     [[nodiscard]] std::span<const SamplerTexturePair> SamplerTexturePairs() const noexcept;
     //[[nodiscard]] RasterView Raster() const noexcept;

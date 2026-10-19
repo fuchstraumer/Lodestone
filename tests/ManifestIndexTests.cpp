@@ -5,11 +5,13 @@
 #include "model/CookedLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
+#include "emit/ShaderManifestVerify.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "permute/PermutationTypes.hpp"
 #include "permute/PermutationValue.hpp"
+#include "ManifestFixtures.hpp"
 #include "TestHarness.hpp"
 
 #include <algorithm>
@@ -154,8 +156,7 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space, Keep keep, Ac
     module.FootprintLists.push_back(
         lodestone::FootprintList{ lodestone::BufferFootprint{ .ElementCount = 256u } });
     module.VisibilityLists.push_back(lodestone::VisibilityList{ 0u });
-    module.RasterStates.emplace_back();
-    module.SamplerPairLists.emplace_back();
+    lodestone::tests::AddDefaultInstanceTables(module);
 
     // The full cross product, enumerated in declaration order, packs to keys 0..35 in ascending order,
     // parallel to the variant table. Every variant shares the single source, list, and raster entry.
@@ -175,26 +176,19 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space, Keep keep, Ac
                     }
                     module.VariantKeys.push_back(PackVariantKey(digits, k_Radices));
 
-                    lodestone::LibraryVariant variant;
-                    variant.Index = index;
+                    lodestone::PermutationAssignment assignment;
                     for (uint32_t axisIndex = 0u; axisIndex < digits.size(); ++axisIndex)
                     {
                         if (active(digits, axisIndex))
                         {
                             const PermutationAxis& axis = space.Axes()[axisIndex];
-                            variant.Active.push_back(lodestone::PermutationBinding{
+                            assignment.push_back(lodestone::PermutationBinding{
                                 .Axis = &axis, .Value = axis.GetValues()[digits[axisIndex]] });
                         }
                     }
-                    variant.ResourceListIndex = 0u;
-                    variant.FootprintListIndex = 0u;
-                    variant.SourceIndices.push_back(0u);
-                    variant.VisibilityIndices.push_back(0u);
-                    variant.RasterIndices.push_back(0u);
-                    variant.SamplerPairIndices.push_back(0u);
-                    variant.Workgroups.emplace_back(lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u });
-                    variant.Canonical = space.CanonicalizeAssignment(variant.Active);
-                    module.Variants.emplace_back(std::move(variant));
+                    const std::array instances{ lodestone::tests::ComputeInstance(0u, 0u) };
+                    module.Variants.push_back(
+                        lodestone::tests::MakeFixtureVariant(space, index, std::move(assignment), instances));
                     ++index;
                 }
             }
@@ -305,24 +299,19 @@ lodestone::CookedModule BuildTileModule(std::string name, const PermutationSpace
     module.ResourceLists.emplace_back();
     module.FootprintLists.emplace_back();
     module.VisibilityLists.emplace_back();
-    module.RasterStates.emplace_back();
-    module.SamplerPairLists.emplace_back();
+    lodestone::tests::AddDefaultInstanceTables(module);
 
     const uint32_t valueCount = static_cast<uint32_t>(space.Axes()[0].NumValues());
     for (uint32_t digit = 0u; digit < valueCount; ++digit)
     {
         module.VariantKeys.push_back(VariantKey{ digit });
-        lodestone::LibraryVariant variant;
-        variant.Index = digit;
         const PermutationAxis& axis = space.Axes()[0];
-        variant.Active.push_back(lodestone::PermutationBinding{ .Axis = &axis, .Value = axis.GetValues()[digit] });
-        variant.SourceIndices.push_back(0u);
-        variant.VisibilityIndices.push_back(0u);
-        variant.RasterIndices.push_back(0u);
-        variant.SamplerPairIndices.push_back(0u);
-        variant.Workgroups.emplace_back(lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u });
-        variant.Canonical = space.CanonicalizeAssignment(variant.Active);
-        module.Variants.emplace_back(std::move(variant));
+        const std::array instances{ lodestone::tests::ComputeInstance(0u, 0u) };
+        module.Variants.push_back(lodestone::tests::MakeFixtureVariant(
+            space,
+            digit,
+            lodestone::PermutationAssignment{ lodestone::PermutationBinding{ .Axis = &axis, .Value = axis.GetValues()[digit] } },
+            instances));
     }
 
     module.SpaceSize = valueCount;
@@ -355,8 +344,7 @@ lodestone::CookedModule BuildRelevanceModule(const PermutationSpace& space, bool
     module.ResourceLists.emplace_back();
     module.FootprintLists.emplace_back();
     module.VisibilityLists.emplace_back();
-    module.RasterStates.emplace_back();
-    module.SamplerPairLists.emplace_back();
+    lodestone::tests::AddDefaultInstanceTables(module);
 
     uint32_t index = 0u;
     for (const bool fog : { false, true })
@@ -368,20 +356,17 @@ lodestone::CookedModule BuildRelevanceModule(const PermutationSpace& space, bool
                 continue;
             }
 
-            lodestone::LibraryVariant variant;
-            variant.Index = index++;
-            variant.Active = lodestone::PermutationAssignment{
-                lodestone::PermutationBinding{ .Axis = &space.Axes()[0], .Value = PermutationValue{ fog } },
-                lodestone::PermutationBinding{ .Axis = &space.Axes()[1], .Value = PermutationValue{ debug } } };
-            variant.Canonical = space.CanonicalizeAssignment(variant.Active);
+            const std::array instances{ lodestone::tests::ComputeInstance(fog ? 1u : 0u, 0u),
+                                        lodestone::tests::ComputeInstance(2u, 0u) };
+            lodestone::LibraryVariant variant = lodestone::tests::MakeFixtureVariant(
+                space,
+                index++,
+                lodestone::PermutationAssignment{
+                    lodestone::PermutationBinding{ .Axis = &space.Axes()[0], .Value = PermutationValue{ fog } },
+                    lodestone::PermutationBinding{ .Axis = &space.Axes()[1], .Value = PermutationValue{ debug } } },
+                instances);
             module.VariantKeys.push_back(space.ComputeVariantKey(variant.Canonical));
-            variant.SourceIndices = { fog ? 1u : 0u, 2u };
-            variant.VisibilityIndices = { 0u, 0u };
-            variant.RasterIndices = { 0u, 0u };
-            variant.SamplerPairIndices = { 0u, 0u };
-            variant.Workgroups = { lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u },
-                                   lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u } };
-            module.Variants.emplace_back(std::move(variant));
+            module.Variants.push_back(std::move(variant));
         }
     }
 
@@ -531,8 +516,7 @@ lodestone::CookedModule BuildChainModule(const PermutationSpace& space)
     module.ResourceLists.emplace_back();
     module.FootprintLists.emplace_back();
     module.VisibilityLists.emplace_back();
-    module.RasterStates.emplace_back();
-    module.SamplerPairLists.emplace_back();
+    lodestone::tests::AddDefaultInstanceTables(module);
 
     constexpr std::array<std::array<bool, 3u>, 5u> k_Cooked{ { { false, false, false },
                                                                { true, true, false },
@@ -542,21 +526,18 @@ lodestone::CookedModule BuildChainModule(const PermutationSpace& space)
     uint32_t index = 0u;
     for (const std::array<bool, 3u>& values : k_Cooked)
     {
-        lodestone::LibraryVariant variant;
-        variant.Index = index++;
+        lodestone::PermutationAssignment assignment;
         for (uint32_t axis = 0u; axis < 3u; ++axis)
         {
-            variant.Active.push_back(
+            assignment.push_back(
                 lodestone::PermutationBinding{ .Axis = &space.Axes()[axis], .Value = PermutationValue{ values[axis] } });
         }
-        variant.Canonical = space.CanonicalizeAssignment(variant.Active);
+        const std::array instances{
+            lodestone::tests::ComputeInstance((values[0] && values[1] && !values[2]) ? 1u : 0u, 0u) };
+        lodestone::LibraryVariant variant =
+            lodestone::tests::MakeFixtureVariant(space, index++, std::move(assignment), instances);
         module.VariantKeys.push_back(space.ComputeVariantKey(variant.Canonical));
-        variant.SourceIndices = { (values[0] && values[1] && !values[2]) ? 1u : 0u };
-        variant.VisibilityIndices = { 0u };
-        variant.RasterIndices = { 0u };
-        variant.SamplerPairIndices = { 0u };
-        variant.Workgroups = { lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u } };
-        module.Variants.emplace_back(std::move(variant));
+        module.Variants.push_back(std::move(variant));
     }
 
     // the emitter wants the variants in key order

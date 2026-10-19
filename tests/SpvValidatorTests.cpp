@@ -221,7 +221,7 @@ int main()
     runner.Check(match.has_value() && std::ranges::contains(match->Capabilities, std::string{ "Shader" }),
                  "the capabilities of the module read back");
 
-    // The pairs are cook output (task L7). `ShadeCS` loads the texture and the sampler, combines them with
+    // The pairs are cook output. `ShadeCS` loads the texture and the sampler, combines them with
     // OpSampledImage, and samples that, so the reader follows both loads back to their variables.
     runner.BeginSection("the sampler and texture pairs come from OpSampledImage");
     const std::vector<SamplerTexturePlacement> expectedPairs

@@ -10,7 +10,7 @@
 
 /**
  * @brief The on-disk form of a cook bundle: the version, the error codes of the reader, and every record. This
- * header holds data and no views. `ShaderManifest.hpp` includes it, so a client includes that header.
+ * header contains data and no views. `ShaderManifest.hpp` includes it, so a client includes that header.
  */
 namespace lodestone::manifest
 {

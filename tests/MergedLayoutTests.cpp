@@ -9,6 +9,7 @@
 #include "permute/PermutationSpace.hpp"
 #include "permute/PermutationTypes.hpp"
 #include "permute/PermutationValue.hpp"
+#include "ManifestFixtures.hpp"
 #include "TestHarness.hpp"
 
 #include <array>
@@ -135,30 +136,26 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space,
     module.ResourceLists.push_back(lodestone::ResourceList{ 0u, 5u });
     module.FootprintLists.emplace_back();
     module.VisibilityLists = std::move(visibility_lists);
-    module.RasterStates.emplace_back();
-    module.SamplerPairLists.emplace_back();
+    lodestone::tests::AddDefaultInstanceTables(module);
 
     const PermutationAxis& axis = space.Axes()[0];
     for (uint32_t caseIndex = 0u; caseIndex < k_CaseCount; ++caseIndex)
     {
         module.VariantKeys.push_back(VariantKey{ caseIndex });
 
-        lodestone::LibraryVariant variant;
-        variant.Index = caseIndex;
-        variant.Active.push_back(lodestone::PermutationBinding{ .Axis = &axis, .Value = axis.GetValues()[caseIndex] });
-        variant.Canonical = space.CanonicalizeAssignment(variant.Active);
-        variant.ResourceListIndex = caseIndex;
-        variant.FootprintListIndex = 0u;
         const std::array<uint32_t, 3>& caseVisibility = visibility[caseIndex];
-        for (const uint32_t visibilityIndex : caseVisibility)
+        std::array<lodestone::tests::FixtureInstance, 3> instances{};
+        for (size_t entryPoint = 0u; entryPoint < instances.size(); ++entryPoint)
         {
-            variant.SourceIndices.push_back(0u);
-            variant.VisibilityIndices.push_back(visibilityIndex);
-            variant.RasterIndices.push_back(0u);
-            variant.SamplerPairIndices.push_back(0u);
-            variant.Workgroups.emplace_back(lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u });
+            instances[entryPoint] = lodestone::tests::ComputeInstance(0u, caseVisibility[entryPoint]);
         }
-        module.Variants.emplace_back(std::move(variant));
+        lodestone::LibraryVariant variant = lodestone::tests::MakeFixtureVariant(
+            space,
+            caseIndex,
+            lodestone::PermutationAssignment{ lodestone::PermutationBinding{ .Axis = &axis, .Value = axis.GetValues()[caseIndex] } },
+            instances);
+        variant.ResourceListIndex = caseIndex;
+        module.Variants.push_back(std::move(variant));
     }
 
     module.SpaceSize = k_CaseCount;

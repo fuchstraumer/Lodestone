@@ -184,7 +184,7 @@ int main(int argc, char** argv)
         }
         runner.Check(count == expected.LightSlots, "the element count equals GRID_X * GRID_Y * 16");
 
-        // ls_extent_1d (task L18): the width follows the axes, and the two axes it does not state are 1
+        // ls_extent_1d: the width follows the axes, and the two axes it does not set are 1
         const std::optional<manifest::ResolvedResource> ramp =
             FindResource(environment.value(), index, expected, "gClusterRamp");
         runner.Check(ramp.has_value() && ramp->ExtentX() == expected.ClusterCount && ramp->ExtentY() == 1u &&

@@ -14,7 +14,8 @@
   link check.
 - Record the capabilities that each entry point needs. Today no cook records them, because Slang warning
   41012 is off (phase F plan, O7). Read them from the target output (SPIR-V `OpCapability`). Collate them
-  for each variant.
+  for each variant. `src/target/impl/SpvModuleReader` already parses each module and lists its
+  `OpCapability` names (`ParseState::Capabilities`), so this can read them without the comparison.
 - A query takes the device capability set and removes each variant that needs more. This filter is the
   base preset. Every other query builds on it.
 - We should provide a way for clients to call something like `SetDeviceLimits` or `SetApiLimits` - we can use this to validate resource sizing expressions when being run as a live compiler,
@@ -27,12 +28,6 @@
 - Lodestone doesn't take action on these, it should just pack them into the manifest. The most elegant solution may be a typeless attribute system of some kind, just a bundle of tagged bytes.
 # Permutation system
 - Policy file target keys are flat (`targets.wgsl`, later `targets.dxil`, `targets.spirv`). A platform split is coming: one target profile likely needs several device presets under it, e.g. `minspec`, `recommended`, `mobile`. A preset picks a different `MaxVariants`, `CookValues`, and binding-time lowering. Decide whether a preset nests under a target (`targets.wgsl.mobile`) or forms its own axis in the policy schema. Do this after E5 lands the flat form, so the schema change has a working baseline to move from.
-- Let a size expression name a *derived* constant, not only an axis or an `extern static const`. Today the resolve namespace (`MakeResolveContext`) holds axis values plus captured undriven `extern` defaults, and nothing else. An `internal static const` that is computed from axes (e.g. `VTF_CLUSTER_COUNT = GRID_X * GRID_Y * GRID_Z`) is invisible, so `[ls_element_count("VTF_CLUSTER_COUNT")]` fails with `AttributeExpressionUnknownSymbol`. The author must inline the product or promote the constant to `extern`, which is a usability wart: the shader already states the relationship once, and we make them state it again.
-  - Approach: capture each module-scope `const` name together with its defining *expression string* (not a folded value) during the same source scan that reads the extern defaults. The `SymbolTable` already tokenizes every source line (it absorbed the old `ExternConstantScanner`), so it is the natural place to grab these too.
-  - Add them to the evaluator as derived symbols. When a name resolves to a derived symbol, evaluate its stored expression recursively against the same context, so the leaves bottom out at axes and extern defaults and the value tracks the per-variant axis values. A folded value captured from reflection would be wrong: it freezes at the declaration defaults and ignores the axes.
-  - Guard against a cycle in the derived-symbol graph (a derived const that names another), and cache a name's evaluated result per variant so a diamond is not recomputed.
-  - 2026-10-15: capture and carry done. `SymbolTable::DerivedConstantsForModule` reads the text, `SlangModuleContext::BuildModuleScopeVariableNames` (reflection) filters it to module scope, and `RawModule::DerivedConstants` carries name, expression, file, and line to stage 4. The Raw dump lists them. Open: the stage 4 evaluation (`MakeResolveContext`), its errors, and a cook test on `tests/assets/DerivedConstants/`.
-  - 2026-10-16: done. `MakeDerivedConstantTable` (once per module) and a three-color depth-first walk in `MakeResolveContext`, errors 150 to 153, `ResolveStageTest` rows, and `DerivedConstantTest` end to end. Shadowing an axis or an extern constant is an error. Not done: an axis default that uses a derived constant.
 - Let a module policy section inherit another target section, for example `inherit = "wgsl"`. Phase F
   step F1.5 makes a missing section fail the cook.
 # Cook driver and manifest
@@ -67,16 +62,6 @@
 # Error reporting
 - `CookResult<T>`'s error type could be refactored to effectively be a `Diagnostic` entry, meaning that failures can be passed up the chain... but would also complicate having something like `MaxErrorCount`. Evaluate this space to see if it could potentially clean up the code, and help create more unified (but still expressive) error reporting
 - Better error reporting out of the attribute expression evaluation system
-## Testing findings to resolve
-- Done 2026-09-24: the stale `CookTest` script line is retired. `OceanFft.slang` is gone, and
-  `KitchenSinkCookTest` is the end-to-end coverage.
-- Done (verified 2026-09-24): `HashReflectedBinding` now hashes each member's whole `Data`, so the item
-  below is closed.
-- `HashReflectedBinding` (`src/model/ShaderDataSchema.cpp`) hashes each member's `Offset`, `Size`, and
-  `ArrayCount`, but not `ElementStride` or `MatrixLayout`. Dedup stays correct, because
-  `ReflectedUniformMember::operator==` includes both and the interner decides equality by byte
-  comparison, not the hash. The cost is extra bucket collisions for structured buffers that differ only
-  in layout, plus a landmine if the hash is ever treated as equality. Close it or leave it, but know it.
 # Phase F: portable geometry (vertex/index pulling)
 Design explored 2026-09-22. This is Phase F lowering work, not scheduled yet. The goal is a shader
 that reads vertices and indices the same way whether the target binds a vertex buffer through the

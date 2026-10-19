@@ -32,14 +32,6 @@ inline constexpr std::string_view k_ManifestFileName = "ShaderLibrary.ldmanifest
  * its entry points or its axes, or when two variants of one environment share a key. */
 [[nodiscard]] CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& library);
 
-/** Reads the bundle back and compares every environment against the module it came from. For each entry
- * point of each variant it checks the source bytes, the workgroup size, each binding field, and the raster
- * state. For each variant it also decodes the key through the module axes and compares the result with
- * the canonical assignment, and compares the axis-active mask with the active assignment.
- *
- * This runs on every cook. The check is not optional. */
-[[nodiscard]] CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::vector<std::byte>& manifest_bytes);
-
 } // namespace lodestone
 
 #endif // !LODESTONE_MANIFEST_EMITTER_HPP

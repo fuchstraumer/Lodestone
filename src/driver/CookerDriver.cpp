@@ -16,6 +16,7 @@
 #include "emit/Depfile.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
+#include "emit/ShaderManifestVerify.hpp"
 #include "target/TargetProfile.hpp"
 #include <algorithm>
 #include <chrono>

@@ -105,6 +105,9 @@ std::string_view ToString(AccessModel model) noexcept
     case AccessModel::Invalid:
         return "invalid";
     }
+
+    // a value outside the enum reaches here, since the switch covers every named value
+    return "invalid";
 }
 
 CookResult<TargetProfile> FindTargetProfile(std::string_view name) noexcept

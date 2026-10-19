@@ -10,11 +10,23 @@ Write your text in ASD-STE100 (Simplified Technical English), as the style file 
 ## Build and test
 
 The project uses CMake presets with the Ninja Multi-Config generator. Each preset builds into
-`build/<presetName>`. Slang and xxHash are git submodules in `third_party/`.
+`build/<presetName>`. Slang, xxHash, toml++, and Dawn are git submodules in `third_party/`.
 
 ```bash
-git submodule update --init --recursive
+git submodule update --init third_party/xxHash third_party/tomlplusplus third_party/dawn
 ```
+
+```bash
+git submodule update --init --recursive third_party/slang
+```
+
+Do not run `git submodule update --init --recursive` on the whole tree. It recurses into Dawn's own
+submodules, which are Chromium dependencies for Dawn's GN build. Measured on 2026-10-19: four of them
+(`buildtools`, `testing`, `third_party/android_build_tools`, `third_party/android_sdk`) had an empty index and
+an empty worktree, so `third_party/dawn` showed as modified in every `git status`. The CMake build does not use
+them: `DAWN_FETCH_DEPENDENCIES` fetches the list in Dawn's `tools/fetch_dawn_dependencies.py`
+(`required_submodules`) at configure time. To clear that state, run
+`git submodule deinit -f <path>` for each of them inside `third_party/dawn`.
 
 ```bash
 cmake --preset ninja-msvc
@@ -173,6 +185,11 @@ when the test needs a command line. A cook test also needs a line in `scripts\ru
 script skips the cook tests in its glob and re-runs each with explicit arguments, so add the new name to
 that skip list and give it its own explicit block.
 
+A test that builds a `CookedModule` by hand uses `tests/ManifestFixtures.hpp`. `MakeFixtureVariant` sets every
+per-entry-point vector of a `LibraryVariant` from one `FixtureInstance` for each entry point, so a new
+per-entry-point field changes that file and no fixture. Before it existed, each such field broke every hand-built
+fixture at once.
+
 ## Running the cooker
 
 `tools/cooker_console` is the CLI. It builds `ls_cooker_console`, and phase D step D1b added
@@ -229,8 +246,9 @@ is therefore a visible word in a diff: the day a file in `emit/` writes
 
 `CookerErrors.hpp` sits at the top of `include/`, because every folder uses it.
 
-`src/compile/impl/` is the one place a header sits beside its source instead of in `include/`. Those
-six headers name Slang types, so `include/` must not hold them. `include/compile/SlangCompiler.hpp`
+`src/compile/impl/` and `src/target/impl/` are the places where a header sits beside its source instead of
+in `include/`. Those headers name third-party types (Slang, and SPIRV-Tools), so `include/` must not contain
+them. The six in `src/compile/impl/` name Slang types. `include/compile/SlangCompiler.hpp`
 is the wall, and it names no Slang type. **A file that needs `slang.h` belongs in `src/compile/impl/`
 and nowhere else.**
 
@@ -243,14 +261,36 @@ and nowhere else.**
 | `ThreadPool` | An atomic job index and a latch. Spreads variants across workers. | One for each compiler. |
 | `EmbeddedFileSystem` | The Slang file system. It serves the builtin modules from memory, and every other path from disk. | One for the process. |
 
-`client/include/` is not part of this split. It is the contract a renderer links against, and it holds
-four headers and nothing else.
+`SlangModuleContext` is defined in two files: `SlangModuleContext.cpp` contains the session, the bootstrap, and
+the module cache, and `SlangModuleContextAxes.cpp` contains the axis declaration reading (`BuildDeclaredAxes` and
+the enum and interface axes).
 
-There is no `validate/` folder, and that is worth knowing. Three of the four validators are functions
-inside the file they check: `VerifyLibraryRoundTrip` and `VerifyLayoutRoundTrip` live in
-`src/driver/CookerDriver.cpp`, and `VerifyManifestRoundTrip` lives in
-`src/emit/ShaderManifestEmitter.cpp`. Only the reflection cross-check has its own files, one for each
-target: `WgslValidator` and `SpvValidator`. The tree cannot show
+`src/target/impl/SpvModuleReader` parses one SPIR-V module with SPIRV-Tools into id records, and lists the
+bindings it declares and the sampler and texture pairs it samples. `SpvValidator` compares what the reader
+returns against reflection.
+
+`client/include/` is not part of this split. It is the contract a renderer links against. A renderer includes
+`ShaderManifest.hpp` (the bundle views) or `ShaderManifestIndex.hpp` (the query surface). The manifest header is
+split in three layers, and each one includes the one before it: `ShaderManifestFormat.hpp` (the version, the
+error codes, and every on-disk record), `ShaderManifestLayout.hpp` (the views of one variant, its resources, and
+merged pipeline layouts), and `ShaderManifest.hpp` (the bundle, module, and environment views). The other headers
+are `ShaderLibraryTypes.hpp`, `VariantKey.hpp`, `ResourceFlags.hpp`, and `EnumClassUtils.hpp`. The target
+`lodestone_client_header_check` compiles each public header alone in its own translation unit, so a header that
+needs another header first fails the build, and the include order of a client cannot matter.
+
+`client/src/` contains two private headers that clients never see: `ShaderManifestRead.hpp` (the helpers that map
+records out of the bytes) and `ShaderManifestValidator.hpp` (the checks that `BundleView::Open` and
+`EnvironmentView::Open` run). The source files are `ShaderManifest.cpp` (the bundle, module, and environment views),
+`ShaderManifestLayout.cpp`, `ShaderManifestValidator.cpp`, `ShaderManifestIndex.cpp` (the index and its scan), and
+`ShaderManifestQuery.cpp` (the query builder and the presets).
+
+There is no `validate/` folder, and that is worth knowing. Two of the five validators are functions inside
+the file they check: `VerifyLibraryRoundTrip` and `VerifyLayoutRoundTrip` live in
+`src/driver/CookerDriver.cpp`. `VerifyManifestRoundTrip` lives in `src/emit/ShaderManifestVerify.cpp`,
+beside the writer it checks (`ShaderManifestEmitter.cpp`). The verifier shares no code with the writer: it
+compares each record against the model field by field. Only the reflection cross-check has its own files, one for
+each target: `WgslValidator` and `SpvValidator`. `VerifySamplerPairsAcrossProfiles` lives in
+`src/model/CookedLibrary.cpp`. The tree cannot show
 that validators rank beside stages, and no arrangement of the current files would.
 
 ## The two problem domains
@@ -511,8 +551,8 @@ unordered container reached the output.
 | `BundleView`, `ModuleView`, `EnvironmentView` | `client/include/ShaderManifest.hpp` | Read-only spans over the bundle bytes, one type for each scope: the whole cook, one module, and one module cooked for one profile. Each `Open` validates its scope once and allocates nothing. |
 | `ManifestIndex`, `ManifestQueryBuilder` | `client/include/ShaderManifestIndex.hpp` | The client query surface, frozen. `ManifestIndex` decodes and enumerates variants and hands out a value-semantic builder. The builder resolves axis names and values by name, and its terminals are `Keys`, `Variants`, `Single`, and `SingleFor`. Each constraint has a `PinMode`: `Where` is `Required` (the axis must be active), and `WhereWhenActive` tests the value only where the axis is active, so it keeps the variants where a gate is off. `Apply(QueryPreset)` applies a set of pins that serves any module: a pin on an axis the module does not declare is skipped and gives a `QueryNote`, never an error. `Notes()` holds those and the `DuplicateValue` notes, and `NotesFor(entry_points)` adds a `PinAxisIrrelevant` note for each pin that cannot change those entry points. `SingleFor(entry_points)` is `Single` for a pipeline: an axis that cannot change any of the named entry points does not count, matches that differ only in such axes are one answer, and the smallest key is returned. `Keys` and `Variants` return a set or an error code: a malformed query is an error, and a valid query with no variant is an empty set. `Single` returns one key or a whole `QueryError`, and never chooses between two matches: more than one match is `AmbiguousVariant`, which names the axes that still vary. `NearestName` is the "did you mean" that the query errors use, public so a renderer can use it for its own names. | |
 | `ShaderSourceProvider` | `client/include/ShaderManifest.hpp` | Where a renderer gets code, bindings, and workgroup size. `Source()` gives WGSL text, and `SpirvWords()` gives SPIR-V words. Each asserts the profile's `ShaderCodeFormat`. `Bindings()` returns a `LayoutRange` of `ResolvedResource` views, built on demand, so the provider allocates nothing. `Generation()` is the hot-reload hook. |
-| `MergedLayoutView`, `MergedResource` | `client/include/ShaderManifest.hpp` | The layout of one pipeline. `Merge` takes one `EntryPointInstanceView` for each stage, checks every shared (group, binding) once, and gives each resource once with a mask of the stages that read it, in placement order. No template and no allocation: a fixed array of up to `k_MaxPipelineStages` ranges. It rests on the placement order of each visibility list, which the cooker sorts and `Open` checks. `SamplerTexturePairs()` gives the union of the stages' sampler and texture pairs, as `MergedSamplerTexturePair` values. |
-| `LayoutRange`, `ResolvedResource`, `VariantView`, `EntryPointInstanceView` | `client/include/ShaderManifest.hpp` | Views over one environment. `LayoutRange::operator[]` is the one place that resolves `resources[visible[i]]`. A view points at its `EnvironmentView`, so keep that environment alive and do not move it. |
+| `MergedLayoutView`, `MergedResource` | `client/include/ShaderManifestLayout.hpp` | The layout of one pipeline. `Merge` takes one `EntryPointInstanceView` for each stage, checks every shared (group, binding) once, and gives each resource once with a mask of the stages that read it, in placement order. No template and no allocation: a fixed array of up to `k_MaxPipelineStages` ranges. It rests on the placement order of each visibility list, which the cooker sorts and `Open` checks. `SamplerTexturePairs()` gives the union of the stages' sampler and texture pairs, as `MergedSamplerTexturePair` values. |
+| `LayoutRange`, `ResolvedResource`, `VariantView`, `EntryPointInstanceView` | `client/include/ShaderManifestLayout.hpp` | Views over one environment. `LayoutRange::operator[]` is the one place that resolves `resources[visible[i]]`. A view points at its `EnvironmentView`, so keep that environment alive and do not move it. |
 
 `ContentHashValue` is xxHash3, 64 bit. `model/ContentHash.hpp` holds the streaming form as well, which the
 composite keys use. The hash name reaches the output, so a new hash needs a new name, and
@@ -710,7 +750,7 @@ payload that is not whole words or has no SPIR-V magic number.
 
 Every cross-reference is an index or an offset, never a pointer, so the reader is a set of spans and it
 relocates nothing. Sections start on 8-byte boundaries. A record must be trivially copyable, and the
-`k_IsManifestRecord` asserts in `client/src/ShaderManifest.cpp` hold that line. Record **sizes** are not
+`k_IsManifestRecord` asserts in `client/src/ShaderManifestRead.hpp` enforce that. Record **sizes** are not
 pinned: the format has no version migration yet, so a record can still grow.
 
 Each table has a `TableRef` (32-bit, inside an extent) or a `TableRef64` (header region): an offset and a
