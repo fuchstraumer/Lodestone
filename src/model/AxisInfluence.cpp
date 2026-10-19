@@ -67,6 +67,9 @@ namespace
         hasher.Append(workgroup.Y);
         hasher.Append(workgroup.Z);
 
+        // the pairs follow from the code and the layout, and a consumer reads them, so they are part of the instance
+        hasher.Append(HashSamplerPairList(module.SamplerPairLists[variant.SamplerPairIndices[entry_point_index]]));
+
         return hasher.Finalize();
     }
 
@@ -119,11 +122,14 @@ namespace
                                   instances.Layouts[instances.Slot(rhs_variant, entry_point_index)];
         const bool sourcesEqual = std::ranges::equal(ResolveSource(module, lhs, entry_point_index),
                                                      ResolveSource(module, rhs, entry_point_index));
+        const bool pairsEqual = module.SamplerPairLists[lhs.SamplerPairIndices[entry_point_index]] ==
+                                module.SamplerPairLists[rhs.SamplerPairIndices[entry_point_index]];
 
         return workgroupsEqual &&
                rasterStatesEqual &&
                layoutsEqual &&
-               sourcesEqual;
+               sourcesEqual &&
+               pairsEqual;
     }
 
     bool GroupSharesOneInstance(const CookedModule& module,

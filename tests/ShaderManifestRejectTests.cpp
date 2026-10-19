@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <cstring>
 #include <optional>
+#include <variant>
 #include <span>
 #include <string>
 #include <utility>
@@ -87,6 +88,8 @@ CookedModule MakeSmallModule()
 
     module.RasterStates.emplace_back();
 
+    module.SamplerPairLists.emplace_back();
+
     for (uint32_t i = 0u; i < 2u; ++i)
     {
         lodestone::LibraryVariant variant;
@@ -99,6 +102,7 @@ CookedModule MakeSmallModule()
         variant.SourceIndices.push_back(i);
         variant.VisibilityIndices.push_back(0u);
         variant.RasterIndices.push_back(0u);
+        variant.SamplerPairIndices.push_back(0u);
         variant.Workgroups.emplace_back(lodestone::WorkgroupSize{ .X=64u, .Y=1u, .Z=1u });
         module.Variants.emplace_back(std::move(variant));
     }
@@ -136,6 +140,45 @@ CookedLibrary MakeSpirvLibrary()
     library.Environments = {};
     library.Environments.emplace_back(std::nullopt);
     library.Environments.emplace_back(std::move(module));
+    return library;
+}
+
+/** The small module with a texture and a sampler that its entry point samples together (task L7). The pair
+ * list names the two visibility positions. */
+CookedModule MakeSampledModule(lodestone::SamplerPairList pairs)
+{
+    CookedModule module = MakeSmallModule();
+    lodestone::ReflectedBinding texture;
+    texture.Name = "Albedo";
+    texture.Placement = lodestone::BoundPlacement{ .Group = 1u, .Binding = 0u };
+    texture.Kind = lodestone::BindingKind::Texture;
+    texture.Shape = lodestone::ResourceShape::Texture2D;
+    texture.SampleType = lodestone::TextureSampleType::Float;
+    lodestone::ReflectedBinding sampler;
+    sampler.Name = "LinearSampler";
+    sampler.Placement = lodestone::BoundPlacement{ .Group = 1u, .Binding = 1u };
+    sampler.Kind = lodestone::BindingKind::Sampler;
+
+    module.Resources = { texture, sampler };
+    module.ResourceLists = { lodestone::ResourceList{ 0u, 1u } };
+    module.FootprintLists = { lodestone::FootprintList{ std::monostate{}, std::monostate{} } };
+    module.VisibilityLists = { lodestone::VisibilityList{ 0u, 1u } };
+    module.SamplerPairLists = { std::move(pairs) };
+    return module;
+}
+
+/** The sampled module cooked for both profiles, each with its own pair list, and each profile recording. */
+CookedLibrary MakeSampledLibrary(lodestone::SamplerPairList wgsl_pairs, lodestone::SamplerPairList spirv_pairs)
+{
+    CookedLibrary library = MakeSmallLibrary();
+    library.Profiles[0].SamplerTexturePairsRecorded = true;
+    library.Profiles[1].SamplerTexturePairsRecorded = true;
+    library.Environments = {};
+    library.Environments.emplace_back(MakeSampledModule(std::move(wgsl_pairs)));
+    CookedModule spirvModule = MakeSampledModule(std::move(spirv_pairs));
+    // a SPIR-V source must be whole words. The emitter does not read SPIR-V, so the words need not be a module
+    spirvModule.Sources = { std::vector<std::byte>(8u, std::byte{ 0x01 }), std::vector<std::byte>(12u, std::byte{ 0x02 }) };
+    library.Environments.emplace_back(std::move(spirvModule));
     return library;
 }
 
@@ -297,6 +340,90 @@ int main()
         runner.Check(spirvEnvironment.has_value() && spirvEnvironment->SpirvWords(1u).size() == 3u,
                      "a 12-byte SPIR-V source reads back as three words");
     }
+
+    runner.BeginSection("the sampler and texture pairs read back, and a damaged pair is rejected");
+    const lodestone::SamplerPairList onePair{ lodestone::SamplerTexturePair{ .Texture = 0u, .Sampler = 1u } };
+    const CookedLibrary sampledLibrary = MakeSampledLibrary(onePair, onePair);
+    const lodestone::CookResult<std::vector<std::byte>> sampledManifest = EmitShaderManifest(sampledLibrary);
+    runner.Check(sampledManifest.has_value(), "the emitter accepts a module with a sampler and texture pair");
+    if (sampledManifest.has_value())
+    {
+        const std::vector<std::byte>& sampledBytes = *sampledManifest;
+        runner.Check(lodestone::VerifyManifestRoundTrip(sampledLibrary, sampledBytes) == lodestone::CookError::Success,
+                     "the round trip reads the pairs back");
+        const ManifestResult<BundleView> sampledBundle = BundleView::Open(sampledBytes);
+        const ManifestResult<EnvironmentView> sampledEnvironment =
+            sampledBundle.has_value() ? sampledBundle->OpenEnvironment(0u, 0u)
+                                      : ManifestResult<EnvironmentView>{ std::unexpected(sampledBundle.error()) };
+        runner.Check(sampledEnvironment.has_value() && sampledEnvironment->HasSamplerTexturePairs(),
+                     "a recording profile reads as recorded");
+        if (sampledEnvironment.has_value())
+        {
+            const lodestone::manifest::EntryPointInstanceView instance = sampledEnvironment->VariantAt(0u).EntryPoint(0u);
+            const std::span<const lodestone::manifest::SamplerTexturePair> pairs = instance.SamplerTexturePairs();
+            runner.Check(pairs.size() == 1u && instance.Layout()[pairs[0].Texture].Name() == "Albedo" &&
+                             instance.Layout()[pairs[0].Sampler].Name() == "LinearSampler",
+                         "a pair resolves through the layout to the texture and the sampler");
+        }
+
+        // a round trip against a cook with no pairs proves that the round trip compares the pairs
+        const CookedLibrary unpairedLibrary = MakeSampledLibrary({}, {});
+        runner.Check(lodestone::VerifyManifestRoundTrip(unpairedLibrary, sampledBytes) ==
+                         lodestone::CookError::ManifestSamplerPairMismatch,
+                     "a manifest whose pairs differ from the cook fails the round trip");
+
+        const EnvironmentDirectoryEntry sampledEntry =
+            ReadRecord<EnvironmentDirectoryEntry>(sampledBytes, ReadRecord<Header>(sampledBytes, 0u).EnvironmentDirectoryOffset);
+        const EnvironmentHeader sampledHeader = ReadRecord<EnvironmentHeader>(sampledBytes, sampledEntry.ExtentOffset);
+        std::vector<std::byte> swappedPair = sampledBytes;
+        WriteValue(swappedPair,
+                   sampledEntry.ExtentOffset + sampledHeader.SamplerTexturePairs.Offset,
+                   lodestone::manifest::SamplerTexturePair{ .Texture = 1u, .Sampler = 0u });
+        runner.Check(EnvironmentErrorFrom(swappedPair, 0u) == ErrorCode::InvalidSamplerTexturePair,
+                     "a pair whose texture position names the sampler is rejected when the environment opens");
+
+        std::vector<std::byte> pastVisibility = sampledBytes;
+        WriteValue(pastVisibility,
+                   sampledEntry.ExtentOffset + sampledHeader.SamplerTexturePairs.Offset,
+                   lodestone::manifest::SamplerTexturePair{ .Texture = 0u, .Sampler = 2u });
+        runner.Check(EnvironmentErrorFrom(pastVisibility, 0u) == ErrorCode::InvalidSamplerTexturePair,
+                     "a pair position past the visibility list is rejected");
+
+        std::vector<std::byte> badPairList = sampledBytes;
+        WriteValue(badPairList,
+                   sampledEntry.ExtentOffset + sampledHeader.EntryPointInstanceTableOffset +
+                       offsetof(lodestone::manifest::EntryPointInstance, SamplerPairs),
+                   5u);
+        runner.Check(EnvironmentErrorFrom(badPairList, 0u) == ErrorCode::InvalidEntryPointInstanceSamplerPairIndex,
+                     "an instance that names a pair list past the table is rejected");
+    }
+
+    CookedLibrary unrecordedLibrary = MakeSampledLibrary({}, {});
+    unrecordedLibrary.Profiles[0].SamplerTexturePairsRecorded = false;
+    const lodestone::CookResult<std::vector<std::byte>> unrecordedManifest = EmitShaderManifest(unrecordedLibrary);
+    if (unrecordedManifest.has_value())
+    {
+        const std::vector<std::byte>& unrecordedBytes = *unrecordedManifest;
+        const ManifestResult<BundleView> unrecordedBundle = BundleView::Open(unrecordedBytes);
+        const ManifestResult<EnvironmentView> unrecorded =
+            unrecordedBundle.has_value() ? unrecordedBundle->OpenEnvironment(0u, 0u)
+                                         : ManifestResult<EnvironmentView>{ std::unexpected(unrecordedBundle.error()) };
+        runner.Check(unrecorded.has_value() && !unrecorded->HasSamplerTexturePairs(),
+                     "a profile with no reader reads as not recorded, which is not the same fact as no pairs");
+    }
+
+    // The cross-target validator: one variant of one module samples the same resources in every profile.
+    runner.BeginSection("two profiles of one variant must read the same pairs");
+    runner.Check(lodestone::VerifySamplerPairsAcrossProfiles(sampledLibrary) == lodestone::CookError::Success,
+                 "two profiles that read the same pairs agree");
+    const CookedLibrary disagreeing = MakeSampledLibrary(onePair, {});
+    runner.Check(lodestone::VerifySamplerPairsAcrossProfiles(disagreeing) ==
+                     lodestone::CookError::SamplerPairsTargetMismatch,
+                 "a pair that one profile reads and the other does not fails the cook");
+    CookedLibrary oneUnrecorded = MakeSampledLibrary(onePair, {});
+    oneUnrecorded.Profiles[1].SamplerTexturePairsRecorded = false;
+    runner.Check(lodestone::VerifySamplerPairsAcrossProfiles(oneUnrecorded) == lodestone::CookError::Success,
+                 "a profile that did not record its pairs is not compared");
 
     return runner.Report();
 }

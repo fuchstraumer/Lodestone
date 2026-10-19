@@ -155,6 +155,7 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space, Keep keep, Ac
         lodestone::FootprintList{ lodestone::BufferFootprint{ .ElementCount = 256u } });
     module.VisibilityLists.push_back(lodestone::VisibilityList{ 0u });
     module.RasterStates.emplace_back();
+    module.SamplerPairLists.emplace_back();
 
     // The full cross product, enumerated in declaration order, packs to keys 0..35 in ascending order,
     // parallel to the variant table. Every variant shares the single source, list, and raster entry.
@@ -190,6 +191,7 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space, Keep keep, Ac
                     variant.SourceIndices.push_back(0u);
                     variant.VisibilityIndices.push_back(0u);
                     variant.RasterIndices.push_back(0u);
+                    variant.SamplerPairIndices.push_back(0u);
                     variant.Workgroups.emplace_back(lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u });
                     variant.Canonical = space.CanonicalizeAssignment(variant.Active);
                     module.Variants.emplace_back(std::move(variant));
@@ -304,6 +306,7 @@ lodestone::CookedModule BuildTileModule(std::string name, const PermutationSpace
     module.FootprintLists.emplace_back();
     module.VisibilityLists.emplace_back();
     module.RasterStates.emplace_back();
+    module.SamplerPairLists.emplace_back();
 
     const uint32_t valueCount = static_cast<uint32_t>(space.Axes()[0].NumValues());
     for (uint32_t digit = 0u; digit < valueCount; ++digit)
@@ -316,6 +319,7 @@ lodestone::CookedModule BuildTileModule(std::string name, const PermutationSpace
         variant.SourceIndices.push_back(0u);
         variant.VisibilityIndices.push_back(0u);
         variant.RasterIndices.push_back(0u);
+        variant.SamplerPairIndices.push_back(0u);
         variant.Workgroups.emplace_back(lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u });
         variant.Canonical = space.CanonicalizeAssignment(variant.Active);
         module.Variants.emplace_back(std::move(variant));
@@ -352,6 +356,7 @@ lodestone::CookedModule BuildRelevanceModule(const PermutationSpace& space, bool
     module.FootprintLists.emplace_back();
     module.VisibilityLists.emplace_back();
     module.RasterStates.emplace_back();
+    module.SamplerPairLists.emplace_back();
 
     uint32_t index = 0u;
     for (const bool fog : { false, true })
@@ -373,6 +378,7 @@ lodestone::CookedModule BuildRelevanceModule(const PermutationSpace& space, bool
             variant.SourceIndices = { fog ? 1u : 0u, 2u };
             variant.VisibilityIndices = { 0u, 0u };
             variant.RasterIndices = { 0u, 0u };
+            variant.SamplerPairIndices = { 0u, 0u };
             variant.Workgroups = { lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u },
                                    lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u } };
             module.Variants.emplace_back(std::move(variant));
@@ -526,6 +532,7 @@ lodestone::CookedModule BuildChainModule(const PermutationSpace& space)
     module.FootprintLists.emplace_back();
     module.VisibilityLists.emplace_back();
     module.RasterStates.emplace_back();
+    module.SamplerPairLists.emplace_back();
 
     constexpr std::array<std::array<bool, 3u>, 5u> k_Cooked{ { { false, false, false },
                                                                { true, true, false },
@@ -547,6 +554,7 @@ lodestone::CookedModule BuildChainModule(const PermutationSpace& space)
         variant.SourceIndices = { (values[0] && values[1] && !values[2]) ? 1u : 0u };
         variant.VisibilityIndices = { 0u };
         variant.RasterIndices = { 0u };
+        variant.SamplerPairIndices = { 0u };
         variant.Workgroups = { lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u } };
         module.Variants.emplace_back(std::move(variant));
     }

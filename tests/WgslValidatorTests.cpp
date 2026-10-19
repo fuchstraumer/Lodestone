@@ -6,9 +6,11 @@
 #include "TestHarness.hpp"
 #include "target/WgslValidator.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 // The cross-check compares what reflection reports against what the emitted WGSL actually declares.
@@ -30,6 +32,7 @@ using lodestone::CookResult;
 using lodestone::ReflectedBinding;
 using lodestone::ResourceAccess;
 using lodestone::ResourceShape;
+using lodestone::SamplerTexturePlacement;
 using lodestone::TargetProfile;
 using lodestone::WgslValidator;
 
@@ -173,6 +176,29 @@ int main()
     runner.Check(match.has_value(), "valid WGSL and agreeing reflection produce a result, not an error");
     runner.Check(match.has_value() && match->Matches, "reflection that agrees with the emitted text passes");
     runner.Check(match.has_value() && match->Report.empty(), "a passing comparison reports nothing");
+
+    // The pairs are cook output, read from Tint's inspector (task L7). `MainCS` samples the height texture with the
+    // linear sampler, and the depth texture with the comparison sampler, so Tint names two pairs. The read path
+    // that `--no-validate` uses must give the same pairs as the validate path.
+    runner.BeginSection("the sampler and texture pairs come from Tint");
+    const std::vector<SamplerTexturePlacement> expectedPairs
+    {
+        SamplerTexturePlacement{ .TextureGroup = 1u, .TextureBinding = 0u, .SamplerGroup = 1u, .SamplerBinding = 1u },
+        SamplerTexturePlacement{ .TextureGroup = 2u, .TextureBinding = 1u, .SamplerGroup = 3u, .SamplerBinding = 2u },
+    };
+    auto sortedPairs = [](std::vector<SamplerTexturePlacement> pairs)
+    {
+        std::ranges::sort(pairs, {}, [](const SamplerTexturePlacement& pair) {
+            return std::tie(pair.TextureGroup, pair.TextureBinding, pair.SamplerGroup, pair.SamplerBinding);
+        });
+        return pairs;
+    };
+    runner.Check(match.has_value() && sortedPairs(match->SamplerTexturePairs) == expectedPairs,
+                 "the validate path reads each texture with the sampler it is sampled with, a comparison sampler too");
+    const CookResult<std::vector<SamplerTexturePlacement>> readPairs =
+        validator.ReadSamplerTexturePairs(std::as_bytes(std::span{ k_Wgsl }), sink);
+    runner.Check(readPairs.has_value() && sortedPairs(*readPairs) == expectedPairs,
+                 "the read path gives the same pairs, and compares nothing");
 
     runner.BeginSection("a kind mismatch fails the cross-check");
     // A uniform block that reflection calls a storage buffer still emits valid WGSL. WebGPU rejects

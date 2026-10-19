@@ -336,6 +336,23 @@ void WriteSlot(lodestone::JsonWriter& writer,
     }
     writer.EndArray();
 
+    // Each pair names two resources by their position in the layout above. Written only when the profile
+    // recorded the pairs, so a missing key and an empty array are different facts.
+    if (view.HasSamplerTexturePairs())
+    {
+        const manifest::LayoutRange layout = instance.Layout();
+        writer.Key("samplerTexturePairs");
+        writer.BeginArray();
+        for (const manifest::SamplerTexturePair& pair : instance.SamplerTexturePairs())
+        {
+            writer.BeginObject();
+            writer.KeyString("texture", layout[pair.Texture].Name());
+            writer.KeyString("sampler", layout[pair.Sampler].Name());
+            writer.EndObject();
+        }
+        writer.EndArray();
+    }
+
     WriteRaster(writer, view, instance.Raster());
 
     if (with_sources)

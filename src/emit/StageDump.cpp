@@ -285,6 +285,35 @@ namespace
         writer.EndArray();
     }
 
+    void WriteSamplerPairs(JsonWriter& writer, std::string_view key, std::span<const SamplerTexturePair> pairs)
+    {
+        writer.Key(key);
+        writer.BeginArray();
+        for (const SamplerTexturePair& pair : pairs)
+        {
+            writer.BeginObject();
+            writer.KeyUInt("texture", pair.Texture);
+            writer.KeyUInt("sampler", pair.Sampler);
+            writer.EndObject();
+        }
+        writer.EndArray();
+    }
+
+    void WriteSamplerPairTable(JsonWriter& writer, const CookedModule& module)
+    {
+        writer.Key("samplerPairLists");
+        writer.BeginArray();
+        for (size_t i = 0u; i < module.SamplerPairLists.size(); ++i)
+        {
+            writer.BeginObject();
+            writer.KeyUInt("index", i);
+            writer.KeyUInt("contentHash", HashSamplerPairList(module.SamplerPairLists[i]));
+            WriteSamplerPairs(writer, "pairs", module.SamplerPairLists[i]);
+            writer.EndObject();
+        }
+        writer.EndArray();
+    }
+
     void WriteFootprintListTable(JsonWriter& writer, const CookedModule& module)
     {
         writer.Key("footprintLists");
@@ -357,6 +386,7 @@ namespace
             WriteIndexArray(writer, "sourceIndices", variant.SourceIndices);
             WriteIndexArray(writer, "visibilityIndices", variant.VisibilityIndices);
             WriteIndexArray(writer, "rasterIndices", variant.RasterIndices);
+            WriteIndexArray(writer, "samplerPairIndices", variant.SamplerPairIndices);
             WriteWorkgroups(writer, variant);
             writer.EndObject();
         }
@@ -709,6 +739,7 @@ std::string DumpResolvedModule(std::string_view module_name, std::span<const Com
             writer.KeyUInt("targetTextByteLength", entryPoint.Code.size());
             writer.KeyUInt("targetTextHash", HashSourceCode(entryPoint.Code));
             WriteIndexArray(writer, "usedBindingIndices", entryPoint.Reflection.UsedBindingIndices);
+            WriteSamplerPairs(writer, "samplerTexturePairs", entryPoint.SamplerTexturePairs);
             WriteVertexInputs(writer, entryPoint.Reflection.Raster);
             WriteColorTargets(writer, entryPoint.Reflection.Raster);
             writer.KeyBool("writesFragDepth", entryPoint.Reflection.Raster.WritesFragDepth);
@@ -806,6 +837,11 @@ std::string DumpInternedModule(const InternedModule& module)
                   module.RasterInterner.HashName(),
                   module.RasterInterner.IsEnabled(),
                   module.RasterInterner.Statistics());
+    WriteInterner(writer,
+                  "samplerPairs",
+                  module.SamplerPairInterner.HashName(),
+                  module.SamplerPairInterner.IsEnabled(),
+                  module.SamplerPairInterner.Statistics());
     writer.EndObject();
 
     writer.Key("provenance");
@@ -816,6 +852,7 @@ std::string DumpInternedModule(const InternedModule& module)
     WriteProvenance(writer, "footprintLists", module.FootprintListInterner);
     WriteProvenance(writer, "visibility", module.VisibilityInterner);
     WriteProvenance(writer, "rasterStates", module.RasterInterner);
+    WriteProvenance(writer, "samplerPairs", module.SamplerPairInterner);
     writer.EndObject();
 
     writer.EndObject();
@@ -835,6 +872,7 @@ std::string DumpCookedModule(const CookedModule& module)
     writer.KeyUInt("footprintListCount", module.FootprintLists.size());
     writer.KeyUInt("visibilityListCount", module.VisibilityLists.size());
     writer.KeyUInt("rasterStateCount", module.RasterStates.size());
+    writer.KeyUInt("samplerPairListCount", module.SamplerPairLists.size());
     writer.KeyUInt("variantCount", module.Variants.size());
 
     WriteEntryPointTable(writer, module.EntryPoints);
@@ -844,6 +882,7 @@ std::string DumpCookedModule(const CookedModule& module)
     WriteFootprintListTable(writer, module);
     WriteIndexListTable(writer, "visibilityLists", module.VisibilityLists);
     WriteRasterTable(writer, module);
+    WriteSamplerPairTable(writer, module);
     WriteVariantTable(writer, module.Variants);
     WriteInternerTable(writer, module);
 

@@ -248,12 +248,25 @@ struct EntryPointReflection
 
 std::string DescribeRasterState(const ReflectedRasterState& raster);
 
+/** @brief The pairing of a texture and the sampler used to read it in an entry point - each index is
+ * into the entry point's `UsedBindingIndices` list. This can only come from analyzing emitted shader code,
+ * and is needed by renderers to choose appropriate sampler types and validate texture filtering support. */
+struct SamplerTexturePair
+{
+    uint32_t Texture{ 0u };
+    uint32_t Sampler{ 0u };
+
+    friend bool operator==(const SamplerTexturePair&, const SamplerTexturePair&) = default;
+    friend auto operator<=>(const SamplerTexturePair&, const SamplerTexturePair&) = default;
+};
+
 struct CompiledEntryPoint
 {
     std::string Name;
     std::string VariantSuffix;
     std::vector<std::byte> Code;
     EntryPointReflection Reflection;
+    std::vector<SamplerTexturePair> SamplerTexturePairs;
 };
 
 struct CompiledVariant

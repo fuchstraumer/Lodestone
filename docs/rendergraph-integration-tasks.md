@@ -168,6 +168,25 @@ no allocation.
   named entry points (it shares `joinRelevance` with `SingleFor`, because a const terminal cannot add notes), and
   `DuplicateValue` for a value that the axis constraint or the same call already names. Only the callers that take
   user values check duplicates, so overlapping `WhereNoneOf` complements give no note. `ManifestIndexTest` 129 checks.
+- 2026-10-19, L18. `ls_extent_1d` (`RawSizeAttributeKind::Extent1d`, one argument). The footprint already held
+  three extents, so the format did not change for it. Proof: `ResolveStageTest` rows (a 1d extent fills X and
+  leaves Y and Z at 1; no argument is a parse error), and `DerivedConstantTest` reads the width of a `Texture1D`
+  sized by `CLUSTER_COUNT` from the manifest for each variant. Not done: no check that the attribute's arity
+  matches the texture shape, for any arity.
+- 2026-10-19, L7, format 10. The sampler and texture pairs come from the emitted code: Tint's inspector for WGSL,
+  and each `OpSampledImage` traced back to its variables for SPIR-V (the SPIR-V reader now parses the function
+  bodies). The reader runs with `--no-validate` too, because the pairs are cook output. Each entry point instance
+  stores a pair list (positions in its visibility list), interned in a seventh interner. `Profile::Flags` records
+  whether the profile read its pairs. Both profiles store them (author's decision: Vulkan needs them to check
+  filter support, which is undefined behavior otherwise, and one client path serves both APIs). Validators: the
+  manifest round trip compares the pairs, `Open` checks them, and `VerifySamplerPairsAcrossProfiles` compares wgsl
+  against spirv for each shared variant. Client: `EntryPointInstanceView::SamplerTexturePairs`,
+  `EnvironmentView::HasSamplerTexturePairs`, `MergedLayoutView::SamplerTexturePairs` (the pipeline union, with
+  stage bits). `manifest_dump` writes `"samplerTexturePairs"` only when recorded. Proof: KitchenSink and
+  ParameterBlocks cook with both targets and the two readers agree (KitchenSink: the pairs follow the
+  `NormalMap` and `DetailMap` axes, and the depth `Cascades` pairs with `CompareSampler`); rows in
+  `WgslValidatorTest`, `SpvValidatorTest`, `ShaderManifestRejectTest`, and `MergedLayoutTest`. 26 of 26 tests.
+  `check-known-good.py`: 33 of 60 dumps differ, only by the new pair fields and the 15 Slang-update differences.
 
 ## 5. Phase F, paused
 

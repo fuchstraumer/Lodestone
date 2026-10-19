@@ -413,7 +413,6 @@ struct alignas(8) EntryPointInstance
     uint32_t WorkgroupY{ 1u };
     uint32_t WorkgroupZ{ 1u };
     uint32_t Raster{ 0u };
-    /** @brief The index of this entry point's sampler and texture pair list. */
     uint32_t SamplerPairs{ 0u };
     uint32_t Reserved{ 0u };
 };

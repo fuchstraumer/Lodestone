@@ -33,6 +33,7 @@ using lodestone::CookResult;
 using lodestone::ReflectedBinding;
 using lodestone::ResourceAccess;
 using lodestone::ResourceShape;
+using lodestone::SamplerTexturePlacement;
 using lodestone::SpvValidator;
 
 namespace
@@ -219,6 +220,30 @@ int main()
     runner.Check(match.has_value() && match->Report.empty(), "a passing comparison reports nothing");
     runner.Check(match.has_value() && std::ranges::contains(match->Capabilities, std::string{ "Shader" }),
                  "the capabilities of the module read back");
+
+    // The pairs are cook output (task L7). `ShadeCS` loads the texture and the sampler, combines them with
+    // OpSampledImage, and samples that, so the reader follows both loads back to their variables.
+    runner.BeginSection("the sampler and texture pairs come from OpSampledImage");
+    const std::vector<SamplerTexturePlacement> expectedPairs
+    {
+        SamplerTexturePlacement{ .TextureGroup = 0u, .TextureBinding = 1u, .SamplerGroup = 0u, .SamplerBinding = 2u },
+    };
+    runner.Check(match.has_value() && match->SamplerTexturePairs == expectedPairs,
+                 "the validate path traces the image and the sampler of OpSampledImage to their bindings");
+    const CookResult<std::vector<SamplerTexturePlacement>> readPairs = validator.ReadSamplerTexturePairs(shadeCs, sink);
+    runner.Check(readPairs.has_value() && *readPairs == expectedPairs,
+                 "the read path gives the same pairs, and compares nothing");
+
+    // An image that does not come from a resource variable cannot name a binding. Dropping the pair would make
+    // the sampler look unpaired, so the read fails.
+    const std::string undefText = Replace(Replace(k_ShadeCs, "%37 = OpSampledImage %36 %29 %33", "%37 = OpSampledImage %36 %undefImage %33"),
+                                          "    %float_0 = OpConstant %float 0",
+                                          "    %float_0 = OpConstant %float 0\n%undefImage = OpUndef %28");
+    const std::vector<std::byte> undefImage = Assemble(undefText);
+    runner.Check(!undefImage.empty(), "the fixture with an undefined image assembles");
+    const CookResult<std::vector<SamplerTexturePlacement>> unresolved = validator.ReadSamplerTexturePairs(undefImage, sink);
+    runner.Check(!unresolved.has_value() && unresolved.error() == CookError::ReflectionSamplerPairUnresolved,
+                 "a sampled image that does not trace back to a variable fails with ReflectionSamplerPairUnresolved");
 
     runner.BeginSection("the module decides the set and the binding");
     const std::vector<std::byte> movedTexture =

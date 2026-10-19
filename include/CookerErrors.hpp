@@ -82,6 +82,7 @@ enum class CookError : uint16_t
     ManifestShaderLayoutVariantIndicesInvalid = 110,
     ManifestShaderLayoutVisiblityIndexInvalid = 111,
     ManifestShaderLayoutResourceListIndexInvalid = 112,
+    ManifestSamplerPairMismatch = 113, // an entry point's sampler and texture pairs read back differently than the cook produced
 
     // output and diagnostic sink operation errors
     OutputPathInvalid = 120,

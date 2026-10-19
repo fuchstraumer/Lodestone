@@ -136,6 +136,7 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space,
     module.FootprintLists.emplace_back();
     module.VisibilityLists = std::move(visibility_lists);
     module.RasterStates.emplace_back();
+    module.SamplerPairLists.emplace_back();
 
     const PermutationAxis& axis = space.Axes()[0];
     for (uint32_t caseIndex = 0u; caseIndex < k_CaseCount; ++caseIndex)
@@ -154,6 +155,7 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space,
             variant.SourceIndices.push_back(0u);
             variant.VisibilityIndices.push_back(visibilityIndex);
             variant.RasterIndices.push_back(0u);
+            variant.SamplerPairIndices.push_back(0u);
             variant.Workgroups.emplace_back(lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u });
         }
         module.Variants.emplace_back(std::move(variant));
@@ -359,6 +361,73 @@ void TestOpenRejectsOrder(lodestone::tests::TestRunner& runner, const Permutatio
 
 } // namespace
 
+// Task L7: the union of the sampler and texture pairs of a pipeline. In case 0 the vertex stage here sees the
+// fragment stage's resources, and both sample Albedo with LinearSampler (positions 1 and 2 of each list).
+void TestSamplerPairs(lodestone::tests::TestRunner& runner, const PermutationSpace& space)
+{
+    runner.BeginSection("sampler and texture pairs");
+
+    lodestone::CookedModule module = BuildModule(space, GoodVisibilityLists(), k_GoodVisibility);
+    module.VisibilityLists[0] = lodestone::VisibilityList{ 0u, 2u, 3u };
+    module.SamplerPairLists = { lodestone::SamplerPairList{},
+                                lodestone::SamplerPairList{ lodestone::SamplerTexturePair{ .Texture = 1u, .Sampler = 2u } } };
+    module.Variants[0].SamplerPairIndices = { 1u, 1u, 0u };
+
+    lodestone::CookedLibrary library;
+    library.ModuleNames = { "MergeTestModule" };
+    library.Profiles = { lodestone::CookedProfile{ .TargetName = "wgsl",
+                                                   .AccessModel = lodestone::PlacementKind::Bound,
+                                                   .CodeFormat = lodestone::ShaderCodeFormat::Wgsl,
+                                                   .SamplerTexturePairsRecorded = true } };
+    library.Environments.emplace_back(std::move(module));
+    const lodestone::CookResult<std::vector<std::byte>> manifest = lodestone::EmitShaderManifest(library);
+    const ManifestResult<EnvironmentView> opened =
+        manifest.has_value() ? OpenEnvironment(*manifest) : ManifestResult<EnvironmentView>{ std::unexpected(lodestone::manifest::ErrorState{}) };
+    runner.Check(opened.has_value(), "a module with pairs in two stages emits and opens");
+    if (!opened.has_value())
+    {
+        return;
+    }
+
+    const VariantView caseZero = opened->VariantAt(0u);
+    const std::array raster{ caseZero.EntryPoint(k_VertexEntryPoint), caseZero.EntryPoint(k_FragmentEntryPoint) };
+    const ManifestResult<MergedLayoutView> merged = MergedLayoutView::Merge(raster);
+    runner.Check(merged.has_value() && merged->HasSamplerTexturePairs(), "the merge of a recording profile is complete");
+    if (merged.has_value())
+    {
+        std::vector<lodestone::manifest::MergedSamplerTexturePair> pairs;
+        for (const lodestone::manifest::MergedSamplerTexturePair pair : merged->SamplerTexturePairs())
+        {
+            pairs.push_back(pair);
+        }
+        runner.Check(pairs.size() == 1u, "a pair that two stages sample appears once");
+        runner.Check(pairs.size() == 1u && pairs[0].Texture.Name() == "Albedo" && pairs[0].Sampler.Name() == "LinearSampler",
+                     "the pair resolves to the texture and the sampler");
+        runner.Check(pairs.size() == 1u && pairs[0].Stages == (ShaderStageKind::Vertex | ShaderStageKind::Fragment),
+                     "the pair names both stages that sample it");
+    }
+
+    const std::array vertexAndCompute{ caseZero.EntryPoint(k_VertexEntryPoint), caseZero.EntryPoint(k_ComputeEntryPoint) };
+    const ManifestResult<MergedLayoutView> partial = MergedLayoutView::Merge(vertexAndCompute);
+    if (partial.has_value())
+    {
+        uint32_t count = 0u;
+        ShaderStageKind stages = ShaderStageKind::Invalid;
+        for (const lodestone::manifest::MergedSamplerTexturePair pair : partial->SamplerTexturePairs())
+        {
+            ++count;
+            stages = pair.Stages;
+        }
+        runner.Check(count == 1u && stages == ShaderStageKind::Vertex,
+                     "a stage with no pairs adds nothing, and does not appear in the stage mask");
+    }
+
+    const std::array computeOnly{ caseZero.EntryPoint(k_ComputeEntryPoint) };
+    const ManifestResult<MergedLayoutView> none = MergedLayoutView::Merge(computeOnly);
+    runner.Check(none.has_value() && none->SamplerTexturePairs().begin() == none->SamplerTexturePairs().end(),
+                 "a pipeline that samples nothing has no pairs");
+}
+
 int main()
 {
     lodestone::tests::TestRunner runner{ "MergedLayoutTests" };
@@ -376,6 +445,7 @@ int main()
     }
 
     TestOpenRejectsOrder(runner, space);
+    TestSamplerPairs(runner, space);
     return runner.Report();
 }
 

@@ -1,14 +1,8 @@
 # Phase F preparation/edge case fixes
-- add query presets, which are module-agnostic
-- Later: declare presets in the policy TOML and cook them into the manifest. Data is easier to iterate on than compiled code. Currently we build these as objects/value types at the client level, inside compiled client code.
-- make the query system very clearly single-module-only. it can reuse a preset across modules, though
+- Allow declaration of presets in the policy TOML and cook them into the manifest. Data is easier to iterate on than compiled code. Currently we build these as objects/value types at the client level, inside compiled client code.
 - Decide the persisted form of a variant. `DecodedVariant` holds string views into one manifest and
   no axis names, so it cannot outlive that manifest. A persisted form needs (axis name, value) pairs
   with owned strings, and a load that re-keys them through a query.
-# SlangCompiler
-- Right now, we map to a super small subset of formats and features. We should support the full range, and extract them untouched
-    - Then, during output format mapping we collapse to what that platform actually supports
-    - Alternatively, use foresight about output target to fail builds if unsupported
 # Resource Layer
 - The WGSL cross-check does not compare a storage texture format. Slang `ac945e5` reflected `RWTexture3D<float>` (no `[format]`) as `Invalid` while the emitted WGSL said `r32float`, and nothing failed. Slang `e9fc02c8d` reflects `R32Float`. Compare the format against Tint's inspector, so the next disagreement fails the cook.
 - Reflection joins a scope with `_` (`JoinScopeName` in `SlangReflector.cpp`), which is the WGSL
@@ -25,6 +19,12 @@
   base preset. Every other query builds on it.
 - We should provide a way for clients to call something like `SetDeviceLimits` or `SetApiLimits` - we can use this to validate resource sizing expressions when being run as a live compiler,
   or we can use it against cooked content (in the device form) to make sure we don't try to create a shader a device can't support
+# Resource Metadata
+- In most shader markup languages, it's possible to specify default values, mins, maxes, etc for each uniform parameter expected to be used as a content-facing editable parameter. 
+- Add this capability to our resource system, using the existing annotation system but expanded with the aforementioned features
+- Add an additionally "clamp mode" parameter: artists often want to push values beyond the min max we specify, so we should use this loose clamping as default. Sometimes, going outside
+  of the range could cause UB or break a shader though - so we want to have a `HardClamp` sort of attribute
+- Lodestone doesn't take action on these, it should just pack them into the manifest. The most elegant solution may be a typeless attribute system of some kind, just a bundle of tagged bytes.
 # Permutation system
 - Policy file target keys are flat (`targets.wgsl`, later `targets.dxil`, `targets.spirv`). A platform split is coming: one target profile likely needs several device presets under it, e.g. `minspec`, `recommended`, `mobile`. A preset picks a different `MaxVariants`, `CookValues`, and binding-time lowering. Decide whether a preset nests under a target (`targets.wgsl.mobile`) or forms its own axis in the policy schema. Do this after E5 lands the flat form, so the schema change has a working baseline to move from.
 - Let a size expression name a *derived* constant, not only an axis or an `extern static const`. Today the resolve namespace (`MakeResolveContext`) holds axis values plus captured undriven `extern` defaults, and nothing else. An `internal static const` that is computed from axes (e.g. `VTF_CLUSTER_COUNT = GRID_X * GRID_Y * GRID_Z`) is invisible, so `[ls_element_count("VTF_CLUSTER_COUNT")]` fails with `AttributeExpressionUnknownSymbol`. The author must inline the product or promote the constant to `extern`, which is a usability wart: the shader already states the relationship once, and we make them state it again.
@@ -67,19 +67,6 @@
 # Error reporting
 - `CookResult<T>`'s error type could be refactored to effectively be a `Diagnostic` entry, meaning that failures can be passed up the chain... but would also complicate having something like `MaxErrorCount`. Evaluate this space to see if it could potentially clean up the code, and help create more unified (but still expressive) error reporting
 - Better error reporting out of the attribute expression evaluation system
-# Found in review
-- SlangCompiler.cpp, Line 1234: We extract the raw global bindings not once, but individually for each variant. We should be able to do this at a higher level, even if this specific variant doesn't actually use all of the entrypoints. We will need to identify further axes for data reuse like this to scale to much higher variant counts without terrible performance.
-# Testing
-- Done: the KitchenSink set (`tests/assets/KitchenSink/`) replaced OceanFft, and it is the known-good
-  reference. The original item follows.
-- Build a purpose-made "kitchen-sink" test shader that exercises the whole capability space in one
-  module, and retire the borrowed content shaders (`OceanFft`, `Vtf`) from the test tree. Those are
-  real content meant for other projects, and each capability now needs its own asset (a separate shader
-  just for enum axes, another for interface axes). One synthetic module should cross an interface axis,
-  an enum axis, a boolean axis, and a tuning axis, with an `ActiveWhen` gate and a `Require` constraint,
-  so the cook tests exercise the axis interactions the single-purpose assets cannot. It should carry a
-  size expression that names an axis, so the resolve path is covered too. Do this when the query and
-  cook code is otherwise finished; it is a test-asset consolidation, not a blocker.
 ## Testing findings to resolve
 - Done 2026-09-24: the stale `CookTest` script line is retired. `OceanFft.slang` is gone, and
   `KitchenSinkCookTest` is the end-to-end coverage.

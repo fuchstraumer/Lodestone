@@ -265,6 +265,15 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
         return std::unexpected(ReportError(diagnostics, CookError::ReflectionMismatch, errStr));
     }
 
+    // a validator over every profile at once, so it runs after the last module and before the emit
+    const CookError pairsError = VerifySamplerPairsAcrossProfiles(library);
+    if (pairsError != CookError::Success)
+    {
+        return std::unexpected(ReportError(diagnostics,
+                                           pairsError,
+                                           "two profiles read different sampler and texture pairs from one variant"));
+    }
+
     const CookError emitError = EmitLibraryArtifacts(library, sink);
     if (!emitError)
     {
@@ -385,7 +394,8 @@ namespace
             const TargetProfile& profile = cook_state.TargetProfiles.at(targetName);
             library.Profiles.push_back(CookedProfile{ .TargetName = targetName,
                                                           .AccessModel = PlacementKindFromAccessModel(profile.Access),
-                                                          .CodeFormat = CodeFormatFromLanguage(profile.Language) });
+                                                          .CodeFormat = CodeFormatFromLanguage(profile.Language),
+                                                          .SamplerTexturePairsRecorded = profile.Validator != nullptr });
         }
 
         library.Environments.resize(library.Profiles.size() * library.ModuleNames.size());

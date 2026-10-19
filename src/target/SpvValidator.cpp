@@ -330,9 +330,8 @@ namespace
             if (!imageBound || !samplerBound)
             {
                 const std::string errStr =
-                    std::format("OpSampledImage %{} (image %{}, sampler %{}) does not trace back to two bound "
+                    std::format("an OpSampledImage of image %{} and sampler %{} does not trace back to two bound "
                                 "resource variables, so the pair cannot be recorded",
-                                use.ImageId,
                                 use.ImageId,
                                 use.SamplerId);
                 return std::unexpected(ReportError(sink, CookError::ReflectionSamplerPairUnresolved, errStr));
