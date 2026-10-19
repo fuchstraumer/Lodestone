@@ -114,9 +114,9 @@ and each takes about one second.
 | `AttributeExpressionTest` | The attribute expression grammar — arithmetic, comparison, and logic — and every rejection it must make. |
 | `ContentInternerTest` | A hash never decides equality. It supplies a hash that returns one constant, so only the byte comparison can separate the payloads. |
 | `PermutationIndexTest` | A variant index is unique, dense, and stable, and a partial assignment resolves to one variant. |
-| `ShaderManifestRejectTest` | The bundle reader rejects a short, misaligned, or damaged file, and opens a real one. It rejects an unknown code format and a SPIR-V source that is not whole words, and reads SPIR-V back as words. It also proves that the header region opens alone, that an extent read on its own opens against that bundle, that an environment the cook skipped reads as absent, and that a damaged directory entry or variant key table is rejected by name. |
-| `WgslValidatorTest` | The WGSL cross-check on Tint. It parses fixed WGSL, reads the used bindings from Tint's inspector, and compares them against hand-written reflection. It proves a match, and a mismatch of kind, shape, access, or name. It also proves that a comparison sampler and a depth texture read back correctly, that a storage buffer's structured or raw shape does not change the WGSL kind, and that invalid WGSL is a parse error, not a mismatch. |
-| `SpvValidatorTest` | The SPIR-V cross-check on SPIRV-Tools. It assembles Slang's own output for one entry point from text, and compares it against hand-written reflection. It proves a match, a moved binding, a missing and an extra binding, and a mismatch of kind, access, name, and depth shape. It proves that a builtin in the interface list is not read as a binding, that the capabilities read back, and that a module spirv-val rejects, or code that is not whole words, is an error and not a mismatch. |
+| `ShaderManifestRejectTest` | The bundle reader rejects a short, misaligned, or damaged file, and opens a real one. It rejects an unknown code format and a SPIR-V source that is not whole words, and reads SPIR-V back as words. It also proves that the header region opens alone, that an extent read on its own opens against that bundle, that an environment the cook skipped reads as absent, and that a damaged directory entry or variant key table is rejected by name. It proves that the sampler and texture pairs read back through the layout, that a pair with the wrong binding kind, a position past the visibility list, or a bad list index is rejected, that a profile with no reader reads as not recorded, and that the round trip fails on a pair that differs. It also proves `VerifySamplerPairsAcrossProfiles`: two profiles that read different pairs fail, and a profile that did not record is not compared. |
+| `WgslValidatorTest` | The WGSL cross-check on Tint. It parses fixed WGSL, reads the used bindings from Tint's inspector, and compares them against hand-written reflection. It proves a match, and a mismatch of kind, shape, access, or name. It also proves that a comparison sampler and a depth texture read back correctly, that a storage buffer's structured or raw shape does not change the WGSL kind, and that invalid WGSL is a parse error, not a mismatch. It proves that the sampler and texture pairs come from Tint, a comparison sampler too, and that the read path (`--no-validate`) gives the same pairs as the validate path. |
+| `SpvValidatorTest` | The SPIR-V cross-check on SPIRV-Tools. It assembles Slang's own output for one entry point from text, and compares it against hand-written reflection. It proves a match, a moved binding, a missing and an extra binding, and a mismatch of kind, access, name, and depth shape. It proves that a builtin in the interface list is not read as a binding, that the capabilities read back, and that a module spirv-val rejects, or code that is not whole words, is an error and not a mismatch. It proves that the pairs come from each OpSampledImage, traced back through the loads to the variables, on both read paths, and that an image that does not trace back to a variable fails with `ReflectionSamplerPairUnresolved`. |
 | `ReflectionSchemaTest` | The pure data of the binding schema, with no Slang. The `ResourceShape` flag layout (a base shape in the low nibble plus array, multisample, shadow, and feedback flags, read with `GetBaseShape`), the `ToString` tables for `ResourceShape`, `BindingKind`, and `TextureSampleType`, and the `ReflectedUniformMember` equality that dedup rests on, which includes matrix layout and element stride. It also proves that every `CookError` band has names, above the 127 limit of magic_enum's default range. |
 | `StageDumpTest` | A stage dump holds the model and no target text, it names itself the way `--dump-stage` names it, and two dumps of one input agree byte for byte. |
 | `SymbolTableTest` | The tokenizer that powers axis-reachability pruning: it strips `extern static const` declarations and reserved keywords, and reports the axis names no reachable source uses. |
@@ -125,13 +125,13 @@ and each takes about one second.
 | `DiagnosticParserTest` | The parser reads Slang's machine-readable diagnostic form into a record, and counts the records whose severity is a failure. Codegen reads that count. It names no Slang type, so it needs no compiler. |
 | `ResolveStageTest` | Stage 4 resolves a hand-built `RawVariant` with no Slang present. This test is the proof that the stage 3 and stage 4 split worked, and before phase D step D5 it could not be written at all. |
 | `AxisDefaultTest` | The declared default of each axis, from the shader initializer to `ManifestIndex::AxisDefault`. `tests/assets/AxisDefaults/AxisDefaults.slang` declares every default as a value other than the first, in all four domains, with a literal initializer (which reflection also reads, so the two readers are compared) and an expression initializer (which only the source text can read). It proves that a missing default and a default outside the declared values each fail the cook, and that a policy which drops the default cooks, keeps the default in the manifest, and leaves no variant for it. |
-| `DerivedConstantTest` | Derived constants in size expressions, from the shader source to the element count in the manifest. `tests/assets/DerivedConstants/DerivedConstants.slang` sizes a buffer with `LIGHT_SLOTS`, which uses another derived constant, two axes, and a constant from an `__include`d fragment. The test compares each variant's count with a hand-computed value, because nothing else checks it: reflection cannot fold the expression. It proves that a function-local constant with the name of an axis fails the cook, and that Slang rejects a cycle of constants before stage 4 runs (E39999). |
+| `DerivedConstantTest` | Derived constants in size expressions, from the shader source to the element count in the manifest. `tests/assets/DerivedConstants/DerivedConstants.slang` sizes a buffer with `LIGHT_SLOTS`, which uses another derived constant, two axes, and a constant from an `__include`d fragment. The test compares each variant's count with a hand-computed value, because nothing else checks it: reflection cannot fold the expression. It proves that a function-local constant with the name of an axis fails the cook, and that Slang rejects a cycle of constants before stage 4 runs (E39999). It also reads a `[ls_extent_1d]` width from the manifest (task L18). |
 | `AccessModelRejectTest` | The table of cooks that must fail. A pointer member under a bound access model, a reflection mismatch, and a codegen error each fail the cook with their own error. A control module still cooks. |
 | `PermutationConstraintTest` | The axis constraint engine. `ActiveWhen` gates an axis the way the old parent link did, `Require` prunes a forbidden combination, and the load check rejects a forward reference, an unknown symbol, and a malformed expression. |
 | `SuggestTest` | The nearest-name suggestion. It measures the edit distance between a mistyped name and the accepted names, and returns the closest one. The cooker and the client both use it for a name rejection. |
 | `EnumTagDecodeTest` | The enum tag-blob decode (`compile/EnumTagDecode`). It reads each integer width, sign-extends a signed tag, zero-extends an unsigned tag, and accepts the `UInt64` wrap above 2^63. It names no Slang type, so the reflection read of an enum case value has a proof that needs no compiler. |
 | `ManifestIndexTest` | The client query surface, end to end. It builds a bundle inline through the emitter, with one axis of each domain, then drives `ManifestQueryBuilder` through every valid construction and every error path, plus a sparse manifest and an `ActiveWhen`-gated one. On the gated manifest, a constraint on the gated axis selects only the variants where that axis is active, and `Decode` marks the inactive axis. It proves that two profiles of one module each key their own subset, and that two modules share a root axis only when their values agree in order. It also covers `AxisNames` and `AxisValues`, the axis relevance of each entry point, `SingleFor` (an irrelevant axis is not ambiguous, a pipeline joins the masks of its stages), and both failures of the relevance validator. It also proves the query presets: a `WhenActive` pin keeps the gated-off variants, a `Required` pin removes them, two modes on one axis merge, a pin on an undeclared axis gives a note and no error, a bad value is an error, `NotesFor` names a pin that cannot change the named entry points, and a repeated value gives a `DuplicateValue` note. It needs no Slang. |
-| `MergedLayoutTest` | The merged layout of one pipeline. It builds a bundle inline through the emitter, with a vertex, a fragment, and a compute entry point. It proves that a resource both stages read appears once with both stage bits, that the order is (group, binding), and that instances from two variants merge. It proves a conflict of kind and of byte size, a duplicate stage, and too many stages. It also proves that `Open` rejects a visibility list that is not in placement order. It needs no Slang. |
+| `MergedLayoutTest` | The merged layout of one pipeline. It builds a bundle inline through the emitter, with a vertex, a fragment, and a compute entry point. It proves that a resource both stages read appears once with both stage bits, that the order is (group, binding), and that instances from two variants merge. It proves a conflict of kind and of byte size, a duplicate stage, and too many stages. It also proves that `Open` rejects a visibility list that is not in placement order, and that `SamplerTexturePairs` gives a pair that two stages sample once, with both stage bits. It needs no Slang. |
 
 An error check prints a diagnostic to `stderr` on purpose. Read the last line for the result.
 
@@ -443,15 +443,28 @@ number would state that every target must supply one. A target supplies a valida
    A cooked module points into its `PermutationSpace`, so the driver moves each space to the heap and
    keeps it until the emit is done.
 
-Four validators run inside that loop. None of them is a stage.
+Five validators run inside that loop. None of them is a stage.
 
-- **The reflection cross-check**, after stage 4. `ValidateResolvedLibrary` asks the target profile for
-  a validator. The WGSL profile parses the emitted text with Tint (`WgslValidator`) and reads the
+- **The reflection cross-check**, after stage 4. `ReadEmittedCode` (in `BuildModuleStep.cpp`) asks the target
+  profile for a validator. The WGSL profile parses the emitted text with Tint (`WgslValidator`) and reads the
   bindings from Tint's inspector, then compares that against the bindings the entry point uses. Tint
   also proves the emitted WGSL parses and resolves, which the old text scanner could not. A mismatch
   increments a counter, and a nonzero counter fails the cook with `CookError::ReflectionMismatch`. A
   target that supplies no validator fails the cook with `TargetValidatorUnavailable`. `--no-validate`
   skips the check, and only on purpose.
+
+  The same parse also produces data (task L7): the sampler and texture pairs of each entry point. Reflection
+  cannot state which sampler a texture is sampled with, so the emitted code is the only source. Tint's inspector
+  gives the WGSL pairs (`GetSamplerTextureUses`), and the SPIR-V reader follows each `OpSampledImage` back through
+  the loads to its variables. `ResolveSamplerTexturePairs` maps each placement to a position in the entry point's
+  used bindings, and fails with `ReflectionSamplerPairUnresolved` when reflection has no texture or sampler there.
+  The pairs are cook output, so `--no-validate` still reads them (`ReadSamplerTexturePairs`, no comparison). A
+  profile with no reader cooks with no pairs, and the manifest records that they were not read.
+- **The sampler pair cross-check**, after the last module and before the emit. `VerifySamplerPairsAcrossProfiles`
+  (in `model/CookedLibrary.cpp`) compares the pairs of each variant that two profiles cooked, by resource scope
+  and name. The two readers are independent, so agreement is a second opinion. It skips an entry point with a
+  combined texture sampler, which SPIR-V samples with no `OpSampledImage`. A difference fails the cook with
+  `SamplerPairsTargetMismatch`.
 - **The library round trip**, after stage 7. `VerifyLibraryRoundTrip` replays every variant through
   the finished tables and compares the result against the text the compiler produced. It covers the
   **source text** only.
@@ -462,7 +475,8 @@ Four validators run inside that loop. None of them is a stage.
   the measured axis influence against the `ModulePolicyEntry` the driver read from the policy file.
 - **The manifest round trip**, inside stage 8. `VerifyManifestRoundTrip` reads each manifest back and
   compares it against the module it came from. `CheckManifestLayout` walks the manifest the way a
-  consumer walks it, from variant to resource list to footprint list to visibility list.
+  consumer walks it, from variant to resource list to footprint list to visibility list, and compares the
+  sampler and texture pairs (`ManifestSamplerPairMismatch`).
   `VerifyAxisRelevance` derives the axis relevance a second time from the written environment alone, through
   the client views, with both passes of `model/AxisInfluence`, and compares content, not record indices. It
   fails the cook when the derived mask differs from the stored one (`ManifestAxisRelevanceMismatch`).
@@ -497,7 +511,7 @@ unordered container reached the output.
 | `BundleView`, `ModuleView`, `EnvironmentView` | `client/include/ShaderManifest.hpp` | Read-only spans over the bundle bytes, one type for each scope: the whole cook, one module, and one module cooked for one profile. Each `Open` validates its scope once and allocates nothing. |
 | `ManifestIndex`, `ManifestQueryBuilder` | `client/include/ShaderManifestIndex.hpp` | The client query surface, frozen. `ManifestIndex` decodes and enumerates variants and hands out a value-semantic builder. The builder resolves axis names and values by name, and its terminals are `Keys`, `Variants`, `Single`, and `SingleFor`. Each constraint has a `PinMode`: `Where` is `Required` (the axis must be active), and `WhereWhenActive` tests the value only where the axis is active, so it keeps the variants where a gate is off. `Apply(QueryPreset)` applies a set of pins that serves any module: a pin on an axis the module does not declare is skipped and gives a `QueryNote`, never an error. `Notes()` holds those and the `DuplicateValue` notes, and `NotesFor(entry_points)` adds a `PinAxisIrrelevant` note for each pin that cannot change those entry points. `SingleFor(entry_points)` is `Single` for a pipeline: an axis that cannot change any of the named entry points does not count, matches that differ only in such axes are one answer, and the smallest key is returned. `Keys` and `Variants` return a set or an error code: a malformed query is an error, and a valid query with no variant is an empty set. `Single` returns one key or a whole `QueryError`, and never chooses between two matches: more than one match is `AmbiguousVariant`, which names the axes that still vary. `NearestName` is the "did you mean" that the query errors use, public so a renderer can use it for its own names. | |
 | `ShaderSourceProvider` | `client/include/ShaderManifest.hpp` | Where a renderer gets code, bindings, and workgroup size. `Source()` gives WGSL text, and `SpirvWords()` gives SPIR-V words. Each asserts the profile's `ShaderCodeFormat`. `Bindings()` returns a `LayoutRange` of `ResolvedResource` views, built on demand, so the provider allocates nothing. `Generation()` is the hot-reload hook. |
-| `MergedLayoutView`, `MergedResource` | `client/include/ShaderManifest.hpp` | The layout of one pipeline. `Merge` takes one `EntryPointInstanceView` for each stage, checks every shared (group, binding) once, and gives each resource once with a mask of the stages that read it, in placement order. No template and no allocation: a fixed array of up to `k_MaxPipelineStages` ranges. It rests on the placement order of each visibility list, which the cooker sorts and `Open` checks. |
+| `MergedLayoutView`, `MergedResource` | `client/include/ShaderManifest.hpp` | The layout of one pipeline. `Merge` takes one `EntryPointInstanceView` for each stage, checks every shared (group, binding) once, and gives each resource once with a mask of the stages that read it, in placement order. No template and no allocation: a fixed array of up to `k_MaxPipelineStages` ranges. It rests on the placement order of each visibility list, which the cooker sorts and `Open` checks. `SamplerTexturePairs()` gives the union of the stages' sampler and texture pairs, as `MergedSamplerTexturePair` values. |
 | `LayoutRange`, `ResolvedResource`, `VariantView`, `EntryPointInstanceView` | `client/include/ShaderManifest.hpp` | Views over one environment. `LayoutRange::operator[]` is the one place that resolves `resources[visible[i]]`. A view points at its `EnvironmentView`, so keep that environment alive and do not move it. |
 
 `ContentHashValue` is xxHash3, 64 bit. `model/ContentHash.hpp` holds the streaming form as well, which the
@@ -582,7 +596,7 @@ disagree. An axis default cannot use a derived constant, because defaults are re
 exists.
 
 The attribute declarations are in `builtins/LodestoneAttributes.slang`: `ls_element_count`,
-`ls_extent_2d`, `ls_extent_3d`. Slang has no optional attribute parameters, so each arity needs its
+`ls_extent_1d`, `ls_extent_2d`, `ls_extent_3d`. Slang has no optional attribute parameters, so each arity needs its
 own name. The README shows `ls_element_count`; the code says `ls_element_count`.
 
 ## Where axes and policy live
@@ -675,6 +689,19 @@ axis that varies within the group, until no group does. The rule marks a set and
 cooker and the validator reach the same mask in any variant order. A smaller mask can exist, but it is not
 unique, and a mask that is too large only costs pins. `SingleFor` rests on the closed property.
 `ManifestIndexTest` builds such a cook, and the KitchenSink masks did not change.
+
+Each entry point instance records its sampler and texture pairs (format version 10, task L7). A pair holds two
+positions in the instance's visibility list, a texture and then a sampler, so `Layout()[pair.Texture]` resolves it.
+The lists are interned like the visibility lists (`EnvironmentHeader::SamplerPairLists` runs over
+`SamplerTexturePairs`, and `EntryPointInstance::SamplerPairs` indexes them). `Open` checks each position, the
+binding kind at each, and that each list is sorted and unique. `Profile::Flags` holds
+`ProfileFlags::SamplerTexturePairsRecorded`: a clear bit means nothing read the pairs, which is a different fact
+from an entry point with no pairs (`EnvironmentView::HasSamplerTexturePairs`). The pairs are part of an entry point
+instance, so the axis relevance and its validator compare them. `MergedLayoutView::SamplerTexturePairs` gives the
+union for a pipeline, each placement pair once, with the stages that sample it. That is the input of the WebGPU
+layout rule (a sampler paired with a texture that cannot filter must be non-filtering), and a Vulkan renderer can
+check a format's filter support with it before it binds. Pairs come from static use: a dynamic index pairs the
+array bindings, and a future bindless access model can hide a pair from the code.
 
 Each profile records its `ShaderCodeFormat` (since format version 7). A SPIR-V source is read as words, so
 `Open` rejects a SPIR-V source that is not on a 4-byte boundary or not whole words. The sources are packed
