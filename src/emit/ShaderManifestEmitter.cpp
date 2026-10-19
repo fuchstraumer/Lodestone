@@ -93,6 +93,8 @@ namespace
         std::vector<manifest::Run> FootprintLists;
         std::vector<uint32_t> VisibilityIndices;
         std::vector<manifest::Run> VisibilityLists;
+        std::vector<manifest::SamplerTexturePair> SamplerTexturePairs;
+        std::vector<manifest::Run> SamplerPairLists;
     };
 
     struct RasterTables
@@ -336,9 +338,13 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
     profiles.reserve(profileCount);
     for (const CookedProfile& profile : library.Profiles)
     {
+        const uint16_t flags = profile.SamplerTexturePairsRecorded
+                                   ? std::to_underlying(manifest::ProfileFlags::SamplerTexturePairsRecorded)
+                                   : uint16_t{ 0u };
         profiles.push_back(manifest::Profile{ .TargetNameString = strings.Add(profile.TargetName),
                                               .AccessModel = profile.AccessModel,
-                                              .CodeFormat = profile.CodeFormat });
+                                              .CodeFormat = profile.CodeFormat,
+                                              .Flags = flags });
     }
 
     // build every extent before the header region: extents add binding names and suffixes to the string
@@ -627,6 +633,11 @@ namespace
         return manifest::Footprint{};
     }
 
+    manifest::SamplerTexturePair MakeSamplerPairRecord(const SamplerTexturePair& pair) noexcept
+    {
+        return manifest::SamplerTexturePair{ .Texture = pair.Texture, .Sampler = pair.Sampler };
+    }
+
     manifest::EntryPointInstance MakeSlotRecord(const LibraryVariant& variant, size_t entry_point_index) noexcept
     {
         manifest::EntryPointInstance slot;
@@ -636,6 +647,7 @@ namespace
         slot.WorkgroupY = variant.Workgroups[entry_point_index].Y;
         slot.WorkgroupZ = variant.Workgroups[entry_point_index].Z;
         slot.Raster = variant.RasterIndices[entry_point_index];
+        slot.SamplerPairs = variant.SamplerPairIndices[entry_point_index];
         return slot;
     }
 
@@ -837,6 +849,7 @@ namespace
         AppendRuns(module.FootprintLists, tables.Footprints, tables.FootprintLists, &MakeFootprintRecord);
         AppendRuns(
             module.VisibilityLists, tables.VisibilityIndices, tables.VisibilityLists, &PassThroughIndex);
+        AppendRuns(module.SamplerPairLists, tables.SamplerTexturePairs, tables.SamplerPairLists, &MakeSamplerPairRecord);
 
         return tables;
     }
@@ -1026,6 +1039,8 @@ namespace
         environment.UniformMembers = AppendTable(extent, layouts.UniformMembers);
         // Reserved. The cooker writes no specialization constant yet.
         environment.SpecConstants = AppendTable(extent, std::vector<manifest::SpecializationConstant>{});
+        environment.SamplerPairLists = AppendTable(extent, layouts.SamplerPairLists);
+        environment.SamplerTexturePairs = AppendTable(extent, layouts.SamplerTexturePairs);
 
         AlignTo8(extent);
         std::memcpy(extent.data(), &environment, sizeof(manifest::EnvironmentHeader));
@@ -1340,6 +1355,11 @@ namespace
             {
                 return false;
             }
+        }
+
+        if (!RecordsEqual(lhs.SamplerTexturePairs(), rhs.SamplerTexturePairs()))
+        {
+            return false;
         }
 
         return lhsRecord.Source == rhsRecord.Source ||
@@ -1691,6 +1711,27 @@ namespace
             }
 
             ++position;
+        }
+
+        // the pairs are positions in the visibility list, which the walk above proved equal, so the positions
+        // compare directly
+        const SamplerPairList& expectedPairs =
+            module.SamplerPairLists[variant.SamplerPairIndices[entry_point_index]];
+        const std::span<const manifest::SamplerTexturePair> readPairs =
+            read_variant.EntryPoint(static_cast<uint32_t>(entry_point_index)).SamplerTexturePairs();
+        const bool pairsMatch = std::ranges::equal(readPairs, expectedPairs, [](const manifest::SamplerTexturePair& read, const SamplerTexturePair& expected) {
+            return read.Texture == expected.Texture && read.Sampler == expected.Sampler;
+        });
+        if (!pairsMatch)
+        {
+            std::println(stderr,
+                         "[lodestone] manifest variant {} entry point {} reads {} sampler and texture pairs, the cook "
+                         "produced {}, or one pair differs",
+                         variant.Index,
+                         entry_point_index,
+                         readPairs.size(),
+                         expectedPairs.size());
+            return CookError::ManifestSamplerPairMismatch;
         }
 
         return CookError::Success;

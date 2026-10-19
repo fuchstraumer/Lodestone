@@ -29,7 +29,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 9u;
+inline constexpr uint32_t k_ShaderManifestVersion = 10u;
 
 // clang-tidy complains about enums being too big, but uint32_t means
 // the error struct is 16bytes, which is great alignment and still compact
@@ -87,6 +87,10 @@ enum class ErrorCode : uint32_t
     MergedLayoutConflict = 48,
     InvalidModuleAxisDefault = 49,
     InvalidAxisRelevance = 50,
+    InvalidSamplerPairListRun = 51,
+    InvalidEntryPointInstanceSamplerPairIndex = 52,
+    // a pair position is past the visibility list, names the wrong binding kind, or the list is not sorted and unique
+    InvalidSamplerTexturePair = 53,
     Count
 };
 
@@ -119,6 +123,8 @@ enum class ShaderManifestTable : uint32_t
     UniformMembers,
     SpecializationConstants,
     AxisRelevance,
+    SamplerPairLists,
+    SamplerTexturePairs,
     Count
 };
 //NOLINTEND(readability-enum-initial-value, performance-enum-size)
@@ -229,8 +235,18 @@ struct alignas(8) Profile
     uint32_t CapabilityFloor{ 0u };
     PlacementKind AccessModel{ PlacementKind::None };
     ShaderCodeFormat CodeFormat{ ShaderCodeFormat::None };
-    uint16_t Reserved1{ 0u };
+    /** @brief A set of `ProfileFlags` bits. */
+    uint16_t Flags{ 0u };
     uint32_t Reserved2{ 0u };
+};
+
+/** @brief The bits of `Profile::Flags`. */
+enum class ProfileFlags : uint16_t
+{
+    None = 0u,
+    /** The cook read the sampler and texture pairs from this profile's code. When the bit is clear, every pair
+     * list is empty because nothing read the pairs, and an empty list does not mean "no pairs". */
+    SamplerTexturePairsRecorded = 1u << 0u,
 };
 
 /** @brief Where one (profile, module) environment sits in the file. A size of zero means the module
@@ -315,6 +331,8 @@ struct alignas(8) EnvironmentHeader
     TableRef ColorTargets{ 0u, 0u };
     TableRef UniformMembers{ 0u, 0u };
     TableRef SpecConstants{ 0u, 0u };
+    TableRef SamplerPairLists{ 0u, 0u };
+    TableRef SamplerTexturePairs{ 0u, 0u };
 };
 
 /** @brief One variant of one environment. Its key is at the same position in the key table. The
@@ -376,6 +394,15 @@ struct alignas(8) Footprint
     uint32_t Kind{ 0u };
 };
 
+/** @brief One texture and one sampler that an entry point samples together. Each field is a position in the
+ * entry point's visibility list, so `EntryPointInstanceView::Layout()[Texture]` is the texture. `Open` checks
+ * that `Texture` names a texture and `Sampler` a sampler, and that each list is sorted and unique. */
+struct alignas(8) SamplerTexturePair
+{
+    uint32_t Texture{ 0u };
+    uint32_t Sampler{ 0u };
+};
+
 /** @brief What one entry point of one variant resolves to. */
 struct alignas(8) EntryPointInstance
 {
@@ -386,6 +413,9 @@ struct alignas(8) EntryPointInstance
     uint32_t WorkgroupY{ 1u };
     uint32_t WorkgroupZ{ 1u };
     uint32_t Raster{ 0u };
+    /** @brief The index of this entry point's sampler and texture pair list. */
+    uint32_t SamplerPairs{ 0u };
+    uint32_t Reserved{ 0u };
 };
 
 struct alignas(8) VertexInput
@@ -577,6 +607,14 @@ private:
     const Footprint* footprint{ nullptr };
 };
 
+/** One texture and one sampler that a pipeline samples together, and the stages that sample them. */
+struct MergedSamplerTexturePair
+{
+    ResolvedResource Texture;
+    ResolvedResource Sampler;
+    ShaderStageKind Stages{ ShaderStageKind::Invalid };
+};
+
 /** One resource of a merged layout, and the stages that use it. */
 struct MergedResource
 {
@@ -701,9 +739,14 @@ public:
     [[nodiscard]] ShaderStageKind Stage() const noexcept;
     [[nodiscard]] WorkgroupSize Workgroup() const noexcept;
     [[nodiscard]] LayoutRange Layout() const noexcept;
+    /** @brief The textures and samplers this entry point samples together, sorted. Each pair holds two positions
+     * in `Layout()`. Empty when the profile did not record pairs (`EnvironmentView::HasSamplerTexturePairs`). */
+    [[nodiscard]] std::span<const SamplerTexturePair> SamplerTexturePairs() const noexcept;
     //[[nodiscard]] RasterView Raster() const noexcept;
     [[nodiscard]] uint32_t Raster() const noexcept;
     [[nodiscard]] const EntryPointInstance& Record() const noexcept;
+    /** @brief The environment this instance belongs to. */
+    [[nodiscard]] const EnvironmentView& Environment() const noexcept;
 
 private:
     friend class VariantView;
@@ -802,11 +845,64 @@ public:
     [[nodiscard]] Iterator end() const noexcept;
     [[nodiscard]] uint32_t StageCount() const noexcept;
 
+    /** The union of the sampler and texture pairs of every stage. Each (texture, sampler) placement appears
+     * once, with every stage that samples it. This is the input of the WebGPU layout rule: a sampler paired with a
+     * texture that cannot filter must be non-filtering, and a texture paired with a filtering sampler must be
+     * filterable. A Vulkan renderer can use it to check a format's filter support before it binds. */
+    class PairIterator
+    {
+    public:
+        PairIterator() noexcept = default;
+
+        using iterator_concept = std::input_iterator_tag;
+        using iterator_category = std::input_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = MergedSamplerTexturePair;
+        using pointer = value_type*;
+        using reference = value_type&;
+
+        void* operator->() const noexcept = delete;
+
+        [[nodiscard]] MergedSamplerTexturePair operator*() const noexcept;
+        PairIterator& operator++() noexcept;
+        PairIterator operator++(int) noexcept;
+        [[nodiscard]] bool operator==(const PairIterator& other) const noexcept;
+        [[nodiscard]] bool operator!=(const PairIterator& other) const noexcept;
+
+    private:
+        friend class MergedLayoutView;
+        PairIterator(const MergedLayoutView* _layout, uint32_t _stage, uint32_t _pair) noexcept;
+        // moves forward to the first pair that no earlier stage has, or to the end
+        void skipRepeats() noexcept;
+        const MergedLayoutView* layout{ nullptr };
+        uint32_t stage{ 0u };
+        uint32_t pair{ 0u };
+    };
+
+    class PairRange
+    {
+    public:
+        [[nodiscard]] PairIterator begin() const noexcept;
+        [[nodiscard]] PairIterator end() const noexcept;
+
+    private:
+        friend class MergedLayoutView;
+        explicit PairRange(const MergedLayoutView* _layout) noexcept : layout(_layout) {}
+        const MergedLayoutView* layout{ nullptr };
+    };
+
+    /** @brief The pairs of every stage, each placement pair once. Keep the view alive while iterating. */
+    [[nodiscard]] PairRange SamplerTexturePairs() const noexcept;
+    /** @brief True when the profile of every stage recorded its pairs, so the union is complete. */
+    [[nodiscard]] bool HasSamplerTexturePairs() const noexcept;
+
 private:
     MergedLayoutView() noexcept = default;
     uint32_t stageCount{ 0u };
+    bool pairsRecorded{ true };
     std::array<LayoutRange, k_MaxPipelineStages> layoutRanges{};
     std::array<ShaderStageKind, k_MaxPipelineStages> shaderStages{};
+    std::array<std::span<const SamplerTexturePair>, k_MaxPipelineStages> pairLists{};
 };
 
 
@@ -963,8 +1059,11 @@ public:
     [[nodiscard]] std::span<const ColorTarget> ColorTargets(uint32_t raster_index) const noexcept;
     [[nodiscard]] bool WritesFragDepth(uint32_t raster_index) const noexcept;
     [[nodiscard]] std::span<const SpecializationConstant> SpecializationConstants() const noexcept;
-
-    
+    /** @brief One sampler and texture pair list. Positions in the visibility list of an entry point instance. */
+    [[nodiscard]] std::span<const SamplerTexturePair> SamplerPairList(uint32_t list_index) const noexcept;
+    /** @brief True when the cook read the sampler and texture pairs of this profile's code. Does not imply
+      * that no entry points read textures, just answers if the cook recorded the sampler and texture pairs. */
+    [[nodiscard]] bool HasSamplerTexturePairs() const noexcept;
 
 private:
     ModuleView module;
@@ -989,6 +1088,8 @@ private:
     std::span<const ColorTarget> colorTargets;
     std::span<const UniformMember> uniformMembers;
     std::span<const SpecializationConstant> specializationConstants;
+    std::span<const Run> samplerPairLists;
+    std::span<const SamplerTexturePair> samplerTexturePairs;
 };
 
 /**

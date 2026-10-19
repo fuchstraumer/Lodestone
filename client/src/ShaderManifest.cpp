@@ -102,6 +102,9 @@ namespace
             "a merged layout got two different resources at one group and binding",
             "a module axis declares a default digit that is not below the axis radix",
             "an entry point's axis relevance mask sets a bit past the module's axes",
+            "a sampler pair list runs past the sampler and texture pair table",
+            "an entry point instance names a sampler pair list past the list table",
+            "a sampler and texture pair names a position past the visibility list, a binding of the wrong kind, or is not sorted and unique",
         });
 
     static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ErrorCode::Count),
@@ -137,6 +140,7 @@ namespace
     static_assert(k_IsManifestRecord<SpecializationConstant>);
     static_assert(k_IsManifestRecord<ColorTarget>);
     static_assert(k_IsManifestRecord<RasterState>);
+    static_assert(k_IsManifestRecord<SamplerTexturePair>);
 
     constexpr size_t k_AxisMaskWordBits = std::numeric_limits<uint64_t>::digits;
     
@@ -259,6 +263,13 @@ namespace
         &ValidateAxisRelevance,       &ValidateRasterStates, &ValidateVertexInputs,
         &ValidateUniformMembers,      &ValidateSpecializationConstants,
     };
+
+    /** True when pair `lhs` of `lhs_layout` and pair `rhs` of `rhs_layout` name the same texture placement and
+     * the same sampler placement. `Merge` checked that every resource is Bound. */
+    bool SamePairPlacement(const LayoutRange& lhs_layout,
+                           const SamplerTexturePair& lhs,
+                           const LayoutRange& rhs_layout,
+                           const SamplerTexturePair& rhs) noexcept;
 
 } // namespace
 
@@ -637,6 +648,8 @@ ManifestResult<EnvironmentView> EnvironmentView::Open(const BundleView& bundle,
     view.colorTargets = Map<ColorTarget>(extent_bytes, parsed.ColorTargets);
     view.uniformMembers = Map<UniformMember>(extent_bytes, parsed.UniformMembers);
     view.specializationConstants = Map<SpecializationConstant>(extent_bytes, parsed.SpecConstants);
+    view.samplerPairLists = Map<Run>(extent_bytes, parsed.SamplerPairLists);
+    view.samplerTexturePairs = Map<SamplerTexturePair>(extent_bytes, parsed.SamplerTexturePairs);
     return view;
 }
 
@@ -823,11 +836,23 @@ std::span<const SpecializationConstant> EnvironmentView::SpecializationConstants
     return specializationConstants;
 }
 
+std::span<const SamplerTexturePair> EnvironmentView::SamplerPairList(uint32_t list_index) const noexcept
+{
+    return RunOf(samplerPairLists, samplerTexturePairs, list_index);
+}
+
+bool EnvironmentView::HasSamplerTexturePairs() const noexcept
+{
+    constexpr uint16_t k_Recorded = std::to_underlying(ProfileFlags::SamplerTexturePairsRecorded);
+    return (ProfileRecord().Flags & k_Recorded) != 0u;
+}
+
 static_assert(std::input_iterator<LayoutRange::Iterator>);
 static_assert(std::ranges::input_range<LayoutRange>);
 static_assert(std::input_iterator<UniformMemberRange::Iterator>);
 static_assert(std::ranges::input_range<UniformMemberRange>);
 static_assert(std::input_iterator<MergedLayoutView::Iterator>);
+static_assert(std::input_iterator<MergedLayoutView::PairIterator>);
 static_assert(std::ranges::input_range<MergedLayoutView>);
 
 UniformMemberView::UniformMemberView(const EnvironmentView* _environment, const UniformMember* _record) noexcept
@@ -1100,6 +1125,11 @@ LayoutRange EntryPointInstanceView::Layout() const noexcept
                         environment->FootprintList(variant->FootprintList) };
 }
 
+std::span<const SamplerTexturePair> EntryPointInstanceView::SamplerTexturePairs() const noexcept
+{
+    return environment->SamplerPairList(entryPointInstance->SamplerPairs);
+}
+
 uint32_t EntryPointInstanceView::Raster() const noexcept
 {
     return entryPointInstance->Raster;
@@ -1108,6 +1138,11 @@ uint32_t EntryPointInstanceView::Raster() const noexcept
 const EntryPointInstance& EntryPointInstanceView::Record() const noexcept
 {
     return *entryPointInstance;
+}
+
+const EnvironmentView& EntryPointInstanceView::Environment() const noexcept
+{
+    return *environment;
 }
 
 VariantView::VariantView(const EnvironmentView* _environment, uint32_t _index) noexcept
@@ -1253,6 +1288,8 @@ ManifestResult<MergedLayoutView> MergedLayoutView::Merge(std::span<const EntryPo
 
         view.shaderStages[i] = stage;
         view.layoutRanges[i] = instance.Layout();
+        view.pairLists[i] = instance.SamplerTexturePairs();
+        view.pairsRecorded = view.pairsRecorded && instance.Environment().HasSamplerTexturePairs();
 
         // will need to validate/verify layouts as bound/pointer/bindless etc here as appropriate, too
     }
@@ -1379,6 +1416,111 @@ bool MergedLayoutView::Iterator::operator==(const Iterator& other) const noexcep
 }
 
 bool MergedLayoutView::Iterator::operator!=(const Iterator& other) const noexcept
+{
+    return !(*this == other);
+}
+
+MergedLayoutView::PairRange MergedLayoutView::SamplerTexturePairs() const noexcept
+{
+    return PairRange{ this };
+}
+
+bool MergedLayoutView::HasSamplerTexturePairs() const noexcept
+{
+    return pairsRecorded;
+}
+
+MergedLayoutView::PairIterator MergedLayoutView::PairRange::begin() const noexcept
+{
+    PairIterator first{ layout, 0u, 0u };
+    first.skipRepeats();
+    return first;
+}
+
+MergedLayoutView::PairIterator MergedLayoutView::PairRange::end() const noexcept
+{
+    return PairIterator{ layout, layout->stageCount, 0u };
+}
+
+MergedLayoutView::PairIterator::PairIterator(const MergedLayoutView* _layout, uint32_t _stage, uint32_t _pair) noexcept
+    : layout{ _layout },
+      stage{ _stage },
+      pair{ _pair }
+{
+}
+
+void MergedLayoutView::PairIterator::skipRepeats() noexcept
+{
+    // a pipeline has a few stages and each stage a few pairs, so a scan of the earlier stages is cheap and
+    // needs no storage. the pairs of one stage are unique already
+    while (stage < layout->stageCount)
+    {
+        const std::span<const SamplerTexturePair> pairs = layout->pairLists[stage];
+        if (pair >= pairs.size())
+        {
+            ++stage;
+            pair = 0u;
+            continue;
+        }
+
+        bool seenEarlier = false;
+        for (uint32_t earlier = 0u; earlier < stage && !seenEarlier; ++earlier)
+        {
+            seenEarlier = std::ranges::any_of(layout->pairLists[earlier], [&](const SamplerTexturePair& candidate) {
+                return SamePairPlacement(layout->layoutRanges[earlier], candidate, layout->layoutRanges[stage], pairs[pair]);
+            });
+        }
+
+        if (!seenEarlier)
+        {
+            return;
+        }
+        ++pair;
+    }
+    pair = 0u;
+}
+
+MergedSamplerTexturePair MergedLayoutView::PairIterator::operator*() const noexcept
+{
+    const LayoutRange& range = layout->layoutRanges[stage];
+    const SamplerTexturePair& current = layout->pairLists[stage][pair];
+    ShaderStageKind stages = layout->shaderStages[stage];
+    for (uint32_t later = stage + 1u; later < layout->stageCount; ++later)
+    {
+        const bool sampledThere = std::ranges::any_of(layout->pairLists[later], [&](const SamplerTexturePair& candidate) {
+            return SamePairPlacement(layout->layoutRanges[later], candidate, range, current);
+        });
+        if (sampledThere)
+        {
+            stages |= layout->shaderStages[later];
+        }
+    }
+
+    return MergedSamplerTexturePair{ .Texture = range[current.Texture],
+                                     .Sampler = range[current.Sampler],
+                                     .Stages = stages };
+}
+
+MergedLayoutView::PairIterator& MergedLayoutView::PairIterator::operator++() noexcept
+{
+    ++pair;
+    skipRepeats();
+    return *this;
+}
+
+MergedLayoutView::PairIterator MergedLayoutView::PairIterator::operator++(int) noexcept
+{
+    PairIterator previous = *this;
+    ++*this;
+    return previous;
+}
+
+bool MergedLayoutView::PairIterator::operator==(const PairIterator& other) const noexcept
+{
+    return layout == other.layout && stage == other.stage && pair == other.pair;
+}
+
+bool MergedLayoutView::PairIterator::operator!=(const PairIterator& other) const noexcept
 {
     return !(*this == other);
 }
@@ -1893,7 +2035,7 @@ namespace
                                      environment.VariantCount * context.AxisMaskWordCount };
         const TableRef axisRelevanceLoc{ environment.AxisRelevanceTableOffset,
                                          static_cast<uint32_t>(context.EntryPointCount) * context.AxisMaskWordCount };
-        const std::array<Section, 18u> sections
+        const std::array<Section, 20u> sections
         {
             Section{ ShaderManifestTable::AxisRelevance, axisRelevanceLoc, sizeof(uint64_t) },
             Section{ ShaderManifestTable::VariantKeys, varKeysLoc, sizeof(VariantKey) },
@@ -1913,6 +2055,8 @@ namespace
             Section{ ShaderManifestTable::ColorTargets, environment.ColorTargets, sizeof(ColorTarget) },
             Section{ ShaderManifestTable::UniformMembers, environment.UniformMembers, sizeof(UniformMember) },
             Section{ ShaderManifestTable::SpecializationConstants, environment.SpecConstants, sizeof(SpecializationConstant) },
+            Section{ ShaderManifestTable::SamplerPairLists, environment.SamplerPairLists, sizeof(Run) },
+            Section{ ShaderManifestTable::SamplerTexturePairs, environment.SamplerTexturePairs, sizeof(SamplerTexturePair) },
         };
 
         return ValidateSections(sections, extentSize);
@@ -2012,7 +2156,7 @@ namespace
         };
 
         const EnvironmentHeader& environment = context.Environment;
-        const std::array<RunTable, 3u> runTables
+        const std::array<RunTable, 4u> runTables
         {
             RunTable{ ShaderManifestTable::ResourceLists,
                           ErrorCode::InvalidResourceListRun,
@@ -2026,6 +2170,10 @@ namespace
                           ErrorCode::InvalidVisibilityListRun,
                           environment.VisibilityLists,
                           environment.VisibilityIndices.Count },
+            RunTable{ ShaderManifestTable::SamplerPairLists,
+                          ErrorCode::InvalidSamplerPairListRun,
+                          environment.SamplerPairLists,
+                          environment.SamplerTexturePairs.Count },
         };
 
         for (const RunTable& runTable : runTables)
@@ -2080,6 +2228,14 @@ namespace
                          .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = slot.Raster };
             }
+
+            if (slot.SamplerPairs >= environment.SamplerPairLists.Count)
+            {
+                return { .Code = ErrorCode::InvalidEntryPointInstanceSamplerPairIndex,
+                         .Table = ShaderManifestTable::EntryPointInstances,
+                         .RecordIndex = static_cast<uint32_t>(i),
+                         .Detail = slot.SamplerPairs };
+            }
         }
 
         return k_ManifestOk;
@@ -2116,6 +2272,9 @@ namespace
         const std::span<const Run> visibilityLists = Map<Run>(extent, environment.VisibilityLists);
         const std::span<const uint32_t> visibilityIndices = Map<uint32_t>(extent, environment.VisibilityIndices);
         const std::span<const Binding> bindingSpan = Map<Binding>(extent, environment.Bindings);
+        const std::span<const Run> samplerPairLists = Map<Run>(extent, environment.SamplerPairLists);
+        const std::span<const SamplerTexturePair> samplerTexturePairs =
+            Map<SamplerTexturePair>(extent, environment.SamplerTexturePairs);
 
         const uint64_t numSlots = context.EntryPointCount * environment.VariantCount;
         const TableRef64 slotsLoc{ environment.EntryPointInstanceTableOffset, numSlots };
@@ -2200,6 +2359,35 @@ namespace
 
                     previousKey = key;
                     hasPreviousBound = true;
+                }
+
+                // each pair names two positions in this instance's visibility list: a texture, then a sampler.
+                // like the placement order, this is checked for each instance, because the positions are local
+                const std::span<const SamplerTexturePair> slotPairs =
+                    RunOf(samplerPairLists, samplerTexturePairs, slot.SamplerPairs);
+                const uint32_t pairRunOffset = static_cast<uint32_t>(slotPairs.data() - samplerTexturePairs.data());
+                auto kindAt = [&](uint32_t position) -> uint32_t
+                {
+                    return bindingSpan[variantResourceIndices[slotVisibilityIndices[position]]].Kind;
+                };
+                for (int32_t j = 0; j < std::ssize(slotPairs); ++j)
+                {
+                    const SamplerTexturePair& pair = slotPairs[j];
+                    const bool inRange = pair.Texture < slotVisibilityIndices.size() &&
+                                         pair.Sampler < slotVisibilityIndices.size();
+                    const bool rightKinds = inRange &&
+                                            kindAt(pair.Texture) == std::to_underlying(BindingKind::Texture) &&
+                                            kindAt(pair.Sampler) == std::to_underlying(BindingKind::Sampler);
+                    const bool ascending = j == 0 ||
+                                           std::tie(slotPairs[j - 1].Texture, slotPairs[j - 1].Sampler) <
+                                               std::tie(pair.Texture, pair.Sampler);
+                    if (!rightKinds || !ascending)
+                    {
+                        return { .Code = ErrorCode::InvalidSamplerTexturePair,
+                                 .Table = ShaderManifestTable::SamplerTexturePairs,
+                                 .RecordIndex = pairRunOffset + static_cast<uint32_t>(j),
+                                 .Detail = slot.SamplerPairs };
+                    }
                 }
             }
         }
@@ -2341,6 +2529,17 @@ namespace
         }
 
         return k_ManifestOk;
+    }
+
+    bool SamePairPlacement(const LayoutRange& lhs_layout,
+                           const SamplerTexturePair& lhs,
+                           const LayoutRange& rhs_layout,
+                           const SamplerTexturePair& rhs) noexcept
+    {
+        return BoundPlacementKey(lhs_layout[lhs.Texture].PlacementValue()) ==
+                   BoundPlacementKey(rhs_layout[rhs.Texture].PlacementValue()) &&
+               BoundPlacementKey(lhs_layout[lhs.Sampler].PlacementValue()) ==
+                   BoundPlacementKey(rhs_layout[rhs.Sampler].PlacementValue());
     }
 
 } // namespace
