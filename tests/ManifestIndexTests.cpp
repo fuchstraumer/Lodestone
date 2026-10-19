@@ -189,6 +189,7 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space, Keep keep, Ac
                     variant.VisibilityIndices.push_back(0u);
                     variant.RasterIndices.push_back(0u);
                     variant.Workgroups.emplace_back(lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u });
+                    variant.Canonical = space.CanonicalizeAssignment(variant.Active);
                     module.Variants.emplace_back(std::move(variant));
                     ++index;
                 }
@@ -314,6 +315,7 @@ lodestone::CookedModule BuildTileModule(std::string name, const PermutationSpace
         variant.VisibilityIndices.push_back(0u);
         variant.RasterIndices.push_back(0u);
         variant.Workgroups.emplace_back(lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u });
+        variant.Canonical = space.CanonicalizeAssignment(variant.Active);
         module.Variants.emplace_back(std::move(variant));
     }
 
@@ -472,8 +474,8 @@ void CheckAxisRelevance(lodestone::tests::TestRunner& runner)
 // Three boolean axes, and a sparse set of cooked variants: (0,0,0), (1,1,0), (0,0,1), (1,0,1), (0,1,1). Only
 // (1,1,0) has different code. A and B each have a pair that differs in that axis alone, (x,x,1), and that pair
 // shares one instance. C has one such pair, (0,0,0) and (0,0,1), and it shares one instance too. So the per-axis
-// measurement finds every axis Inert. But (0,0,0) and (1,1,0) differ in their code, and no cooked variant links
-// them. This is what a sparse cook policy can leave.
+// pass finds every axis Inert. But (0,0,0) and (1,1,0) differ in their code, and no cooked variant links them.
+// This is what a sparse cook policy can leave, and what the closing pass of `model/AxisInfluence` exists for.
 PermutationSpace MakeChainSpace()
 {
     std::vector<PermutationAxis> axes;
@@ -574,7 +576,8 @@ void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
                      lodestone::CookError::ManifestAxisRelevanceMismatch,
                  "a stored mask that calls a code-changing axis irrelevant fails the validator");
 
-    // a class of variants that agree on every relevant axis and hold two different instances
+    // the broken chain: every axis is Inert in the per-axis pass, and the closing pass must mark all three,
+    // because (0,0,0) and (1,1,0) hold different code and the whole cook is one class of the empty mask
     const PermutationSpace chainSpace = MakeChainSpace();
     lodestone::CookedLibrary chainLibrary;
     chainLibrary.ModuleNames = { "ChainModule" };
@@ -582,12 +585,42 @@ void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
     chainLibrary.Environments.emplace_back(BuildChainModule(chainSpace));
     const std::vector<std::byte> chainBytes = EmitBytes(chainLibrary);
     const ManifestResult<EnvironmentView> chainView = OpenEnvironment(chainBytes, 0u, 0u);
-    runner.Check(chainView.has_value() && !chainView->IsAxisRelevant(0u, 0u) && !chainView->IsAxisRelevant(0u, 1u) &&
-                     !chainView->IsAxisRelevant(0u, 2u),
-                 "the per-axis measurement finds every axis Inert on the broken chain, so it claims no pin is needed");
-    runner.Check(lodestone::VerifyManifestRoundTrip(chainLibrary, chainBytes) ==
-                     lodestone::CookError::ManifestAxisRelevanceIncomplete,
-                 "two variants that agree on every relevant axis and differ in code fail the validator");
+    runner.Check(chainView.has_value() && chainView->IsAxisRelevant(0u, 0u) && chainView->IsAxisRelevant(0u, 1u) &&
+                     chainView->IsAxisRelevant(0u, 2u),
+                 "the closing pass marks every axis that varies in a class with two instances");
+    runner.Check(lodestone::VerifyManifestRoundTrip(chainLibrary, chainBytes) == lodestone::CookError::Success,
+                 "the closed mask passes the validator");
+    if (chainView.has_value())
+    {
+        const ManifestIndex chainIndex{ *chainView };
+        const std::array<std::string_view, 1u> mainCS{ "MainCS" };
+        // C = false matches (0,0,0) and (1,1,0), which hold different code, so this must not pick one of them
+        const std::expected<VariantKey, lodestone::QueryError> highQuality =
+            chainIndex.Query().Where("C", false).SingleFor(mainCS);
+        runner.Check(!highQuality.has_value() &&
+                         highQuality.error().Code == lodestone::QueryErrorCode::AmbiguousVariant &&
+                         highQuality.error().AxisName == "A, B",
+                     "SingleFor does not choose between the two code paths of the broken chain");
+    }
+
+    // the per-axis pass alone derives an empty mask here, so only a validator that closes the mask too can see
+    // that an empty stored mask is wrong
+    const lodestone::manifest::Header chainHeader = [&] {
+        lodestone::manifest::Header value;
+        std::memcpy(&value, chainBytes.data(), sizeof(value));
+        return value;
+    }();
+    lodestone::manifest::EnvironmentDirectoryEntry chainEntry;
+    std::memcpy(&chainEntry, chainBytes.data() + chainHeader.EnvironmentDirectoryOffset, sizeof(chainEntry));
+    lodestone::manifest::EnvironmentHeader chainEnvironment;
+    std::memcpy(&chainEnvironment, chainBytes.data() + chainEntry.ExtentOffset, sizeof(chainEnvironment));
+    std::vector<std::byte> unclosed = chainBytes;
+    const uint64_t noAxes = 0u;
+    std::memcpy(unclosed.data() + chainEntry.ExtentOffset + chainEnvironment.AxisRelevanceTableOffset, &noAxes,
+                sizeof(noAxes));
+    runner.Check(lodestone::VerifyManifestRoundTrip(chainLibrary, unclosed) ==
+                     lodestone::CookError::ManifestAxisRelevanceMismatch,
+                 "a stored mask that the per-axis pass alone would accept fails the validator");
 }
 
 // Counts the keys of a query, or returns SIZE_MAX when the query is in an error state.

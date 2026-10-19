@@ -144,6 +144,18 @@ no allocation.
   varies inside an inconsistent class, until no class is inconsistent). `ShaderManifestRejectTest`'s fixture had
   two variants and no axis, which the validator rejects, so it got the one axis it modelled. 26 of 26 tests,
   `ManifestIndexTest` 111 checks; KitchenSink passes with and without `--no-dedupe`. Next: R2 continues with L4.
+- 2026-10-18. The author chose option 2: the cooker closes the mask (`CloseRelevance` in `model/AxisInfluence`). In
+  each class of variants that agree on the relevant axes and hold more than one instance, it marks every axis that
+  varies within the class, until no class does. The validator runs the same closing pass on the written bytes, so
+  its separate consistency check and error 113 (`ManifestAxisRelevanceIncomplete`) were removed: an equal mask is
+  closed. Correction to the explanation of 2026-10-17: the broken-chain fixture closes to {A, B, C}, not {A, B}. A
+  pair-based rule depends on which pair it finds first, and the minimal choice is not unique. Proof: with the
+  cooker's closing pass off, three `ManifestIndexTest` rows fail (the mask, the validator, and a `SingleFor` query
+  on C alone that would return one of two code paths); with the validator's closing pass off, two rows fail. The
+  hand-built fixtures in `ManifestIndexTest` and `MergedLayoutTest` set no `Canonical` assignment; the closing pass
+  read past it and `MergedLayoutTest` crashed, so the fixtures now canonicalize, and `ComputeActualInfluence`
+  asserts the length (Debug only). The KitchenSink masks did not change. 26 of 26 tests, `ManifestIndexTest` 113
+  checks.
 
 ## 5. Phase F, paused
 

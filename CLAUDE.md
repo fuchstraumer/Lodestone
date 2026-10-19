@@ -464,10 +464,8 @@ Four validators run inside that loop. None of them is a stage.
   compares it against the module it came from. `CheckManifestLayout` walks the manifest the way a
   consumer walks it, from variant to resource list to footprint list to visibility list.
   `VerifyAxisRelevance` derives the axis relevance a second time from the written environment alone, through
-  the client views, and compares content, not record indices. It fails the cook when the derived mask differs
-  from the stored one (`ManifestAxisRelevanceMismatch`), or when two variants agree on every relevant axis of
-  an entry point and hold different instances of it (`ManifestAxisRelevanceIncomplete`). `SingleFor` rests on
-  that second claim.
+  the client views, with both passes of `model/AxisInfluence`, and compares content, not record indices. It
+  fails the cook when the derived mask differs from the stored one (`ManifestAxisRelevanceMismatch`).
 
 `--verify-deterministic` runs stages 1 to 8 twice into two `MemoryOutputSink` objects, compares every
 artifact byte for byte, then writes the first result to the real sink. A difference means an
@@ -668,10 +666,15 @@ again from the written bytes. The client reads it with `EnvironmentView::AxisRel
 `ManifestQueryBuilder::SingleFor(entry_points)` uses it, and `manifest_dump` writes a `"relevantAxes"` object
 for each environment.
 
-The per-axis measurement compares variants that differ in one axis. It proves that a class of variants which
-agree on the relevant axes holds one instance only along chains of cooked variants, and a sparse policy can
-remove a link. The validator then fails the cook with `ManifestAxisRelevanceIncomplete`
-(`ManifestIndexTest` builds such a cook).
+The measurement has two passes. The first compares variants that differ in one axis. That proves that a class
+of variants which agree on the relevant axes holds one instance only along chains of cooked variants, and a
+sparse policy can remove a link: cook only "all off" and "all on" on one quality level, and an interaction such as
+`if (!LOW_QUALITY && FOG && SHADOWS)` has no one-axis pair that shows it. So the second pass closes the mask: it
+groups the variants by their relevant axes, and in each group that holds more than one instance it marks every
+axis that varies within the group, until no group does. The rule marks a set and never picks a pair, so the
+cooker and the validator reach the same mask in any variant order. A smaller mask can exist, but it is not
+unique, and a mask that is too large only costs pins. `SingleFor` rests on the closed property.
+`ManifestIndexTest` builds such a cook, and the KitchenSink masks did not change.
 
 Each profile records its `ShaderCodeFormat` (since format version 7). A SPIR-V source is read as words, so
 `Open` rejects a SPIR-V source that is not on a 4-byte boundary or not whole words. The sources are packed

@@ -80,7 +80,6 @@ enum class CookError : uint16_t
     ManifestShaderLayoutVariantIndicesInvalid = 110,
     ManifestShaderLayoutVisiblityIndexInvalid = 111,
     ManifestShaderLayoutResourceListIndexInvalid = 112,
-    ManifestAxisRelevanceIncomplete = 113, // two variants agree on every relevant axis of an entry point, and its instances differ
 
     // output and diagnostic sink operation errors
     OutputPathInvalid = 120,

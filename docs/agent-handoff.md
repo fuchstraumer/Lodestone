@@ -46,6 +46,12 @@ that: L3.
 **2026-10-16.** Derived constants are done (section 2a). 26 of 26 tests (RelWithDebInfo), 60 of 60
 known-good dumps. Next: L3.
 
+**2026-10-19.** L3 is done and committed: format 9 axis relevance table, `model/AxisInfluence` (instance-level
+measurement plus the closing pass), `SingleFor(entry_points)`, and the `VerifyAxisRelevance` validator. Slang is at
+`v2026.19-87-ge9fc02c8d`; the module cache is `%TEMP%\LodestoneShaderCooker\<tag>-<config>`. 26 of 26 tests. 15
+known-good dumps differ only by the Slang update (code hash and length, `OutVolume` storage format `R32Float`);
+the author has not accepted them yet. Next: R2 continues with L4 (query presets, decision D-R2 first).
+
 ## 2a. Derived constants: notes for the stage 4 work (2026-10-15)
 
 `todo.md` ("Permutation system") holds the item. Size expressions may name a module-scope `static const`

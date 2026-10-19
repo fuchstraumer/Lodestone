@@ -10,10 +10,15 @@
 /** The measured influence of each axis on each entry point of one cooked module (one environment).
  *
  * An axis influences an entry point when two variants that differ only in that axis give two different entry
- * point instances. An instance is everything a consumer reads for one (variant, entry point): the source, the
+ * point instances, or when the closing pass below needs it. An instance is everything a consumer reads for one (variant, entry point): the source, the
  * layout (each visible resource with its footprint), the raster state, and the workgroup size. The source
  * alone is not enough: an axis that appears only in a size attribute changes a footprint and leaves the code
  * the same.
+ *
+ * The measurement has two passes. The first compares variants that differ in one axis. The second closes the
+ * result: variants that agree on every relevant axis must hold one instance, and a sparse cook can leave two
+ * such variants with no chain of one-axis steps between them, so the second pass marks more axes relevant until
+ * that holds. `ManifestQueryBuilder::SingleFor` rests on that property.
  *
  * The measurement reads content and never an interner index, so `--no-dedupe` gives the same answer. The
  * dedupe report, the inert-axis policy check, and the manifest's axis relevance table all read it. */

@@ -145,6 +145,7 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space,
         lodestone::LibraryVariant variant;
         variant.Index = caseIndex;
         variant.Active.push_back(lodestone::PermutationBinding{ .Axis = &axis, .Value = axis.GetValues()[caseIndex] });
+        variant.Canonical = space.CanonicalizeAssignment(variant.Active);
         variant.ResourceListIndex = caseIndex;
         variant.FootprintListIndex = 0u;
         const std::array<uint32_t, 3>& caseVisibility = visibility[caseIndex];

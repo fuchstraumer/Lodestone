@@ -1408,8 +1408,9 @@ namespace
             return view.String(module.EntryPoints()[entry_point].NameString);
         };
 
-        // first derivation: an axis is relevant when two variants that differ only in it hold different
-        // instances, or when no two variants differ only in it (one cooked value is undetermined)
+        // first pass: an axis is relevant when two variants that differ only in it hold different instances, or
+        // when no two variants differ only in it (one cooked value is undetermined)
+        std::vector<std::vector<uint8_t>> derived(entryPointCount, std::vector<uint8_t>(axisCount, uint8_t{ 0u }));
         std::vector<uint32_t> order;
         std::vector<uint8_t> allButOne(axisCount, uint8_t{ 1u });
         for (uint32_t axis = 0u; axis < axisCount; ++axis)
@@ -1417,26 +1418,65 @@ namespace
             allButOne[axis] = 0u;
             const std::vector<std::span<const uint32_t>> classes = GroupVariants(digits, allButOne, order);
             allButOne[axis] = 1u;
-            const bool determined = std::ranges::any_of(classes, [](std::span<const uint32_t> group) { return group.size() > 1u; });
+            const bool determined =
+                std::ranges::any_of(classes, [](std::span<const uint32_t> group) { return group.size() > 1u; });
 
             for (uint32_t entryPoint = 0u; entryPoint < entryPointCount; ++entryPoint)
             {
-                bool relevant = !determined;
-                for (const std::span<const uint32_t> group : classes)
-                {
-                    if (relevant)
-                    {
-                        break;
-                    }
-                    
-                    auto relevantPredicate = [&](uint32_t variant)
-                    {
+                const bool relevant = !determined || std::ranges::any_of(classes, [&](std::span<const uint32_t> group) {
+                    return std::ranges::any_of(group.subspan(1u), [&](uint32_t variant) {
                         return !InstancesEqual(view, group.front(), variant, entryPoint);
-                    };
+                    });
+                });
+                derived[entryPoint][axis] = relevant ? 1u : 0u;
+            }
+        }
 
-                    relevant = std::ranges::any_of(group.subspan(1u), relevantPredicate);
+        // closing pass: in each class of variants that agree on the relevant axes and hold more than one instance,
+        // mark every axis that varies within the class, until no class holds more than one instance
+        for (uint32_t entryPoint = 0u; entryPoint < entryPointCount; ++entryPoint)
+        {
+            std::vector<uint8_t>& relevant = derived[entryPoint];
+            while (true)
+            {
+                std::vector<uint8_t> marked(axisCount, uint8_t{ 0u });
+                for (const std::span<const uint32_t> group : GroupVariants(digits, relevant, order))
+                {
+                    const bool oneInstance = std::ranges::all_of(group.subspan(1u), [&](uint32_t variant) {
+                        return InstancesEqual(view, group.front(), variant, entryPoint);
+                    });
+                    if (oneInstance)
+                    {
+                        continue;
+                    }
+                    for (uint32_t axis = 0u; axis < axisCount; ++axis)
+                    {
+                        const bool varies = std::ranges::any_of(group.subspan(1u), [&](uint32_t variant) {
+                            return digits[variant][axis] != digits[group.front()][axis];
+                        });
+                        if (relevant[axis] == 0u && varies)
+                        {
+                            marked[axis] = 1u;
+                        }
+                    }
                 }
 
+                if (std::ranges::none_of(marked, [](uint8_t bit) { return bit != 0u; }))
+                {
+                    break;
+                }
+                for (uint32_t axis = 0u; axis < axisCount; ++axis)
+                {
+                    relevant[axis] = static_cast<uint8_t>(relevant[axis] | marked[axis]);
+                }
+            }
+        }
+
+        for (uint32_t entryPoint = 0u; entryPoint < entryPointCount; ++entryPoint)
+        {
+            for (uint32_t axis = 0u; axis < axisCount; ++axis)
+            {
+                const bool relevant = derived[entryPoint][axis] != 0u;
                 if (view.IsAxisRelevant(entryPoint, axis) != relevant)
                 {
                     std::println(stderr,
@@ -1447,39 +1487,6 @@ namespace
                                  entryPointName(entryPoint),
                                  relevant ? "relevant" : "irrelevant");
                     return CookError::ManifestAxisRelevanceMismatch;
-                }
-            }
-        }
-
-        // second check: SingleFor treats variants that agree on every relevant axis as one answer, so each
-        // such class must hold one instance. the per-axis derivation only proves this along chains of cooked
-        // variants, and a sparse policy can remove a link of a chain
-        for (uint32_t entryPoint = 0u; entryPoint < entryPointCount; ++entryPoint)
-        {
-            std::vector<uint8_t> relevantAxes(axisCount, uint8_t{ 0u });
-            for (uint32_t axis = 0u; axis < axisCount; ++axis)
-            {
-                relevantAxes[axis] = view.IsAxisRelevant(entryPoint, axis) ? 1u : 0u;
-            }
-            
-            for (const std::span<const uint32_t> group : GroupVariants(digits, relevantAxes, order))
-            {
-                auto differsPredicate = [&](uint32_t variant)
-                {
-                    return !InstancesEqual(view, group.front(), variant, entryPoint);
-                };
-
-                const auto differs = std::ranges::find_if(group.subspan(1u), differsPredicate);
-
-                if (differs != group.end())
-                {
-                    std::println(stderr,
-                                 "[lodestone] AXIS RELEVANCE: variants {} and {} agree on every relevant axis of entry "
-                                 "point '{}', and their instances differ",
-                                 std::to_underlying(view.VariantKeys()[group.front()]),
-                                 std::to_underlying(view.VariantKeys()[*differs]),
-                                 entryPointName(entryPoint));
-                    return CookError::ManifestAxisRelevanceIncomplete;
                 }
             }
         }
