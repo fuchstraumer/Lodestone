@@ -163,9 +163,11 @@ no allocation.
   stores its canonical digit, 0. `WhereWhenActive` (bool, uint, named). `QueryPreset` owns its pins, and
   `ManifestQueryBuilder::Apply` skips a pin on an undeclared axis with a `PinAxisNotDeclared` note (`Notes()`);
   a note never fails a terminal. A bad value on a declared axis is `ValueNotInAxis`. Proof: `ManifestIndexTest` 122
-  checks; with the `filterKeys` change reverted, three rows fail. 26 of 26 tests. Not done: a note for a pin on an
-  axis that is irrelevant to the `SingleFor` entry points, and the duplicate-value note (`todo-ship` in
-  `insertConstraint`).
+  checks; with the `filterKeys` change reverted, three rows fail. 26 of 26 tests. Then two more notes:
+  `NotesFor(entry_point_names)` adds a `PinAxisIrrelevant` note for each constrained axis that cannot change the
+  named entry points (it shares `joinRelevance` with `SingleFor`, because a const terminal cannot add notes), and
+  `DuplicateValue` for a value that the axis constraint or the same call already names. Only the callers that take
+  user values check duplicates, so overlapping `WhereNoneOf` complements give no note. `ManifestIndexTest` 129 checks.
 
 ## 5. Phase F, paused
 

@@ -95,6 +95,8 @@ struct QueryError
 enum class QueryNoteCode : uint8_t
 {
     PinAxisNotDeclared, // a preset pinned an axis that this module does not declare, and Apply skipped the pin
+    PinAxisIrrelevant, // the query constrains an axis that cannot change any entry point given to NotesFor
+    DuplicateValue, // a constraint names a value that the constraints on its axis already name
 };
 
 struct QueryNote
@@ -226,6 +228,12 @@ struct ManifestQueryBuilder
     /** @brief The notes of this query. A note does not fail a terminal. Log them to show which constraints
       * had no effect. */
     [[nodiscard]] std::span<const QueryNote> Notes() const noexcept;
+    /** @brief The notes of this query, plus a `PinAxisIrrelevant` note for each constrained axis that cannot
+      * change any of the named entry points (`EnvironmentView::IsAxisRelevant`). Give it the names that
+      * `SingleFor` gets. Such a pin still filters the matches, but the pipeline does not need it.
+      * @return The notes, or `EmptyEntryPointSet`, or `UnknownEntryPoint` with the name and a suggestion. */
+    [[nodiscard]] std::expected<std::vector<QueryNote>, QueryError> NotesFor(
+        std::span<const std::string_view> entry_point_names) const;
 private:
     // resolves the given axis name, domain, and input values. returns the axis index if successful, nullopt if
     // any of the validations fails
@@ -243,6 +251,16 @@ private:
     // the shared body of Single and SingleFor: one answer when the matches agree on every axis whose bit is
     // set in `relevant_axes` (in the word layout of EnvironmentView::AxisRelevance)
     [[nodiscard]] std::expected<VariantKey, QueryError> singleOver(std::span<const uint64_t> relevant_axes) const noexcept;
+    // the axis relevance of a pipeline: the masks of the named entry points joined, in the word layout of
+    // EnvironmentView::AxisRelevance. shared by SingleFor and NotesFor, so both read the same entry points
+    [[nodiscard]] std::expected<std::vector<uint64_t>, QueryError> joinRelevance(
+        std::span<const std::string_view> entry_point_names) const;
+    // adds a DuplicateValue note for each value in `values` that an earlier value in `values`, or the existing
+    // constraint on `axis_index`, already names. only the callers that take values from the user call it, so
+    // the complement that WhereNoneOf builds does not give a note
+    void noteDuplicateValues(std::string_view axis_name,
+                             uint32_t axis_index,
+                             std::span<const QueryAxisValue> values);
 
     // overload to coalesce work for WhereAnyOf functions, assuming shared value domain
     [[nodiscard]] ManifestQueryBuilder whereAnyOf(std::string_view axis_name,

@@ -431,6 +431,30 @@ void CheckAxisRelevance(lodestone::tests::TestRunner& runner)
                          "SingleFor names only the relevant axes that still vary");
             runner.Check(index.Query().SingleFor(plain).has_value(),
                          "an entry point that no axis changes needs no pin at all");
+
+            // NotesFor names each pin that cannot change the named entry points. DEBUG changes nothing, and
+            // FOG changes FogCS only
+            const ManifestQueryBuilder bothPinned = index.Query().Where("FOG", true).Where("DEBUG", true);
+            const std::expected<std::vector<lodestone::QueryNote>, lodestone::QueryError> fogNotes =
+                bothPinned.NotesFor(fog);
+            runner.Check(fogNotes.has_value() && fogNotes->size() == 1u &&
+                             fogNotes->front().Code == lodestone::QueryNoteCode::PinAxisIrrelevant &&
+                             fogNotes->front().AxisName == "DEBUG",
+                         "NotesFor names a pin that cannot change the entry point");
+            const std::expected<std::vector<lodestone::QueryNote>, lodestone::QueryError> plainNotes =
+                bothPinned.NotesFor(plain);
+            runner.Check(plainNotes.has_value() && plainNotes->size() == 2u,
+                         "NotesFor names every pin when no pinned axis changes the entry point");
+            const std::expected<std::vector<lodestone::QueryNote>, lodestone::QueryError> pipelineNotes =
+                bothPinned.NotesFor(pipeline);
+            runner.Check(pipelineNotes.has_value() && pipelineNotes->size() == 1u,
+                         "NotesFor joins the masks of a pipeline, as SingleFor does");
+            const std::span<const std::string_view> noStages{};
+            const std::expected<std::vector<lodestone::QueryNote>, lodestone::QueryError> noStageNotes =
+                bothPinned.NotesFor(noStages);
+            runner.Check(!noStageNotes.has_value() &&
+                             noStageNotes.error().Code == lodestone::QueryErrorCode::EmptyEntryPointSet,
+                         "NotesFor with no entry point is an error");
             const std::expected<VariantKey, lodestone::QueryError> joined = index.Query().SingleFor(pipeline);
             runner.Check(!joined.has_value() && joined.error().AxisName == "FOG",
                          "a pipeline counts every axis that any of its entry points reads");
@@ -1013,6 +1037,19 @@ int main()
         const std::expected<VariantKey, lodestone::QueryError> presetSingleFor = applied.SingleFor(mainStage);
         runner.Check(presetSingleFor.has_value() && presetSingleFor.value() == gatedOffKey,
                      "SingleFor takes the same preset");
+
+        const ManifestQueryBuilder repeated = gated.Query().Where("TILE", 8u).Where("TILE", 8u);
+        runner.Check(repeated.IsValid() && repeated.Notes().size() == 1u &&
+                         repeated.Notes().front().Code == lodestone::QueryNoteCode::DuplicateValue &&
+                         repeated.Notes().front().AxisName == "TILE",
+                     "a value that the axis constraint already names gives one note");
+        const std::array<uint32_t, 2> eightTwice{ 8u, 8u };
+        runner.Check(gated.Query().WhereAnyOf("TILE", eightTwice).Notes().size() == 1u,
+                     "a value repeated within one call gives one note");
+        const std::array<uint32_t, 1> eight{ 8u };
+        const std::array<uint32_t, 1> sixteen{ 16u };
+        runner.Check(gated.Query().WhereNoneOf("TILE", eight).WhereNoneOf("TILE", sixteen).Notes().empty(),
+                     "the overlap of two WhereNoneOf complements gives no note, because the caller named no value twice");
 
         QueryPreset misspelled;
         misspelled.Pin("SHADE", AxisValueDomain::Type, "Phongg", PinMode::WhenActive);

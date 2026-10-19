@@ -130,6 +130,7 @@ ManifestQueryBuilder ManifestQueryBuilder::Apply(const QueryPreset& preset) cons
         const std::optional<uint32_t> axisIndex = resolveAndValidate(result, pin.AxisName, values);
         if (axisIndex)
         {
+            result.noteDuplicateValues(pin.AxisName, *axisIndex, values);
             result.insertConstraint(pin.AxisName, *axisIndex, std::move(values), pin.Mode);
         }
     }
@@ -370,6 +371,17 @@ std::expected<VariantKey, QueryError> ManifestQueryBuilder::SingleFor(
         return std::unexpected(errors.front());
     }
 
+    const std::expected<std::vector<uint64_t>, QueryError> relevant = joinRelevance(entry_point_names);
+    if (!relevant)
+    {
+        return std::unexpected(relevant.error());
+    }
+    return singleOver(*relevant);
+}
+
+std::expected<std::vector<uint64_t>, QueryError> ManifestQueryBuilder::joinRelevance(
+    std::span<const std::string_view> entry_point_names) const
+{
     if (entry_point_names.empty())
     {
         return std::unexpected(QueryError{ .Code = QueryErrorCode::EmptyEntryPointSet });
@@ -409,7 +421,48 @@ std::expected<VariantKey, QueryError> ManifestQueryBuilder::SingleFor(
         }
     }
 
-    return singleOver(relevant);
+    return relevant;
+}
+
+std::expected<std::vector<QueryNote>, QueryError> ManifestQueryBuilder::NotesFor(
+    std::span<const std::string_view> entry_point_names) const
+{
+    const std::expected<std::vector<uint64_t>, QueryError> relevant = joinRelevance(entry_point_names);
+    if (!relevant)
+    {
+        return std::unexpected(relevant.error());
+    }
+
+    constexpr size_t k_WordBits = std::numeric_limits<uint64_t>::digits;
+    std::vector<QueryNote> result = notes;
+    const std::vector<uint64_t>& relevantBits = *relevant;
+    for (const QueryAxisRange& constraint : constraints)
+    {
+        const uint32_t axisIndex = constraint.AxisIndex;
+        const bool isRelevant = ((relevantBits[axisIndex / k_WordBits] >> (axisIndex % k_WordBits)) & 1u) != 0u;
+        if (!isRelevant)
+        {
+            result.emplace_back(QueryNoteCode::PinAxisIrrelevant, std::string(constraint.AxisName));
+        }
+    }
+    return result;
+}
+
+void ManifestQueryBuilder::noteDuplicateValues(std::string_view axis_name,
+                                               uint32_t axis_index,
+                                               std::span<const QueryAxisValue> values)
+{
+    const auto existing = std::ranges::find(constraints, axis_index, &QueryAxisRange::AxisIndex);
+    for (size_t i = 0u; i < values.size(); ++i)
+    {
+        const bool earlierInInput = std::ranges::contains(values.first(i), values[i]);
+        const bool inConstraint = existing != constraints.end() &&
+                                  std::ranges::contains(existing->Values, values[i]);
+        if (earlierInInput || inConstraint)
+        {
+            notes.emplace_back(QueryNoteCode::DuplicateValue, std::string(axis_name));
+        }
+    }
 }
 
 std::expected<VariantKey, QueryError> ManifestQueryBuilder::singleOver(std::span<const uint64_t> relevant_axes) const noexcept
@@ -569,8 +622,7 @@ void ManifestQueryBuilder::insertConstraint(std::string_view axis_name,
         constraintIter->AxisIndex == axis_index)
     {
         QueryAxisRange& constraint = *constraintIter;
-        // todo-ship: validate against duplicate values, but add a warning that can be printed 
-        // when the query is finally resolved: it's not critical, but we should make users aware
+        // a duplicate value is harmless here. the callers that take user values note it first
         constraint.Values.append_range(allowed);
         // (active and A) or (inactive or B) is (inactive or A or B): the union of a required and a
         // when-active constraint is when-active over both value sets
@@ -600,6 +652,7 @@ ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name
     }
 
     const uint32_t axisIndex = *axisIndexOpt;
+    result.noteDuplicateValues(axis_name, axisIndex, values);
     result.insertConstraint(axis_name, axisIndex, std::move(values), mode);
     return result;
 }
