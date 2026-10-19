@@ -44,6 +44,18 @@ struct QueryAxisValue
     }
 };
 
+/** @brief How a constraint treats a variant where its axis is inactive (an `ActiveWhen` gate is off).
+  * The constraint tests the value of an active axis the same way in both modes. */
+enum class PinMode : uint8_t
+{
+    /** The axis must be active and hold an allowed value. A variant with the axis inactive does not match,
+      * so a required pin on a gated axis also selects the gate. */
+    Required,
+    /** The axis holds an allowed value when it is active. A variant with the axis inactive matches, so the
+      * pin narrows the active variants and keeps the gated-off ones. */
+    WhenActive,
+};
+
 /** @brief Collection of values constraining a single axis. Most clients should not use or build
   * these directly; they are generated sequentially by the builder during query build */
 struct QueryAxisRange
@@ -53,6 +65,7 @@ struct QueryAxisRange
     // AxisIndex to keep constraints sorted. Trivial and tiny and easy to add 
     // so that's why we're growing this struct to include it
     uint32_t AxisIndex{ 0u };
+    PinMode Mode{ PinMode::Required };
 };
 
 enum class QueryErrorCode : uint8_t
@@ -154,10 +167,12 @@ private:
                                                              std::string_view axis_name,
                                                              std::span<const QueryAxisValue> values) const;
     // sorted lower_bound insert/merge of `allowed` values either into existing constraints or new placement
-    // operates directly on *this, since we call it through the result object right before it's returned
+    // operates directly on *this, since we call it through the result object right before it's returned.
+    // a merge is the union of both constraints: the values join, and the result is WhenActive when either is
     void insertConstraint(std::string_view axis_name,
                           uint32_t axis_index,
-                          std::vector<QueryAxisValue> allowed);
+                          std::vector<QueryAxisValue> allowed,
+                          PinMode mode);
 
     // the shared body of Single and SingleFor: one answer when the matches agree on every axis whose bit is
     // set in `relevant_axes` (in the word layout of EnvironmentView::AxisRelevance)
@@ -220,6 +235,7 @@ private:
     {
         uint32_t AxisIndex;
         std::vector<uint32_t> AllowedValueIndices;
+        PinMode Mode;
     };
     
     [[nodiscard]] std::vector<ScanConstraint> convertToScanConstraints(std::span<const QueryAxisRange> query) const;
@@ -232,9 +248,10 @@ private:
     /** @brief Filters the keys based on the provided scan constraints - returns a view into manifest
       * that's better bounded based on the input constraints, to reduce iteration complexity. */
     [[nodiscard]] std::span<const VariantKey> filterKeys(std::span<const ScanConstraint> constraints) const;
-    /** @brief True when every constraint allows the key's digit, and its axis is active in the variant.
-      * Inactive axes store their canonical default digit, so testing the digit alone matches too many
-      * variants. */
+    /** @brief True when every constraint matches the variant. A `Required` constraint needs its axis active
+      * and the key's digit allowed. A `WhenActive` constraint needs the digit allowed only when its axis is
+      * active. Inactive axes store their canonical digit, so testing the digit alone gives the wrong answer
+      * for both modes. */
     [[nodiscard]] bool matches(uint32_t variant_index,
                                VariantKey key,
                                std::span<const ScanConstraint> constraints) const noexcept;

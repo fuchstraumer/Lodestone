@@ -1,5 +1,6 @@
 # Phase F preparation/edge case fixes
 - add query presets, which are module-agnostic
+- Later: declare presets in the policy TOML and cook them into the manifest. Data is easier to iterate on than compiled code. Currently we build these as objects/value types at the client level, inside compiled client code.
 - make the query system very clearly single-module-only. it can reuse a preset across modules, though
 - Decide the persisted form of a variant. `DecodedVariant` holds string views into one manifest and
   no axis names, so it cannot outlive that manifest. A persisted form needs (axis name, value) pairs

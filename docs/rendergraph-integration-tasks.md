@@ -177,7 +177,7 @@ decide how a pointer or a handle names its container before a merge can read it.
 | # | Question | Recommendation |
 |---|---|---|
 | D-R1 | L12: which side owns which type in `ResourceFlags.hpp`? | **Answered:** Lodestone keeps the usage flags too, for now. Annotations will cover most of them, as a condensed set over the union of the Vulkan and WebGPU usages. |
-| D-R2 | L4: what does a preset do with an axis a module does not declare? | Skip it. The graph fails when no module in the graph declares it. |
+| D-R2 | L4: what does a preset do with an axis a module does not declare? | **Answered (2026-10-19):** skip it, and keep a path open for a warning at query resolution that names the unused pin, so users learn they need not set it (no cargo-cult pins). Each pin has a mode, Required or WhenActive; a WhenActive pin passes a variant where the axis is inactive. A declared axis with an undeclared value is an error (`ValueNotInAxis`). Presets are a client value type only; a cooked form is in todo.md. |
 | D-R3 | L10: the option name, and its default when Lodestone is not the top-level project. | **Answered:** `LODESTONE_BUILD_COOKER`, default `NOT EMSCRIPTEN`. |
 | D-R4 | L1: how `First` reports "no constraints" against "no match". | **Moot:** `First` is removed. |
 | D-R5 | L2: does `Single()` ignore an inert axis (L3) from the start, or only after L3? | After L3. Until then, two variants that differ only in an inert axis are an error that names the axis. |

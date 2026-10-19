@@ -144,7 +144,7 @@ ManifestQueryBuilder ManifestQueryBuilder::WhereNoneOf(std::string_view axis_nam
 
     std::erase_if(complement, isInQueryValues);
 
-    result.insertConstraint(axis_name, axisIndex, std::move(complement));
+    result.insertConstraint(axis_name, axisIndex, std::move(complement), PinMode::Required);
     return result;
 }
 
@@ -190,7 +190,7 @@ ManifestQueryBuilder ManifestQueryBuilder::WhereNoneOf(std::string_view axis_nam
     // do not ask the standards committee why this overload of erase_if is needed vs remove_if lmao
     std::erase_if(complement, isInQueryValues);
     
-    result.insertConstraint(axis_name, axisIndex, std::move(complement));
+    result.insertConstraint(axis_name, axisIndex, std::move(complement), PinMode::Required);
     return result;
 }
 
@@ -436,7 +436,8 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
 
 void ManifestQueryBuilder::insertConstraint(std::string_view axis_name,
                                             uint32_t axis_index,
-                                            std::vector<QueryAxisValue> allowed)
+                                            std::vector<QueryAxisValue> allowed,
+                                            PinMode mode)
 {
     auto constraintIter = std::ranges::lower_bound(constraints,
                                                    axis_index,
@@ -450,12 +451,18 @@ void ManifestQueryBuilder::insertConstraint(std::string_view axis_name,
         // todo-ship: validate against duplicate values, but add a warning that can be printed 
         // when the query is finally resolved: it's not critical, but we should make users aware
         constraint.Values.append_range(allowed);
+        // (active and A) or (inactive or B) is (inactive or A or B): the union of a required and a
+        // when-active constraint is when-active over both value sets
+        if (mode == PinMode::WhenActive)
+        {
+            constraint.Mode = PinMode::WhenActive;
+        }
     }
     else
     {
         // insert a new constraint at the position indicated by lower_bound, which keeps it sorted
         constraints.insert(constraintIter,
-            QueryAxisRange{ axis_name, std::move(allowed), axis_index });
+            QueryAxisRange{ axis_name, std::move(allowed), axis_index, mode });
     }
 }
 
@@ -470,7 +477,7 @@ ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name
     }
 
     const uint32_t axisIndex = *axisIndexOpt;
-    result.insertConstraint(axis_name, axisIndex, std::move(values));
+    result.insertConstraint(axis_name, axisIndex, std::move(values), PinMode::Required);
     return result;
 }
 
@@ -634,7 +641,7 @@ std::vector<ManifestIndex::ScanConstraint> ManifestIndex::convertToScanConstrain
             return {};
         }
 
-        scanConstraints.emplace_back(range.AxisIndex, std::move(valueIndices));
+        scanConstraints.emplace_back(range.AxisIndex, std::move(valueIndices), range.Mode);
     }
 
     return scanConstraints;
@@ -738,9 +745,11 @@ std::span<const VariantKey> ManifestIndex::filterKeys(std::span<const ScanConstr
         if (std::cmp_less(constraintCursor, constraints.size()) &&
             std::cmp_equal(constraints[constraintCursor].AxisIndex , axisIndex))
         {
-            const auto [minValue, maxValue] =
-                std::ranges::minmax(constraints[constraintCursor].AllowedValueIndices);
-            minDigit = minValue;
+            const ScanConstraint& constraint = constraints[constraintCursor];
+            const auto [minValue, maxValue] = std::ranges::minmax(constraint.AllowedValueIndices);
+            // a when-active constraint keeps the variants where its axis is inactive, and those store the
+            // canonical digit 0 (the first value), so the band must keep digit 0. the upper bound holds
+            minDigit = constraint.Mode == PinMode::WhenActive ? 0u : minValue;
             maxDigit = maxValue;
             ++constraintCursor;
         }
@@ -784,9 +793,13 @@ bool ManifestIndex::matches(uint32_t variant_index,
 {
     auto matchFn = [&](const ScanConstraint& constraint) -> bool
     {
+        const bool active = environment.IsAxisActive(variant_index, constraint.AxisIndex);
+        if (!active)
+        {
+            return constraint.Mode == PinMode::WhenActive;
+        }
         const uint32_t digit = digitOf(key, constraint.AxisIndex);
-        return std::ranges::contains(constraint.AllowedValueIndices, digit) &&
-               environment.IsAxisActive(variant_index, constraint.AxisIndex);
+        return std::ranges::contains(constraint.AllowedValueIndices, digit);
     };
 
     return std::ranges::all_of(constraints, matchFn);
