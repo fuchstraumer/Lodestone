@@ -29,11 +29,16 @@ struct ClusterInfo
 [ls_element_count("LIGHT_SLOTS")]
 RWStructuredBuffer<uint> gLightIndices;
 
+// a 1d extent sized by a derived constant: GRID_X * GRID_Y gives 8, 16, 16, and 32
+[ls_extent_1d("CLUSTER_COUNT")]
+Texture1D<float4> gClusterRamp;
+
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void csMain(uint3 tid : SV_DispatchThreadID)
 {
     // a function local: not module scope, so not captured
     static const uint LOCAL_ONLY = 7u;
-    gLightIndices[tid.x] = CLUSTER_COUNT + LIGHT_SLOTS + LOCAL_ONLY + ClusterInfo.MEMBER_ONLY;
+    gLightIndices[tid.x] = CLUSTER_COUNT + LIGHT_SLOTS + LOCAL_ONLY + ClusterInfo.MEMBER_ONLY +
+                           uint(gClusterRamp.Load(int2(int(tid.x % CLUSTER_COUNT), 0)).x);
 }

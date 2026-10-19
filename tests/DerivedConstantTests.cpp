@@ -54,15 +54,16 @@ struct ExpectedCount
     uint32_t GridX;
     uint32_t GridY;
     uint64_t LightSlots;
+    uint32_t ClusterCount;
 };
 
-// LIGHT_SLOTS = CLUSTER_COUNT * LIGHTS_PER_CLUSTER = GRID_X * GRID_Y * 16
+// LIGHT_SLOTS = CLUSTER_COUNT * LIGHTS_PER_CLUSTER = GRID_X * GRID_Y * 16, and CLUSTER_COUNT = GRID_X * GRID_Y
 constexpr std::array<ExpectedCount, 4u> k_ExpectedCounts
 {
-    ExpectedCount{ .GridX = 4u, .GridY = 2u, .LightSlots = 128u },
-    ExpectedCount{ .GridX = 4u, .GridY = 4u, .LightSlots = 256u },
-    ExpectedCount{ .GridX = 8u, .GridY = 2u, .LightSlots = 256u },
-    ExpectedCount{ .GridX = 8u, .GridY = 4u, .LightSlots = 512u },
+    ExpectedCount{ .GridX = 4u, .GridY = 2u, .LightSlots = 128u, .ClusterCount = 8u },
+    ExpectedCount{ .GridX = 4u, .GridY = 4u, .LightSlots = 256u, .ClusterCount = 16u },
+    ExpectedCount{ .GridX = 8u, .GridY = 2u, .LightSlots = 256u, .ClusterCount = 16u },
+    ExpectedCount{ .GridX = 8u, .GridY = 4u, .LightSlots = 512u, .ClusterCount = 32u },
 };
 
 CookResult<CookStatistics> CookIntoMemory(const std::filesystem::path& module_path, MemoryOutputSink& sink)
@@ -89,11 +90,12 @@ std::vector<std::byte> ManifestBytes(const MemoryOutputSink& sink)
     return bytes;
 }
 
-/** Returns the element count of `gLightIndices` in the variant with the given axis values, or nothing when the
- * variant or the resource is not found. */
-std::optional<uint64_t> FindLightSlots(const manifest::EnvironmentView& environment,
-                                       const ManifestIndex& index,
-                                       const ExpectedCount& expected)
+/** Returns the resource named `name` in the variant with the given axis values, or nothing when the variant or
+ * the resource is not found. */
+std::optional<manifest::ResolvedResource> FindResource(const manifest::EnvironmentView& environment,
+                                                       const ManifestIndex& index,
+                                                       const ExpectedCount& expected,
+                                                       std::string_view name)
 {
     const std::expected<VariantKey, QueryError> key =
         index.Query().Where("GRID_X", expected.GridX).Where("GRID_Y", expected.GridY).Single();
@@ -112,9 +114,9 @@ std::optional<uint64_t> FindLightSlots(const manifest::EnvironmentView& environm
     const manifest::EntryPointInstanceView entryPoint = variant.EntryPoint(0u);
     for (const manifest::ResolvedResource resource : entryPoint.Layout())
     {
-        if (resource.Name() == "gLightIndices")
+        if (resource.Name() == name)
         {
-            return resource.ElementCount();
+            return resource;
         }
     }
     return std::nullopt;
@@ -167,7 +169,10 @@ int main(int argc, char** argv)
     const ManifestIndex index{ environment.value() };
     for (const ExpectedCount& expected : k_ExpectedCounts)
     {
-        const std::optional<uint64_t> count = FindLightSlots(environment.value(), index, expected);
+        const std::optional<manifest::ResolvedResource> lightIndices =
+            FindResource(environment.value(), index, expected, "gLightIndices");
+        const std::optional<uint64_t> count =
+            lightIndices.has_value() ? std::optional<uint64_t>{ lightIndices->ElementCount() } : std::nullopt;
         if (count != expected.LightSlots)
         {
             std::println(stderr,
@@ -178,6 +183,13 @@ int main(int argc, char** argv)
                          count.has_value() ? std::to_string(*count) : std::string{ "nothing" });
         }
         runner.Check(count == expected.LightSlots, "the element count equals GRID_X * GRID_Y * 16");
+
+        // ls_extent_1d (task L18): the width follows the axes, and the two axes it does not state are 1
+        const std::optional<manifest::ResolvedResource> ramp =
+            FindResource(environment.value(), index, expected, "gClusterRamp");
+        runner.Check(ramp.has_value() && ramp->ExtentX() == expected.ClusterCount && ramp->ExtentY() == 1u &&
+                         ramp->ExtentZ() == 1u,
+                     "the 1d extent equals GRID_X * GRID_Y, and its other axes are 1");
     }
 
     return runner.Report();

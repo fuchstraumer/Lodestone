@@ -344,6 +344,7 @@ void CheckRawPrimitives(lodestone::tests::TestRunner& runner)
                  "an unplaced resource sorts after every placed one");
 
     runner.Check(ArgumentCountOf(RawSizeAttributeKind::ElementCount) == 1u, "element count takes one");
+    runner.Check(ArgumentCountOf(RawSizeAttributeKind::Extent1d) == 1u, "a 1d extent takes one");
     runner.Check(ArgumentCountOf(RawSizeAttributeKind::Extent2d) == 2u, "a 2d extent takes two");
     runner.Check(ArgumentCountOf(RawSizeAttributeKind::Extent3d) == 3u, "a 3d extent takes three");
     runner.Check(ArgumentCountOf(RawSizeAttributeKind::Invalid) == 0u, "the invalid kind takes none");

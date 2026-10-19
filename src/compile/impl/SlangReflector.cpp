@@ -46,7 +46,8 @@ constexpr SlangUInt k_WorkgroupAxisCount = 3u;
 // the shader-side attribute names are defined on RawSizeAttributeKind, so that one table defines the
 // contract and this file reads the spelling from it. Slang drops the `Attribute` suffix from the struct name,
 // so those strings match the declarations in tests/assets/LodestoneAttributes.slang.
-constexpr std::array<RawSizeAttributeKind, 3u> k_SizeAttributeKinds{ RawSizeAttributeKind::ElementCount,
+constexpr std::array<RawSizeAttributeKind, 4u> k_SizeAttributeKinds{ RawSizeAttributeKind::ElementCount,
+                                                                     RawSizeAttributeKind::Extent1d,
                                                                      RawSizeAttributeKind::Extent2d,
                                                                      RawSizeAttributeKind::Extent3d };
 

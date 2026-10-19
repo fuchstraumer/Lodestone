@@ -11,6 +11,8 @@ std::string_view ToString(RawSizeAttributeKind kind) noexcept
     {
     case RawSizeAttributeKind::ElementCount:
         return "ls_element_count";
+    case RawSizeAttributeKind::Extent1d:
+        return "ls_extent_1d";
     case RawSizeAttributeKind::Extent2d:
         return "ls_extent_2d";
     case RawSizeAttributeKind::Extent3d:
@@ -27,6 +29,7 @@ uint32_t ArgumentCountOf(RawSizeAttributeKind kind) noexcept
     switch (kind)
     {
     case RawSizeAttributeKind::ElementCount:
+    case RawSizeAttributeKind::Extent1d:
         return 1u;
     case RawSizeAttributeKind::Extent2d:
         return 2u;

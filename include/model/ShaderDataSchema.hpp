@@ -58,7 +58,8 @@ struct BufferFootprint
     friend bool operator==(const BufferFootprint&, const BufferFootprint&) = default;
 };
 
-/**@brief The extent a texture is created with, from a `[ls_extent_2d]` or `[ls_extent_3d]` attribute.
+/**@brief The extent a texture is created with, from a `[ls_extent_1d]`, `[ls_extent_2d]`, or `[ls_extent_3d]`
+ * attribute. An axis the attribute does not state is 1.
  *
  * @note Briefly, it's important to realize why this isn't a byte size: textures are formatted, so every
  * graphics API only wants the texture dimensions. We don't have format fields yet.

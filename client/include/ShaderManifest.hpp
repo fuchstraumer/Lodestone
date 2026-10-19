@@ -554,7 +554,7 @@ public:
     /** @brief The element count from `[ls_element_count]`, for this variant. Zero when the shader does not
      * declare one, or when the resource has no footprint. In that case, the caller must provide the size. */
     [[nodiscard]] uint64_t ElementCount() const noexcept;
-    /** @brief The texture extent from `[ls_extent_2d]` or `[ls_extent_3d]`. Zero when the shader does not
+    /** @brief The texture extent from `[ls_extent_1d]`, `[ls_extent_2d]`, or `[ls_extent_3d]`. Zero when the shader does not
      * declare one, or when the resource has no footprint. In that case, the caller must provide the size. */
     [[nodiscard]] uint32_t ExtentX() const noexcept;
     [[nodiscard]] uint32_t ExtentY() const noexcept;

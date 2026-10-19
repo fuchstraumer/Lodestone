@@ -25,6 +25,13 @@ public struct ls_element_countAttribute
     public string expression;
 };
 
+/** Width of a 1D texture, in texels. */
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct ls_extent_1dAttribute
+{
+    public string width;
+};
+
 /** Width and height of a 2D texture, in texels. */
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct ls_extent_2dAttribute

@@ -35,6 +35,7 @@ enum class RawSizeAttributeKind : uint8_t
 {
     Invalid = 0,
     ElementCount,
+    Extent1d,
     Extent2d,
     Extent3d,
 };

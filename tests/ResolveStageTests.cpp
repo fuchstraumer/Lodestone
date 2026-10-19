@@ -201,6 +201,12 @@ void TestExtent(TestRunner& runner, DiagnosticSink& sink)
 {
     runner.BeginSection("extent");
 
+    const auto extent1d = ResolveOneAttribute(MakeAttribute(RawSizeAttributeKind::Extent1d, { "IFFT_SIZE" }), sink);
+    const TextureFootprint* line =
+        extent1d.has_value() ? std::get_if<TextureFootprint>(&extent1d.value()) : nullptr;
+    runner.Check(line != nullptr && line->ExtentX == 512u && line->ExtentY == 1u && line->ExtentZ == 1u,
+                 "a 1d extent fills the first axis and leaves the other two at one");
+
     const auto extent2d = ResolveOneAttribute(
         MakeAttribute(RawSizeAttributeKind::Extent2d, { "IFFT_SIZE", "IFFT_SIZE / 2" }), sink);
     const TextureFootprint* first =
@@ -264,6 +270,11 @@ void TestRejections(TestRunner& runner, DiagnosticSink& sink)
                    MakeAttribute(RawSizeAttributeKind::ElementCount, { "0" }),
                    CookError::AttributeExpressionOutOfRange,
                    "an element count of zero cannot size a buffer",
+                   sink);
+    CheckRejection(runner,
+                   MakeAttribute(RawSizeAttributeKind::Extent1d, {}),
+                   CookError::AttributeExpressionParseFailed,
+                   "a 1d extent with no argument",
                    sink);
     CheckRejection(runner,
                    MakeAttribute(RawSizeAttributeKind::Extent2d, { "IFFT_SIZE" }),
