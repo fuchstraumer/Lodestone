@@ -53,6 +53,8 @@ struct LibraryVariant
     std::vector<uint32_t> VisibilityIndices;
     std::vector<uint32_t> RasterIndices;
     std::vector<WorkgroupSize> Workgroups;
+    /** One index into `CookedModule::SamplerPairLists` for each entry point. */
+    std::vector<uint32_t> SamplerPairIndices;
 };
 
 /**@brief Indices into `CookedModule::Resources`: the resources one variant declares. */
@@ -60,6 +62,8 @@ using ResourceList = std::vector<uint32_t>;
 /**@brief Indices into a variant's own resource list: the resources one entry point reads. Local, so the
  * list stays valid when the resource table changes, and small enough to collapse well. */
 using VisibilityList = std::vector<uint32_t>;
+/**@brief The sampler and texture pairs of one entry point, as positions in its visibility list. */
+using SamplerPairList = std::vector<SamplerTexturePair>;
 /**@brief One footprint for each entry of a variant's resource list. */
 using FootprintList = std::vector<ResourceFootprint>;
 /**@brief What a caller gets for one entry point: the resources it reads, joined with their footprints. */
@@ -71,6 +75,7 @@ ContentHashValue HashSourceCode(const std::vector<std::byte>& source) noexcept;
 ContentHashValue HashResourceList(const ResourceList& resources) noexcept;
 ContentHashValue HashVisibilityList(const VisibilityList& visibility) noexcept;
 ContentHashValue HashFootprintList(const FootprintList& footprints) noexcept;
+ContentHashValue HashSamplerPairList(const SamplerPairList& pairs) noexcept;
 void AppendFootprintHash(StreamingHash& hasher, const ResourceFootprint& footprint) noexcept;
 
 /**@brief The hash that generated a table, whether or not it used dedupe logic,
@@ -107,6 +112,7 @@ struct InternedModule
     ContentInterner<FootprintList> FootprintListInterner{ &HashFootprintList, k_HashName };
     ContentInterner<VisibilityList> VisibilityInterner{ &HashVisibilityList, k_HashName };
     ContentInterner<ReflectedRasterState> RasterInterner{ &HashReflectedRasterState, k_HashName };
+    ContentInterner<SamplerPairList> SamplerPairInterner{ &HashSamplerPairList, k_HashName };
     // Required capabilities read back from the target's validator in any variant, stored as names since those
     // are easiest to associate with renderer runtime caps (e.g., Vulkan device features/extensions)
     std::vector<std::string> ObservedCapabilities;
@@ -119,6 +125,7 @@ struct InternedModule
         FootprintListInterner.Disable();
         VisibilityInterner.Disable();
         RasterInterner.Disable();
+        SamplerPairInterner.Disable();
     }
 };
 
@@ -138,6 +145,7 @@ struct CookedModule
     std::vector<FootprintList> FootprintLists;
     std::vector<VisibilityList> VisibilityLists;
     std::vector<ReflectedRasterState> RasterStates;
+    std::vector<SamplerPairList> SamplerPairLists;
     std::vector<VariantKey> VariantKeys;
     std::vector<LibraryVariant> Variants;
     std::vector<std::string> ObservedCapabilities;
@@ -148,6 +156,7 @@ struct CookedModule
     TableStatistics FootprintListTable;
     TableStatistics VisibilityTable;
     TableStatistics RasterTable;
+    TableStatistics SamplerPairTable;
 };
 
 /** @brief One cooked form of the library: a target and the access model it binds with. */
@@ -156,6 +165,9 @@ struct CookedProfile
     std::string TargetName;
     PlacementKind AccessModel{ PlacementKind::None };
     ShaderCodeFormat CodeFormat{ ShaderCodeFormat::None };
+    /** This only indicates if we could (or chose to) read the sampler pairs - not if any 
+      * implicitly exist in the shader code itself. */
+    bool SamplerTexturePairsRecorded{ false };
 };
 
 /**@brief The whole cook: every module, cooked for every profile.
@@ -175,6 +187,16 @@ void DisableDedupe(InternedModule& module) noexcept;
 CookError AppendVariantToModule(InternedModule& module,
                                 const CompiledVariant& variant,
                                 const VariantDescriptor& descriptor);
+
+/**@brief The cross-target validator for sampler and texture pairs. Since profiles cook the same inputs to
+ * different output formats, we can use this to validate that both paths produce consistent sampler and
+ * texture pairings.
+ *
+ * Skips profiles that did not or cannot record these pairings, as well as entry points that use combined 
+ * texture samplers since those are not supported by all profiles.
+ *
+ * @returns `SamplerPairsTargetMismatch` and names the module, the profiles, the variant, and the entry point. */
+CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library);
 
 /**@brief "Freezes" the module by *consuming* `InternedModule`. CookedModule takes the results, gathering
  * all the data so far in one place. The intent was that CookedModule is a bundle of data, it doesn't hold

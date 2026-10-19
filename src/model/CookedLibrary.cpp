@@ -1,4 +1,6 @@
 #include "model/CookedLibrary.hpp"
+#include "ShaderLibraryTypes.hpp"
+#include "VariantKey.hpp"
 #include "model/ContentHash.hpp"
 #include "model/ContentInterner.hpp"
 #include "CookerErrors.hpp"
@@ -6,16 +8,22 @@
 #include "permute/PermutationSpace.hpp"
 #include "model/ShaderDataSchema.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <expected>
+#include <memory>
+#include <optional>
 #include <print>
+#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #ifdef __clang__
@@ -25,6 +33,22 @@
 
 namespace lodestone
 {
+
+namespace
+{
+
+    /** One pair, named by the scope and name of each resource: texture scope, texture name, sampler scope,
+     * sampler name. */
+    using NamedPair = std::array<std::string_view, 4u>;
+
+    /** The pairs of one entry point instance by name, sorted. Empty with `has_combined` set when the entry point
+     * uses a combined texture sampler. */
+    CookResult<std::vector<NamedPair>> NamePairs(const CookedModule& module,
+                                                 const LibraryVariant& variant,
+                                                 size_t entry_point_index,
+                                                 bool& has_combined);
+
+} // namespace
 
 ContentHashValue HashIndexList(const std::vector<uint32_t>& indices) noexcept
 {
@@ -76,6 +100,13 @@ void AppendFootprintHash(StreamingHash& hasher, const ResourceFootprint& footpri
     }
 }
 
+ContentHashValue HashSamplerPairList(const SamplerPairList& pairs) noexcept
+{
+    // two uint32_t fields and no padding, so the bytes are the content
+    static_assert(sizeof(SamplerTexturePair) == 2u * sizeof(uint32_t));
+    return HashBytes(std::as_bytes(std::span<const SamplerTexturePair>{ pairs.data(), pairs.size() }));
+}
+
 ContentHashValue HashFootprintList(const std::vector<ResourceFootprint>& footprints) noexcept
 {
     thread_local StreamingHash compositeHasher;
@@ -98,6 +129,7 @@ void DisableDedupe(InternedModule& module) noexcept
     module.FootprintListInterner.Disable();
     module.VisibilityInterner.Disable();
     module.RasterInterner.Disable();
+    module.SamplerPairInterner.Disable();
 }
 
 CookError AppendVariantToModule(InternedModule& module,
@@ -140,6 +172,7 @@ CookError AppendVariantToModule(InternedModule& module,
     record.VisibilityIndices.reserve(variant.EntryPoints.size());
     record.RasterIndices.reserve(variant.EntryPoints.size());
     record.Workgroups.reserve(variant.EntryPoints.size());
+    record.SamplerPairIndices.reserve(variant.EntryPoints.size());
     // we could probably make this more efficient in the future, it'll be moving a good bit of data
     // around as variant size grows
     // todo-ship: once we have a better logger with levels, it'd be interesting to see how uniqueness count
@@ -162,6 +195,9 @@ CookError AppendVariantToModule(InternedModule& module,
         record.RasterIndices.push_back(raster.Index);
 
         record.Workgroups.push_back(entryPoint.Reflection.Workgroup);
+
+        const InternResult samplerPairs = module.SamplerPairInterner.Intern(entryPoint.SamplerTexturePairs, origin);
+        record.SamplerPairIndices.push_back(samplerPairs.Index);
     }
 
     module.Variants.emplace_back(std::move(record));
@@ -198,6 +234,7 @@ CookedModule FreezeModuleTables(InternedModule&& interned)
     module.FootprintLists = interned.FootprintListInterner.ConsumeTable();
     module.VisibilityLists = interned.VisibilityInterner.ConsumeTable();
     module.RasterStates = interned.RasterInterner.ConsumeTable();
+    module.SamplerPairLists = interned.SamplerPairInterner.ConsumeTable();
     module.ObservedCapabilities = std::move(interned.ObservedCapabilities);
 
     module.SourceTable = DescribeTable(interned.SourceInterner);
@@ -206,6 +243,7 @@ CookedModule FreezeModuleTables(InternedModule&& interned)
     module.FootprintListTable = DescribeTable(interned.FootprintListInterner);
     module.VisibilityTable = DescribeTable(interned.VisibilityInterner);
     module.RasterTable = DescribeTable(interned.RasterInterner);
+    module.SamplerPairTable = DescribeTable(interned.SamplerPairInterner);
 
     return module;
 }
@@ -305,6 +343,127 @@ CookResult<ShaderLayoutView> ResolveLayoutView(const CookedModule& module,
     }
 
     return layoutView;
+}
+
+CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library)
+{
+    // todo-ship: maybe this one is worth making an optional validation or check, at this point
+    const size_t moduleCount = library.ModuleNames.size();
+    for (size_t moduleIndex = 0u; moduleIndex < moduleCount; ++moduleIndex)
+    {
+        // every recorded profile is compared against the first recorded profile that cooked the module
+        const CookedModule* baseline = nullptr;
+        size_t baselineProfile = 0u;
+        std::unordered_map<VariantKey, size_t> baselineVariants;
+        for (size_t profileIndex = 0u; profileIndex < library.Profiles.size(); ++profileIndex)
+        {
+            const std::optional<CookedModule>& environment =
+                library.Environments[(profileIndex * moduleCount) + moduleIndex];
+
+            if (!environment.has_value() || !library.Profiles[profileIndex].SamplerTexturePairsRecorded)
+            {
+                continue;
+            }
+
+            if (baseline == nullptr)
+            {
+                baseline = std::to_address(environment);
+                baselineProfile = profileIndex;
+                std::span<const VariantKey> variantKeys = baseline->VariantKeys;
+                for (auto&& [variantIndex, variantKey] : variantKeys | std::views::enumerate)
+                {
+                    baselineVariants.emplace(variantKey, variantIndex);
+                }
+                continue;
+            }
+
+            // each profile applies its own policy, so only the variants both profiles cooked are compared
+            for (size_t variantIndex = 0u; variantIndex < environment->VariantKeys.size(); ++variantIndex)
+            {
+
+                const auto match = baselineVariants.find(environment->VariantKeys[variantIndex]);
+                if (match == baselineVariants.end())
+                {
+                    continue;
+                }
+
+                const LibraryVariant& variant = environment->Variants[variantIndex];
+                const LibraryVariant& baselineVariant = baseline->Variants[match->second];
+                for (size_t entryPointIndex = 0u; entryPointIndex < environment->EntryPoints.size(); ++entryPointIndex)
+                {
+                    bool combined = false;
+                    bool baselineCombined = false;
+
+                    const CookResult<std::vector<NamedPair>> pairs =
+                        NamePairs(*environment, variant, entryPointIndex, combined);
+                    const CookResult<std::vector<NamedPair>> baselinePairs =
+                        NamePairs(*baseline, baselineVariant, entryPointIndex, baselineCombined);
+
+                    if (!pairs || !baselinePairs)
+                    {
+                        return !pairs ? pairs.error() : baselinePairs.error();
+                    }
+
+                    if (combined || baselineCombined || *pairs == *baselinePairs)
+                    {
+                        continue;
+                    }
+
+                    std::println(stderr,
+                                 "[lodestone] SAMPLER PAIRS: module '{}' variant [{}] entry point '{}' samples {} "
+                                 "pairs in profile '{}' and {} pairs in profile '{}', or one pair differs",
+                                 library.ModuleNames[moduleIndex],
+                                 variant.Description,
+                                 environment->EntryPoints[entryPointIndex].Name,
+                                 pairs->size(),
+                                 library.Profiles[profileIndex].TargetName,
+                                 baselinePairs->size(),
+                                 library.Profiles[baselineProfile].TargetName);
+
+                    return CookError::SamplerPairsTargetMismatch;
+                }
+            }
+        }
+    }
+
+    return CookError::Success;
+}
+
+namespace
+{
+
+    CookResult<std::vector<NamedPair>> NamePairs(const CookedModule& module,
+                                                 const LibraryVariant& variant,
+                                                 size_t entry_point_index,
+                                                 bool& has_combined)
+    {
+        const CookResult<ShaderLayoutView> layout = ResolveLayoutView(module, variant, entry_point_index);
+        if (!layout)
+        {
+            return std::unexpected(layout.error());
+        }
+
+        auto isCombinedTextureSampler = [](const ResolvedBindingView& binding)
+        {
+            return binding.Resource->Kind == BindingKind::CombinedTextureSampler;
+        };
+
+        has_combined = std::ranges::any_of(*layout, isCombinedTextureSampler);
+
+        std::vector<NamedPair> named;
+        const ShaderLayoutView& layout_view = *layout;
+        for (const SamplerTexturePair& pair : module.SamplerPairLists[variant.SamplerPairIndices[entry_point_index]])
+        {
+            const ReflectedBinding* texture = layout_view[pair.Texture].Resource;
+            const ReflectedBinding* sampler = layout_view[pair.Sampler].Resource;
+            named.push_back(NamedPair{ texture->ScopeName, texture->Name, sampler->ScopeName, sampler->Name });
+        }
+
+        std::ranges::sort(named);
+        
+        return named;
+    }
+
 }
 
 } // namespace lodestone
