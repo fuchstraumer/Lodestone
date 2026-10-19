@@ -20,6 +20,7 @@
 #include <memory>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -38,14 +39,23 @@ namespace
     void ReportVariantIfRequested(const CookerOptions& options,
                                   const CompiledVariant& variant,
                                   DiagnosticSink& diagnostics);
-    // reflection cross check: reads emitted text back and compares it against what the reflection
-    // claims for the source text. each target decides how to read it's own output, so if `target`
-    // is not valid or doesn't contain a validator the function will simply return 0 mismatches.
+    // reads the emitted code of each entry point back with the target's reader. It always reads the sampler and
+    // texture pairs, which are cook output, into `variant`. When `validate` is true, it also runs the reflection
+    // cross check on the same parse, and returns the mismatch count. A target with no reader fails when
+    // `validate` is true, and otherwise leaves the pairs empty (the profile records that they were not read).
     // The capabilities the validator reads are merged into `observed_capabilities`, sorted and unique.
-    CookResult<uint32_t> ValidateResolvedLibrary(const TargetProfile& target,
-                                                 const CompiledVariant& variant,
-                                                 std::vector<std::string>& observed_capabilities,
-                                                 DiagnosticSink& diagnostics);
+    CookResult<uint32_t> ReadEmittedCode(const TargetProfile& target,
+                                         bool validate,
+                                         CompiledVariant& variant,
+                                         std::vector<std::string>& observed_capabilities,
+                                         DiagnosticSink& diagnostics);
+    // maps the pairs a target reader gives, by placement, to positions in the entry point's used bindings, then
+    // sorts them and removes duplicates. A placement that no used binding has, or a pair that is not a texture and
+    // a sampler, fails: the reader and reflection disagree, and a dropped pair would hide a sampler constraint.
+    CookError ResolveSamplerTexturePairs(CompiledVariant& variant,
+                                         size_t entry_point_index,
+                                         std::span<const SamplerTexturePlacement> placements,
+                                         DiagnosticSink& diagnostics);
     void ReportUnreferencedBindings(const CompiledVariant& variant, DiagnosticSink& diagnostics);
     [[nodiscard]] CookResult<CookStatistics> CompileModuleVariants(const SharedCookState& shared_state,
                                                                    const TargetProfile& target,
@@ -218,14 +228,19 @@ namespace
         }
     }
 
-    CookResult<uint32_t> ValidateResolvedLibrary(const TargetProfile& target,
-                                                 const CompiledVariant& variant,
-                                                 std::vector<std::string>& observed_capabilities,
-                                                 DiagnosticSink& diagnostics)
+    CookResult<uint32_t> ReadEmittedCode(const TargetProfile& target,
+                                         bool validate,
+                                         CompiledVariant& variant,
+                                         std::vector<std::string>& observed_capabilities,
+                                         DiagnosticSink& diagnostics)
     {
         if (target.Validator == nullptr)
         {
-            return std::unexpected(CookError::TargetValidatorUnavailable);
+            if (validate)
+            {
+                return std::unexpected(CookError::TargetValidatorUnavailable);
+            }
+            return 0u;
         }
 
         uint32_t mismatchCount = 0u;
@@ -233,12 +248,32 @@ namespace
         for (size_t i = 0u; i < variant.EntryPoints.size(); ++i)
         {
             const CompiledEntryPoint& entryPoint = variant.EntryPoints[i];
+            if (!validate)
+            {
+                const CookResult<std::vector<SamplerTexturePlacement>> pairs =
+                    target.Validator->ReadSamplerTexturePairs(entryPoint.Code, diagnostics);
+
+                if (!pairs)
+                {
+                    return std::unexpected(pairs.error());
+                }
+
+                const CookError resolved = ResolveSamplerTexturePairs(variant, i, *pairs, diagnostics);
+
+                if (resolved != CookError::Success)
+                {
+                    return std::unexpected(resolved);
+                }
+
+                continue;
+            }
+
             auto extractBinding = [&variant](const uint32_t binding_index)-> const ReflectedBinding*
             {
                 return &variant.Bindings[binding_index];
             };
 
-            std::vector<const ReflectedBinding*> used = variant.EntryPoints[i].Reflection.UsedBindingIndices |
+            std::vector<const ReflectedBinding*> used = entryPoint.Reflection.UsedBindingIndices |
                                                         std::views::transform(extractBinding) |
                                                         std::ranges::to<std::vector>();
 
@@ -274,10 +309,83 @@ namespace
                                 target.Name,
                                 comparison->Report);
                 ReportWarning(diagnostics, warningStr);
+                // a mismatch fails the cook, and the pairs of a mismatched entry point need not resolve
+                continue;
+            }
+
+            const CookError resolved =
+                ResolveSamplerTexturePairs(variant, i, comparison->SamplerTexturePairs, diagnostics);
+
+            if (resolved != CookError::Success)
+            {
+                return std::unexpected(resolved);
             }
         }
 
         return mismatchCount;
+    }
+
+    CookError ResolveSamplerTexturePairs(CompiledVariant& variant,
+                                         size_t entry_point_index,
+                                         std::span<const SamplerTexturePlacement> placements,
+                                         DiagnosticSink& diagnostics)
+    {
+        CompiledEntryPoint& entryPoint = variant.EntryPoints[entry_point_index];
+        const std::vector<uint32_t>& used = entryPoint.Reflection.UsedBindingIndices;
+
+        // the position in `used` of the binding at (group, binding), when it has the expected kind
+        auto findPosition = [&](uint32_t group, uint32_t binding, BindingKind kind) -> std::optional<uint32_t>
+        {
+            for (size_t position = 0u; position < used.size(); ++position)
+            {
+                const ReflectedBinding& candidate = variant.Bindings[used[position]];
+                const BoundPlacement* placement = GetBoundPlacement(candidate.Placement);
+
+                if (placement != nullptr && placement->Group == group && placement->Binding == binding)
+                {
+                    return candidate.Kind == kind ? std::optional<uint32_t>{ static_cast<uint32_t>(position) }
+                                                  : std::nullopt;
+                }
+
+            }
+            return std::nullopt;
+        };
+
+        std::vector<SamplerTexturePair> pairs;
+        pairs.reserve(placements.size());
+        for (const SamplerTexturePlacement& placement : placements)
+        {
+
+            const std::optional<uint32_t> texture =
+                findPosition(placement.TextureGroup, placement.TextureBinding, BindingKind::Texture);
+            const std::optional<uint32_t> sampler =
+                findPosition(placement.SamplerGroup, placement.SamplerBinding, BindingKind::Sampler);
+
+            if (!texture || !sampler)
+            {
+                const std::string errStr =
+                    std::format("{}{} ({}): the emitted code samples the texture at ({}, {}) with the sampler at "
+                                "({}, {}), and reflection has no used {} at that placement",
+                                entryPoint.Name,
+                                entryPoint.VariantSuffix,
+                                variant.VariantDescription,
+                                placement.TextureGroup,
+                                placement.TextureBinding,
+                                placement.SamplerGroup,
+                                placement.SamplerBinding,
+                                !texture ? "texture" : "sampler");
+                return ReportError(diagnostics, CookError::ReflectionSamplerPairUnresolved, errStr);
+            }
+            
+            pairs.push_back(SamplerTexturePair{ .Texture = *texture, .Sampler = *sampler });
+        }
+
+        // a reader reports one pair for each use, so one pair can appear many times
+        std::ranges::sort(pairs);
+        const auto duplicates = std::ranges::unique(pairs);
+        pairs.erase(duplicates.begin(), duplicates.end());
+        entryPoint.SamplerTexturePairs = std::move(pairs);
+        return CookError::Success;
     }
 
     void ReportUnreferencedBindings(const CompiledVariant& variant, DiagnosticSink& diagnostics)
@@ -355,24 +463,22 @@ namespace
                 raw_module.Variants.emplace_back(std::move(*result));
             }
 
-            const CompiledVariant& variant = variantResult.value();
+            CompiledVariant& variant = variantResult.value();
             RecordVariantStatistics(variant, localStats);
             ReportVariantIfRequested(shared_state.Options, variant, *shared_state.Diagnostics);
 
-            if (shared_state.Options.ValidateAgainstEmittedText)
+            // the reader runs with --no-validate too, because the sampler and texture pairs are cook output
+            const CookResult<uint32_t> mismatches = ReadEmittedCode(target,
+                                                                    shared_state.Options.ValidateAgainstEmittedText,
+                                                                    variant,
+                                                                    interned_module.ObservedCapabilities,
+                                                                    *shared_state.Diagnostics);
+            if (!mismatches)
             {
-                const CookResult<uint32_t> mismatches =
-                    ValidateResolvedLibrary(target,
-                                            variant,
-                                            interned_module.ObservedCapabilities,
-                                            *shared_state.Diagnostics);
-                if (!mismatches)
-                {
-                    return std::unexpected(mismatches.error());
-                }
-                std::atomic_ref<uint32_t> mismatchesRef(localStats.ReflectionMismatches);
-                mismatchesRef += *mismatches;
+                return std::unexpected(mismatches.error());
             }
+            std::atomic_ref<uint32_t> mismatchesRef(localStats.ReflectionMismatches);
+            mismatchesRef += *mismatches;
 
             if (shared_state.Options.ReportReflection)
             {
