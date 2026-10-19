@@ -85,6 +85,13 @@ CookResult<BindingComparison> ResolvedLibraryValidator::ValidateEntryPoint(std::
     return validateEntryPoint(target_code, sortedUsed, sink);
 }
 
+CookResult<std::vector<SamplerTexturePlacement>> ResolvedLibraryValidator::ReadSamplerTexturePairs(
+    std::span<const std::byte> target_code,
+    DiagnosticSink& sink) const
+{
+    return readSamplerTexturePairs(target_code, sink);
+}
+
 std::string_view ToString(AccessModel model) noexcept
 {
     switch (model)

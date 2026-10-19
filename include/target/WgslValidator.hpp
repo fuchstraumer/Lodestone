@@ -20,6 +20,9 @@ protected:
     [[nodiscard]] CookResult<BindingComparison> validateEntryPoint(std::span<const std::byte> source_code,
                                                                    std::span<const ReflectedBinding*> bindings,
                                                                    DiagnosticSink& sink) const final;
+    [[nodiscard]] CookResult<std::vector<SamplerTexturePlacement>> readSamplerTexturePairs(
+        std::span<const std::byte> source_code,
+        DiagnosticSink& sink) const final;
 };
 
 } // namespace lodestone

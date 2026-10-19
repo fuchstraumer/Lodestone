@@ -5,6 +5,7 @@
 #include "target/TargetProfile.hpp"
 #include <cstddef>
 #include <span>
+#include <vector>
 
 struct spv_context_t;
 
@@ -23,6 +24,9 @@ protected:
     [[nodiscard]] CookResult<BindingComparison> validateEntryPoint(std::span<const std::byte> source_code,
                                                                    std::span<const ReflectedBinding*> bindings,
                                                                    DiagnosticSink& sink) const final;
+    [[nodiscard]] CookResult<std::vector<SamplerTexturePlacement>> readSamplerTexturePairs(
+        std::span<const std::byte> source_code,
+        DiagnosticSink& sink) const final;
 private:
     spv_context_t* context{ nullptr };
 };

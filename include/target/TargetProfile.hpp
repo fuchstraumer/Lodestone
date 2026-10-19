@@ -38,6 +38,19 @@ enum class TargetLanguage : uint8_t
     Spirv,
 };
 
+/** @brief One sampler and one texture that the emitted code samples together, by (group, binding). The emitted
+ * artifact decides placements, so a target reader gives a pair in this form, and the cook maps it to the
+ * reflected bindings. */
+struct SamplerTexturePlacement
+{
+    uint32_t TextureGroup{ 0u };
+    uint32_t TextureBinding{ 0u };
+    uint32_t SamplerGroup{ 0u };
+    uint32_t SamplerBinding{ 0u };
+
+    friend bool operator==(const SamplerTexturePlacement&, const SamplerTexturePlacement&) = default;
+};
+
 /** @brief The answer a validator gives about one entry point. `Matches` being `true` means the bindings and
  * specializations match the expected value. If `Matches` is `false`, `Report` specifies how/where it is
  * false.
@@ -50,6 +63,9 @@ struct BindingComparison
       * This happens as a separate pass bc especially with SPIR-V there's a whole tangled nest of 
       * related,nested,dependent etc caps and features that are really easy to miss otherwise */
     std::vector<std::string> Capabilities;
+    /** The sampler and texture pairs the emitted code samples with. This is cook output, not a comparison:
+      * reflection cannot state which sampler a texture is sampled with, so only the emitted code can. */
+    std::vector<SamplerTexturePlacement> SamplerTexturePairs;
 };
 
 /**@brief A valuble second opinon about what one entry point really declared. The emitted artifact
@@ -71,11 +87,19 @@ public:
     [[nodiscard]] CookResult<BindingComparison> ValidateEntryPoint(std::span<const std::byte> target_code,
                                                                    std::span<const ReflectedBinding*> used,
                                                                    DiagnosticSink& sink) const;
+    /**@brief Reads the sampler and texture pairs of one entry point, and compares nothing. The cook calls this
+     * when `--no-validate` skips `ValidateEntryPoint`, because the pairs are cook output and not a check. */
+    [[nodiscard]] CookResult<std::vector<SamplerTexturePlacement>> ReadSamplerTexturePairs(
+        std::span<const std::byte> target_code,
+        DiagnosticSink& sink) const;
 
 protected:
     [[nodiscard]] virtual CookResult<BindingComparison> validateEntryPoint(std::span<const std::byte> target_code,
                                                                            std::span<const ReflectedBinding*> used,
                                                                            DiagnosticSink& sink) const = 0;
+    [[nodiscard]] virtual CookResult<std::vector<SamplerTexturePlacement>> readSamplerTexturePairs(
+        std::span<const std::byte> target_code,
+        DiagnosticSink& sink) const = 0;
 };
 
 struct TargetProfile

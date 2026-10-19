@@ -110,6 +110,16 @@ namespace
         ConstantKind Constant{ ConstantKind::None };
         // raw bits: the type record says how to read them
         uint64_t ConstantBits{ 0u };
+        // OpLoad, OpAccessChain, OpInBoundsAccessChain, OpCopyObject: the id this value came from. The sampler
+        // and texture pairs follow it back to the resource variable
+        uint32_t DerivedFrom{ 0u };
+    };
+
+    /** The image and sampler operands of one OpSampledImage, as ids inside a function. */
+    struct SampledImageUse
+    {
+        uint32_t ImageId{ 0u };
+        uint32_t SamplerId{ 0u };
     };
 
     struct ParseState
@@ -124,6 +134,7 @@ namespace
         std::vector<PendingMemberDecoration> PendingMembers;
         std::vector<MemberRecord> Members;
         spv::AddressingModel AddressingModel{ spv::AddressingModel::Max };
+        std::vector<SampledImageUse> SampledImages;
     };
 
     spv_result_t OnHeader(void* user_data,
@@ -154,6 +165,20 @@ namespace
 
     std::vector<DeclaredBinding> CollectDeclaredBindings(const ParseState& parse_state);
 
+    /** Checks the word count, and parses the module into `out_state`. `validate` runs spirv-val first, with
+     * the Vulkan 1.2 rules: the read path for `--no-validate` skips that legality check. */
+    CookError ParseModule(spv_context_t* context,
+                          std::span<const std::byte> source_code,
+                          bool validate,
+                          ParseState& out_state,
+                          DiagnosticSink& sink);
+
+    /** Follows each OpSampledImage operand back to its resource variable, and returns the placements. A value
+     * that does not come from a decorated variable (a function parameter, OpPhi, or OpSelect) fails, because a
+     * pair that the cook drops would make a sampler look unpaired. */
+    CookResult<std::vector<SamplerTexturePlacement>> CollectSamplerTexturePairs(const ParseState& parse_state,
+                                                                                 DiagnosticSink& sink);
+
     BindingComparison CompareBindings(std::span<const DeclaredBinding> declared,
                                       std::span<const ReflectedBinding*> reflected);
 
@@ -176,47 +201,12 @@ CookResult<BindingComparison> SpvValidator::validateEntryPoint(std::span<const s
                                                                std::span<const ReflectedBinding*> bindings,
                                                                DiagnosticSink& sink) const
 {
-    if (source_code.empty() || (source_code.size() % sizeof(uint32_t)) != 0u)
-    {
-        const std::string errStr =
-            std::format("the SPIR-V entry point is {} bytes, which is not whole words", source_code.size());
-        return std::unexpected(ReportError(sink, CookError::TargetValidationEntryPointParseFailed, errStr));
-    }
-
-    // A copy, so no alignment of the source bytes is assumed
-    std::vector<uint32_t> words(source_code.size() / sizeof(uint32_t));
-    std::memcpy(words.data(), source_code.data(), source_code.size());
-
-    // Legality first: spirv-val with the Vulkan 1.2 rules. Tint gives the WGSL side this for free.
-    spv_diagnostic diagnostic = nullptr;
-    const spv_result_t validResult = spvValidateBinary(context, words.data(), words.size(), &diagnostic);
-    if (validResult != SPV_SUCCESS)
-    {
-        std::string errStr = std::format("spirv-val rejects the entry point: {}",
-                                         (diagnostic != nullptr) ? diagnostic->error : "no diagnostic");
-        spvDiagnosticDestroy(diagnostic);
-        return std::unexpected(ReportError(sink, CookError::TargetValidationEntryPointInvalid, std::move(errStr)));
-    }
-    spvDiagnosticDestroy(diagnostic);
-    diagnostic = nullptr;
-
     ParseState state;
-    const spv_result_t parsed = spvBinaryParse(context,
-                                               &state,
-                                               words.data(),
-                                               words.size(),
-                                               &OnHeader,
-                                               &OnInstruction,
-                                               &diagnostic);
-    // SPV_REQUESTED_TERMINATION is the stop at the first OpFunction: a success
-    if ((parsed != SPV_SUCCESS) && (parsed != SPV_REQUESTED_TERMINATION))
+    const CookError parsed = ParseModule(context, source_code, true, state, sink);
+    if (parsed != CookError::Success)
     {
-        std::string errStr = std::format("the SPIR-V parse failed: {}",
-                                         (diagnostic != nullptr) ? diagnostic->error : "no diagnostic");
-        spvDiagnosticDestroy(diagnostic);
-        return std::unexpected(ReportError(sink, CookError::TargetValidationEntryPointParseFailed, std::move(errStr)));
+        return std::unexpected(parsed);
     }
-    spvDiagnosticDestroy(diagnostic);
 
     ApplyPendingMembers(state);
 
@@ -234,11 +224,130 @@ CookResult<BindingComparison> SpvValidator::validateEntryPoint(std::span<const s
         comparison.Capabilities.emplace_back(capability);
     }
 
+    CookResult<std::vector<SamplerTexturePlacement>> pairs = CollectSamplerTexturePairs(state, sink);
+    if (!pairs)
+    {
+        return std::unexpected(pairs.error());
+    }
+    comparison.SamplerTexturePairs = std::move(*pairs);
     return comparison;
+}
+
+CookResult<std::vector<SamplerTexturePlacement>> SpvValidator::readSamplerTexturePairs(
+    std::span<const std::byte> source_code,
+    DiagnosticSink& sink) const
+{
+    ParseState state;
+    const CookError parsed = ParseModule(context, source_code, false, state, sink);
+    if (parsed != CookError::Success)
+    {
+        return std::unexpected(parsed);
+    }
+    return CollectSamplerTexturePairs(state, sink);
 }
 
 namespace
 {
+    CookError ParseModule(spv_context_t* context,
+                          std::span<const std::byte> source_code,
+                          bool validate,
+                          ParseState& out_state,
+                          DiagnosticSink& sink)
+    {
+        if (source_code.empty() || (source_code.size() % sizeof(uint32_t)) != 0u)
+        {
+            const std::string errStr =
+                std::format("the SPIR-V entry point is {} bytes, which is not whole words", source_code.size());
+            return ReportError(sink, CookError::TargetValidationEntryPointParseFailed, errStr);
+        }
+
+        // A copy, so no alignment of the source bytes is assumed
+        std::vector<uint32_t> words(source_code.size() / sizeof(uint32_t));
+        std::memcpy(words.data(), source_code.data(), source_code.size());
+
+        spv_diagnostic diagnostic = nullptr;
+        if (validate)
+        {
+            // Legality first: spirv-val with the Vulkan 1.2 rules. Tint gives the WGSL side this for free.
+            const spv_result_t validResult = spvValidateBinary(context, words.data(), words.size(), &diagnostic);
+            if (validResult != SPV_SUCCESS)
+            {
+                std::string errStr = std::format("spirv-val rejects the entry point: {}",
+                                                 (diagnostic != nullptr) ? diagnostic->error : "no diagnostic");
+                spvDiagnosticDestroy(diagnostic);
+                return ReportError(sink, CookError::TargetValidationEntryPointInvalid, std::move(errStr));
+            }
+            spvDiagnosticDestroy(diagnostic);
+            diagnostic = nullptr;
+        }
+
+        const spv_result_t parsed = spvBinaryParse(context,
+                                                   &out_state,
+                                                   words.data(),
+                                                   words.size(),
+                                                   &OnHeader,
+                                                   &OnInstruction,
+                                                   &diagnostic);
+        if (parsed != SPV_SUCCESS)
+        {
+            std::string errStr = std::format("the SPIR-V parse failed: {}",
+                                             (diagnostic != nullptr) ? diagnostic->error : "no diagnostic");
+            spvDiagnosticDestroy(diagnostic);
+            return ReportError(sink, CookError::TargetValidationEntryPointParseFailed, std::move(errStr));
+        }
+        spvDiagnosticDestroy(diagnostic);
+        return CookError::Success;
+    }
+
+    /** Follows `id` back through loads, access chains, and copies. Returns the id of the variable, or 0 when
+     * the chain ends at something that is not a variable. The chain is at most one step per id, so the step
+     * count bounds the walk on a malformed module. */
+    uint32_t TraceToVariable(const ParseState& parse_state, uint32_t id)
+    {
+        for (size_t step = 0u; step < parse_state.Ids.size() && id != 0u && id < parse_state.Ids.size(); ++step)
+        {
+            const IdRecord& record = parse_state.Ids[id];
+            if (record.OpCode == spv::Op::OpVariable)
+            {
+                return id;
+            }
+            id = record.DerivedFrom;
+        }
+        return 0u;
+    }
+
+    CookResult<std::vector<SamplerTexturePlacement>> CollectSamplerTexturePairs(const ParseState& parse_state,
+                                                                                 DiagnosticSink& sink)
+    {
+        std::vector<SamplerTexturePlacement> pairs;
+        pairs.reserve(parse_state.SampledImages.size());
+        for (const SampledImageUse& use : parse_state.SampledImages)
+        {
+            const uint32_t imageVariable = TraceToVariable(parse_state, use.ImageId);
+            const uint32_t samplerVariable = TraceToVariable(parse_state, use.SamplerId);
+            const bool imageBound = imageVariable != 0u && parse_state.Ids[imageVariable].Group != ~0u;
+            const bool samplerBound = samplerVariable != 0u && parse_state.Ids[samplerVariable].Group != ~0u;
+            if (!imageBound || !samplerBound)
+            {
+                const std::string errStr =
+                    std::format("OpSampledImage %{} (image %{}, sampler %{}) does not trace back to two bound "
+                                "resource variables, so the pair cannot be recorded",
+                                use.ImageId,
+                                use.ImageId,
+                                use.SamplerId);
+                return std::unexpected(ReportError(sink, CookError::ReflectionSamplerPairUnresolved, errStr));
+            }
+
+            const IdRecord& image = parse_state.Ids[imageVariable];
+            const IdRecord& sampler = parse_state.Ids[samplerVariable];
+            pairs.push_back(SamplerTexturePlacement{ .TextureGroup = image.Group,
+                                                     .TextureBinding = image.Binding,
+                                                     .SamplerGroup = sampler.Group,
+                                                     .SamplerBinding = sampler.Binding });
+        }
+        return pairs;
+    }
+
     spv_result_t OnHeader(void* user_data,
                           spv_endianness_t endianness,
                           uint32_t magic,
@@ -644,10 +753,17 @@ namespace
             // the numbers
             parseState->Ids[resultId].Constant = ConstantKind::SpecDerived;
             break;
-        case spv::Op::OpFunction:
-            // Terminate parsing when a function is encountered, bc everything we care about
-            // is before the functions.
-            return SPV_REQUESTED_TERMINATION;
+        case spv::Op::OpLoad:
+        case spv::Op::OpAccessChain:
+        case spv::Op::OpInBoundsAccessChain:
+        case spv::Op::OpCopyObject:
+            // words[3] is the pointer, the base, or the copied value
+            parseState->Ids[resultId].DerivedFrom = words[3];
+            break;
+        case spv::Op::OpSampledImage:
+            // the function bodies are parsed for this: words[3] is the image, and words[4] the sampler
+            parseState->SampledImages.push_back(SampledImageUse{ .ImageId = words[3], .SamplerId = words[4] });
+            break;
         default:
             // for unhandled opcodes, just continue parsing
             return SPV_SUCCESS;

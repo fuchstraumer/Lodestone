@@ -29,6 +29,50 @@ namespace
      * and placement mismatches (which are an error). */
     BindingComparison CompareBindings(std::span<const tint::inspector::ResourceBinding> wgsl_bindings,
                                       std::span<const ReflectedBinding*> reflected_bindings) noexcept;
+
+    /**@brief Parses one entry point's WGSL with every extension allowed: trust that the compiler knew what to
+     * emit. Invalid WGSL is a parse error, not a mismatch. */
+    CookResult<tint::Program> ParseWgsl(std::span<const std::byte> source_code, DiagnosticSink& sink)
+    {
+        using namespace tint;
+        wgsl::reader::Options readerOptions;
+        readerOptions.allowed_features = wgsl::AllowedFeatures::Everything();
+        std::string_view source_code_view(reinterpret_cast<const char*>(source_code.data()), source_code.size());
+        Source::File entrypointSource("source.wgsl", source_code_view);
+
+        Program entrypointProgram = wgsl::reader::Parse(&entrypointSource, readerOptions);
+        if (!entrypointProgram.IsValid())
+        {
+            std::string tintDiagnostics; tintDiagnostics.reserve(1024);
+            for (const auto& diag : entrypointProgram.Diagnostics())
+            {
+                // location, then message
+                tintDiagnostics += ToString(diag.source);
+                tintDiagnostics += diag.message.Plain() + "\n";
+            }
+            std::string fullMessage = std::format("WGSL program could not be constructed from given source. Diagnostics:\n{}", tintDiagnostics);
+            return std::unexpected(ReportError(sink,
+                                               CookError::TargetValidationEntryPointParseFailed,
+                                               fullMessage));
+        }
+
+        return entrypointProgram;
+    }
+
+    /**@brief The (texture, sampler) placements that one entry point samples together, from Tint's inspector.
+     * Texture uses with no sampler (textureLoad) are not pairs. */
+    std::vector<SamplerTexturePlacement> ReadPairs(tint::inspector::Inspector& inspector, const std::string& entry_point)
+    {
+        std::vector<SamplerTexturePlacement> pairs;
+        for (const tint::inspector::SamplerTexturePair& use : inspector.GetSamplerTextureUses(entry_point))
+        {
+            pairs.push_back(SamplerTexturePlacement{ .TextureGroup = use.texture_binding_point.group,
+                                                     .TextureBinding = use.texture_binding_point.binding,
+                                                     .SamplerGroup = use.sampler_binding_point.group,
+                                                     .SamplerBinding = use.sampler_binding_point.binding });
+        }
+        return pairs;
+    }
 }
 
 WgslValidator::WgslValidator() = default;
@@ -38,35 +82,15 @@ CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::span<const 
                                                                 std::span<const ReflectedBinding*> bindings,
                                                                 DiagnosticSink& sink) const
 {
-    using namespace tint;
-    // set the wgsl reader options to just enable all extensions: trust the compiler knew what to output
-    // in the future, we can make this queryable but for now it's not needed
-    wgsl::reader::Options readerOptions;
-    readerOptions.allowed_features = wgsl::AllowedFeatures::Everything();
-    // build a source file
-    // cast the source code span to a string_view
-    std::string_view source_code_view(reinterpret_cast<const char*>(source_code.data()), source_code.size());
-    Source::File entrypointSource("source.wgsl", source_code_view);
-
-    Program entrypointProgram = wgsl::reader::Parse(&entrypointSource, readerOptions);
-    if (!entrypointProgram.IsValid())
+    CookResult<tint::Program> entrypointProgram = ParseWgsl(source_code, sink);
+    if (!entrypointProgram)
     {
-        std::string tintDiagnostics; tintDiagnostics.reserve(1024);
-        for (const auto& diag : entrypointProgram.Diagnostics())
-        {
-            // location, then message
-            tintDiagnostics += ToString(diag.source);
-            tintDiagnostics += diag.message.Plain() + "\n";
-        }
-        std::string fullMessage = std::format("WGSL program could not be constructed from given source. Diagnostics:\n{}", tintDiagnostics);
-        return std::unexpected(ReportError(sink,
-                                           CookError::TargetValidationEntryPointParseFailed,
-                                           fullMessage));
+        return std::unexpected(entrypointProgram.error());
     }
-    
-    BindingComparison result;
-    inspector::Inspector epInspector(entrypointProgram);
-    using inspector::ResourceBinding;
+
+    tint::inspector::Inspector epInspector(*entrypointProgram);
+    using tint::inspector::ResourceBinding;
+    BindingComparison result{ .Matches = true, .Report = "" };
     for (const auto& entrypoint : epInspector.GetEntryPoints())
     {
         std::vector<ResourceBinding> wgslBindings = epInspector.GetResourceBindings(entrypoint.name);
@@ -84,13 +108,35 @@ CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::span<const 
 
         // now resources should be precisely sorted, we can use the comparison iterator
         BindingComparison epResult = CompareBindings(wgslBindings, bindings);
+        // the pairs are cook output, so they are read whether or not the bindings match
+        epResult.SamplerTexturePairs = ReadPairs(epInspector, entrypoint.name);
         if (!epResult.Matches)
         {
             return epResult;
         }
+        result.SamplerTexturePairs.append_range(std::move(epResult.SamplerTexturePairs));
     }
 
-    return BindingComparison{.Matches = true, .Report = ""};
+    return result;
+}
+
+CookResult<std::vector<SamplerTexturePlacement>> WgslValidator::readSamplerTexturePairs(
+    std::span<const std::byte> source_code,
+    DiagnosticSink& sink) const
+{
+    CookResult<tint::Program> entrypointProgram = ParseWgsl(source_code, sink);
+    if (!entrypointProgram)
+    {
+        return std::unexpected(entrypointProgram.error());
+    }
+
+    tint::inspector::Inspector epInspector(*entrypointProgram);
+    std::vector<SamplerTexturePlacement> pairs;
+    for (const auto& entrypoint : epInspector.GetEntryPoints())
+    {
+        pairs.append_range(ReadPairs(epInspector, entrypoint.name));
+    }
+    return pairs;
 }
 
 namespace

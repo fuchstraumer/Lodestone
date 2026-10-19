@@ -37,6 +37,8 @@ enum class CookError : uint16_t
     PointerTypeNotSupported = 47, // tried to use pointer placements w unsupported target
     ReflectionCouldNotFindBufferElementLayout = 48,
     ReflectionUnsupportedBindingKind = 49,
+    ReflectionSamplerPairUnresolved = 50, // a sampler and texture pair in the emitted code does not resolve to two used bindings
+    SamplerPairsTargetMismatch = 51, // two profiles of one variant read different sampler and texture pairs
 
     NoModulesSpecified = 60,
     NoOutputSpecified = 61,
