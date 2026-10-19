@@ -90,6 +90,54 @@ struct QueryError
     std::string_view Suggestion; // read from manifest blob, can be a view
 };
 
+/** @brief The kind of a query note. A note never fails a terminal. It names a constraint that had no effect,
+  * so the caller can remove it or log it. */
+enum class QueryNoteCode : uint8_t
+{
+    PinAxisNotDeclared, // a preset pinned an axis that this module does not declare, and Apply skipped the pin
+};
+
+struct QueryNote
+{
+    QueryNoteCode Code{ QueryNoteCode::PinAxisNotDeclared };
+    std::string AxisName;
+};
+
+/** @brief One pin of a `QueryPreset`: one axis, the values it allows, and its mode. The pin owns its strings,
+  * so one preset can serve many modules and many manifests. */
+struct QueryPresetPin
+{
+    std::string AxisName;
+    AxisValueDomain Domain{ AxisValueDomain::None };
+    // the values of a Boolean (0 or 1) or Integral pin
+    std::vector<AxisValueType> IntegralValues;
+    // the implementation names of a Type pin, or the case names of an Enum pin
+    std::vector<std::string> NamedValues;
+    PinMode Mode{ PinMode::Required };
+};
+
+/** @brief A set of axis pins that a caller builds once and applies to the query of any module, through
+  * `ManifestQueryBuilder::Apply`. A pin on an axis that the module does not declare is skipped and gives a
+  * `QueryNote`, so one preset serves modules with different axes. A pin on a declared axis is checked as
+  * `Where` checks it, so a value the axis does not declare is an error. */
+class QueryPreset
+{
+public:
+    void Pin(std::string_view axis_name, bool value, PinMode mode);
+    void Pin(std::string_view axis_name, uint32_t value, PinMode mode);
+    /** @brief Must provide `domain`, for the same reason as `ManifestQueryBuilder::Where`. */
+    void Pin(std::string_view axis_name, AxisValueDomain domain, std::string_view type_or_enum_name, PinMode mode);
+    void PinAnyOf(std::string_view axis_name, std::span<const uint32_t> values, PinMode mode);
+    void PinAnyOf(std::string_view axis_name,
+                  AxisValueDomain domain,
+                  std::span<const std::string_view> values,
+                  PinMode mode);
+
+    [[nodiscard]] std::span<const QueryPresetPin> Pins() const noexcept;
+private:
+    std::vector<QueryPresetPin> pins;
+};
+
 // QueryResult comes from the terminal functions - it tells you 
 // mostly just success or failure. To get the full error state,
 // you'll need to get the error vector
@@ -120,6 +168,21 @@ struct ManifestQueryBuilder
     [[nodiscard]] ManifestQueryBuilder Where(std::string_view axis_name,
                                              AxisValueDomain domain,
                                              std::string_view type_or_enum_name) const noexcept;
+
+    /** @brief The `PinMode::WhenActive` form of `Where`. The value applies only to variants where the axis is
+      * active, and a variant where the axis is inactive still matches. */
+    [[nodiscard]] ManifestQueryBuilder WhereWhenActive(std::string_view axis_name, bool value) const noexcept;
+    [[nodiscard]] ManifestQueryBuilder WhereWhenActive(std::string_view axis_name, uint32_t value) const noexcept;
+    [[nodiscard]] ManifestQueryBuilder WhereWhenActive(std::string_view axis_name,
+                                                       AxisValueDomain domain,
+                                                       std::string_view type_or_enum_name) const noexcept;
+
+    /** @brief Applies each pin of `preset`, in order. A pin on an undeclared axis is skipped and gives a
+      * `PinAxisNotDeclared` note. Any other pin works as `Where` or `WhereWhenActive` does, and its errors
+      * are the same.
+      * @note The builder keeps views into the preset's strings, so keep the preset alive while the builder
+      * is in use. */
+    [[nodiscard]] ManifestQueryBuilder Apply(const QueryPreset& preset) const;
 
     // For the boolean multi-parameter case, there's no need to even pass values... it's true or false
     [[nodiscard]] ManifestQueryBuilder WhereAnyOfBoolean(std::string_view axis_name) const;
@@ -160,6 +223,9 @@ struct ManifestQueryBuilder
 
     [[nodiscard]] bool IsValid() const noexcept;
     [[nodiscard]] std::span<const QueryError> Errors() const noexcept;
+    /** @brief The notes of this query. A note does not fail a terminal. Log them to show which constraints
+      * had no effect. */
+    [[nodiscard]] std::span<const QueryNote> Notes() const noexcept;
 private:
     // resolves the given axis name, domain, and input values. returns the axis index if successful, nullopt if
     // any of the validations fails
@@ -179,9 +245,12 @@ private:
     [[nodiscard]] std::expected<VariantKey, QueryError> singleOver(std::span<const uint64_t> relevant_axes) const noexcept;
 
     // overload to coalesce work for WhereAnyOf functions, assuming shared value domain
-    [[nodiscard]] ManifestQueryBuilder whereAnyOf(std::string_view axis_name, std::vector<QueryAxisValue> value) const noexcept;
+    [[nodiscard]] ManifestQueryBuilder whereAnyOf(std::string_view axis_name,
+                                                  std::vector<QueryAxisValue> value,
+                                                  PinMode mode) const noexcept;
     const class ManifestIndex* index{ nullptr };
     std::vector<QueryError> errors;
+    std::vector<QueryNote> notes;
     // Since we can have multiple values as constraints per axis, we use a vector of QueryAxisRange.
     // Kept in insertion order here; Select sorts the derived scan constraints by axis index.
     std::vector<QueryAxisRange> constraints;

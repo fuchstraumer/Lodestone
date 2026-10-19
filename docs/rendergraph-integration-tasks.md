@@ -156,6 +156,16 @@ no allocation.
   read past it and `MergedLayoutTest` crashed, so the fixtures now canonicalize, and `ComputeActualInfluence`
   asserts the length (Debug only). The KitchenSink masks did not change. 26 of 26 tests, `ManifestIndexTest` 113
   checks.
+- 2026-10-19, L4. `PinMode { Required, WhenActive }` on each constraint. A WhenActive constraint matches a variant
+  where its axis is inactive, and tests the value only where the axis is active. Two constraints on one axis join
+  their values, and the result is WhenActive when either is, because (active and A) or (inactive or B) is
+  (inactive or A or B). `filterKeys` keeps digit 0 in the key band for a WhenActive axis, because an inactive axis
+  stores its canonical digit, 0. `WhereWhenActive` (bool, uint, named). `QueryPreset` owns its pins, and
+  `ManifestQueryBuilder::Apply` skips a pin on an undeclared axis with a `PinAxisNotDeclared` note (`Notes()`);
+  a note never fails a terminal. A bad value on a declared axis is `ValueNotInAxis`. Proof: `ManifestIndexTest` 122
+  checks; with the `filterKeys` change reverted, three rows fail. 26 of 26 tests. Not done: a note for a pin on an
+  axis that is irrelevant to the `SingleFor` entry points, and the duplicate-value note (`todo-ship` in
+  `insertConstraint`).
 
 ## 5. Phase F, paused
 

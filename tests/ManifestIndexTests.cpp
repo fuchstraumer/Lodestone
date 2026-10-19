@@ -51,7 +51,9 @@ using lodestone::PackVariantKey;
 using lodestone::PermutationAxis;
 using lodestone::PermutationSpace;
 using lodestone::PermutationValue;
+using lodestone::PinMode;
 using lodestone::QueryErrorCode;
+using lodestone::QueryPreset;
 using lodestone::RawEnumCase;
 using lodestone::RawInterfaceImpl;
 using lodestone::manifest::BundleView;
@@ -969,6 +971,56 @@ int main()
             enumerateAgrees = enumerateAgrees && variant.Values[k_ShadeAxis].Active == ditherOn;
         }
         runner.Check(enumerateAgrees, "Enumerate marks SHADE active exactly where DITHER is on");
+    }
+
+    // L4: a WhenActive pin constrains a gated axis only where the axis is active, so it keeps the gated-off
+    // variants. A preset applies one set of pins to any module, and skips a pin on an axis the module does not
+    // declare. The gated manifest holds 27 variants: 9 with DITHER off (SHADE inactive), and 18 with DITHER on.
+    runner.BeginSection("a WhenActive pin keeps the gated-off variants, and a preset skips an undeclared axis");
+    if (gatedOpened.has_value())
+    {
+        const ManifestIndex gated{ gatedOpened.value() };
+        const VariantKey gatedOffKey = PackVariantKey(std::array<uint32_t, 4>{ 0u, 0u, 0u, 0u }, k_Radices);
+        runner.Check(KeyCount(gated.Query().Where("SHADE", AxisValueDomain::Type, "Phong")) == 9u,
+                     "a Required pin on a gated axis removes the gated-off variants");
+        // Phong is digit 1 and the gated-off variants store digit 0, so this row also proves that filterKeys
+        // keeps digit 0 in the key band for a WhenActive constraint
+        runner.Check(KeyCount(gated.Query().WhereWhenActive("SHADE", AxisValueDomain::Type, "Phong")) == 18u,
+                     "a WhenActive pin on a gated axis keeps the 9 gated-off variants and the 9 active Phong variants");
+        runner.Check(KeyCount(gated.Query().WhereWhenActive("SHADE", AxisValueDomain::Type, "Phong").Where("DITHER", true)) == 9u,
+                     "a WhenActive pin and a pin on its gate select only the active Phong variants");
+        runner.Check(KeyCount(gated.Query()
+                                  .Where("SHADE", AxisValueDomain::Type, "Lambert")
+                                  .WhereWhenActive("SHADE", AxisValueDomain::Type, "Phong")) == 27u,
+                     "a Required and a WhenActive pin on one axis merge to WhenActive over both values");
+
+        QueryPreset preset;
+        preset.Pin("DITHER", false, PinMode::Required);
+        preset.Pin("QUALITY", AxisValueDomain::Enum, "Low", PinMode::Required);
+        preset.Pin("TILE", 8u, PinMode::Required);
+        preset.Pin("SHADE", AxisValueDomain::Type, "Phong", PinMode::WhenActive);
+        preset.Pin("FOG", true, PinMode::Required);
+        const ManifestQueryBuilder applied = gated.Query().Apply(preset);
+        runner.Check(applied.IsValid(), "a pin on an undeclared axis is not an error");
+        runner.Check(applied.Notes().size() == 1u &&
+                         applied.Notes().front().Code == lodestone::QueryNoteCode::PinAxisNotDeclared &&
+                         applied.Notes().front().AxisName == "FOG",
+                     "a pin on an undeclared axis gives one note that names the axis");
+        const std::expected<VariantKey, lodestone::QueryError> presetSingle = applied.Single();
+        runner.Check(presetSingle.has_value() && presetSingle.value() == gatedOffKey,
+                     "a WhenActive pin does not stop Single from returning a gated-off variant");
+        const std::array<std::string_view, 1> mainStage{ "MainCS" };
+        const std::expected<VariantKey, lodestone::QueryError> presetSingleFor = applied.SingleFor(mainStage);
+        runner.Check(presetSingleFor.has_value() && presetSingleFor.value() == gatedOffKey,
+                     "SingleFor takes the same preset");
+
+        QueryPreset misspelled;
+        misspelled.Pin("SHADE", AxisValueDomain::Type, "Phongg", PinMode::WhenActive);
+        const ManifestQueryBuilder misspelledQuery = gated.Query().Apply(misspelled);
+        runner.Check(!misspelledQuery.IsValid() &&
+                         misspelledQuery.Errors().front().Code == QueryErrorCode::ValueNotInAxis &&
+                         misspelledQuery.Notes().empty(),
+                     "a value that a declared axis does not have is an error, not a note");
     }
 
     // Keys are per module, and each profile applies its own policy, so two profiles of one module can cook

@@ -58,14 +58,14 @@ ManifestQueryBuilder ManifestQueryBuilder::Where(std::string_view axis_name, boo
     // A boolean axis is an integral axis with values {0, 1}, so store the boolean as its 0/1 integral
     // and let it share the integral resolution and decode paths.
     QueryAxisValue newValue{ .Type = AxisValueDomain::Boolean, .IntegralValue = value ? 1u : 0u, .Name = {} };
-    return whereAnyOf(axis_name, { newValue });
+    return whereAnyOf(axis_name, { newValue }, PinMode::Required);
 
 }
 
 ManifestQueryBuilder ManifestQueryBuilder::Where(std::string_view axis_name, uint32_t value) const noexcept
 {
     QueryAxisValue newValue{ .Type = AxisValueDomain::Integral, .IntegralValue = value, .Name = {} };
-    return whereAnyOf(axis_name, { newValue });
+    return whereAnyOf(axis_name, { newValue }, PinMode::Required);
 }
 
 ManifestQueryBuilder ManifestQueryBuilder::Where(std::string_view axis_name,
@@ -73,12 +73,128 @@ ManifestQueryBuilder ManifestQueryBuilder::Where(std::string_view axis_name,
                                                  std::string_view type_or_enum_name) const noexcept
 {
     QueryAxisValue newValue{ .Type = domain, .IntegralValue=0u, .Name = type_or_enum_name };
-    return whereAnyOf(axis_name, { newValue });
+    return whereAnyOf(axis_name, { newValue }, PinMode::Required);
+}
+
+ManifestQueryBuilder ManifestQueryBuilder::WhereWhenActive(std::string_view axis_name, bool value) const noexcept
+{
+    QueryAxisValue newValue{ .Type = AxisValueDomain::Boolean, .IntegralValue = value ? 1u : 0u, .Name = {} };
+    return whereAnyOf(axis_name, { newValue }, PinMode::WhenActive);
+}
+
+ManifestQueryBuilder ManifestQueryBuilder::WhereWhenActive(std::string_view axis_name, uint32_t value) const noexcept
+{
+    QueryAxisValue newValue{ .Type = AxisValueDomain::Integral, .IntegralValue = value, .Name = {} };
+    return whereAnyOf(axis_name, { newValue }, PinMode::WhenActive);
+}
+
+ManifestQueryBuilder ManifestQueryBuilder::WhereWhenActive(std::string_view axis_name,
+                                                           AxisValueDomain domain,
+                                                           std::string_view type_or_enum_name) const noexcept
+{
+    QueryAxisValue newValue{ .Type = domain, .IntegralValue = 0u, .Name = type_or_enum_name };
+    return whereAnyOf(axis_name, { newValue }, PinMode::WhenActive);
+}
+
+ManifestQueryBuilder ManifestQueryBuilder::Apply(const QueryPreset& preset) const
+{
+    ManifestQueryBuilder result{ *this };
+    for (const QueryPresetPin& pin : preset.Pins())
+    {
+        if (!index->axisNameToIndex.contains(pin.AxisName))
+        {
+            result.notes.emplace_back(QueryNoteCode::PinAxisNotDeclared, pin.AxisName);
+            continue;
+        }
+
+        // the values point into the preset's strings, as the constraint's axis name does
+        std::vector<QueryAxisValue> values;
+        if (pin.Domain == AxisValueDomain::Type || pin.Domain == AxisValueDomain::Enum)
+        {
+            values.reserve(pin.NamedValues.size());
+            for (const std::string& name : pin.NamedValues)
+            {
+                values.emplace_back(QueryAxisValue{ .Type = pin.Domain, .IntegralValue = 0u, .Name = name });
+            }
+        }
+        else
+        {
+            values.reserve(pin.IntegralValues.size());
+            for (const AxisValueType value : pin.IntegralValues)
+            {
+                values.emplace_back(QueryAxisValue{ .Type = pin.Domain, .IntegralValue = value, .Name = {} });
+            }
+        }
+
+        // resolve into `result` directly, so each pin does not copy the builder again
+        const std::optional<uint32_t> axisIndex = resolveAndValidate(result, pin.AxisName, values);
+        if (axisIndex)
+        {
+            result.insertConstraint(pin.AxisName, *axisIndex, std::move(values), pin.Mode);
+        }
+    }
+    return result;
+}
+
+void QueryPreset::Pin(std::string_view axis_name, bool value, PinMode mode)
+{
+    pins.emplace_back(QueryPresetPin{ .AxisName = std::string(axis_name),
+                                      .Domain = AxisValueDomain::Boolean,
+                                      .IntegralValues = { value ? 1u : 0u },
+                                      .NamedValues = {},
+                                      .Mode = mode });
+}
+
+void QueryPreset::Pin(std::string_view axis_name, uint32_t value, PinMode mode)
+{
+    pins.emplace_back(QueryPresetPin{ .AxisName = std::string(axis_name),
+                                      .Domain = AxisValueDomain::Integral,
+                                      .IntegralValues = { value },
+                                      .NamedValues = {},
+                                      .Mode = mode });
+}
+
+void QueryPreset::Pin(std::string_view axis_name,
+                      AxisValueDomain domain,
+                      std::string_view type_or_enum_name,
+                      PinMode mode)
+{
+    pins.emplace_back(QueryPresetPin{ .AxisName = std::string(axis_name),
+                                      .Domain = domain,
+                                      .IntegralValues = {},
+                                      .NamedValues = { std::string(type_or_enum_name) },
+                                      .Mode = mode });
+}
+
+void QueryPreset::PinAnyOf(std::string_view axis_name, std::span<const uint32_t> values, PinMode mode)
+{
+    pins.emplace_back(QueryPresetPin{ .AxisName = std::string(axis_name),
+                                      .Domain = AxisValueDomain::Integral,
+                                      .IntegralValues = values | std::ranges::to<std::vector<AxisValueType>>(),
+                                      .NamedValues = {},
+                                      .Mode = mode });
+}
+
+void QueryPreset::PinAnyOf(std::string_view axis_name,
+                           AxisValueDomain domain,
+                           std::span<const std::string_view> values,
+                           PinMode mode)
+{
+    pins.emplace_back(QueryPresetPin{ .AxisName = std::string(axis_name),
+                                      .Domain = domain,
+                                      .IntegralValues = {},
+                                      .NamedValues = values | std::ranges::to<std::vector<std::string>>(),
+                                      .Mode = mode });
+}
+
+std::span<const QueryPresetPin> QueryPreset::Pins() const noexcept
+{
+    return pins;
 }
 
 ManifestQueryBuilder ManifestQueryBuilder::WhereAnyOfBoolean(std::string_view axis_name) const
 {
-    return whereAnyOf(axis_name, AllBooleanValues(axis_name));
+    return whereAnyOf(axis_name, AllBooleanValues(axis_name), PinMode::Required);
 }
 
 ManifestQueryBuilder ManifestQueryBuilder::WhereAnyOf(std::string_view axis_name, std::span<const uint32_t> values) const
@@ -90,7 +206,7 @@ ManifestQueryBuilder ManifestQueryBuilder::WhereAnyOf(std::string_view axis_name
     std::vector<QueryAxisValue> queryValues = values |
                                               std::views::transform(buildAxisValue) |
                                               std::ranges::to<std::vector>();
-    return whereAnyOf(axis_name, std::move(queryValues));
+    return whereAnyOf(axis_name, std::move(queryValues), PinMode::Required);
 }
 
 ManifestQueryBuilder ManifestQueryBuilder::WhereAnyOf(std::string_view axis_name,
@@ -104,7 +220,7 @@ ManifestQueryBuilder ManifestQueryBuilder::WhereAnyOf(std::string_view axis_name
     std::vector<QueryAxisValue> queryValues = values |
                                               std::views::transform(buildAxisValue) |
                                               std::ranges::to<std::vector>();
-    return whereAnyOf(axis_name, std::move(queryValues));
+    return whereAnyOf(axis_name, std::move(queryValues), PinMode::Required);
 }
 
 ManifestQueryBuilder ManifestQueryBuilder::WhereNoneOf(std::string_view axis_name, bool value) const noexcept
@@ -355,6 +471,11 @@ std::span<const QueryError> ManifestQueryBuilder::Errors() const noexcept
     return errors;
 }
 
+std::span<const QueryNote> ManifestQueryBuilder::Notes() const noexcept
+{
+    return notes;
+}
+
 std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBuilder& result,
                                                                  std::string_view axis_name,
                                                                  std::span<const QueryAxisValue> values) const
@@ -466,7 +587,9 @@ void ManifestQueryBuilder::insertConstraint(std::string_view axis_name,
     }
 }
 
-ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name, std::vector<QueryAxisValue> values) const noexcept
+ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name,
+                                                     std::vector<QueryAxisValue> values,
+                                                     PinMode mode) const noexcept
 {
     ManifestQueryBuilder result{ *this };
     // this adds errors to result, but otherwise doesn't modify constraints
@@ -477,7 +600,7 @@ ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name
     }
 
     const uint32_t axisIndex = *axisIndexOpt;
-    result.insertConstraint(axis_name, axisIndex, std::move(values), PinMode::Required);
+    result.insertConstraint(axis_name, axisIndex, std::move(values), mode);
     return result;
 }
 
