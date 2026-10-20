@@ -103,6 +103,7 @@ public:
 
 private:
     friend class ResolvedResource;
+    friend class EntryPointConstantsView;
     UniformMemberRange(const EnvironmentView* _environment, std::span<const UniformMember> _members) noexcept;
     const EnvironmentView* environment{ nullptr };
     std::span<const UniformMember> members;
@@ -276,6 +277,27 @@ private:
     std::span<const Footprint> footprints;
 };
 
+/** The entry point constants of one entry point instance: its `uniform` parameters of ordinary data, in the layout
+ * of the environment's target. The delivery tells a renderer how to supply the data: a buffer write for
+ * `UniformBuffer`, or a push constant range from offset 0 for `PushConstant`. */
+class EntryPointConstantsView
+{
+public:
+    [[nodiscard]] EntryPointConstantsDelivery Delivery() const noexcept;
+    [[nodiscard]] uint32_t ByteSize() const noexcept;
+    [[nodiscard]] UniformMemberRange Members() const noexcept;
+    /** @brief The position in the instance's `Layout()` of the uniform buffer that contains the data. Only for the
+     * `UniformBuffer` delivery. */
+    [[nodiscard]] uint32_t BindingPosition() const noexcept;
+    [[nodiscard]] const EntryPointConstants& Record() const noexcept;
+
+private:
+    friend class EntryPointInstanceView;
+    EntryPointConstantsView(const EnvironmentView* _environment, const EntryPointConstants* _record) noexcept;
+    const EnvironmentView* environment{ nullptr };
+    const EntryPointConstants* record{ nullptr };
+};
+
 /** One entry point of one variant.
  * @note Iterators point into their range, so keep the range returned by `Layout()` alive while iterating. */
 class EntryPointInstanceView
@@ -291,6 +313,8 @@ public:
     /** @brief The textures and samplers this entry point samples together, sorted. Each pair stores two positions
      * in `Layout()`. Empty when the profile did not record pairs (`EnvironmentView::HasSamplerTexturePairs`). */
     [[nodiscard]] std::span<const SamplerTexturePair> SamplerTexturePairs() const noexcept;
+    /** @brief The `uniform` parameters of ordinary data. The delivery is `None` when the entry point reads none. */
+    [[nodiscard]] EntryPointConstantsView Constants() const noexcept;
     //[[nodiscard]] RasterView Raster() const noexcept;
     [[nodiscard]] uint32_t Raster() const noexcept;
     [[nodiscard]] const EntryPointInstance& Record() const noexcept;

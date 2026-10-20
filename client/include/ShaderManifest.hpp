@@ -175,6 +175,8 @@ public:
     /** @brief Which of a variant's resources one entry point reads. Indices into the resource list. */
     [[nodiscard]] std::span<const uint32_t> VisibilityList(uint32_t list_index) const noexcept;
     [[nodiscard]] std::span<const UniformMember> UniformMembers(const Binding& binding) const noexcept;
+    [[nodiscard]] std::span<const UniformMember> UniformMembers(const EntryPointConstants& constants) const noexcept;
+    [[nodiscard]] std::span<const EntryPointConstants> EntryPointConstantsTable() const noexcept;
     [[nodiscard]] std::span<const VertexInput> VertexInputs(uint32_t raster_index) const noexcept;
     [[nodiscard]] std::span<const ColorTarget> ColorTargets(uint32_t raster_index) const noexcept;
     [[nodiscard]] bool WritesFragDepth(uint32_t raster_index) const noexcept;
@@ -210,6 +212,7 @@ private:
     std::span<const SpecializationConstant> specializationConstants;
     std::span<const Run> samplerPairLists;
     std::span<const SamplerTexturePair> samplerTexturePairs;
+    std::span<const EntryPointConstants> entryPointConstants;
 };
 
 /**

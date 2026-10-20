@@ -63,6 +63,7 @@ namespace lodestone::manifest::detail
     static_assert(k_IsManifestRecord<ColorTarget>);
     static_assert(k_IsManifestRecord<RasterState>);
     static_assert(k_IsManifestRecord<SamplerTexturePair>);
+    static_assert(k_IsManifestRecord<EntryPointConstants>);
 
     inline constexpr size_t k_AxisMaskWordBits = std::numeric_limits<uint64_t>::digits;
     

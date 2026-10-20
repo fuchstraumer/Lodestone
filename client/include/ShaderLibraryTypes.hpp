@@ -67,6 +67,17 @@ enum class BindingKind : uint8_t
     PushConstant
 };
 
+/** @brief How a target delivers the `uniform` parameters of ordinary data to an entry point: the entry point
+ * constants. Slang chooses the form for each target. WGSL reads them from a uniform buffer that has a
+ * placement in the entry point's layout. SPIR-V reads them from a push constant block for raster and compute
+ * stages, and that block has no placement. `None` means that the entry point reads no such data. */
+enum class EntryPointConstantsDelivery : uint8_t
+{
+    None = 0,
+    UniformBuffer,
+    PushConstant,
+};
+
 enum class ShaderStageKind : uint32_t
 {
     Invalid = 0u,

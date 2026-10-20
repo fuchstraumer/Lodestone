@@ -1,4 +1,5 @@
 #include "ShaderManifestValidator.hpp"
+#include "ShaderManifestFormat.hpp"
 #include "ShaderManifestRead.hpp"
 #include "ShaderManifest.hpp"
 #include "ShaderLibraryTypes.hpp"
@@ -68,6 +69,7 @@ namespace
     ErrorState ValidateEnvironmentSections(const EnvironmentContext& context) noexcept;
     ErrorState ValidateSources(const EnvironmentContext& context) noexcept;
     ErrorState ValidateBindings(const EnvironmentContext& context) noexcept;
+    ErrorState ValidateEntryPointConstants(const EnvironmentContext& context) noexcept;
     ErrorState ValidateResourceIndices(const EnvironmentContext& context) noexcept;
     ErrorState ValidateRunTables(const EnvironmentContext& context) noexcept;
     ErrorState ValidateSlots(const EnvironmentContext& context) noexcept;
@@ -92,8 +94,9 @@ namespace
         &ValidateModuleHeaders,  &ValidateEntryPoints,  &ValidateModuleAxes, &ValidateDirectory,
     };
 
-    constexpr std::array<EnvironmentValidator, 14u> k_EnvironmentValidators{
+    constexpr std::array<EnvironmentValidator, 15u> k_EnvironmentValidators{
         &ValidateEnvironmentSections, &ValidateSources,      &ValidateBindings,
+        &ValidateEntryPointConstants,
         &ValidateResourceIndices,     &ValidateRunTables,    &ValidateSlots,
         &ValidateVariantKeys,         &ValidateVariants,     &ValidateAxisMasks,
         &ValidateAxisRelevance,       &ValidateRasterStates, &ValidateVertexInputs,
@@ -509,7 +512,7 @@ namespace
                                      environment.VariantCount * context.AxisMaskWordCount };
         const TableRef axisRelevanceLoc{ environment.AxisRelevanceTableOffset,
                                          static_cast<uint32_t>(context.EntryPointCount) * context.AxisMaskWordCount };
-        const std::array<Section, 20u> sections
+        const std::array<Section, 21u> sections
         {
             Section{ ShaderManifestTable::AxisRelevance, axisRelevanceLoc, sizeof(uint64_t) },
             Section{ ShaderManifestTable::VariantKeys, varKeysLoc, sizeof(VariantKey) },
@@ -531,6 +534,7 @@ namespace
             Section{ ShaderManifestTable::SpecializationConstants, environment.SpecConstants, sizeof(SpecializationConstant) },
             Section{ ShaderManifestTable::SamplerPairLists, environment.SamplerPairLists, sizeof(Run) },
             Section{ ShaderManifestTable::SamplerTexturePairs, environment.SamplerTexturePairs, sizeof(SamplerTexturePair) },
+            Section{ ShaderManifestTable::EntryPointConstants, environment.EntryPointConstants, sizeof(EntryPointConstants) },
         };
 
         return ValidateSections(sections, extentSize);
@@ -594,6 +598,37 @@ namespace
                 return { .Code = ErrorCode::ManifestBindingInvalidUniforms,
                          .Table = ShaderManifestTable::Bindings,
                          .RecordIndex = static_cast<uint32_t>(i) };
+            }
+        }
+
+        return k_ManifestOk;
+    }
+
+    /** Checks each entry point constants record alone: a known delivery, a member run inside the member table, no
+     * position on a push constant block, and no data for the delivery `None`. `ValidateVariants` checks the
+     * position of a uniform buffer, because a position is local to one instance. */
+    ErrorState ValidateEntryPointConstants(const EnvironmentContext& context) noexcept
+    {
+        const EnvironmentHeader& environment = context.Environment;
+        const std::span<const EntryPointConstants> constantsSpan =
+            Map<EntryPointConstants>(context.Extent, environment.EntryPointConstants);
+        for (int32_t i = 0; i < std::ssize(constantsSpan); ++i)
+        {
+            const EntryPointConstants& constants = constantsSpan[i];
+            const bool knownDelivery =
+                constants.Delivery <= std::to_underlying(EntryPointConstantsDelivery::PushConstant);
+            const bool membersInRange =
+                constants.FirstUniformMember <= environment.UniformMembers.Count &&
+                constants.UniformMemberCount <= environment.UniformMembers.Count - constants.FirstUniformMember;
+            const bool hasPosition = constants.Delivery == std::to_underlying(EntryPointConstantsDelivery::UniformBuffer);
+            const bool isNone = constants.Delivery == std::to_underlying(EntryPointConstantsDelivery::None);
+            const bool emptyWhenNone = !isNone || (constants.ByteSize == 0u && constants.UniformMemberCount == 0u);
+            if (!knownDelivery || !membersInRange || (!hasPosition && constants.Binding != 0u) || !emptyWhenNone)
+            {
+                return { .Code = ErrorCode::InvalidEntryPointConstants,
+                         .Table = ShaderManifestTable::EntryPointConstants,
+                         .RecordIndex = static_cast<uint32_t>(i),
+                         .Detail = constants.Delivery };
             }
         }
 
@@ -710,6 +745,14 @@ namespace
                          .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = slot.SamplerPairs };
             }
+
+            if (slot.Constants >= environment.EntryPointConstants.Count)
+            {
+                return { .Code = ErrorCode::InvalidEntryPointInstanceConstantsIndex,
+                         .Table = ShaderManifestTable::EntryPointInstances,
+                         .RecordIndex = static_cast<uint32_t>(i),
+                         .Detail = slot.Constants };
+            }
         }
 
         return k_ManifestOk;
@@ -749,6 +792,8 @@ namespace
         const std::span<const Run> samplerPairLists = Map<Run>(extent, environment.SamplerPairLists);
         const std::span<const SamplerTexturePair> samplerTexturePairs =
             Map<SamplerTexturePair>(extent, environment.SamplerTexturePairs);
+        const std::span<const EntryPointConstants> constantsSpan =
+            Map<EntryPointConstants>(extent, environment.EntryPointConstants);
 
         const uint64_t numSlots = context.EntryPointCount * environment.VariantCount;
         const TableRef64 slotsLoc{ environment.EntryPointInstanceTableOffset, numSlots };
@@ -861,6 +906,24 @@ namespace
                                  .Table = ShaderManifestTable::SamplerTexturePairs,
                                  .RecordIndex = pairRunOffset + static_cast<uint32_t>(j),
                                  .Detail = slot.SamplerPairs };
+                    }
+                }
+
+                // a uniform buffer of entry point constants is a position in this instance's visibility list, and
+                // that position must name a uniform buffer of the same size
+                const EntryPointConstants& constants = constantsSpan[slot.Constants];
+                if (constants.Delivery == std::to_underlying(EntryPointConstantsDelivery::UniformBuffer))
+                {
+                    const bool inRange = constants.Binding < slotVisibilityIndices.size();
+                    const Binding* container =
+                        inRange ? &bindingSpan[variantResourceIndices[slotVisibilityIndices[constants.Binding]]] : nullptr;
+                    if (container == nullptr || container->Kind != std::to_underlying(BindingKind::UniformBuffer) ||
+                        container->ByteSize != constants.ByteSize)
+                    {
+                        return { .Code = ErrorCode::InvalidEntryPointConstants,
+                                 .Table = ShaderManifestTable::EntryPointConstants,
+                                 .RecordIndex = slot.Constants,
+                                 .Detail = constants.Binding };
                     }
                 }
             }

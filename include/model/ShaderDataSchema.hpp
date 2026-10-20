@@ -237,6 +237,20 @@ struct ReflectedRasterState
  * that clients can merge the lists of several stages in one pass. `EnvironmentView::Open` validates the
  * order. This is a list rather than a bit mask, because a mask would limit a module to the width of the
  * mask. */
+/** @brief The `uniform` parameters of ordinary data on one entry point, in the layout of one target: the entry
+ * point constants. The byte size and the member offsets follow the target's layout rules, so two targets of one
+ * variant can differ. `Binding` is the position in `UsedBindingIndices` of the uniform buffer that contains the
+ * data, and it is used only when `Delivery` is `UniformBuffer`. A push constant block has no placement. */
+struct EntryPointConstants
+{
+    EntryPointConstantsDelivery Delivery{ EntryPointConstantsDelivery::None };
+    uint32_t ByteSize{ 0u };
+    uint32_t Binding{ 0u };
+    std::vector<ReflectedUniformMember> Members;
+
+    friend bool operator==(const EntryPointConstants&, const EntryPointConstants&) = default;
+};
+
 struct EntryPointReflection
 {
     std::string Name;
@@ -244,6 +258,7 @@ struct EntryPointReflection
     WorkgroupSize Workgroup;
     std::vector<uint32_t> UsedBindingIndices;
     ReflectedRasterState Raster;
+    EntryPointConstants Constants;
 };
 
 std::string DescribeRasterState(const ReflectedRasterState& raster);
@@ -300,6 +315,7 @@ std::string DescribeUniformMembers(const ReflectedBinding& binding);
 
 uint64_t HashReflectedBinding(const ReflectedBinding& binding) noexcept;
 uint64_t HashReflectedRasterState(const ReflectedRasterState& raster) noexcept;
+uint64_t HashEntryPointConstants(const EntryPointConstants& constants) noexcept;
 
 } // namespace lodestone
 

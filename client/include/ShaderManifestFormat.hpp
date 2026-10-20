@@ -16,7 +16,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 10u;
+inline constexpr uint32_t k_ShaderManifestVersion = 11u;
 
 // clang-tidy complains about enums being too big, but uint32_t means
 // the error struct is 16bytes, which is great alignment and still compact
@@ -78,6 +78,10 @@ enum class ErrorCode : uint32_t
     InvalidEntryPointInstanceSamplerPairIndex = 52,
     // a pair position is past the visibility list, names the wrong binding kind, or the list is not sorted and unique
     InvalidSamplerTexturePair = 53,
+    InvalidEntryPointInstanceConstantsIndex = 54,
+    // a delivery that is not known, a binding position that is not a uniform buffer of the same size, a position
+    // on a push constant block, or a member run outside the member table
+    InvalidEntryPointConstants = 55,
     Count
 };
 
@@ -112,6 +116,7 @@ enum class ShaderManifestTable : uint32_t
     AxisRelevance,
     SamplerPairLists,
     SamplerTexturePairs,
+    EntryPointConstants,
     Count
 };
 //NOLINTEND(readability-enum-initial-value, performance-enum-size)
@@ -320,6 +325,7 @@ struct alignas(8) EnvironmentHeader
     TableRef SpecConstants{ 0u, 0u };
     TableRef SamplerPairLists{ 0u, 0u };
     TableRef SamplerTexturePairs{ 0u, 0u };
+    TableRef EntryPointConstants{ 0u, 0u };
 };
 
 /** @brief One variant of one environment. Its key is at the same position in the key table. The
@@ -390,6 +396,23 @@ struct alignas(8) SamplerTexturePair
     uint32_t Sampler{ 0u };
 };
 
+/** @brief The `uniform` parameters of ordinary data on one entry point instance, in the layout of this profile's
+ * target: the entry point constants. `Delivery` is an `EntryPointConstantsDelivery`. For a uniform buffer,
+ * `Binding` is a position in the instance's visibility list, so `EntryPointInstanceView::Layout()[Binding]` is that
+ * buffer. A push constant block has no placement, and `Binding` is 0. An entry point that reads no such data refers
+ * to a record with the delivery `None` and no members. */
+struct alignas(8) EntryPointConstants
+{
+    uint32_t ByteSize{ 0u };
+    uint32_t Binding{ 0u };
+    uint32_t FirstUniformMember{ 0u };
+    uint32_t UniformMemberCount{ 0u };
+    uint8_t Delivery{ 0u };
+    uint8_t Reserved0{ 0u };
+    uint16_t Reserved1{ 0u };
+    uint32_t Reserved2{ 0u };
+};
+
 /** @brief What one entry point of one variant resolves to. */
 struct alignas(8) EntryPointInstance
 {
@@ -401,7 +424,8 @@ struct alignas(8) EntryPointInstance
     uint32_t WorkgroupZ{ 1u };
     uint32_t Raster{ 0u };
     uint32_t SamplerPairs{ 0u };
-    uint32_t Reserved{ 0u };
+    /** @brief An index into the entry point constants table of the environment. */
+    uint32_t Constants{ 0u };
 };
 
 struct alignas(8) VertexInput

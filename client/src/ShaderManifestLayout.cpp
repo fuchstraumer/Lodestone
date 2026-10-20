@@ -320,6 +320,44 @@ std::span<const SamplerTexturePair> EntryPointInstanceView::SamplerTexturePairs(
     return environment->SamplerPairList(entryPointInstance->SamplerPairs);
 }
 
+EntryPointConstantsView EntryPointInstanceView::Constants() const noexcept
+{
+    return EntryPointConstantsView{ environment,
+                                    &environment->EntryPointConstantsTable()[entryPointInstance->Constants] };
+}
+
+EntryPointConstantsView::EntryPointConstantsView(const EnvironmentView* _environment,
+                                                 const EntryPointConstants* _record) noexcept
+    : environment{ _environment },
+      record{ _record }
+{
+}
+
+EntryPointConstantsDelivery EntryPointConstantsView::Delivery() const noexcept
+{
+    return static_cast<EntryPointConstantsDelivery>(record->Delivery);
+}
+
+uint32_t EntryPointConstantsView::ByteSize() const noexcept
+{
+    return record->ByteSize;
+}
+
+UniformMemberRange EntryPointConstantsView::Members() const noexcept
+{
+    return UniformMemberRange{ environment, environment->UniformMembers(*record) };
+}
+
+uint32_t EntryPointConstantsView::BindingPosition() const noexcept
+{
+    return record->Binding;
+}
+
+const EntryPointConstants& EntryPointConstantsView::Record() const noexcept
+{
+    return *record;
+}
+
 uint32_t EntryPointInstanceView::Raster() const noexcept
 {
     return entryPointInstance->Raster;

@@ -515,4 +515,25 @@ uint64_t HashReflectedRasterState(const ReflectedRasterState& rasterState) noexc
     return compositeHasher.Finalize();
 }
 
+uint64_t HashEntryPointConstants(const EntryPointConstants& constants) noexcept
+{
+    thread_local StreamingHash compositeHasher;
+    compositeHasher.Reset();
+    const uint64_t scalarValues[]
+    {
+        static_cast<uint64_t>(constants.Delivery),
+        static_cast<uint64_t>(constants.ByteSize),
+        static_cast<uint64_t>(constants.Binding)
+    };
+    compositeHasher.Append(std::as_bytes(std::span{ scalarValues }));
+
+    for (const ReflectedUniformMember& member : constants.Members)
+    {
+        compositeHasher.Append(std::string_view{ member.Name });
+        compositeHasher.Append(ObjectAsBytes(member.Data));
+    }
+
+    return compositeHasher.Finalize();
+}
+
 } // namespace lodestone

@@ -106,6 +106,8 @@ namespace
             "a sampler pair list runs past the sampler and texture pair table",
             "an entry point instance names a sampler pair list past the list table",
             "a sampler and texture pair names a position past the visibility list, a binding of the wrong kind, or is not sorted and unique",
+            "an entry point instance names an entry point constants record past the table",
+            "an entry point constants record has an unknown delivery, a member run past the member table, a position on a push constant block, data with no delivery, or a uniform buffer position that does not name a uniform buffer of its size",
         });
 
     static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ErrorCode::Count),
@@ -478,6 +480,7 @@ ManifestResult<EnvironmentView> EnvironmentView::Open(const BundleView& bundle,
     view.specializationConstants = Map<SpecializationConstant>(extent_bytes, parsed.SpecConstants);
     view.samplerPairLists = Map<Run>(extent_bytes, parsed.SamplerPairLists);
     view.samplerTexturePairs = Map<SamplerTexturePair>(extent_bytes, parsed.SamplerTexturePairs);
+    view.entryPointConstants = Map<EntryPointConstants>(extent_bytes, parsed.EntryPointConstants);
     return view;
 }
 
@@ -640,6 +643,16 @@ std::span<const uint32_t> EnvironmentView::VisibilityList(uint32_t list_index) c
 std::span<const UniformMember> EnvironmentView::UniformMembers(const Binding& binding) const noexcept
 {
     return uniformMembers.subspan(binding.FirstUniformMember, binding.UniformMemberCount);
+}
+
+std::span<const UniformMember> EnvironmentView::UniformMembers(const EntryPointConstants& constants) const noexcept
+{
+    return uniformMembers.subspan(constants.FirstUniformMember, constants.UniformMemberCount);
+}
+
+std::span<const EntryPointConstants> EnvironmentView::EntryPointConstantsTable() const noexcept
+{
+    return entryPointConstants;
 }
 
 std::span<const VertexInput> EnvironmentView::VertexInputs(uint32_t raster_index) const noexcept
