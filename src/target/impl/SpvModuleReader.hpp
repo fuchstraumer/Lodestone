@@ -121,6 +121,9 @@ struct SampledImageUse
 
 struct ParseState
 {
+    // have to persist a copy of the SPIR-V words, because all the string views
+    // for names, caps, extensions etc, point into this vector
+    std::vector<uint32_t> Words;
     // in our cooker, we only allow one entry point per SPIR-V module
     EntryPointInfo EntryPoint;
     std::vector<IdRecord> Ids;

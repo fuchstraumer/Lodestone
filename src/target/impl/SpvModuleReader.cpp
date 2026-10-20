@@ -584,9 +584,10 @@ CookError ParseModule(spv_context_t* context,
         return ReportError(sink, CookError::TargetValidationEntryPointParseFailed, errStr);
     }
 
-    // A copy, so no alignment of the source bytes is assumed
-    std::vector<uint32_t> words(source_code.size() / sizeof(uint32_t));
-    std::memcpy(words.data(), source_code.data(), source_code.size());
+    // A copy, so no alignment of the source bytes is assumed. The state owns it: names point into these words
+    out_state.Words.resize(source_code.size() / sizeof(uint32_t));
+    std::memcpy(out_state.Words.data(), source_code.data(), source_code.size());
+    const std::vector<uint32_t>& words = out_state.Words;
 
     spv_diagnostic diagnostic = nullptr;
     if (validate)
