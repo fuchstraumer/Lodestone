@@ -46,6 +46,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -88,6 +92,10 @@
                 1
             ],
             "rasterIndices": [
+                0,
+                1
+            ],
+            "samplerPairIndices": [
                 0,
                 1
             ],
@@ -136,6 +144,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -178,6 +190,10 @@
                 1
             ],
             "rasterIndices": [
+                0,
+                1
+            ],
+            "samplerPairIndices": [
                 0,
                 1
             ],
@@ -226,6 +242,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -268,6 +288,10 @@
                 1
             ],
             "rasterIndices": [
+                0,
+                1
+            ],
+            "samplerPairIndices": [
                 0,
                 1
             ],
@@ -316,6 +340,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -358,6 +386,10 @@
                 1
             ],
             "rasterIndices": [
+                0,
+                1
+            ],
+            "samplerPairIndices": [
                 0,
                 1
             ],
@@ -406,6 +438,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -448,6 +484,10 @@
                 1
             ],
             "rasterIndices": [
+                0,
+                1
+            ],
+            "samplerPairIndices": [
                 0,
                 1
             ],
@@ -496,6 +536,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -538,6 +582,10 @@
                 1
             ],
             "rasterIndices": [
+                0,
+                1
+            ],
+            "samplerPairIndices": [
                 0,
                 1
             ],
@@ -586,6 +634,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -628,6 +680,10 @@
                 1
             ],
             "rasterIndices": [
+                0,
+                1
+            ],
+            "samplerPairIndices": [
                 0,
                 1
             ],
@@ -676,6 +732,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -718,6 +778,10 @@
                 1
             ],
             "rasterIndices": [
+                0,
+                1
+            ],
+            "samplerPairIndices": [
                 0,
                 1
             ],
@@ -777,6 +841,14 @@
             "byteComparisons": 30
         },
         "rasterStates": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 32,
+            "uniqueEntries": 2,
+            "hashCollisions": 0,
+            "byteComparisons": 30
+        },
+        "samplerPairs": {
             "hashName": "xxHash3_64",
             "dedupeEnabled": true,
             "artifactsSeen": 32,
@@ -1592,6 +1664,178 @@
             }
         ],
         "rasterStates": [
+            {
+                "index": 0,
+                "mappedFrom": [
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=false, VERTEX_COLOR=false",
+                        "variantIndex": 0
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=false, VERTEX_COLOR=true",
+                        "variantIndex": 1
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=true, VERTEX_COLOR=false",
+                        "variantIndex": 2
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=true, VERTEX_COLOR=true",
+                        "variantIndex": 3
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=false, VERTEX_COLOR=false",
+                        "variantIndex": 4
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=false, VERTEX_COLOR=true",
+                        "variantIndex": 5
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=true, VERTEX_COLOR=false",
+                        "variantIndex": 6
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=true, VERTEX_COLOR=true",
+                        "variantIndex": 7
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=false, VERTEX_COLOR=false",
+                        "variantIndex": 8
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=false, VERTEX_COLOR=true",
+                        "variantIndex": 9
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=true, VERTEX_COLOR=false",
+                        "variantIndex": 10
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=true, VERTEX_COLOR=true",
+                        "variantIndex": 11
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=false, VERTEX_COLOR=false",
+                        "variantIndex": 12
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=false, VERTEX_COLOR=true",
+                        "variantIndex": 13
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=true, VERTEX_COLOR=false",
+                        "variantIndex": 14
+                    },
+                    {
+                        "entryPoint": "MainVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=true, VERTEX_COLOR=true",
+                        "variantIndex": 15
+                    }
+                ]
+            },
+            {
+                "index": 1,
+                "mappedFrom": [
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=false, VERTEX_COLOR=false",
+                        "variantIndex": 0
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=false, VERTEX_COLOR=true",
+                        "variantIndex": 1
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=true, VERTEX_COLOR=false",
+                        "variantIndex": 2
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, HAS_TANGENTS=true, VERTEX_COLOR=true",
+                        "variantIndex": 3
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=false, VERTEX_COLOR=false",
+                        "variantIndex": 4
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=false, VERTEX_COLOR=true",
+                        "variantIndex": 5
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=true, VERTEX_COLOR=false",
+                        "variantIndex": 6
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, HAS_TANGENTS=true, VERTEX_COLOR=true",
+                        "variantIndex": 7
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=false, VERTEX_COLOR=false",
+                        "variantIndex": 8
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=false, VERTEX_COLOR=true",
+                        "variantIndex": 9
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=true, VERTEX_COLOR=false",
+                        "variantIndex": 10
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, HAS_TANGENTS=true, VERTEX_COLOR=true",
+                        "variantIndex": 11
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=false, VERTEX_COLOR=false",
+                        "variantIndex": 12
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=false, VERTEX_COLOR=true",
+                        "variantIndex": 13
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=true, VERTEX_COLOR=false",
+                        "variantIndex": 14
+                    },
+                    {
+                        "entryPoint": "MainFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, HAS_TANGENTS=true, VERTEX_COLOR=true",
+                        "variantIndex": 15
+                    }
+                ]
+            }
+        ],
+        "samplerPairs": [
             {
                 "index": 0,
                 "mappedFrom": [

@@ -99,6 +99,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -153,6 +154,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -272,6 +279,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -326,6 +334,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -445,6 +459,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -499,6 +514,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -618,6 +639,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -672,6 +694,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -791,6 +819,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -845,6 +874,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -964,6 +999,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -1018,6 +1054,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -1137,6 +1179,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -1191,6 +1234,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -1310,6 +1359,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -1364,6 +1414,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -1483,6 +1539,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -1537,6 +1594,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -1656,6 +1719,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -1710,6 +1774,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -1829,6 +1899,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -1883,6 +1954,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -2002,6 +2079,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -2056,6 +2134,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -2175,6 +2259,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -2229,6 +2314,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -2348,6 +2439,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -2402,6 +2494,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -2521,6 +2619,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -2575,6 +2674,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [
@@ -2694,6 +2799,7 @@
                     "usedBindingIndices": [
                         0
                     ],
+                    "samplerTexturePairs": [],
                     "vertexInputs": [
                         {
                             "semanticName": "POSITION",
@@ -2748,6 +2854,12 @@
                         0,
                         1,
                         2
+                    ],
+                    "samplerTexturePairs": [
+                        {
+                            "texture": 1,
+                            "sampler": 2
+                        }
                     ],
                     "vertexInputs": [],
                     "colorTargets": [

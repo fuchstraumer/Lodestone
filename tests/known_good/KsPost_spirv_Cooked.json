@@ -8,6 +8,7 @@
     "footprintListCount": 1,
     "visibilityListCount": 3,
     "rasterStateCount": 2,
+    "samplerPairListCount": 3,
     "variantCount": 24,
     "entryPoints": [
         {
@@ -295,6 +296,37 @@
             "writesFragDepth": false
         }
     ],
+    "samplerPairLists": [
+        {
+            "index": 0,
+            "contentHash": 3244421341483603138,
+            "pairs": []
+        },
+        {
+            "index": 1,
+            "contentHash": 17197929579947543131,
+            "pairs": [
+                {
+                    "texture": 0,
+                    "sampler": 1
+                }
+            ]
+        },
+        {
+            "index": 2,
+            "contentHash": 14848259712338569877,
+            "pairs": [
+                {
+                    "texture": 0,
+                    "sampler": 2
+                },
+                {
+                    "texture": 1,
+                    "sampler": 2
+                }
+            ]
+        }
+    ],
     "variants": [
         {
             "index": 0,
@@ -329,6 +361,10 @@
                 1
             ],
             "rasterIndices": [
+                0,
+                1
+            ],
+            "samplerPairIndices": [
                 0,
                 1
             ],
@@ -381,6 +417,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -429,6 +469,10 @@
             "rasterIndices": [
                 0,
                 1
+            ],
+            "samplerPairIndices": [
+                0,
+                2
             ],
             "workgroups": [
                 {
@@ -479,6 +523,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                2
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -527,6 +575,10 @@
             "rasterIndices": [
                 0,
                 1
+            ],
+            "samplerPairIndices": [
+                0,
+                2
             ],
             "workgroups": [
                 {
@@ -577,6 +629,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                2
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -623,6 +679,10 @@
                 1
             ],
             "rasterIndices": [
+                0,
+                1
+            ],
+            "samplerPairIndices": [
                 0,
                 1
             ],
@@ -675,6 +735,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -723,6 +787,10 @@
             "rasterIndices": [
                 0,
                 1
+            ],
+            "samplerPairIndices": [
+                0,
+                2
             ],
             "workgroups": [
                 {
@@ -773,6 +841,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                2
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -821,6 +893,10 @@
             "rasterIndices": [
                 0,
                 1
+            ],
+            "samplerPairIndices": [
+                0,
+                2
             ],
             "workgroups": [
                 {
@@ -871,6 +947,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                2
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -917,6 +997,10 @@
                 1
             ],
             "rasterIndices": [
+                0,
+                1
+            ],
+            "samplerPairIndices": [
                 0,
                 1
             ],
@@ -969,6 +1053,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -1017,6 +1105,10 @@
             "rasterIndices": [
                 0,
                 1
+            ],
+            "samplerPairIndices": [
+                0,
+                2
             ],
             "workgroups": [
                 {
@@ -1067,6 +1159,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                2
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -1115,6 +1211,10 @@
             "rasterIndices": [
                 0,
                 1
+            ],
+            "samplerPairIndices": [
+                0,
+                2
             ],
             "workgroups": [
                 {
@@ -1165,6 +1265,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                2
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -1211,6 +1315,10 @@
                 1
             ],
             "rasterIndices": [
+                0,
+                1
+            ],
+            "samplerPairIndices": [
                 0,
                 1
             ],
@@ -1263,6 +1371,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -1311,6 +1423,10 @@
             "rasterIndices": [
                 0,
                 1
+            ],
+            "samplerPairIndices": [
+                0,
+                2
             ],
             "workgroups": [
                 {
@@ -1361,6 +1477,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                2
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -1410,6 +1530,10 @@
                 0,
                 1
             ],
+            "samplerPairIndices": [
+                0,
+                2
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -1458,6 +1582,10 @@
             "rasterIndices": [
                 0,
                 1
+            ],
+            "samplerPairIndices": [
+                0,
+                2
             ],
             "workgroups": [
                 {

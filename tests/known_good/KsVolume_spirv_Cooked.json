@@ -8,6 +8,7 @@
     "footprintListCount": 3,
     "visibilityListCount": 3,
     "rasterStateCount": 1,
+    "samplerPairListCount": 2,
     "variantCount": 288,
     "entryPoints": [
         {
@@ -22,744 +23,744 @@
     "sources": [
         {
             "index": 0,
-            "byteLength": 1248,
-            "contentHash": 4686906959543339126
+            "byteLength": 1232,
+            "contentHash": 13049145097044233403
         },
         {
             "index": 1,
-            "byteLength": 1268,
-            "contentHash": 564254062544551448
+            "byteLength": 1252,
+            "contentHash": 10248815114336955768
         },
         {
             "index": 2,
-            "byteLength": 1340,
-            "contentHash": 10966083300933762406
+            "byteLength": 1324,
+            "contentHash": 1070720372285127165
         },
         {
             "index": 3,
-            "byteLength": 1348,
-            "contentHash": 16707624414750248792
+            "byteLength": 1332,
+            "contentHash": 7993865998037222804
         },
         {
             "index": 4,
-            "byteLength": 1588,
-            "contentHash": 11015698870591012750
+            "byteLength": 1572,
+            "contentHash": 7322653208754520506
         },
         {
             "index": 5,
-            "byteLength": 1680,
-            "contentHash": 597126366988315050
+            "byteLength": 1664,
+            "contentHash": 15034078349355039673
         },
         {
             "index": 6,
-            "byteLength": 1688,
-            "contentHash": 4821095970445103108
+            "byteLength": 1672,
+            "contentHash": 10888388191728719327
         },
         {
             "index": 7,
-            "byteLength": 1368,
-            "contentHash": 10561044468847799310
+            "byteLength": 1352,
+            "contentHash": 5643038766681548006
         },
         {
             "index": 8,
-            "byteLength": 1460,
-            "contentHash": 7497691842733426839
+            "byteLength": 1444,
+            "contentHash": 9860051828220281732
         },
         {
             "index": 9,
-            "byteLength": 1468,
-            "contentHash": 11409983220946301426
+            "byteLength": 1452,
+            "contentHash": 2495734099330721851
         },
         {
             "index": 10,
-            "byteLength": 1708,
-            "contentHash": 14287003825723182951
+            "byteLength": 1692,
+            "contentHash": 488850767007309749
         },
         {
             "index": 11,
-            "byteLength": 1800,
-            "contentHash": 10471640994375891611
+            "byteLength": 1784,
+            "contentHash": 7497500782004055834
         },
         {
             "index": 12,
-            "byteLength": 1808,
-            "contentHash": 15120470087646215747
+            "byteLength": 1792,
+            "contentHash": 9153544179866565020
         },
         {
             "index": 13,
-            "byteLength": 1352,
-            "contentHash": 6069872081401786585
+            "byteLength": 1336,
+            "contentHash": 9756508205004753516
         },
         {
             "index": 14,
-            "byteLength": 1444,
-            "contentHash": 445120005055153838
+            "byteLength": 1428,
+            "contentHash": 2719061186875868633
         },
         {
             "index": 15,
-            "byteLength": 1452,
-            "contentHash": 10369496452440428627
+            "byteLength": 1436,
+            "contentHash": 6116317102655509297
         },
         {
             "index": 16,
-            "byteLength": 1692,
-            "contentHash": 16144226535568421962
+            "byteLength": 1676,
+            "contentHash": 9289879032522236164
         },
         {
             "index": 17,
-            "byteLength": 1784,
-            "contentHash": 298342357173880581
+            "byteLength": 1768,
+            "contentHash": 7592560057993010625
         },
         {
             "index": 18,
-            "byteLength": 1792,
-            "contentHash": 2586373801464621968
+            "byteLength": 1776,
+            "contentHash": 14453898284830405642
         },
         {
             "index": 19,
-            "byteLength": 1368,
-            "contentHash": 15107900199666703163
+            "byteLength": 1352,
+            "contentHash": 6482397787860653453
         },
         {
             "index": 20,
-            "byteLength": 1460,
-            "contentHash": 13057506491218933018
+            "byteLength": 1444,
+            "contentHash": 7195941697119383078
         },
         {
             "index": 21,
-            "byteLength": 1468,
-            "contentHash": 12720954421524911035
+            "byteLength": 1452,
+            "contentHash": 187389055808707315
         },
         {
             "index": 22,
-            "byteLength": 1708,
-            "contentHash": 15013944445267386083
+            "byteLength": 1692,
+            "contentHash": 14994573297719215015
         },
         {
             "index": 23,
-            "byteLength": 1800,
-            "contentHash": 14889866424880128784
+            "byteLength": 1784,
+            "contentHash": 10987147466689701272
         },
         {
             "index": 24,
-            "byteLength": 1808,
-            "contentHash": 15113922666848316434
+            "byteLength": 1792,
+            "contentHash": 18098609054649827885
         },
         {
             "index": 25,
-            "byteLength": 1248,
-            "contentHash": 16021301545833045549
+            "byteLength": 1232,
+            "contentHash": 3433671885804195310
         },
         {
             "index": 26,
-            "byteLength": 1268,
-            "contentHash": 11786975077714933221
+            "byteLength": 1252,
+            "contentHash": 16466050941093575184
         },
         {
             "index": 27,
-            "byteLength": 1340,
-            "contentHash": 18420193871237008572
+            "byteLength": 1324,
+            "contentHash": 8742168631185320102
         },
         {
             "index": 28,
-            "byteLength": 1348,
-            "contentHash": 13955714548904812453
+            "byteLength": 1332,
+            "contentHash": 17026606901131376053
         },
         {
             "index": 29,
-            "byteLength": 1588,
-            "contentHash": 15957776010342925885
+            "byteLength": 1572,
+            "contentHash": 15919705467364165923
         },
         {
             "index": 30,
-            "byteLength": 1680,
-            "contentHash": 8125879797714075115
+            "byteLength": 1664,
+            "contentHash": 6582369921352464843
         },
         {
             "index": 31,
-            "byteLength": 1688,
-            "contentHash": 14058767501546355316
+            "byteLength": 1672,
+            "contentHash": 16656179128464414390
         },
         {
             "index": 32,
-            "byteLength": 1368,
-            "contentHash": 15167288298886520868
+            "byteLength": 1352,
+            "contentHash": 7970258086913818758
         },
         {
             "index": 33,
-            "byteLength": 1460,
-            "contentHash": 6107265051147832074
+            "byteLength": 1444,
+            "contentHash": 797274108752575829
         },
         {
             "index": 34,
-            "byteLength": 1468,
-            "contentHash": 6772498052050346560
+            "byteLength": 1452,
+            "contentHash": 11274062800823817317
         },
         {
             "index": 35,
-            "byteLength": 1708,
-            "contentHash": 7975894470248739948
+            "byteLength": 1692,
+            "contentHash": 12274782042037657081
         },
         {
             "index": 36,
-            "byteLength": 1800,
-            "contentHash": 16567102163904233706
+            "byteLength": 1784,
+            "contentHash": 15472423019280991838
         },
         {
             "index": 37,
-            "byteLength": 1808,
-            "contentHash": 14169918105334919545
+            "byteLength": 1792,
+            "contentHash": 15466419010785097590
         },
         {
             "index": 38,
-            "byteLength": 1368,
-            "contentHash": 13903214099565454492
+            "byteLength": 1352,
+            "contentHash": 9449309049583666876
         },
         {
             "index": 39,
-            "byteLength": 1460,
-            "contentHash": 7152724533710970373
+            "byteLength": 1444,
+            "contentHash": 13913359252541796230
         },
         {
             "index": 40,
-            "byteLength": 1468,
-            "contentHash": 15838700375035948786
+            "byteLength": 1452,
+            "contentHash": 6200301594875422916
         },
         {
             "index": 41,
-            "byteLength": 1708,
-            "contentHash": 16046909435313908518
+            "byteLength": 1692,
+            "contentHash": 15504831161056424605
         },
         {
             "index": 42,
-            "byteLength": 1800,
-            "contentHash": 6470215842077390571
+            "byteLength": 1784,
+            "contentHash": 13239344505059377905
         },
         {
             "index": 43,
-            "byteLength": 1808,
-            "contentHash": 6278197150594821371
+            "byteLength": 1792,
+            "contentHash": 3748063739943559209
         },
         {
             "index": 44,
-            "byteLength": 1352,
-            "contentHash": 18088426765685334834
+            "byteLength": 1336,
+            "contentHash": 4802219525621108599
         },
         {
             "index": 45,
-            "byteLength": 1444,
-            "contentHash": 15147406477443613922
+            "byteLength": 1428,
+            "contentHash": 5435087269523833963
         },
         {
             "index": 46,
-            "byteLength": 1452,
-            "contentHash": 10310241808831402470
+            "byteLength": 1436,
+            "contentHash": 11006208768075680471
         },
         {
             "index": 47,
-            "byteLength": 1692,
-            "contentHash": 256768199072465135
+            "byteLength": 1676,
+            "contentHash": 10394925171934070988
         },
         {
             "index": 48,
-            "byteLength": 1784,
-            "contentHash": 14603792757080414942
+            "byteLength": 1768,
+            "contentHash": 3044245986960413692
         },
         {
             "index": 49,
-            "byteLength": 1792,
-            "contentHash": 4726381829095115526
+            "byteLength": 1776,
+            "contentHash": 7982172482592490004
         },
         {
             "index": 50,
-            "byteLength": 1248,
-            "contentHash": 3326553455702706084
+            "byteLength": 1232,
+            "contentHash": 11389639236460574216
         },
         {
             "index": 51,
-            "byteLength": 1268,
-            "contentHash": 7392211110798394985
+            "byteLength": 1252,
+            "contentHash": 2337093397520701411
         },
         {
             "index": 52,
-            "byteLength": 1340,
-            "contentHash": 2529988618336800784
+            "byteLength": 1324,
+            "contentHash": 659035785880281877
         },
         {
             "index": 53,
-            "byteLength": 1348,
-            "contentHash": 7749748882035665426
+            "byteLength": 1332,
+            "contentHash": 6496619716798064513
         },
         {
             "index": 54,
-            "byteLength": 1588,
-            "contentHash": 2903234024622038878
+            "byteLength": 1572,
+            "contentHash": 7159431427594108225
         },
         {
             "index": 55,
-            "byteLength": 1680,
-            "contentHash": 1815473152788593302
+            "byteLength": 1664,
+            "contentHash": 17817375963026672760
         },
         {
             "index": 56,
-            "byteLength": 1688,
-            "contentHash": 17657541653895867313
+            "byteLength": 1672,
+            "contentHash": 2068028451261068330
         },
         {
             "index": 57,
-            "byteLength": 1368,
-            "contentHash": 704149429606169726
+            "byteLength": 1352,
+            "contentHash": 9980312125472051717
         },
         {
             "index": 58,
-            "byteLength": 1460,
-            "contentHash": 10576646370140998258
+            "byteLength": 1444,
+            "contentHash": 162829826592624428
         },
         {
             "index": 59,
-            "byteLength": 1468,
-            "contentHash": 13231862183240570967
+            "byteLength": 1452,
+            "contentHash": 9391644290574949883
         },
         {
             "index": 60,
-            "byteLength": 1708,
-            "contentHash": 6837562197449904218
+            "byteLength": 1692,
+            "contentHash": 11033254947183285453
         },
         {
             "index": 61,
-            "byteLength": 1800,
-            "contentHash": 2842382653840952821
+            "byteLength": 1784,
+            "contentHash": 4114575529909514905
         },
         {
             "index": 62,
-            "byteLength": 1808,
-            "contentHash": 577114489741506711
+            "byteLength": 1792,
+            "contentHash": 4067245676508657871
         },
         {
             "index": 63,
-            "byteLength": 1368,
-            "contentHash": 9723285768395765106
+            "byteLength": 1352,
+            "contentHash": 9679789617136861002
         },
         {
             "index": 64,
-            "byteLength": 1460,
-            "contentHash": 16813373690920942760
+            "byteLength": 1444,
+            "contentHash": 6037807586615348435
         },
         {
             "index": 65,
-            "byteLength": 1468,
-            "contentHash": 11434998152125091729
+            "byteLength": 1452,
+            "contentHash": 11200897044032860592
         },
         {
             "index": 66,
-            "byteLength": 1708,
-            "contentHash": 11254314671472692174
+            "byteLength": 1692,
+            "contentHash": 3064998673628830212
         },
         {
             "index": 67,
-            "byteLength": 1800,
-            "contentHash": 6772843832343825985
+            "byteLength": 1784,
+            "contentHash": 10128093999035218185
         },
         {
             "index": 68,
-            "byteLength": 1808,
-            "contentHash": 14688462313006560798
+            "byteLength": 1792,
+            "contentHash": 2919553619220387954
         },
         {
             "index": 69,
-            "byteLength": 1368,
-            "contentHash": 13218196339861124466
+            "byteLength": 1352,
+            "contentHash": 2290348061518710090
         },
         {
             "index": 70,
-            "byteLength": 1460,
-            "contentHash": 16421123548084431473
+            "byteLength": 1444,
+            "contentHash": 14769992059259465502
         },
         {
             "index": 71,
-            "byteLength": 1468,
-            "contentHash": 14525993900188160680
+            "byteLength": 1452,
+            "contentHash": 10352553866139963982
         },
         {
             "index": 72,
-            "byteLength": 1708,
-            "contentHash": 2692194023670567655
+            "byteLength": 1692,
+            "contentHash": 2930621945904871499
         },
         {
             "index": 73,
-            "byteLength": 1800,
-            "contentHash": 8369322636645824105
+            "byteLength": 1784,
+            "contentHash": 17449190951771161468
         },
         {
             "index": 74,
-            "byteLength": 1808,
-            "contentHash": 9162235384084021248
+            "byteLength": 1792,
+            "contentHash": 7180612572848062701
         },
         {
             "index": 75,
-            "byteLength": 1284,
-            "contentHash": 14105323045688652774
+            "byteLength": 1268,
+            "contentHash": 15387631828151462462
         },
         {
             "index": 76,
-            "byteLength": 1376,
-            "contentHash": 11877518789492221258
+            "byteLength": 1360,
+            "contentHash": 14086844751033496460
         },
         {
             "index": 77,
-            "byteLength": 1384,
-            "contentHash": 14538828174541116973
+            "byteLength": 1368,
+            "contentHash": 9695864867997780612
         },
         {
             "index": 78,
-            "byteLength": 1624,
-            "contentHash": 11680329568900765159
+            "byteLength": 1608,
+            "contentHash": 8735016757276967910
         },
         {
             "index": 79,
-            "byteLength": 1716,
-            "contentHash": 15059459099179022103
+            "byteLength": 1700,
+            "contentHash": 4774728885841132062
         },
         {
             "index": 80,
-            "byteLength": 1724,
-            "contentHash": 18289134044958021581
+            "byteLength": 1708,
+            "contentHash": 3800386799303253373
         },
         {
             "index": 81,
-            "byteLength": 1404,
-            "contentHash": 7662065738736298743
+            "byteLength": 1388,
+            "contentHash": 14735005429877104454
         },
         {
             "index": 82,
-            "byteLength": 1496,
-            "contentHash": 7650474802498657978
+            "byteLength": 1480,
+            "contentHash": 4398417700178602792
         },
         {
             "index": 83,
-            "byteLength": 1504,
-            "contentHash": 15234036881298767392
+            "byteLength": 1488,
+            "contentHash": 10181080060577435221
         },
         {
             "index": 84,
-            "byteLength": 1744,
-            "contentHash": 10580402269700154194
+            "byteLength": 1728,
+            "contentHash": 13976484534632006743
         },
         {
             "index": 85,
-            "byteLength": 1836,
-            "contentHash": 8309685289751035733
+            "byteLength": 1820,
+            "contentHash": 1389319087630955428
         },
         {
             "index": 86,
-            "byteLength": 1844,
-            "contentHash": 12587240180767402542
+            "byteLength": 1828,
+            "contentHash": 14358642965976309827
         },
         {
             "index": 87,
-            "byteLength": 1388,
-            "contentHash": 12395045208252570379
+            "byteLength": 1372,
+            "contentHash": 14046256582608150036
         },
         {
             "index": 88,
-            "byteLength": 1480,
-            "contentHash": 5010637563072402481
+            "byteLength": 1464,
+            "contentHash": 4338997073338967329
         },
         {
             "index": 89,
-            "byteLength": 1488,
-            "contentHash": 1052248697085194511
+            "byteLength": 1472,
+            "contentHash": 367511919708657107
         },
         {
             "index": 90,
-            "byteLength": 1728,
-            "contentHash": 11098943058032550683
+            "byteLength": 1712,
+            "contentHash": 9084499948090602864
         },
         {
             "index": 91,
-            "byteLength": 1820,
-            "contentHash": 10734860703055002369
+            "byteLength": 1804,
+            "contentHash": 7315112153284435334
         },
         {
             "index": 92,
-            "byteLength": 1828,
-            "contentHash": 12158077038727835971
+            "byteLength": 1812,
+            "contentHash": 13726320681285679223
         },
         {
             "index": 93,
-            "byteLength": 1404,
-            "contentHash": 4092130508042889043
+            "byteLength": 1388,
+            "contentHash": 16877022794004764162
         },
         {
             "index": 94,
-            "byteLength": 1496,
-            "contentHash": 2928780531914282941
+            "byteLength": 1480,
+            "contentHash": 14835248622118228962
         },
         {
             "index": 95,
-            "byteLength": 1504,
-            "contentHash": 10689807701949891441
+            "byteLength": 1488,
+            "contentHash": 18016266735074890476
         },
         {
             "index": 96,
-            "byteLength": 1744,
-            "contentHash": 7900370696385988537
+            "byteLength": 1728,
+            "contentHash": 6944726403912846602
         },
         {
             "index": 97,
-            "byteLength": 1836,
-            "contentHash": 8729624991337642595
+            "byteLength": 1820,
+            "contentHash": 481984474816980757
         },
         {
             "index": 98,
-            "byteLength": 1844,
-            "contentHash": 17006376079363914978
+            "byteLength": 1828,
+            "contentHash": 6833123840503129018
         },
         {
             "index": 99,
-            "byteLength": 1284,
-            "contentHash": 4336229206725676479
+            "byteLength": 1268,
+            "contentHash": 5814195696299936746
         },
         {
             "index": 100,
-            "byteLength": 1376,
-            "contentHash": 163872822239044824
+            "byteLength": 1360,
+            "contentHash": 18378505646107963657
         },
         {
             "index": 101,
-            "byteLength": 1384,
-            "contentHash": 12487851365971153817
+            "byteLength": 1368,
+            "contentHash": 6091055514331228424
         },
         {
             "index": 102,
-            "byteLength": 1624,
-            "contentHash": 14484669362025276862
+            "byteLength": 1608,
+            "contentHash": 14018406463036808763
         },
         {
             "index": 103,
-            "byteLength": 1716,
-            "contentHash": 3876277283173040568
+            "byteLength": 1700,
+            "contentHash": 9727974053063980164
         },
         {
             "index": 104,
-            "byteLength": 1724,
-            "contentHash": 18124092373662663429
+            "byteLength": 1708,
+            "contentHash": 6110925825206576831
         },
         {
             "index": 105,
-            "byteLength": 1404,
-            "contentHash": 6943956804021937161
+            "byteLength": 1388,
+            "contentHash": 9339867120044168652
         },
         {
             "index": 106,
-            "byteLength": 1496,
-            "contentHash": 17920412605735361404
+            "byteLength": 1480,
+            "contentHash": 17578941061963130004
         },
         {
             "index": 107,
-            "byteLength": 1504,
-            "contentHash": 8055375777408726657
+            "byteLength": 1488,
+            "contentHash": 11533049196015963232
         },
         {
             "index": 108,
-            "byteLength": 1744,
-            "contentHash": 7277861207179568453
+            "byteLength": 1728,
+            "contentHash": 4255593189260129858
         },
         {
             "index": 109,
-            "byteLength": 1836,
-            "contentHash": 138735530589904930
+            "byteLength": 1820,
+            "contentHash": 13958272299343336076
         },
         {
             "index": 110,
-            "byteLength": 1844,
-            "contentHash": 152969630699085982
+            "byteLength": 1828,
+            "contentHash": 5828221307249810829
         },
         {
             "index": 111,
-            "byteLength": 1404,
-            "contentHash": 4092155446462919778
+            "byteLength": 1388,
+            "contentHash": 17075471601856423858
         },
         {
             "index": 112,
-            "byteLength": 1496,
-            "contentHash": 9478257517025672454
+            "byteLength": 1480,
+            "contentHash": 771876198014138686
         },
         {
             "index": 113,
-            "byteLength": 1504,
-            "contentHash": 9164637654167737344
+            "byteLength": 1488,
+            "contentHash": 6979582427424315011
         },
         {
             "index": 114,
-            "byteLength": 1744,
-            "contentHash": 2359544841349009501
+            "byteLength": 1728,
+            "contentHash": 18324564612666330650
         },
         {
             "index": 115,
-            "byteLength": 1836,
-            "contentHash": 1900181634375623975
+            "byteLength": 1820,
+            "contentHash": 5619581814173681283
         },
         {
             "index": 116,
-            "byteLength": 1844,
-            "contentHash": 12097226241676490176
+            "byteLength": 1828,
+            "contentHash": 8287263293823251709
         },
         {
             "index": 117,
-            "byteLength": 1388,
-            "contentHash": 7279133467358533172
+            "byteLength": 1372,
+            "contentHash": 17660562420407431588
         },
         {
             "index": 118,
-            "byteLength": 1480,
-            "contentHash": 11375134911679609521
+            "byteLength": 1464,
+            "contentHash": 11005039300213162322
         },
         {
             "index": 119,
-            "byteLength": 1488,
-            "contentHash": 1769355341888426608
+            "byteLength": 1472,
+            "contentHash": 2659042736413128635
         },
         {
             "index": 120,
-            "byteLength": 1728,
-            "contentHash": 506900542733770415
+            "byteLength": 1712,
+            "contentHash": 3205161815769223428
         },
         {
             "index": 121,
-            "byteLength": 1820,
-            "contentHash": 9420612613883897498
+            "byteLength": 1804,
+            "contentHash": 1848953418482230530
         },
         {
             "index": 122,
-            "byteLength": 1828,
-            "contentHash": 15276643337445994288
+            "byteLength": 1812,
+            "contentHash": 13856116693953119124
         },
         {
             "index": 123,
-            "byteLength": 1284,
-            "contentHash": 11794476780218981060
+            "byteLength": 1268,
+            "contentHash": 2767417697508140286
         },
         {
             "index": 124,
-            "byteLength": 1376,
-            "contentHash": 15554476446604339255
+            "byteLength": 1360,
+            "contentHash": 6237207989158484511
         },
         {
             "index": 125,
-            "byteLength": 1384,
-            "contentHash": 17255968011611023897
+            "byteLength": 1368,
+            "contentHash": 6333807653196908062
         },
         {
             "index": 126,
-            "byteLength": 1624,
-            "contentHash": 15532724494520695199
+            "byteLength": 1608,
+            "contentHash": 11607033233526942658
         },
         {
             "index": 127,
-            "byteLength": 1716,
-            "contentHash": 13870499602595419033
+            "byteLength": 1700,
+            "contentHash": 17080515820468775245
         },
         {
             "index": 128,
-            "byteLength": 1724,
-            "contentHash": 15912522577222224456
+            "byteLength": 1708,
+            "contentHash": 90331265321626185
         },
         {
             "index": 129,
-            "byteLength": 1404,
-            "contentHash": 17098349807090898692
+            "byteLength": 1388,
+            "contentHash": 5356201842216932045
         },
         {
             "index": 130,
-            "byteLength": 1496,
-            "contentHash": 9383421116575880952
+            "byteLength": 1480,
+            "contentHash": 525466597328546006
         },
         {
             "index": 131,
-            "byteLength": 1504,
-            "contentHash": 14430776385769980590
+            "byteLength": 1488,
+            "contentHash": 12901634321475922833
         },
         {
             "index": 132,
-            "byteLength": 1744,
-            "contentHash": 7052049911708173441
+            "byteLength": 1728,
+            "contentHash": 5402540774871641679
         },
         {
             "index": 133,
-            "byteLength": 1836,
-            "contentHash": 18228818741495586936
+            "byteLength": 1820,
+            "contentHash": 10622270171215320727
         },
         {
             "index": 134,
-            "byteLength": 1844,
-            "contentHash": 15719612155053625751
+            "byteLength": 1828,
+            "contentHash": 9755378278737947699
         },
         {
             "index": 135,
-            "byteLength": 1404,
-            "contentHash": 5586896479145746377
+            "byteLength": 1388,
+            "contentHash": 13612247657732531775
         },
         {
             "index": 136,
-            "byteLength": 1496,
-            "contentHash": 10989925135795156484
+            "byteLength": 1480,
+            "contentHash": 207856249750266420
         },
         {
             "index": 137,
-            "byteLength": 1504,
-            "contentHash": 16740350115753637757
+            "byteLength": 1488,
+            "contentHash": 6389710367109947571
         },
         {
             "index": 138,
-            "byteLength": 1744,
-            "contentHash": 17018195002228689669
+            "byteLength": 1728,
+            "contentHash": 3921629435906716977
         },
         {
             "index": 139,
-            "byteLength": 1836,
-            "contentHash": 3951556435413974911
+            "byteLength": 1820,
+            "contentHash": 8124738898280085808
         },
         {
             "index": 140,
-            "byteLength": 1844,
-            "contentHash": 907639041947062680
+            "byteLength": 1828,
+            "contentHash": 14278522477851695786
         },
         {
             "index": 141,
-            "byteLength": 1404,
-            "contentHash": 14535211006229216189
+            "byteLength": 1388,
+            "contentHash": 9149542039080253866
         },
         {
             "index": 142,
-            "byteLength": 1496,
-            "contentHash": 4153768531564497623
+            "byteLength": 1480,
+            "contentHash": 5084106542915443321
         },
         {
             "index": 143,
-            "byteLength": 1504,
-            "contentHash": 2100171764487230520
+            "byteLength": 1488,
+            "contentHash": 6287167797022973804
         },
         {
             "index": 144,
-            "byteLength": 1744,
-            "contentHash": 2336433345478031801
+            "byteLength": 1728,
+            "contentHash": 11546677877144755832
         },
         {
             "index": 145,
-            "byteLength": 1836,
-            "contentHash": 9058503233091912567
+            "byteLength": 1820,
+            "contentHash": 4267810332157320831
         },
         {
             "index": 146,
-            "byteLength": 1844,
-            "contentHash": 842535369144524311
+            "byteLength": 1828,
+            "contentHash": 4132896493615726789
         }
     ],
     "resources": [
         {
             "index": 0,
-            "contentHash": 2518466271437156925,
+            "contentHash": 13720657122635343486,
             "resource": {
                 "name": "OutVolume",
                 "scope": "",
@@ -772,7 +773,7 @@
                 "arrayCount": 1,
                 "shape": "Texture3D",
                 "sampleType": "Invalid",
-                "storageFormat": "Invalid",
+                "storageFormat": "R32Float",
                 "storageAccess": "ReadWrite",
                 "isComparisonSampler": false,
                 "uniformMembers": []
@@ -993,6 +994,23 @@
             "writesFragDepth": false
         }
     ],
+    "samplerPairLists": [
+        {
+            "index": 0,
+            "contentHash": 3244421341483603138,
+            "pairs": []
+        },
+        {
+            "index": 1,
+            "contentHash": 254984204845929552,
+            "pairs": [
+                {
+                    "texture": 1,
+                    "sampler": 2
+                }
+            ]
+        }
+    ],
     "variants": [
         {
             "index": 0,
@@ -1037,6 +1055,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -1095,6 +1117,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1151,6 +1177,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -1209,6 +1239,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1265,6 +1299,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -1323,6 +1361,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1379,6 +1421,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -1437,6 +1483,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1493,6 +1543,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -1551,6 +1605,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1607,6 +1665,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -1665,6 +1727,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1721,6 +1787,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -1779,6 +1849,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1835,6 +1909,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -1893,6 +1971,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1949,6 +2031,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -2007,6 +2093,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2063,6 +2153,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -2121,6 +2215,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2177,6 +2275,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -2235,6 +2337,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2291,6 +2397,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -2349,6 +2459,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2405,6 +2519,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -2463,6 +2581,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2519,6 +2641,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -2577,6 +2703,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2633,6 +2763,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -2691,6 +2825,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2747,6 +2885,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -2805,6 +2947,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2861,6 +3007,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -2919,6 +3069,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2975,6 +3129,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -3033,6 +3191,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3089,6 +3251,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -3147,6 +3313,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3203,6 +3373,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -3261,6 +3435,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3317,6 +3495,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -3375,6 +3557,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3431,6 +3617,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -3489,6 +3679,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3545,6 +3739,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -3603,6 +3801,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3659,6 +3861,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -3717,6 +3923,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3773,6 +3983,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -3831,6 +4045,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3887,6 +4105,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -3945,6 +4167,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4001,6 +4227,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -4059,6 +4289,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4115,6 +4349,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -4173,6 +4411,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4229,6 +4471,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -4287,6 +4533,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4343,6 +4593,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -4401,6 +4655,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4457,6 +4715,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -4515,6 +4777,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4571,6 +4837,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -4629,6 +4899,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4685,6 +4959,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -4743,6 +5021,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4799,6 +5081,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -4857,6 +5143,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4913,6 +5203,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -4971,6 +5265,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5027,6 +5325,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -5085,6 +5387,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5141,6 +5447,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -5199,6 +5509,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5255,6 +5569,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -5313,6 +5631,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5369,6 +5691,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -5427,6 +5753,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5483,6 +5813,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -5541,6 +5875,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5597,6 +5935,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -5655,6 +5997,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5711,6 +6057,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -5769,6 +6119,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5825,6 +6179,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -5883,6 +6241,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5939,6 +6301,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -5997,6 +6363,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6053,6 +6423,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -6111,6 +6485,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6167,6 +6545,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -6225,6 +6607,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6281,6 +6667,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -6339,6 +6729,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6395,6 +6789,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -6453,6 +6851,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6509,6 +6911,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -6567,6 +6973,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6623,6 +7033,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -6681,6 +7095,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6737,6 +7155,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -6795,6 +7217,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6851,6 +7277,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -6909,6 +7339,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6965,6 +7399,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -7023,6 +7461,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7079,6 +7521,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -7137,6 +7583,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7193,6 +7643,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -7251,6 +7705,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7307,6 +7765,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -7365,6 +7827,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7421,6 +7887,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -7479,6 +7949,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7535,6 +8009,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -7593,6 +8071,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7649,6 +8131,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -7707,6 +8193,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7763,6 +8253,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -7821,6 +8315,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7877,6 +8375,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -7935,6 +8437,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7991,6 +8497,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -8049,6 +8559,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8105,6 +8619,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -8163,6 +8681,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8219,6 +8741,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -8277,6 +8803,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8333,6 +8863,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -8391,6 +8925,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8447,6 +8985,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -8505,6 +9047,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8561,6 +9107,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -8619,6 +9169,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8675,6 +9229,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -8733,6 +9291,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8789,6 +9351,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -8847,6 +9413,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8903,6 +9473,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -8961,6 +9535,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9017,6 +9595,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -9075,6 +9657,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9131,6 +9717,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -9189,6 +9779,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9245,6 +9839,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -9303,6 +9901,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9359,6 +9961,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -9417,6 +10023,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9473,6 +10083,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -9531,6 +10145,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9587,6 +10205,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -9645,6 +10267,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9701,6 +10327,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -9759,6 +10389,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9815,6 +10449,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -9873,6 +10511,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9929,6 +10571,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -9987,6 +10633,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10043,6 +10693,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -10101,6 +10755,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10157,6 +10815,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -10215,6 +10877,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10271,6 +10937,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -10329,6 +10999,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10385,6 +11059,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -10443,6 +11121,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10499,6 +11181,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -10557,6 +11243,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10613,6 +11303,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -10671,6 +11365,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10727,6 +11425,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -10785,6 +11487,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10841,6 +11547,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -10899,6 +11609,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10955,6 +11669,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -11013,6 +11731,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11069,6 +11791,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -11127,6 +11853,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11183,6 +11913,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -11241,6 +11975,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11297,6 +12035,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -11355,6 +12097,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11411,6 +12157,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -11469,6 +12219,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11525,6 +12279,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -11583,6 +12341,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11639,6 +12401,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -11697,6 +12463,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11753,6 +12523,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -11811,6 +12585,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11867,6 +12645,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -11925,6 +12707,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11981,6 +12767,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -12039,6 +12829,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12095,6 +12889,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -12153,6 +12951,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12209,6 +13011,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -12267,6 +13073,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12323,6 +13133,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -12381,6 +13195,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12437,6 +13255,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -12495,6 +13317,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12551,6 +13377,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -12609,6 +13439,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12665,6 +13499,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -12723,6 +13561,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12779,6 +13621,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -12837,6 +13683,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12893,6 +13743,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -12951,6 +13805,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13007,6 +13865,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -13065,6 +13927,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13121,6 +13987,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -13179,6 +14049,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13235,6 +14109,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -13293,6 +14171,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13349,6 +14231,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -13407,6 +14293,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13463,6 +14353,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -13521,6 +14415,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13577,6 +14475,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -13635,6 +14537,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13691,6 +14597,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -13749,6 +14659,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13805,6 +14719,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -13863,6 +14781,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13919,6 +14841,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -13977,6 +14903,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14033,6 +14963,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -14091,6 +15025,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14147,6 +15085,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -14205,6 +15147,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14261,6 +15207,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -14319,6 +15269,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14375,6 +15329,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -14433,6 +15391,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14489,6 +15451,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -14547,6 +15513,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14603,6 +15573,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -14661,6 +15635,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14717,6 +15695,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -14775,6 +15757,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14831,6 +15817,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -14889,6 +15879,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14945,6 +15939,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -15003,6 +16001,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15059,6 +16061,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -15117,6 +16123,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15173,6 +16183,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -15231,6 +16245,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15287,6 +16305,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -15345,6 +16367,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15401,6 +16427,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -15459,6 +16489,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15515,6 +16549,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -15573,6 +16611,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15629,6 +16671,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -15687,6 +16733,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15743,6 +16793,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -15801,6 +16855,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15857,6 +16915,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -15915,6 +16977,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15971,6 +17037,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -16029,6 +17099,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16085,6 +17159,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -16143,6 +17221,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16199,6 +17281,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -16257,6 +17343,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16313,6 +17403,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -16371,6 +17465,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16427,6 +17525,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -16485,6 +17587,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16541,6 +17647,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -16599,6 +17709,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16655,6 +17769,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -16713,6 +17831,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16769,6 +17891,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -16827,6 +17953,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16883,6 +18013,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -16941,6 +18075,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16997,6 +18135,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -17055,6 +18197,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -17111,6 +18257,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -17169,6 +18319,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -17225,6 +18379,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {
@@ -17283,6 +18441,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -17340,6 +18502,10 @@
                 0,
                 0
             ],
+            "samplerPairIndices": [
+                0,
+                1
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -17396,6 +18562,10 @@
             "rasterIndices": [
                 0,
                 0
+            ],
+            "samplerPairIndices": [
+                0,
+                1
             ],
             "workgroups": [
                 {

@@ -8,6 +8,7 @@
     "footprintListCount": 1,
     "visibilityListCount": 0,
     "rasterStateCount": 0,
+    "samplerPairListCount": 0,
     "variantCount": 1,
     "entryPoints": [],
     "sources": [],
@@ -28,6 +29,7 @@
     ],
     "visibilityLists": [],
     "rasterStates": [],
+    "samplerPairLists": [],
     "variants": [
         {
             "index": 0,
@@ -39,6 +41,7 @@
             "sourceIndices": [],
             "visibilityIndices": [],
             "rasterIndices": [],
+            "samplerPairIndices": [],
             "workgroups": []
         }
     ],
