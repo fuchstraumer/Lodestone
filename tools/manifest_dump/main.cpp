@@ -182,11 +182,11 @@ void WriteModuleAxes(lodestone::JsonWriter& writer, const manifest::ModuleView& 
 
 void WriteUniformMembers(lodestone::JsonWriter& writer,
                          const manifest::EnvironmentView& view,
-                         const manifest::Binding& binding) noexcept
+                         std::span<const manifest::UniformMember> members) noexcept
 {
     writer.Key("members");
     writer.BeginArray();
-    for (const manifest::UniformMember& member : view.UniformMembers(binding))
+    for (const manifest::UniformMember& member : members)
     {
         writer.BeginObject();
         writer.KeyString("name", view.String(member.NameString));
@@ -225,7 +225,7 @@ void WriteBinding(lodestone::JsonWriter& writer,
     writer.KeyUInt("byteSize", binding.ByteSize);
     writer.KeyUInt("elementStride", binding.ElementStride);
     writer.KeyUInt("arrayCount", binding.ArrayCount);
-    WriteUniformMembers(writer, view, binding);
+    WriteUniformMembers(writer, view, view.UniformMembers(binding));
     writer.EndObject();
 }
 
@@ -351,6 +351,22 @@ void WriteSlot(lodestone::JsonWriter& writer,
             writer.EndObject();
         }
         writer.EndArray();
+    }
+
+    // The uniform buffer of WGSL constants is also in the layout above. A push constant block has no placement.
+    const manifest::EntryPointConstantsView constants = instance.Constants();
+    if (constants.Delivery() != lodestone::EntryPointConstantsDelivery::None)
+    {
+        writer.Key("constants");
+        writer.BeginObject();
+        writer.KeyString("delivery", magic_enum::enum_name(constants.Delivery()));
+        writer.KeyUInt("byteSize", constants.ByteSize());
+        if (constants.Delivery() == lodestone::EntryPointConstantsDelivery::UniformBuffer)
+        {
+            writer.KeyString("binding", instance.Layout()[constants.BindingPosition()].Name());
+        }
+        WriteUniformMembers(writer, view, view.UniformMembers(constants.Record()));
+        writer.EndObject();
     }
 
     WriteRaster(writer, view, instance.Raster());
