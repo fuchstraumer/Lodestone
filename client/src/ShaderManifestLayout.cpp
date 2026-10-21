@@ -40,6 +40,8 @@ namespace
                            const SamplerTexturePair& lhs,
                            const LayoutRange& rhs_layout,
                            const SamplerTexturePair& rhs) noexcept;
+    // compare by text, because the two resources can come from two environments
+    bool TagsEqual(const ResolvedResource& lhs, const ResolvedResource& rhs) noexcept;
 } // namespace
 
 static_assert(std::input_iterator<LayoutRange::Iterator>);
@@ -212,6 +214,45 @@ UniformMemberRange ResolvedResource::Members() const noexcept
     return UniformMemberRange{ environment, environment->UniformMembers(*record) };
 }
 
+ResourceRoleFlags ResolvedResource::Roles() const noexcept
+{
+    return static_cast<ResourceRoleFlags>(record->Roles);
+}
+
+uint32_t ResolvedResource::TagCount() const noexcept
+{
+    return record->TagCount;
+}
+
+std::string_view ResolvedResource::Tag(uint32_t position) const noexcept
+{
+    const std::span<const uint32_t> tagIndices = environment->ResourceTags(*record);
+    return environment->String(tagIndices[position]);
+}
+
+bool ResolvedResource::HasTag(std::string_view tag) const noexcept
+{
+    const std::span<const uint32_t> tagIndices = environment->ResourceTags(*record);
+    auto checkStrIndex = [this, tag](uint32_t string_idx)->bool
+    {
+        return environment->String(string_idx) == tag;
+    };
+    return std::ranges::any_of(tagIndices, checkStrIndex);
+}
+
+BufferUsageFlags ResolvedResource::RequiredBufferUsage() const noexcept
+{
+    switch (Kind())
+    {
+    case BindingKind::UniformBuffer:
+        return BufferUsageFlags::Uniform | BufferUsageOfRoles(Roles());
+    case BindingKind::StorageBuffer:
+        return BufferUsageFlags::Storage | BufferUsageOfRoles(Roles());
+    default:
+        return BufferUsageFlags::Invalid;
+    }
+}
+
 uint32_t ResolvedResource::Index() const noexcept
 {
     // the record points into the binding table, so its distance from the table start is its index
@@ -238,7 +279,9 @@ bool ResolvedResource::operator==(const ResolvedResource& rhs) const noexcept
            SampleType() == rhs.SampleType() &&
            IsComparisonSampler() == rhs.IsComparisonSampler() &&
            ArrayCount() == rhs.ArrayCount() &&
-           ByteSize() == rhs.ByteSize();
+           ByteSize() == rhs.ByteSize() &&
+           Roles() == rhs.Roles() &&
+           TagsEqual(*this, rhs);
 }
 
 bool ResolvedResource::operator!=(const ResolvedResource& rhs) const noexcept
@@ -556,7 +599,7 @@ ManifestResult<MergedLayoutView> MergedLayoutView::Merge(std::span<const EntryPo
             }
             else
             {
-                
+
                 if (!SharePushConstantPrefix(view.pushConstants->Constants, constants))
                 {
                     return std::unexpected(ErrorState{ .Code = ErrorCode::MergedLayoutPushConstantConflict,
@@ -815,6 +858,7 @@ bool MergedLayoutView::PairIterator::operator!=(const PairIterator& other) const
 
 namespace
 {
+    
     bool SamePairPlacement(const LayoutRange& lhs_layout,
                            const SamplerTexturePair& lhs,
                            const LayoutRange& rhs_layout,
@@ -824,6 +868,22 @@ namespace
                    BoundPlacementKey(rhs_layout[rhs.Texture].PlacementValue()) &&
                BoundPlacementKey(lhs_layout[lhs.Sampler].PlacementValue()) ==
                    BoundPlacementKey(rhs_layout[rhs.Sampler].PlacementValue());
+    }
+
+    bool TagsEqual(const ResolvedResource& lhs, const ResolvedResource& rhs) noexcept
+    {
+        if (lhs.TagCount() != rhs.TagCount())
+        {
+            return false;
+        }
+        for (uint32_t i = 0u; i < lhs.TagCount(); ++i)
+        {
+            if (lhs.Tag(i) != rhs.Tag(i))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
 } // namespace

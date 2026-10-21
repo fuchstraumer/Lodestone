@@ -2,7 +2,10 @@
 #ifndef LODESTONE_GRAPH_RESOURCE_FLAGS_HPP
 #define LODESTONE_GRAPH_RESOURCE_FLAGS_HPP
 #include "EnumClassUtils.hpp"
+#include <array>
 #include <cstdint>
+#include <string_view>
+#include <utility>
 
 /**
  * @brief Velox's own vocabulary for resource creation parameters, deliberately independent of any
@@ -72,6 +75,59 @@ enum class TextureUsageFlags : uint16_t
 };
 
 MAKE_ENUM_CLASS_FLAGS(TextureUsageFlags);
+
+/** @brief How a buffer is used outside of its shader bindings, as the shader author declares it with
+ * `[ls_resource_role("...")]`. A binding already shows the uniform and storage usages, and the graph knows the copies
+ * and the attachments, so a role states only a usage that neither of them shows. The cooker checks each role against
+ * the binding kind and the element stride. */
+enum class ResourceRoleFlags : uint16_t
+{
+    None = 0,
+    /** @brief Arguments of an indirect dispatch: three `uint` values, 12 bytes. */
+    IndirectDispatch = 1u << 0,
+    /** @brief Arguments of an indirect draw: four `uint` values, 16 bytes. */
+    IndirectDraw = 1u << 1u,
+    /** @brief Arguments of an indirect indexed draw: five 4-byte values, 20 bytes. */
+    IndirectDrawIndexed = 1u << 2u,
+    /** @brief Index data of an indexed draw, as 32-bit indices. */
+    IndexData = 1u << 3u,
+    /** @brief Vertex data of a draw. */
+    VertexData = 1u << 4u,
+    All = IndirectDispatch | IndirectDraw | IndirectDrawIndexed | IndexData | VertexData,
+};
+
+MAKE_ENUM_CLASS_FLAGS(ResourceRoleFlags);
+
+/** @brief The name of each role, as the shader writes it in `[ls_resource_role("...")]`. */
+inline constexpr std::array<std::pair<std::string_view, ResourceRoleFlags>, 5u> k_ResourceRoleNames{ {
+    { "IndirectDispatch", ResourceRoleFlags::IndirectDispatch },
+    { "IndirectDraw", ResourceRoleFlags::IndirectDraw },
+    { "IndirectDrawIndexed", ResourceRoleFlags::IndirectDrawIndexed },
+    { "IndexData", ResourceRoleFlags::IndexData },
+    { "VertexData", ResourceRoleFlags::VertexData },
+} };
+
+/** @brief The buffer usage that the roles add to a buffer's binding usage. */
+[[nodiscard]] constexpr BufferUsageFlags BufferUsageOfRoles(ResourceRoleFlags roles) noexcept
+{
+    constexpr static ResourceRoleFlags k_IndirectRoles = ResourceRoleFlags::IndirectDispatch |
+                                                         ResourceRoleFlags::IndirectDraw |
+                                                         ResourceRoleFlags::IndirectDrawIndexed;
+    BufferUsageFlags usage = BufferUsageFlags::Invalid;
+    if (HasAnyFlag(roles, k_IndirectRoles))
+    {
+        usage |= BufferUsageFlags::Indirect;
+    }
+    if (HasAnyFlag(roles, ResourceRoleFlags::IndexData))
+    {
+        usage |= BufferUsageFlags::Index;
+    }
+    if (HasAnyFlag(roles, ResourceRoleFlags::VertexData))
+    {
+        usage |= BufferUsageFlags::Vertex;
+    }
+    return usage;
+}
 
 /** @brief Velox specifically excludes many edge case formats: grow this list as needed. */
 enum class TextureFormat : uint8_t

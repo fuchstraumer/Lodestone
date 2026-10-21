@@ -86,6 +86,7 @@ namespace
     struct LayoutTables
     {
         std::vector<manifest::UniformMember> UniformMembers;
+        std::vector<uint32_t> ResourceTags;
         std::vector<manifest::Binding> Bindings;
         std::vector<uint32_t> ResourceIndices;
         std::vector<manifest::Run> ResourceLists;
@@ -472,7 +473,8 @@ namespace
 
     manifest::Binding MakeBindingRecord(const ReflectedBinding& binding,
                                         StringTableBuilder& strings,
-                                        std::vector<manifest::UniformMember>& member_records)
+                                        std::vector<manifest::UniformMember>& member_records,
+                                        std::vector<uint32_t>& tag_records)
     {
         manifest::Binding record;
         record.ByteSize = binding.ByteSize;
@@ -493,6 +495,13 @@ namespace
 
         record.FirstUniformMember = AppendMemberRecords(binding.UniformMembers, strings, member_records);
         record.UniformMemberCount = static_cast<uint32_t>(binding.UniformMembers.size());
+        record.Roles = std::to_underlying(binding.Roles);
+        record.FirstTag = static_cast<uint32_t>(tag_records.size());
+        record.TagCount = static_cast<uint32_t>(binding.Tags.size());
+        for (const std::string& tag : binding.Tags)
+        {
+            tag_records.push_back(strings.Add(tag));
+        }
         return record;
     }
 
@@ -736,7 +745,7 @@ namespace
 
         for (const ReflectedBinding& resource : module.Resources)
         {
-            tables.Bindings.push_back(MakeBindingRecord(resource, strings, tables.UniformMembers));
+            tables.Bindings.push_back(MakeBindingRecord(resource, strings, tables.UniformMembers, tables.ResourceTags));
         }
         // todo-ship: Make this into a move, and make footprint record stop using a variant. Change values
         // to be stored not in a variant, but in a dedicated footprint record structure that we can just copy
@@ -945,6 +954,7 @@ namespace
         environment.SamplerPairLists = AppendTable(extent, layouts.SamplerPairLists);
         environment.SamplerTexturePairs = AppendTable(extent, layouts.SamplerTexturePairs);
         environment.EntryPointConstants = AppendTable(extent, layouts.EntryPointConstants);
+        environment.ResourceTags = AppendTable(extent, layouts.ResourceTags);
 
         AlignTo8(extent);
         std::memcpy(extent.data(), &environment, sizeof(manifest::EnvironmentHeader));

@@ -867,6 +867,33 @@ CookError SlangReflector::collectRawSizeAttributes(slang::VariableReflection* le
     return CookError::Success;
 }
 
+/** Reads the one string argument of an attribute. `out_value` stays unchanged when the variable has no such
+ * attribute. */
+CookError SlangReflector::readSingleStringAttribute(slang::VariableReflection* leaf_variable,
+                                                    const char* attribute_name,
+                                                    std::string_view binding_name,
+                                                    std::string& out_value) const
+{
+    if (leaf_variable == nullptr)
+    {
+        return CookError::Success;
+    }
+
+    slang::Attribute* found = leaf_variable->findAttributeByName(globalSession, attribute_name);
+    if (found == nullptr)
+    {
+        return CookError::Success;
+    }
+
+    CookResult<std::string> argument = ReadStringArgument(found, 0u, binding_name);
+    if (!argument)
+    {
+        return argument.error();
+    }
+    out_value = std::move(argument.value());
+    return CookError::Success;
+}
+
 /**@brief Flattens one uniform or structured buffer block into rows of name, offset, and size.
  * Nested fields take a dotted name to reflect the hierarchy. Offset is accumulated from the
  * root of the struct, as slang structures offsets from zero based on recursive walks of all fields.
@@ -1034,6 +1061,20 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
         if (!collectAttributesError)
         {
             return collectAttributesError;
+        }
+
+        const CookError rolesError = readSingleStringAttribute(leafVariable, "ls_resource_role", draft.Binding.Name,
+                                                               draft.Binding.RawRoles);
+        if (!rolesError)
+        {
+            return rolesError;
+        }
+
+        const CookError tagsError = readSingleStringAttribute(leafVariable, "ls_resource_tags", draft.Binding.Name,
+                                                              draft.Binding.RawTags);
+        if (!tagsError)
+        {
+            return tagsError;
         }
 
         out_drafts.emplace_back(std::move(draft));

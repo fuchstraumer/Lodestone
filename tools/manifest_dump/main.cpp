@@ -225,6 +225,14 @@ void WriteBinding(lodestone::JsonWriter& writer,
     writer.KeyUInt("byteSize", binding.ByteSize);
     writer.KeyUInt("elementStride", binding.ElementStride);
     writer.KeyUInt("arrayCount", binding.ArrayCount);
+    writer.KeyUInt("roles", binding.Roles);
+    writer.Key("tags");
+    writer.BeginArray();
+    for (const uint32_t tag : view.ResourceTags(binding))
+    {
+        writer.String(view.String(tag));
+    }
+    writer.EndArray();
     WriteUniformMembers(writer, view, view.UniformMembers(binding));
     writer.EndObject();
 }

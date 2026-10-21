@@ -114,6 +114,13 @@ enum class CookError : uint16_t
     DerivedConstantCycle = 152, // a derived constant reaches itself through the constants its expression uses
     DerivedConstantUnreadable = 153, // a derived constant that a size attribute reaches does not parse or evaluate
 
+    // the roles and tags of a resource (`[ls_resource_role]`, `[ls_resource_tags]`)
+    ResourceRoleUnknown = 160, // a role name is not in the role table, or the attribute is empty
+    ResourceRoleKindMismatch = 161, // a role is on a resource that is not a structured or raw storage buffer
+    ResourceRoleStrideMismatch = 162, // the element stride, or the element count, does not fit the role
+    ResourceRoleNeedsElementCount = 163, // a 4-byte stride needs `[ls_element_count]` to check an indirect role
+    ResourceTagInvalid = 164, // a tag holds a character outside letters, digits, and `_.:-`, or the attribute is empty
+
     // start system errors
     SystemError = 200,
     DirectoryDoesNotExist = 201,

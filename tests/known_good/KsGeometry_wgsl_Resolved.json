@@ -23,6 +23,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -65,6 +67,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -82,6 +86,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -215,6 +221,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -257,6 +265,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -274,6 +284,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -407,6 +419,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -449,6 +463,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -466,6 +482,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -599,6 +617,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -641,6 +661,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -658,6 +680,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -791,6 +815,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -833,6 +859,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -850,6 +878,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -983,6 +1013,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -1025,6 +1057,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -1042,6 +1076,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -1175,6 +1211,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -1217,6 +1255,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -1234,6 +1274,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -1367,6 +1409,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -1409,6 +1453,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -1426,6 +1472,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -1559,6 +1607,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -1601,6 +1651,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -1618,6 +1670,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -1751,6 +1805,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -1793,6 +1849,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -1810,6 +1868,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -1943,6 +2003,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -1985,6 +2047,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -2002,6 +2066,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -2135,6 +2201,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -2177,6 +2245,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -2194,6 +2264,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -2327,6 +2399,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -2369,6 +2443,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -2386,6 +2462,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -2519,6 +2597,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -2561,6 +2641,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -2578,6 +2660,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -2711,6 +2795,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -2753,6 +2839,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -2770,6 +2858,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],
@@ -2903,6 +2993,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": [
                         {
                             "name": "ViewProjection",
@@ -2945,6 +3037,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "ReadOnly",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 },
                 {
@@ -2962,6 +3056,8 @@
                     "storageFormat": "Invalid",
                     "storageAccess": "Invalid",
                     "isComparisonSampler": false,
+                    "roles": 0,
+                    "tags": [],
                     "uniformMembers": []
                 }
             ],

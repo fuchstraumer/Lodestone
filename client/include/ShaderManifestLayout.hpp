@@ -141,6 +141,16 @@ public:
     [[nodiscard]] uint32_t ExtentY() const noexcept;
     [[nodiscard]] uint32_t ExtentZ() const noexcept;
     [[nodiscard]] UniformMemberRange Members() const noexcept;
+    /** @brief The roles from `[ls_resource_role]`: usages of a buffer outside of its shader bindings. */
+    [[nodiscard]] ResourceRoleFlags Roles() const noexcept;
+    /** @brief The count of tags from `[ls_resource_tags]`. */
+    [[nodiscard]] uint32_t TagCount() const noexcept;
+    /** @brief One tag, in the order of the tags' text. */
+    [[nodiscard]] std::string_view Tag(uint32_t position) const noexcept;
+    [[nodiscard]] bool HasTag(std::string_view tag) const noexcept;
+    /** @brief The usage a buffer needs at creation for its binding kind and its roles. Copy and map usages are not
+     * included: the graph knows them. `Invalid` for a resource that is not a uniform or storage buffer. */
+    [[nodiscard]] BufferUsageFlags RequiredBufferUsage() const noexcept;
     /** @brief The position of the binding record in `EnvironmentView::Bindings()`. */
     [[nodiscard]] uint32_t Index() const noexcept;
     [[nodiscard]] const Binding& Record() const noexcept;
@@ -418,7 +428,7 @@ public:
      * - two instances have the same stage (`MergedLayoutDuplicateStage`)
      * - a resource is not Bound (`MergedLayoutPlacementUnsupported`) (other binding/layout forms coming later)
      * - two resources at one (group, binding) differ in kind, shape, access, storage format, sample type,
-     *   comparison, array count, or byte size (`MergedLayoutConflict`). Names are not compared.
+     *   comparison, array count, byte size, roles, or tags (`MergedLayoutConflict`). Names are not compared.
      * - two push constant blocks differ where they overlap (`MergedLayoutPushConstantConflict`): the members of
      *   the shorter block must be the first members of the longer block, with the same offset, size, array
      *   count, element stride, and matrix layout. Names are not compared.

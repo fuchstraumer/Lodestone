@@ -176,6 +176,14 @@ namespace
         writer.KeyString("storageFormat", magic_enum::enum_name(binding.StorageFormat));
         writer.KeyString("storageAccess", magic_enum::enum_name(binding.Access));
         writer.KeyBool("isComparisonSampler", binding.IsComparisonSampler);
+        writer.KeyUInt("roles", std::to_underlying(binding.Roles));
+        writer.Key("tags");
+        writer.BeginArray();
+        for (const std::string& tag : binding.Tags)
+        {
+            writer.String(tag);
+        }
+        writer.EndArray();
         WriteUniformMembers(writer, "uniformMembers", binding.UniformMembers);
         writer.EndObject();
     }

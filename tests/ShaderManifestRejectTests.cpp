@@ -536,6 +536,59 @@ int main()
                      "an instance that names a constants record past the table is rejected");
     }
 
+    // The stage 4 checks of a role need Slang (ResourceRoleTest). Here only the record matters, so any binding can hold
+    // a role and tags.
+    runner.BeginSection("the roles and tags of a binding read back, and a damaged binding is rejected");
+    CookedLibrary taggedLibrary = MakeConstantsLibrary(true);
+    taggedLibrary.Environments[0]->Resources[0].Roles = lodestone::ResourceRoleFlags::IndexData;
+    taggedLibrary.Environments[0]->Resources[0].Tags = { "Alpha", "Beta" };
+    const lodestone::CookResult<std::vector<std::byte>> taggedManifest = EmitShaderManifest(taggedLibrary);
+    runner.Check(taggedManifest.has_value(), "the emitter accepts a binding with roles and tags");
+    if (taggedManifest.has_value())
+    {
+        const std::vector<std::byte>& taggedBytes = *taggedManifest;
+        runner.Check(lodestone::VerifyManifestRoundTrip(taggedLibrary, taggedBytes) == lodestone::CookError::Success,
+                     "the round trip reads the roles and tags back");
+        CookedLibrary otherTags = MakeConstantsLibrary(true);
+        otherTags.Environments[0]->Resources[0].Roles = lodestone::ResourceRoleFlags::IndexData;
+        otherTags.Environments[0]->Resources[0].Tags = { "Alpha", "Gamma" };
+        runner.Check(lodestone::VerifyManifestRoundTrip(otherTags, taggedBytes) != lodestone::CookError::Success,
+                     "a manifest whose tags differ from the cook fails the round trip");
+
+        const EnvironmentDirectoryEntry taggedEntry = ReadRecord<EnvironmentDirectoryEntry>(
+            taggedBytes, ReadRecord<Header>(taggedBytes, 0u).EnvironmentDirectoryOffset);
+        const EnvironmentHeader taggedHeader = ReadRecord<EnvironmentHeader>(taggedBytes, taggedEntry.ExtentOffset);
+        const size_t bindingOffset = taggedEntry.ExtentOffset + taggedHeader.Bindings.Offset;
+        const auto goodBinding = ReadRecord<lodestone::manifest::Binding>(taggedBytes, bindingOffset);
+        runner.Check(goodBinding.Roles == std::to_underlying(lodestone::ResourceRoleFlags::IndexData) &&
+                         goodBinding.TagCount == 2u,
+                     "the binding record holds the role bits and the tag count");
+        auto rejectBinding = [&](const lodestone::manifest::Binding& record) -> ErrorCode
+        {
+            std::vector<std::byte> damaged = taggedBytes;
+            WriteValue(damaged, bindingOffset, record);
+            return EnvironmentErrorFrom(damaged, 0u);
+        };
+
+        lodestone::manifest::Binding unknownRole = goodBinding;
+        unknownRole.Roles = 0x8000u;
+        runner.Check(rejectBinding(unknownRole) == ErrorCode::InvalidBindingRoles, "an unknown role bit is rejected");
+        lodestone::manifest::Binding tagsPastTable = goodBinding;
+        tagsPastTable.TagCount = 100u;
+        runner.Check(rejectBinding(tagsPastTable) == ErrorCode::InvalidBindingTags,
+                     "a tag run past the tag table is rejected");
+
+        const size_t tagOffset = taggedEntry.ExtentOffset + taggedHeader.ResourceTags.Offset;
+        std::vector<std::byte> repeatedTag = taggedBytes;
+        WriteValue(repeatedTag, tagOffset + sizeof(uint32_t), ReadRecord<uint32_t>(taggedBytes, tagOffset));
+        runner.Check(EnvironmentErrorFrom(repeatedTag, 0u) == ErrorCode::InvalidBindingTags,
+                     "a repeated tag is rejected");
+        std::vector<std::byte> tagPastStrings = taggedBytes;
+        WriteValue(tagPastStrings, tagOffset, 0xFFFFFFu);
+        runner.Check(EnvironmentErrorFrom(tagPastStrings, 0u) == ErrorCode::InvalidBindingTags,
+                     "a tag past the string table is rejected");
+    }
+
     return runner.Report();
 }
 

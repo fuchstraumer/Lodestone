@@ -49,6 +49,23 @@ public struct ls_extent_3dAttribute
     public string depth;
 };
 
+/** The usages of a buffer outside of its shader bindings, separated by whitespace: IndirectDispatch,
+ * IndirectDraw, IndirectDrawIndexed, IndexData, VertexData. The cooker checks each role against the
+ * binding kind and the element stride. */
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct ls_resource_roleAttribute
+{
+    public string roles;
+};
+
+/** Free tags for a resource, separated by whitespace. The cooker does not interpret a tag: it stores the
+ * tags in the manifest, and the renderer reads them. A tag holds only letters, digits, and `_.:-`. */
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct ls_resource_tagsAttribute
+{
+    public string tags;
+};
+
 /** shortcut to declare a boolean axis, which will only produce true/false values in permutation space */
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct ls_axis_booleanAttribute

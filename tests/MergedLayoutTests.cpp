@@ -514,6 +514,43 @@ void TestPushConstants(lodestone::tests::TestRunner& runner, const PermutationSp
                  "two blocks that differ at offset 0 fail, and the error names the second instance and its record");
 }
 
+// The tags and roles are part of a resource: case 2's second Scene is changed to 64 bytes, so only its tag differs.
+void TestTagConflict(lodestone::tests::TestRunner& runner, const PermutationSpace& space)
+{
+    runner.BeginSection("tags and roles");
+
+    lodestone::CookedModule module = BuildModule(space, GoodVisibilityLists(), k_GoodVisibility);
+    for (ReflectedBinding& resource : module.Resources)
+    {
+        if (resource.Name == "Scene" && resource.ByteSize == 128u)
+        {
+            resource.ByteSize = 64u;
+            resource.Tags = { "Other" };
+        }
+    }
+
+    lodestone::CookedLibrary library;
+    library.ModuleNames = { "MergeTestModule" };
+    library.Profiles = { lodestone::CookedProfile{ .TargetName = "wgsl",
+                                                   .AccessModel = lodestone::PlacementKind::Bound,
+                                                   .CodeFormat = lodestone::ShaderCodeFormat::Wgsl,
+                                                   .SamplerTexturePairsRecorded = true } };
+    library.Environments.emplace_back(std::move(module));
+    const lodestone::CookResult<std::vector<std::byte>> manifest = lodestone::EmitShaderManifest(library);
+    const ManifestResult<EnvironmentView> opened =
+        manifest.has_value() ? OpenEnvironment(*manifest) : ManifestResult<EnvironmentView>{ std::unexpected(lodestone::manifest::ErrorState{}) };
+    runner.Check(opened.has_value(), "a module with a tagged resource emits and opens");
+    if (!opened.has_value())
+    {
+        return;
+    }
+
+    const VariantView caseTwo = opened->VariantAt(2u);
+    const std::array raster{ caseTwo.EntryPoint(k_VertexEntryPoint), caseTwo.EntryPoint(k_FragmentEntryPoint) };
+    runner.Check(MergeError(raster) == ErrorCode::MergedLayoutConflict,
+                 "two resources at one placement that differ only in their tags conflict");
+}
+
 int main()
 {
     lodestone::tests::TestRunner runner{ "MergedLayoutTests" };
@@ -533,6 +570,7 @@ int main()
     TestOpenRejectsOrder(runner, space);
     TestSamplerPairs(runner, space);
     TestPushConstants(runner, space);
+    TestTagConflict(runner, space);
     return runner.Report();
 }
 

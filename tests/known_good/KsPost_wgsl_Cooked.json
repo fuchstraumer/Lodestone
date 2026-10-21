@@ -151,7 +151,7 @@
     "resources": [
         {
             "index": 0,
-            "contentHash": 6969220317231583764,
+            "contentHash": 11723944889601267711,
             "resource": {
                 "name": "SceneColor",
                 "scope": "",
@@ -167,12 +167,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 1,
-            "contentHash": 11008137680117175333,
+            "contentHash": 9799666970977834945,
             "resource": {
                 "name": "BloomChain",
                 "scope": "",
@@ -188,12 +190,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 2,
-            "contentHash": 1389697799311910281,
+            "contentHash": 17110004022257531070,
             "resource": {
                 "name": "LinearSampler",
                 "scope": "",
@@ -209,6 +213,8 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "Invalid",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         }

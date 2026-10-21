@@ -176,6 +176,8 @@ public:
     [[nodiscard]] std::span<const uint32_t> VisibilityList(uint32_t list_index) const noexcept;
     [[nodiscard]] std::span<const UniformMember> UniformMembers(const Binding& binding) const noexcept;
     [[nodiscard]] std::span<const UniformMember> UniformMembers(const EntryPointConstants& constants) const noexcept;
+    /** @brief The string indices of a binding's tags, in the order of the tags' text. */
+    [[nodiscard]] std::span<const uint32_t> ResourceTags(const Binding& binding) const noexcept;
     [[nodiscard]] std::span<const EntryPointConstants> EntryPointConstantsTable() const noexcept;
     [[nodiscard]] std::span<const VertexInput> VertexInputs(uint32_t raster_index) const noexcept;
     [[nodiscard]] std::span<const ColorTarget> ColorTargets(uint32_t raster_index) const noexcept;
@@ -209,6 +211,7 @@ private:
     std::span<const VertexInput> vertexInputs;
     std::span<const ColorTarget> colorTargets;
     std::span<const UniformMember> uniformMembers;
+    std::span<const uint32_t> resourceTags;
     std::span<const SpecializationConstant> specializationConstants;
     std::span<const Run> samplerPairLists;
     std::span<const SamplerTexturePair> samplerTexturePairs;

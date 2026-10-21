@@ -751,7 +751,7 @@
     "resources": [
         {
             "index": 0,
-            "contentHash": 15295045527403342661,
+            "contentHash": 16064255499134070351,
             "resource": {
                 "name": "OutColor",
                 "scope": "",
@@ -767,12 +767,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadWrite",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 1,
-            "contentHash": 10047931253639565999,
+            "contentHash": 14042022294128338128,
             "resource": {
                 "name": "Albedo",
                 "scope": "Surface_Material",
@@ -788,12 +790,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 2,
-            "contentHash": 8314754880571155947,
+            "contentHash": 14515709797843367324,
             "resource": {
                 "name": "NormalMap",
                 "scope": "Surface_Material",
@@ -809,12 +813,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 3,
-            "contentHash": 15341710848974423257,
+            "contentHash": 12975805446802127838,
             "resource": {
                 "name": "DetailMap",
                 "scope": "Surface_Material",
@@ -830,12 +836,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 4,
-            "contentHash": 16665875694892147959,
+            "contentHash": 15023399715909833293,
             "resource": {
                 "name": "ColorGradeLut",
                 "scope": "Surface_Material",
@@ -851,12 +859,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 5,
-            "contentHash": 14179044356017491765,
+            "contentHash": 570649281346755963,
             "resource": {
                 "name": "Environment",
                 "scope": "Surface_Material",
@@ -872,12 +882,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 6,
-            "contentHash": 15055241829117551768,
+            "contentHash": 1288128783098461521,
             "resource": {
                 "name": "Sampler",
                 "scope": "Surface_Material",
@@ -893,12 +905,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "Invalid",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 7,
-            "contentHash": 6686495392114965327,
+            "contentHash": 2807789287812458595,
             "resource": {
                 "name": "Palette",
                 "scope": "Surface_Material",
@@ -914,12 +928,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 8,
-            "contentHash": 12317759320109290946,
+            "contentHash": 10353262022018409182,
             "resource": {
                 "name": "Cascades",
                 "scope": "Surface_Shadow",
@@ -935,12 +951,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 9,
-            "contentHash": 8936604872827714628,
+            "contentHash": 6539635656913287698,
             "resource": {
                 "name": "CompareSampler",
                 "scope": "Surface_Shadow",
@@ -956,12 +974,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "Invalid",
                 "isComparisonSampler": true,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 10,
-            "contentHash": 10047931253639565999,
+            "contentHash": 14042022294128338128,
             "resource": {
                 "name": "Albedo",
                 "scope": "entryPointParams_probe",
@@ -977,12 +997,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 11,
-            "contentHash": 8314754880571155947,
+            "contentHash": 14515709797843367324,
             "resource": {
                 "name": "NormalMap",
                 "scope": "entryPointParams_probe",
@@ -998,12 +1020,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 12,
-            "contentHash": 15341710848974423257,
+            "contentHash": 12975805446802127838,
             "resource": {
                 "name": "DetailMap",
                 "scope": "entryPointParams_probe",
@@ -1019,12 +1043,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 13,
-            "contentHash": 16665875694892147959,
+            "contentHash": 15023399715909833293,
             "resource": {
                 "name": "ColorGradeLut",
                 "scope": "entryPointParams_probe",
@@ -1040,12 +1066,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 14,
-            "contentHash": 14179044356017491765,
+            "contentHash": 570649281346755963,
             "resource": {
                 "name": "Environment",
                 "scope": "entryPointParams_probe",
@@ -1061,12 +1089,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 15,
-            "contentHash": 15055241829117551768,
+            "contentHash": 1288128783098461521,
             "resource": {
                 "name": "Sampler",
                 "scope": "entryPointParams_probe",
@@ -1082,12 +1112,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "Invalid",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 16,
-            "contentHash": 6686495392114965327,
+            "contentHash": 2807789287812458595,
             "resource": {
                 "name": "Palette",
                 "scope": "entryPointParams_probe",
@@ -1103,6 +1135,8 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         }

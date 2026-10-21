@@ -129,6 +129,11 @@ struct ReflectedBinding
       * churn for little reason. (for now) */
     std::vector<ReflectedUniformMember> UniformMembers;
 
+    /** The roles from `[ls_resource_role]`, checked against the kind and the stride in stage 4. */
+    ResourceRoleFlags Roles{ ResourceRoleFlags::None };
+    /** The tags from `[ls_resource_tags]`, sorted and unique, so the order the author wrote does not matter. */
+    std::vector<std::string> Tags;
+
     friend bool operator==(const ReflectedBinding&, const ReflectedBinding&) = default;
 };
 

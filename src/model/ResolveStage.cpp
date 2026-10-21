@@ -9,6 +9,8 @@
 #include "permute/PermutationTypes.hpp"
 #include "permute/PermutationValue.hpp"
 #include "Diagnostics.hpp"
+#include "ResourceFlags.hpp"
+#include "ShaderManifestIndex.hpp"
 
 #include <algorithm>
 #include <array>
@@ -39,180 +41,60 @@ namespace
                                                 uint32_t argument_index,
                                                 std::string_view binding_name,
                                                 const ResolveContext& context,
-                                                DiagnosticSink& sink)
-    {
-        if (argument_index >= attribute.Arguments.size())
-        {
-            std::println(stderr,
-                         "[lodestone] [{}] on '{}' is missing argument {}",
-                         ToString(attribute.Kind),
-                         binding_name,
-                         argument_index);
-            return std::unexpected(CookError::AttributeExpressionParseFailed);
-        }
-
-        const CookResult<int64_t> value =
-            EvaluateExpression(attribute.Arguments[argument_index], context.Symbols, sink);
-        if (!value)
-        {
-            return std::unexpected(value.error());
-        }
-
-        if (value.value() <= 0)
-        {
-            std::println(stderr,
-                         "[lodestone] extent argument {} on '{}' evaluated to {}, which is not a "
-                         "valid texture dimension",
-                         argument_index,
-                         binding_name,
-                         value.value());
-            return std::unexpected(CookError::AttributeExpressionOutOfRange);
-        }
-
-        return static_cast<uint32_t>(value.value());
-    }
-
+                                                DiagnosticSink& sink);
     CookResult<TextureFootprint> ResolveExtent(const RawSizeAttribute& attribute,
                                                std::string_view binding_name,
                                                const ResolveContext& context,
-                                               DiagnosticSink& sink)
-    {
-        const uint32_t argumentCount = ArgumentCountOf(attribute.Kind);
-        std::array<uint32_t, 3u> axes{ 1u, 1u, 1u };
-
-        for (uint32_t i = 0u; i < argumentCount && i < axes.size(); ++i)
-        {
-            const CookResult<uint32_t> value = EvaluateExtentArgument(attribute, i, binding_name, context, sink);
-            if (!value)
-            {
-                return std::unexpected(value.error());
-            }
-
-            axes.at(i) = value.value();
-        }
-
-        return TextureFootprint{ .ExtentX = axes[0],
-                                 .ExtentY = axes[1],
-                                 .ExtentZ = axes[2],
-                                 .Expression = attribute.Arguments.front() };
-    }
-
+                                               DiagnosticSink& sink);
     CookResult<BufferFootprint> ResolveElementCount(const RawSizeAttribute& attribute,
                                                     std::string_view binding_name,
                                                     const ResolveContext& context,
-                                                    DiagnosticSink& sink)
-    {
-        if (attribute.Arguments.empty())
-        {
-            std::println(stderr,
-                         "[lodestone] [{}] on '{}' has no argument",
-                         ToString(attribute.Kind),
-                         binding_name);
-            return std::unexpected(CookError::AttributeExpressionParseFailed);
-        }
-
-        const CookResult<int64_t> value =
-            EvaluateExpression(attribute.Arguments.front(), context.Symbols, sink);
-        if (!value)
-        {
-            std::println(stderr,
-                         "[lodestone] [{}] on '{}' did not evaluate",
-                         ToString(attribute.Kind),
-                         binding_name);
-            return std::unexpected(value.error());
-        }
-
-        if (value.value() <= 0)
-        {
-            std::println(stderr,
-                         "[lodestone] [{}] on '{}' evaluated to {}, which cannot size a buffer",
-                         ToString(attribute.Kind),
-                         binding_name,
-                         value.value());
-            return std::unexpected(CookError::AttributeExpressionOutOfRange);
-        }
-
-        return BufferFootprint{ .ElementCount = static_cast<uint64_t>(value.value()),
-                                .Expression = attribute.Arguments.front() };
-    }
-
-
+                                                    DiagnosticSink& sink);
     /**@brief Every annotation on one resource, evaluated. A resource with no annotation is not an error,
      * because many resources can be sized by the caller. The annotation kind tells us if the author is
      * describing a buffer or texture, which is the current extent of our taxonomy here */
     CookResult<ResourceFootprint> ResolveFootprint(std::span<const RawSizeAttribute> attributes,
                                                    std::string_view binding_name,
                                                    const ResolveContext& context,
-                                                   DiagnosticSink& sink)
+                                                   DiagnosticSink& sink);
+    // the whitespace-separated words of one attribute argument
+    std::vector<std::string_view> SplitWords(std::string_view text);
+    std::vector<RawSizeAttribute> AttributesOfBinding(const RawVariant& raw, size_t binding_index);
+    CookResult<std::vector<std::string>> ResolveTags(const RawBinding& raw_binding, DiagnosticSink& sink);
+    CookResult<ResourceRoleFlags> ResolveRoleNames(const RawBinding& raw_binding, DiagnosticSink& sink);
+    /** Checks each role of a buffer against its kind, its element stride, and its element count. A raw buffer counts
+     * as a stride of 4. An indirect role accepts the stride of its command, or a stride of 4 with an element count
+     * that is a whole number of commands. */
+    CookError CheckRoles(const ReflectedBinding& binding, const ResourceFootprint& footprint, DiagnosticSink& sink);
+
+    constexpr bool IsTagCharacter(char character) noexcept
     {
-        const RawSizeAttribute* count = nullptr;
-        const RawSizeAttribute* extent = nullptr;
-
-        for (const RawSizeAttribute& attribute : attributes)
-        {
-            const RawSizeAttribute*& slot =
-                attribute.Kind == RawSizeAttributeKind::ElementCount ? count : extent;
-            if (slot != nullptr)
-            {
-                std::println(stderr,
-                             "[lodestone] '{}' carries [{}] and [{}]; only one may size a resource",
-                             binding_name,
-                             ToString(slot->Kind),
-                             ToString(attribute.Kind));
-                return std::unexpected(CookError::ReflectionSizeUnresolved);
-            }
-
-            slot = &attribute;
-        }
-
-        if (count != nullptr && extent != nullptr)
-        {
-            std::println(stderr,
-                         "[lodestone] '{}' carries an element count and an extent; a resource is a "
-                         "buffer or a texture",
-                         binding_name);
-            return std::unexpected(CookError::ReflectionSizeUnresolved);
-        }
-
-        if (count != nullptr)
-        {
-            CookResult<BufferFootprint> buffer = ResolveElementCount(*count, binding_name, context, sink);
-            if (!buffer)
-            {
-                return std::unexpected(buffer.error());
-            }
-            return ResourceFootprint{ std::move(buffer.value()) };
-        }
-
-        if (extent != nullptr)
-        {
-            CookResult<TextureFootprint> texture = ResolveExtent(*extent, binding_name, context, sink);
-            if (!texture)
-            {
-                return std::unexpected(texture.error());
-            }
-            return ResourceFootprint{ std::move(texture.value()) };
-        }
-
-        return ResourceFootprint{};
+        return (character >= 'a' && character <= 'z') ||
+               (character >= 'A' && character <= 'Z') ||
+               (character >= '0' && character <= '9') ||
+               character == '_' ||
+               character == '.' ||
+               character == ':' ||
+               character == '-';
     }
 
-    std::vector<RawSizeAttribute> AttributesOfBinding(const RawVariant& raw, size_t binding_index)
+    // the size in bytes of the command of an indirect role, or 0 for a role that is not indirect
+    uint32_t IndirectCommandBytes(ResourceRoleFlags role) noexcept
     {
-        std::vector<RawSizeAttribute> attributes;
-
-        for (const RawSizeAttribute& attribute : raw.SizeAttributes)
+        switch (role)
         {
-            if (attribute.BindingIndex == binding_index)
-            {
-                attributes.push_back(attribute);
-            }
+        case ResourceRoleFlags::IndirectDispatch:
+            return 12u;
+        case ResourceRoleFlags::IndirectDraw:
+            return 16u;
+        case ResourceRoleFlags::IndirectDrawIndexed:
+            return 20u;
+        default:
+            return 0u;
         }
-
-        return attributes;
     }
 
-    ReflectedBinding ResolveBinding(const RawBinding& raw_binding)
+    constexpr ReflectedBinding ResolveBinding(const RawBinding& raw_binding) noexcept
     {
         ReflectedBinding binding;
         binding.Name = raw_binding.Name;
@@ -231,7 +113,7 @@ namespace
         return binding;
     }
 
-    CompiledEntryPoint ResolveEntryPoint(const RawEntryPoint& raw_entry_point)
+    constexpr CompiledEntryPoint ResolveEntryPoint(const RawEntryPoint& raw_entry_point) noexcept
     {
         CompiledEntryPoint entryPoint;
         entryPoint.Name = raw_entry_point.Name;
@@ -312,117 +194,14 @@ namespace
 
     private:
 
-        [[nodiscard]] CookError visitIdentifiers(std::span<const std::string> identifiers)
-        {
-            for (const std::string& identifier : identifiers)
-            {
-                // axes, extern constants, and unknown names are leaves. EvaluateExpression reports an
-                // unknown name later, with the expression it was found in
-                const std::optional<uint32_t> index = findByName(identifier);
-                if (!index)
-                {
-                    continue;
-                }
-
-                const CookError visited = visit(*index);
-                if (!visited)
-                {
-                    return visited;
-                }
-            }
-
-            return CookError::Success;
-        }
-
-        [[nodiscard]] CookError visit(uint32_t index)
-        {
-            if (colors[index] == VisitColor::Black)
-            {
-                return CookError::Success;
-            }
-
-            const RawDerivedConstant& constant = table.Constants[index];
-            if (colors[index] == VisitColor::Gray)
-            {
-                return reportCycle(index);
-            }
-
-            colors[index] = VisitColor::Gray;
-            path.push_back(index);
-
-            const CookResult<std::vector<std::string>> identifiers =
-                CollectExpressionIdentifiers(constant.Expression, sink);
-            if (!identifiers)
-            {
-                return reportUnreadable(constant, "does not parse");
-            }
-
-            const CookError dependencies = visitIdentifiers(identifiers.value());
-            if (!dependencies)
-            {
-                return dependencies;
-            }
-
-            // post-order: every derived constant this expression uses is black, so its value is in the table
-            const CookResult<int64_t> value = EvaluateExpression(constant.Expression, context.Symbols, sink);
-            if (!value)
-            {
-                return reportUnreadable(constant, "did not evaluate");
-            }
-
-            context.Symbols.push_back(AttrExprSymbol{ .Name = constant.Name, .Value = value.value() });
-            colors[index] = VisitColor::Black;
-            path.pop_back();
-
-            return CookError::Success;
-        }
-
-        [[nodiscard]] std::optional<uint32_t> findByName(std::string_view name) const
-        {
-            auto extractNameView = [&](uint32_t index)->std::string_view
-            {
-                return std::string_view{ table.Constants[index].Name };
-            };
-            const auto found = std::ranges::lower_bound(table.ByName, name, std::less{}, extractNameView);
-            if (found == table.ByName.end() || table.Constants[*found].Name != name)
-            {
-                return std::nullopt;
-            }
-            return *found;
-        }
-
+        [[nodiscard]] CookError visitIdentifiers(std::span<const std::string> identifiers);
+        [[nodiscard]] CookError visit(uint32_t index);
+        [[nodiscard]] std::optional<uint32_t> findByName(std::string_view name) const;
         /** Returns the current path as `'A' (file:line) = '...' -> 'B' (file:line) = '...'`. */
-        [[nodiscard]] std::string describePath(std::span<const uint32_t> nodes) const
-        {
-            std::string description;
-            for (const uint32_t node : nodes)
-            {
-                description += std::format("\n    -> {}", DescribeDerivedConstant(table.Constants[node]));
-            }
-            return description;
-        }
-
-        [[nodiscard]] CookError reportCycle(uint32_t index) const
-        {
-            // the cycle is the part of the path from the first visit of `index` to its end, and back to `index`
-            const auto cycleStart = std::ranges::find(path, index);
-            std::vector<uint32_t> cycle(cycleStart, path.end());
-            cycle.push_back(index);
-            const std::string message = std::format("derived constants form a cycle, reached from {}:{}",
-                                                    rootDescription,
-                                                    describePath(cycle));
-            return ReportError(sink, CookError::DerivedConstantCycle, message);
-        }
-
-        [[nodiscard]] CookError reportUnreadable(const RawDerivedConstant& constant, std::string_view failure) const
-        {
-            const std::string message = std::format("derived constant '{}' {}, reached from {}:{}",
-                                                    constant.Name,
-                                                    failure,
-                                                    rootDescription,
-                                                    describePath(path));
-            return ReportError(sink, CookError::DerivedConstantUnreadable, message);
-        }
+        [[nodiscard]] std::string describePath(std::span<const uint32_t> nodes) const;
+        [[nodiscard]] CookError reportCycle(uint32_t index) const;
+        [[nodiscard]] CookError reportUnreadable(const RawDerivedConstant& constant,
+                                                 std::string_view failure) const;
 
         const DerivedConstantTable& table;
         ResolveContext& context;
@@ -566,7 +345,27 @@ CookResult<CompiledVariant> ResolveVariant(const RawVariant& raw, const ResolveC
             return std::unexpected(footprint.error());
         }
 
-        variant.Bindings.push_back(ResolveBinding(rawBinding));
+        ReflectedBinding binding = ResolveBinding(rawBinding);
+        CookResult<ResourceRoleFlags> roles = ResolveRoleNames(rawBinding, sink);
+        if (!roles)
+        {
+            return std::unexpected(roles.error());
+        }
+        binding.Roles = *roles;
+        CookResult<std::vector<std::string>> tags = ResolveTags(rawBinding, sink);
+        if (!tags)
+        {
+            return std::unexpected(tags.error());
+        }
+        binding.Tags = std::move(*tags);
+
+        const CookError roleError = CheckRoles(binding, *footprint, sink);
+        if (roleError != CookError::Success)
+        {
+            return std::unexpected(roleError);
+        }
+
+        variant.Bindings.push_back(std::move(binding));
         variant.Footprints.push_back(std::move(footprint.value()));
     }
 
@@ -578,5 +377,476 @@ CookResult<CompiledVariant> ResolveVariant(const RawVariant& raw, const ResolveC
 
     return variant;
 }
+
+namespace
+{
+    CookResult<uint32_t> EvaluateExtentArgument(const RawSizeAttribute& attribute,
+                                                uint32_t argument_index,
+                                                std::string_view binding_name,
+                                                const ResolveContext& context,
+                                                DiagnosticSink& sink)
+    {
+        if (argument_index >= attribute.Arguments.size())
+        {
+            std::println(stderr,
+                         "[lodestone] [{}] on '{}' is missing argument {}",
+                         ToString(attribute.Kind),
+                         binding_name,
+                         argument_index);
+            return std::unexpected(CookError::AttributeExpressionParseFailed);
+        }
+
+        const CookResult<int64_t> value =
+            EvaluateExpression(attribute.Arguments[argument_index], context.Symbols, sink);
+        if (!value)
+        {
+            return std::unexpected(value.error());
+        }
+
+        if (value.value() <= 0)
+        {
+            std::println(stderr,
+                         "[lodestone] extent argument {} on '{}' evaluated to {}, which is not a "
+                         "valid texture dimension",
+                         argument_index,
+                         binding_name,
+                         value.value());
+            return std::unexpected(CookError::AttributeExpressionOutOfRange);
+        }
+
+        return static_cast<uint32_t>(value.value());
+    }
+
+    CookResult<TextureFootprint> ResolveExtent(const RawSizeAttribute& attribute,
+                                               std::string_view binding_name,
+                                               const ResolveContext& context,
+                                               DiagnosticSink& sink)
+    {
+        const uint32_t argumentCount = ArgumentCountOf(attribute.Kind);
+        std::array<uint32_t, 3u> axes{ 1u, 1u, 1u };
+
+        for (uint32_t i = 0u; i < argumentCount && i < axes.size(); ++i)
+        {
+            const CookResult<uint32_t> value = EvaluateExtentArgument(attribute, i, binding_name, context, sink);
+            if (!value)
+            {
+                return std::unexpected(value.error());
+            }
+
+            axes.at(i) = value.value();
+        }
+
+        return TextureFootprint{ .ExtentX = axes[0],
+                                 .ExtentY = axes[1],
+                                 .ExtentZ = axes[2],
+                                 .Expression = attribute.Arguments.front() };
+    }
+
+    CookResult<BufferFootprint> ResolveElementCount(const RawSizeAttribute& attribute,
+                                                    std::string_view binding_name,
+                                                    const ResolveContext& context,
+                                                    DiagnosticSink& sink)
+    {
+        if (attribute.Arguments.empty())
+        {
+            std::println(stderr,
+                         "[lodestone] [{}] on '{}' has no argument",
+                         ToString(attribute.Kind),
+                         binding_name);
+            return std::unexpected(CookError::AttributeExpressionParseFailed);
+        }
+
+        const CookResult<int64_t> value =
+            EvaluateExpression(attribute.Arguments.front(), context.Symbols, sink);
+        if (!value)
+        {
+            std::println(stderr,
+                         "[lodestone] [{}] on '{}' did not evaluate",
+                         ToString(attribute.Kind),
+                         binding_name);
+            return std::unexpected(value.error());
+        }
+
+        if (value.value() <= 0)
+        {
+            std::println(stderr,
+                         "[lodestone] [{}] on '{}' evaluated to {}, which cannot size a buffer",
+                         ToString(attribute.Kind),
+                         binding_name,
+                         value.value());
+            return std::unexpected(CookError::AttributeExpressionOutOfRange);
+        }
+
+        return BufferFootprint{ .ElementCount = static_cast<uint64_t>(value.value()),
+                                .Expression = attribute.Arguments.front() };
+    }
+
+    CookResult<ResourceFootprint> ResolveFootprint(std::span<const RawSizeAttribute> attributes,
+                                                   std::string_view binding_name,
+                                                   const ResolveContext& context,
+                                                   DiagnosticSink& sink)
+    {
+        const RawSizeAttribute* count = nullptr;
+        const RawSizeAttribute* extent = nullptr;
+
+        for (const RawSizeAttribute& attribute : attributes)
+        {
+            const RawSizeAttribute*& slot =
+                attribute.Kind == RawSizeAttributeKind::ElementCount ? count : extent;
+            if (slot != nullptr)
+            {
+                std::println(stderr,
+                             "[lodestone] '{}' carries [{}] and [{}]; only one may size a resource",
+                             binding_name,
+                             ToString(slot->Kind),
+                             ToString(attribute.Kind));
+                return std::unexpected(CookError::ReflectionSizeUnresolved);
+            }
+
+            slot = &attribute;
+        }
+
+        if (count != nullptr && extent != nullptr)
+        {
+            std::println(stderr,
+                         "[lodestone] '{}' carries an element count and an extent; a resource is a "
+                         "buffer or a texture",
+                         binding_name);
+            return std::unexpected(CookError::ReflectionSizeUnresolved);
+        }
+
+        if (count != nullptr)
+        {
+            CookResult<BufferFootprint> buffer = ResolveElementCount(*count, binding_name, context, sink);
+            if (!buffer)
+            {
+                return std::unexpected(buffer.error());
+            }
+            return ResourceFootprint{ std::move(buffer.value()) };
+        }
+
+        if (extent != nullptr)
+        {
+            CookResult<TextureFootprint> texture = ResolveExtent(*extent, binding_name, context, sink);
+            if (!texture)
+            {
+                return std::unexpected(texture.error());
+            }
+            return ResourceFootprint{ std::move(texture.value()) };
+        }
+
+        return ResourceFootprint{};
+    }
+
+    std::vector<RawSizeAttribute> AttributesOfBinding(const RawVariant& raw, size_t binding_index)
+    {
+        std::vector<RawSizeAttribute> attributes;
+
+        for (const RawSizeAttribute& attribute : raw.SizeAttributes)
+        {
+            if (attribute.BindingIndex == binding_index)
+            {
+                attributes.push_back(attribute);
+            }
+        }
+
+        return attributes;
+    }
+
+    std::vector<std::string_view> SplitWords(std::string_view text)
+    {
+        std::vector<std::string_view> words;
+        for (const auto word : std::views::split(text, ' '))
+        {
+            const std::string_view view{ word.begin(), word.end() };
+            // a tab or a newline is not a separator here, so it fails the check of the word it is in
+            if (!view.empty())
+            {
+                words.push_back(view);
+            }
+        }
+        return words;
+    }
+
+    CookResult<std::vector<std::string>> ResolveTags(const RawBinding& raw_binding, DiagnosticSink& sink)
+    {
+        std::vector<std::string> tags;
+        if (raw_binding.RawTags.empty())
+        {
+            return tags;
+        }
+
+        for (const std::string_view word : SplitWords(raw_binding.RawTags))
+        {
+            if (!std::ranges::all_of(word, IsTagCharacter))
+            {
+                return std::unexpected(ReportError(sink,
+                                                   CookError::ResourceTagInvalid,
+                                                   std::format("'{}': the tag '{}' holds a character other than a "
+                                                               "letter, a digit, or one of '_.:-'",
+                                                               raw_binding.Name,
+                                                               word)));
+            }
+            tags.emplace_back(word);
+        }
+
+        if (tags.empty())
+        {
+            return std::unexpected(ReportError(sink,
+                                               CookError::ResourceTagInvalid,
+                                               std::format("'{}': [ls_resource_tags] holds no tag", raw_binding.Name)));
+        }
+
+        std::ranges::sort(tags);
+        const auto repeated = std::ranges::unique(tags);
+        tags.erase(repeated.begin(), repeated.end());
+        return tags;
+    }
+
+    CookResult<ResourceRoleFlags> ResolveRoleNames(const RawBinding& raw_binding, DiagnosticSink& sink)
+    {
+        ResourceRoleFlags roles = ResourceRoleFlags::None;
+        if (raw_binding.RawRoles.empty())
+        {
+            return roles;
+        }
+
+        for (const std::string_view word : SplitWords(raw_binding.RawRoles))
+        {
+            const auto found =
+                std::ranges::find(k_ResourceRoleNames, word, &std::pair<std::string_view, ResourceRoleFlags>::first);
+            if (found == k_ResourceRoleNames.end())
+            {
+                std::array<std::string_view, k_ResourceRoleNames.size()> names{};
+                std::ranges::transform(k_ResourceRoleNames, names.begin(), [](const auto& entry) { return entry.first; });
+                const std::string_view nearest = NearestName(word, names);
+                return std::unexpected(ReportError(
+                    sink,
+                    CookError::ResourceRoleUnknown,
+                    nearest.empty() ? std::format("'{}': '{}' is not a resource role", raw_binding.Name, word)
+                                    : std::format("'{}': '{}' is not a resource role. Did you mean '{}'?",
+                                                  raw_binding.Name,
+                                                  word,
+                                                  nearest)));
+            }
+            roles |= found->second;
+        }
+
+        if (roles == ResourceRoleFlags::None)
+        {
+            return std::unexpected(ReportError(sink,
+                                               CookError::ResourceRoleUnknown,
+                                               std::format("'{}': [ls_resource_role] holds no role", raw_binding.Name)));
+        }
+        return roles;
+    }
+
+    CookError CheckRoles(const ReflectedBinding& binding, const ResourceFootprint& footprint, DiagnosticSink& sink)
+    {
+        if (binding.Roles == ResourceRoleFlags::None)
+        {
+            return CookError::Success;
+        }
+
+        const ResourceShape baseShape = GetBaseShape(binding.Shape);
+        const bool isBuffer = binding.Kind == BindingKind::StorageBuffer &&
+                              (baseShape == ResourceShape::StructuredBuffer || baseShape == ResourceShape::ByteAddressBuffer);
+        if (!isBuffer)
+        {
+            return ReportError(sink,
+                               CookError::ResourceRoleKindMismatch,
+                               std::format("'{}': a resource role needs a structured or raw storage buffer, not a {}",
+                                           binding.Name,
+                                           ToString(binding.Kind)));
+        }
+
+        const uint32_t stride = baseShape == ResourceShape::ByteAddressBuffer ? 4u : binding.ElementStride;
+        const BufferFootprint* counted = std::get_if<BufferFootprint>(&footprint);
+        for (const auto& [name, role] : k_ResourceRoleNames)
+        {
+            if (!HasAnyFlag(binding.Roles, role))
+            {
+                continue;
+            }
+
+            const uint32_t commandBytes = IndirectCommandBytes(role);
+            if (commandBytes != 0u)
+            {
+                if (stride == commandBytes)
+                {
+                    continue;
+                }
+                if (stride != 4u)
+                {
+                    return ReportError(sink,
+                                       CookError::ResourceRoleStrideMismatch,
+                                       std::format("'{}': the role {} needs a stride of {} or 4 bytes, not {}",
+                                                   binding.Name,
+                                                   name,
+                                                   commandBytes,
+                                                   stride));
+                }
+                if (counted == nullptr)
+                {
+                    return ReportError(sink,
+                                       CookError::ResourceRoleNeedsElementCount,
+                                       std::format("'{}': the role {} with a 4-byte stride needs [ls_element_count], so "
+                                                   "the cook can check that the buffer holds whole commands",
+                                                   binding.Name,
+                                                   name));
+                }
+                const uint32_t commandWords = commandBytes / 4u;
+                if (counted->ElementCount % commandWords != 0u)
+                {
+                    return ReportError(sink,
+                                       CookError::ResourceRoleStrideMismatch,
+                                       std::format("'{}': the role {} needs a count of 4-byte elements that is a "
+                                                   "multiple of {}, not {}",
+                                                   binding.Name,
+                                                   name,
+                                                   commandWords,
+                                                   counted->ElementCount));
+                }
+                continue;
+            }
+
+            const bool strideFits = role == ResourceRoleFlags::IndexData ? stride == 4u : stride != 0u && stride % 4u == 0u;
+            if (!strideFits)
+            {
+                return ReportError(sink,
+                                   CookError::ResourceRoleStrideMismatch,
+                                   std::format("'{}': the role {} needs {}, not a stride of {}",
+                                               binding.Name,
+                                               name,
+                                               role == ResourceRoleFlags::IndexData ? "a stride of 4 bytes (32-bit indices)"
+                                                                                    : "a stride that is a multiple of 4 bytes",
+                                               stride));
+            }
+        }
+
+        return CookError::Success;
+    }
+
+    CookError DerivedConstantWalk::visitIdentifiers(std::span<const std::string> identifiers)
+    {
+        for (const std::string& identifier : identifiers)
+        {
+            // axes, extern constants, and unknown names are leaves. EvaluateExpression reports an
+            // unknown name later, with the expression it was found in
+            const std::optional<uint32_t> index = findByName(identifier);
+            if (!index)
+            {
+                continue;
+            }
+
+            const CookError visited = visit(*index);
+            if (!visited)
+            {
+                return visited;
+            }
+        }
+
+        return CookError::Success;
+    }
+
+    CookError DerivedConstantWalk::visit(uint32_t index)
+    {
+        if (colors[index] == VisitColor::Black)
+        {
+            return CookError::Success;
+        }
+
+        const RawDerivedConstant& constant = table.Constants[index];
+        if (colors[index] == VisitColor::Gray)
+        {
+            return reportCycle(index);
+        }
+
+        colors[index] = VisitColor::Gray;
+        path.push_back(index);
+
+        const CookResult<std::vector<std::string>> identifiers =
+            CollectExpressionIdentifiers(constant.Expression, sink);
+        if (!identifiers)
+        {
+            return reportUnreadable(constant, "does not parse");
+        }
+
+        const CookError dependencies = visitIdentifiers(identifiers.value());
+        if (!dependencies)
+        {
+            return dependencies;
+        }
+
+        // post-order: every derived constant this expression uses is black, so its value is in the table
+        const CookResult<int64_t> value = EvaluateExpression(constant.Expression,
+                                                             context.Symbols,
+                                                             sink);
+        if (!value)
+        {
+            return reportUnreadable(constant, "did not evaluate");
+        }
+
+        context.Symbols.push_back(AttrExprSymbol{ .Name = constant.Name, .Value = value.value() });
+        colors[index] = VisitColor::Black;
+        path.pop_back();
+
+        return CookError::Success;
+    }
+
+    std::optional<uint32_t> DerivedConstantWalk::findByName(std::string_view name) const
+    {
+        auto extractNameView = [&](uint32_t index)->std::string_view
+        {
+            return std::string_view{ table.Constants[index].Name };
+        };
+
+        const auto found = std::ranges::lower_bound(table.ByName,
+                                                    name,
+                                                    std::less{},
+                                                    extractNameView);
+        
+        if (found == table.ByName.end() || table.Constants[*found].Name != name)
+        {
+            return std::nullopt;
+        }
+
+        return *found;
+    }
+
+    std::string DerivedConstantWalk::describePath(std::span<const uint32_t> nodes) const
+    {
+        std::string description;
+        for (const uint32_t node : nodes)
+        {
+            description += std::format("\n    -> {}", DescribeDerivedConstant(table.Constants[node]));
+        }
+        return description;
+    }
+
+    CookError DerivedConstantWalk::reportCycle(uint32_t index) const
+    {
+        // the cycle is the part of the path from the first visit of `index` to its end, and back to `index`
+        const auto cycleStart = std::ranges::find(path, index);
+        std::vector<uint32_t> cycle(cycleStart, path.end());
+        cycle.push_back(index);
+        const std::string message = std::format("derived constants form a cycle, reached from {}:{}",
+                                                rootDescription,
+                                                describePath(cycle));
+        return ReportError(sink, CookError::DerivedConstantCycle, message);
+    }
+
+    CookError DerivedConstantWalk::reportUnreadable(const RawDerivedConstant& constant,
+                                                    std::string_view failure) const
+    {
+        const std::string message = std::format("derived constant '{}' {}, reached from {}:{}",
+                                                constant.Name,
+                                                failure,
+                                                rootDescription,
+                                                describePath(path));
+        return ReportError(sink, CookError::DerivedConstantUnreadable, message);
+    }
+
+} // namespace
 
 } // namespace lodestone

@@ -761,7 +761,7 @@
     "resources": [
         {
             "index": 0,
-            "contentHash": 13720657122635343486,
+            "contentHash": 17894144023921686057,
             "resource": {
                 "name": "OutVolume",
                 "scope": "",
@@ -777,12 +777,14 @@
                 "storageFormat": "R32Float",
                 "storageAccess": "ReadWrite",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 1,
-            "contentHash": 14203428985747490723,
+            "contentHash": 2602235143042222123,
             "resource": {
                 "name": "InVolume",
                 "scope": "",
@@ -798,12 +800,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 2,
-            "contentHash": 2733849252160162325,
+            "contentHash": 146800882396232672,
             "resource": {
                 "name": "VolumeSampler",
                 "scope": "",
@@ -819,12 +823,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "Invalid",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 3,
-            "contentHash": 13825225395280901702,
+            "contentHash": 13227858735910869092,
             "resource": {
                 "name": "DebugStats",
                 "scope": "",
@@ -840,6 +846,8 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadWrite",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         }

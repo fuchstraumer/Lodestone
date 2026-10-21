@@ -483,7 +483,8 @@ uint64_t HashReflectedBinding(const ReflectedBinding& binding) noexcept
         static_cast<uint64_t>(binding.SampleType),
         static_cast<uint64_t>(binding.StorageFormat),
         static_cast<uint64_t>(binding.Access),
-        static_cast<uint64_t>(binding.IsComparisonSampler)
+        static_cast<uint64_t>(binding.IsComparisonSampler),
+        static_cast<uint64_t>(binding.Roles)
     };
     std::span<const std::byte> scalarValuesBytes = std::as_bytes(std::span{ scalarValues });
     compositeHasher.Append(scalarValuesBytes);
@@ -492,6 +493,13 @@ uint64_t HashReflectedBinding(const ReflectedBinding& binding) noexcept
     {
         compositeHasher.Append(std::string_view{ member.Name });
         compositeHasher.Append(ObjectAsBytes(member.Data));
+    }
+
+    // the count separates the last member name from the first tag
+    compositeHasher.Append(static_cast<uint64_t>(binding.Tags.size()));
+    for (const std::string& tag : binding.Tags)
+    {
+        compositeHasher.Append(std::string_view{ tag });
     }
 
     return compositeHasher.Finalize();

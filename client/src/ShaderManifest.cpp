@@ -109,6 +109,8 @@ namespace
             "an entry point instance names an entry point constants record past the table",
             "an entry point constants record has an unknown delivery, a member run past the member table, a position on a push constant block, data with no delivery, or a uniform buffer position that does not name a uniform buffer of its size",
             "a merged layout got two push constant blocks whose members differ where the blocks overlap",
+            "a binding sets a role bit that ResourceRoleFlags does not define",
+            "a binding's tag run is outside the tag table, names a string past the string table, or repeats a tag",
         });
 
     static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ErrorCode::Count),
@@ -478,6 +480,7 @@ ManifestResult<EnvironmentView> EnvironmentView::Open(const BundleView& bundle,
     view.vertexInputs = Map<VertexInput>(extent_bytes, parsed.VertexInputs);
     view.colorTargets = Map<ColorTarget>(extent_bytes, parsed.ColorTargets);
     view.uniformMembers = Map<UniformMember>(extent_bytes, parsed.UniformMembers);
+    view.resourceTags = Map<uint32_t>(extent_bytes, parsed.ResourceTags);
     view.specializationConstants = Map<SpecializationConstant>(extent_bytes, parsed.SpecConstants);
     view.samplerPairLists = Map<Run>(extent_bytes, parsed.SamplerPairLists);
     view.samplerTexturePairs = Map<SamplerTexturePair>(extent_bytes, parsed.SamplerTexturePairs);
@@ -644,6 +647,11 @@ std::span<const uint32_t> EnvironmentView::VisibilityList(uint32_t list_index) c
 std::span<const UniformMember> EnvironmentView::UniformMembers(const Binding& binding) const noexcept
 {
     return uniformMembers.subspan(binding.FirstUniformMember, binding.UniformMemberCount);
+}
+
+std::span<const uint32_t> EnvironmentView::ResourceTags(const Binding& binding) const noexcept
+{
+    return resourceTags.subspan(binding.FirstTag, binding.TagCount);
 }
 
 std::span<const UniformMember> EnvironmentView::UniformMembers(const EntryPointConstants& constants) const noexcept

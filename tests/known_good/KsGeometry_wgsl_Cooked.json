@@ -66,7 +66,7 @@
     "resources": [
         {
             "index": 0,
-            "contentHash": 7504288063752556050,
+            "contentHash": 11655714808812582930,
             "resource": {
                 "name": "Scene",
                 "scope": "",
@@ -82,6 +82,8 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "Invalid",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": [
                     {
                         "name": "ViewProjection",
@@ -112,7 +114,7 @@
         },
         {
             "index": 1,
-            "contentHash": 15134074852137143118,
+            "contentHash": 13546689089028762482,
             "resource": {
                 "name": "BaseColorTexture",
                 "scope": "",
@@ -128,12 +130,14 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "ReadOnly",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         },
         {
             "index": 2,
-            "contentHash": 10161006085530564015,
+            "contentHash": 2029418013695724943,
             "resource": {
                 "name": "BaseColorSampler",
                 "scope": "",
@@ -149,6 +153,8 @@
                 "storageFormat": "Invalid",
                 "storageAccess": "Invalid",
                 "isComparisonSampler": false,
+                "roles": 0,
+                "tags": [],
                 "uniformMembers": []
             }
         }

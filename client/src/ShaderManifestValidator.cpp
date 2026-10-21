@@ -512,7 +512,7 @@ namespace
                                      environment.VariantCount * context.AxisMaskWordCount };
         const TableRef axisRelevanceLoc{ environment.AxisRelevanceTableOffset,
                                          static_cast<uint32_t>(context.EntryPointCount) * context.AxisMaskWordCount };
-        const std::array<Section, 21u> sections
+        const std::array<Section, 22u> sections
         {
             Section{ ShaderManifestTable::AxisRelevance, axisRelevanceLoc, sizeof(uint64_t) },
             Section{ ShaderManifestTable::VariantKeys, varKeysLoc, sizeof(VariantKey) },
@@ -535,6 +535,7 @@ namespace
             Section{ ShaderManifestTable::SamplerPairLists, environment.SamplerPairLists, sizeof(Run) },
             Section{ ShaderManifestTable::SamplerTexturePairs, environment.SamplerTexturePairs, sizeof(SamplerTexturePair) },
             Section{ ShaderManifestTable::EntryPointConstants, environment.EntryPointConstants, sizeof(EntryPointConstants) },
+            Section{ ShaderManifestTable::ResourceTags, environment.ResourceTags, sizeof(uint32_t) },
         };
 
         return ValidateSections(sections, extentSize);
@@ -581,6 +582,7 @@ namespace
     {
         const EnvironmentHeader& environment = context.Environment;
         const std::span<const Binding> bindingSpan = Map<Binding>(context.Extent, environment.Bindings);
+        const std::span<const uint32_t> tagSpan = Map<uint32_t>(context.Extent, environment.ResourceTags);
         for (int32_t i = 0; i < std::ssize(bindingSpan); ++i)
         {
             const Binding& binding = bindingSpan[i];
@@ -598,6 +600,36 @@ namespace
                 return { .Code = ErrorCode::ManifestBindingInvalidUniforms,
                          .Table = ShaderManifestTable::Bindings,
                          .RecordIndex = static_cast<uint32_t>(i) };
+            }
+
+            if ((binding.Roles & ~std::to_underlying(ResourceRoleFlags::All)) != 0u)
+            {
+                return { .Code = ErrorCode::InvalidBindingRoles,
+                         .Table = ShaderManifestTable::Bindings,
+                         .RecordIndex = static_cast<uint32_t>(i),
+                         .Detail = binding.Roles };
+            }
+
+            if (binding.FirstTag > environment.ResourceTags.Count ||
+                binding.TagCount > environment.ResourceTags.Count - binding.FirstTag)
+            {
+                return { .Code = ErrorCode::InvalidBindingTags,
+                         .Table = ShaderManifestTable::Bindings,
+                         .RecordIndex = static_cast<uint32_t>(i) };
+            }
+
+            // the string table holds each text once, so a repeated index is a repeated tag
+            const std::span<const uint32_t> tags = tagSpan.subspan(binding.FirstTag, binding.TagCount);
+            for (size_t tag = 0u; tag < tags.size(); ++tag)
+            {
+                if (tags[tag] >= context.StringCount ||
+                    std::ranges::find(tags.first(tag), tags[tag]) != tags.first(tag).end())
+                {
+                    return { .Code = ErrorCode::InvalidBindingTags,
+                             .Table = ShaderManifestTable::Bindings,
+                             .RecordIndex = static_cast<uint32_t>(i),
+                             .Detail = static_cast<uint32_t>(tag) };
+                }
             }
         }
 
@@ -623,6 +655,7 @@ namespace
             const bool hasPosition = constants.Delivery == std::to_underlying(EntryPointConstantsDelivery::UniformBuffer);
             const bool isNone = constants.Delivery == std::to_underlying(EntryPointConstantsDelivery::None);
             const bool emptyWhenNone = !isNone || (constants.ByteSize == 0u && constants.UniformMemberCount == 0u);
+            
             if (!knownDelivery || !membersInRange || (!hasPosition && constants.Binding != 0u) || !emptyWhenNone)
             {
                 return { .Code = ErrorCode::InvalidEntryPointConstants,

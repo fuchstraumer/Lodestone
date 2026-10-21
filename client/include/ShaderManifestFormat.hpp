@@ -16,7 +16,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 11u;
+inline constexpr uint32_t k_ShaderManifestVersion = 12u;
 
 // clang-tidy complains about enums being too big, but uint32_t means
 // the error struct is 16bytes, which is great alignment and still compact
@@ -85,6 +85,10 @@ enum class ErrorCode : uint32_t
     // two stages put push constant blocks at offset 0, and the members of the shorter block are not the first
     // members of the longer block
     MergedLayoutPushConstantConflict = 56,
+    // a binding sets a role bit that `ResourceRoleFlags` does not define
+    InvalidBindingRoles = 57,
+    // a binding's tag run is outside the tag table, names a string past the string table, or repeats a tag
+    InvalidBindingTags = 58,
     Count
 };
 
@@ -120,6 +124,7 @@ enum class ShaderManifestTable : uint32_t
     SamplerPairLists,
     SamplerTexturePairs,
     EntryPointConstants,
+    ResourceTags,
     Count
 };
 //NOLINTEND(readability-enum-initial-value, performance-enum-size)
@@ -329,6 +334,7 @@ struct alignas(8) EnvironmentHeader
     TableRef SamplerPairLists{ 0u, 0u };
     TableRef SamplerTexturePairs{ 0u, 0u };
     TableRef EntryPointConstants{ 0u, 0u };
+    TableRef ResourceTags{ 0u, 0u };
 };
 
 /** @brief One variant of one environment. Its key is at the same position in the key table. The
@@ -366,13 +372,17 @@ struct alignas(8) Binding
     uint32_t StorageFormat{ 0u };
     uint32_t UniformMemberCount{ 0u };
     uint32_t FirstUniformMember{ 0u };
+    // a run in the tag table: string indices, one for each tag, in the order of the tags' text
+    uint32_t FirstTag{ 0u };
+    uint32_t TagCount{ 0u };
     uint8_t PlacementKind{ 0u };
     uint8_t Kind{ 0u };
     uint8_t Shape{ 0u };
     uint8_t IsComparisonSampler{ 0u };
     uint8_t Access{ 0u };
     uint8_t SampleType{ 0u };
-    uint16_t Reserved1{ 0u };
+    // a `ResourceRoleFlags`
+    uint16_t Roles{ 0u };
     uint32_t Reserved2{ 0u };
 };
 

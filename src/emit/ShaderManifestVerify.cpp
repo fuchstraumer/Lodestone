@@ -410,8 +410,12 @@ namespace
         manifest::Binding rhsBinding = rhs.Record();
         lhsBinding.FirstUniformMember = 0u;
         rhsBinding.FirstUniformMember = 0u;
+        lhsBinding.FirstTag = 0u;
+        rhsBinding.FirstTag = 0u;
+        // one string table for the bundle, so equal tag text has one string index
         if (std::memcmp(&lhsBinding, &rhsBinding, sizeof(manifest::Binding)) != 0 ||
-            !RecordsEqual(view.UniformMembers(lhs.Record()), view.UniformMembers(rhs.Record())))
+            !RecordsEqual(view.UniformMembers(lhs.Record()), view.UniformMembers(rhs.Record())) ||
+            !RecordsEqual(view.ResourceTags(lhs.Record()), view.ResourceTags(rhs.Record())))
         {
             return false;
         }
@@ -741,7 +745,18 @@ namespace
                record.Shape == static_cast<uint8_t>(binding.Shape) &&
                record.IsComparisonSampler == static_cast<uint8_t>(binding.IsComparisonSampler) &&
                record.Access == static_cast<uint8_t>(binding.Access) &&
-               record.SampleType == static_cast<uint8_t>(binding.SampleType);
+               record.SampleType == static_cast<uint8_t>(binding.SampleType) &&
+               record.Roles == std::to_underlying(binding.Roles) &&
+               record.TagCount == static_cast<uint32_t>(binding.Tags.size());
+    }
+
+    bool ManifestTagsMatch(const manifest::EnvironmentView& view,
+                           std::span<const uint32_t> read,
+                           std::span<const std::string> expected) noexcept
+    {
+        return std::ranges::equal(read, expected, [&view](uint32_t string_index, const std::string& tag) {
+            return view.String(string_index) == tag;
+        });
     }
 
     bool ManifestUniformMembersMatch(const manifest::EnvironmentView& view,
@@ -831,7 +846,8 @@ namespace
                 resource.ScopeName() != expected.Resource->ScopeName ||
                 !RecordMatchesBinding(read, *expected.Resource) ||
                 !RecordMatchesFootprint(*footprint, *expected.Footprint) ||
-                !ManifestUniformMembersMatch(view, view.UniformMembers(read), expected.Resource->UniformMembers))
+                !ManifestUniformMembersMatch(view, view.UniformMembers(read), expected.Resource->UniformMembers) ||
+                !ManifestTagsMatch(view, view.ResourceTags(read), expected.Resource->Tags))
             {
                 std::println(stderr,
                              "[lodestone] manifest binding '{}' of variant {} does not match the cook",

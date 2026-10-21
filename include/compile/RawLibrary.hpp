@@ -106,6 +106,11 @@ struct RawBinding
     bool IsComparisonSampler{ false };
 
     std::vector<ReflectedUniformMember> UniformMembers;
+
+    /** The argument of `[ls_resource_role]` and of `[ls_resource_tags]`, as the author wrote it. Empty when the
+     * resource has no such attribute. Stage 4 splits and checks them. */
+    std::string RawRoles;
+    std::string RawTags;
 };
 
 /** The `uniform` parameters of ordinary data on one entry point, as Slang lays them out for one target. The
