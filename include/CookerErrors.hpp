@@ -26,6 +26,7 @@ enum class CookError : uint16_t
     FailedToLoadModuleDependencySource = 20,
     VariantNotCompiled = 21,
     TargetProfileNotFound = 22,
+    WorkerSetupFailed = 23, // no worker could prepare its Slang session, so no variant of the batch compiled
 
     ReflectionUnavailable = 40,
     ReflectionMismatch = 41,

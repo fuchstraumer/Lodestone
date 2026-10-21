@@ -432,6 +432,19 @@ CookResult<CookStatistics> RunCook(CookerOptions options, OutputSink& sink)
     // create one diag sink for the *whole* cook
     StderrDiagnosticSink diagnostics;
 
+    // a failed cook must leave no manifest of an earlier cook, or a reader takes the old file for this cook's output
+    for (const std::string_view artifactName : { k_ManifestFileName, k_DedupeReportFileName, k_DepfileName })
+    {
+        if (sink.RemoveArtifact(artifactName) != CookError::Success)
+        {
+            return std::unexpected(ReportError(diagnostics,
+                                               CookError::OutputWriteFailed,
+                                               std::format("cannot remove '{}' of an earlier cook from '{}'",
+                                                           artifactName,
+                                                           sink.Describe())));
+        }
+    }
+
     if (options.VerifyDeterministic)
     {
         return RunCookTwiceAndCompare(std::move(options), sink, diagnostics);

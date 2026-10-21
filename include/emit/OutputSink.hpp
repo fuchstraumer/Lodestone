@@ -30,6 +30,9 @@ public:
                                     std::string_view content) = 0;
     [[nodiscard]] virtual CookError WriteArtifact(std::string_view artifact_name,
                                     std::span<const std::byte> content) = 0;
+    /** Clean up artifacts earlier cooks potentially wrote, so that failed cooks do not leave stale artifacts
+      * that can cascade into further failures (especially in CI/testing/agentic workflows) */
+    [[nodiscard]] virtual CookError RemoveArtifact(std::string_view artifact_name) = 0;
     [[nodiscard]] std::string_view Describe() const noexcept;
 protected:
     std::string name;
@@ -45,6 +48,7 @@ public:
 
     [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::string_view content) override;
     [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::span<const std::byte> content) override;
+    [[nodiscard]] CookError RemoveArtifact(std::string_view artifact_name) override;
 
 private:
     std::filesystem::path path;
@@ -59,6 +63,7 @@ public:
 
     [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::string_view content) override;
     [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::span<const std::byte> content) override;
+    [[nodiscard]] CookError RemoveArtifact(std::string_view artifact_name) override;
     /** Every companion artifact, keyed by name. The determinism check compares two cooks with it. */
     [[nodiscard]] const std::map<std::string, std::string>& GetArtifacts() const noexcept;
 

@@ -2,6 +2,8 @@
 #include "CookerErrors.hpp"
 #include <cstring>
 #include <cwchar>
+#include <format>
+#include <random>
 #include <filesystem>
 #include <system_error>
 #include <fstream>
@@ -26,9 +28,12 @@ FileOutputSink::FileOutputSink(std::filesystem::path _path) noexcept :
     OutputSink{ _path.string() },
     path{ std::move(_path) }
 {
-    if (!path.empty() && !std::filesystem::exists(path))
+    // the throwing overload would end the process here, because the constructor is noexcept. a folder that cannot
+    // be made fails the first write instead, with OutputFileOpenFailed
+    std::error_code ignored;
+    if (!path.empty())
     {
-        std::filesystem::create_directories(path);
+        std::filesystem::create_directories(path, ignored);
     }
 }
 
@@ -51,19 +56,44 @@ CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::str
         return CookError::OutputFileOpenFailed;
     }
 
-    std::ofstream stream{ artifactPath, std::ios::binary | std::ios::trunc };
-    if (!stream.is_open())
+    // write to a temporary file in the same folder, then rename it into place. a reader sees the old file or the
+    // new one, and never a partial write. the suffix is random so that two cooks never share a temporary file
+    std::random_device random;
+    std::filesystem::path temporaryPath = artifactPath;
+    temporaryPath += std::format(".{:08x}{:08x}.tmp", random(), random());
     {
-        return CookError::OutputFileOpenFailed;
+        std::ofstream stream{ temporaryPath, std::ios::binary | std::ios::trunc };
+        if (!stream.is_open())
+        {
+            return CookError::OutputFileOpenFailed;
+        }
+
+        stream.write(content.data(), static_cast<std::streamsize>(content.size()));
+        // close before the check, because the flush on close can fail too
+        stream.close();
+        if (!stream)
+        {
+            std::error_code ignored;
+            std::filesystem::remove(temporaryPath, ignored);
+            return CookError::OutputWriteFailed;
+        }
     }
 
-    stream.write(content.data(), static_cast<std::streamsize>(content.size()));
-    if (!stream.good())
+    std::error_code fileError;
+    std::filesystem::rename(temporaryPath, artifactPath, fileError);
+    if (fileError)
     {
+        std::error_code ignored;
+        std::filesystem::remove(temporaryPath, ignored);
         return CookError::OutputWriteFailed;
     }
 
-    stream.close();
+    // read the size back from the file system, so that a write that the stream accepted and the disk lost fails
+    const std::uintmax_t writtenSize = std::filesystem::file_size(artifactPath, fileError);
+    if (fileError || writtenSize != content.size())
+    {
+        return CookError::OutputWriteFailed;
+    }
 
     return CookError::Success;
 }
@@ -73,6 +103,13 @@ CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::spa
     // be evil: just cast the span of bytes to a string view and call the other overload
     const std::string_view contentAsStringView{ reinterpret_cast<const char*>(content.data()), content.size() };
     return WriteArtifact(artifact_name, contentAsStringView);
+}
+
+CookError FileOutputSink::RemoveArtifact(std::string_view artifact_name)
+{
+    std::error_code removeError;
+    std::filesystem::remove(path / std::filesystem::path{ artifact_name }, removeError);
+    return removeError ? CookError::OutputWriteFailed : CookError::Success;
 }
 
 MemoryOutputSink::MemoryOutputSink() : MemoryOutputSink{ "memory_output_sink" }
@@ -100,6 +137,16 @@ CookError MemoryOutputSink::WriteArtifact(std::string_view artifact_name, std::s
 const std::map<std::string, std::string>& MemoryOutputSink::GetArtifacts() const noexcept
 {
     return artifacts;
+}
+
+CookError MemoryOutputSink::RemoveArtifact(std::string_view artifact_name)
+{
+    const auto artifact = artifacts.find(std::string{ artifact_name });
+    if (artifact != artifacts.end())
+    {
+        artifacts.erase(artifact);
+    }
+    return CookError::Success;
 }
 
 } // namespace lodestone
