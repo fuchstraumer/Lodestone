@@ -409,3 +409,18 @@ One line for each update. Git history holds the full text.
   `MakeResolveContext`, errors 150 to 153, `DerivedConstantTest`, and `ResolveStageTest` rows. The hang
   and E00131 failures came from the stale Debug test binaries (Slang `6eb89786c`), which `run-tests.bat`
   ran by default. The default is now RelWithDebInfo.
+- **2026-10-19, later.** L4 (query presets: `PinMode`, `WhereWhenActive`, `QueryPreset`, `Apply`, `QueryNote`,
+  `NotesFor`), L18 (`ls_extent_1d`), and L7 (sampler and texture pairs, format 10, read by Tint and by
+  `SpvModuleReader`, cross-checked between profiles). Then a cleanup pass: the manifest reader, its header, the
+  emitter, the query code, the SPIR-V validator, and `SlangModuleContext` were split into smaller files;
+  `tests/ManifestFixtures.hpp` builds hand-made fixtures; the client header self-containment check exists; the
+  C4715 warnings are fixed; four broken Dawn nested submodules were deinitialized. 26 of 26 tests. Known-good:
+  33 of 60 dumps differ (the new pair fields and the Slang update), not accepted yet.
+- **2026-10-19, L14 done (format 11).** Known-good accepted first (`f2764e1`). `EntryPointConstants` on each entry
+  point instance (delivery, size, members, the WGSL uniform buffer's visibility position); the reflector walks the
+  element of the parameters' constant buffer, so mixed struct parameters cook on both targets; the SPIR-V read
+  settles push constant use (`ReconcileEntryPointConstants`) and the 128-byte limit (`EntryPointConstantsTooLarge`);
+  `ReadSamplerTexturePairs` became `ReadEmittedCodeFacts`. `EntryPointConstantsTest` added: 27 of 27 tests. Open:
+  D-R6 (Slang's metadata marks every resource beside entry point constants as used; the mismatch row of
+  `AccessModelRejectTest` now holds that case), the merged layout and push constants (todo.md). Known-good: the new
+  constants fields change the dumps, not accepted yet.

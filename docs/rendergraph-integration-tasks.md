@@ -65,7 +65,7 @@ no allocation.
 | L3 | Per-entry-point axis relevance in the manifest. The cook already measures axis influence for each entry point. Emit one mask for each (module, entry point). | An exact ambiguity check: two variants that differ only in an inert axis give one entry point instance. The graph pins only the axes that matter for a node. | The emitted mask equals the measured influence. `DedupeInfluenceTest` holds the measurement, so compare against it. |
 | L4 | Query presets, with a match rule, and a "constrain when active" form for a gated axis. The rule that the source note proposes: a preset skips an axis that a module does not declare, and the graph fails when no module in the graph declares it. | Graph pins are presets. Today a pin on a gated axis removes every variant where the gate is off. | `ManifestIndexTest` rows on the gated manifest: a "when active" pin keeps the gated-off variants. Decision D-R2 first. |
 | L7 | Sampler and texture pairs. WebGPU needs a non-filtering sampler for an `unfilterable-float` texture. Tint's inspector gives the pairs. Store them in the manifest. | Explicit bind group layouts. Without the pairs, Velox must guess the sampler type. | The `WgslValidator` reads the pairs from Tint. The manifest pairs equal Tint's pairs for KitchenSink. |
-| L14 | State how an entry point `uniform` parameter appears in the manifest, and fix the cross-check for it (phase F step F2.7, the empty `entryPointParams` name). | The graph treats an entry point parameter as per-dispatch data. Ocean FFT `SpectrumConjugateCS` uses one. | `EntryPointParamsCookTest` passes with the cross-check on. `AccessModelRejectTest` keeps a mismatch row (F2.7 replaces it). Question to the author first. |
+| L14 | **Done 2026-10-19** (format 11, `EntryPointConstantsTest`; D-R6 open). State how an entry point `uniform` parameter appears in the manifest, and fix the cross-check for it (phase F step F2.7, the empty `entryPointParams` name). | The graph treats an entry point parameter as per-dispatch data. Ocean FFT `SpectrumConjugateCS` uses one. | `EntryPointParamsCookTest` passes with the cross-check on. `AccessModelRejectTest` keeps a mismatch row (F2.7 replaces it). Question to the author first. |
 | L18 | Add `ls_extent_1d`. | `IfftSinCosLUT` is a `Texture1D`. Its extent cannot be stated in the shader today. | A `ResolveStageTest` row, and a footprint in the manifest. |
 
 ### R3. Larger work (design first)
@@ -187,6 +187,22 @@ no allocation.
   `NormalMap` and `DetailMap` axes, and the depth `Cascades` pairs with `CompareSampler`); rows in
   `WgslValidatorTest`, `SpvValidatorTest`, `ShaderManifestRejectTest`, and `MergedLayoutTest`. 26 of 26 tests.
   `check-known-good.py`: 33 of 60 dumps differ, only by the new pair fields and the 15 Slang-update differences.
+- 2026-10-19, L14, format 11. **Decided:** the record is `EntryPointConstants` (a name that does not suggest compute
+  only), and a SPIR-V push constant block above 128 bytes fails the cook now. Measured: with ordinary data, Slang
+  wraps the entry point parameters in one constant buffer, a uniform buffer `entryPointParams` on WGSL (std140) and
+  a push constant block on SPIR-V (std430, no placement), and the resources sit in the buffer's element, which the
+  scope walk never entered. Both targets remove data that the entry point does not read, and partial use keeps the
+  whole block. Slang's metadata does not track push constants, so stage 3 states a block and the SPIR-V read clears
+  it when the code has none (`ReconcileEntryPointConstants`), and it compares the block's extent with reflection's
+  size. Each entry point instance stores a constants record (delivery, size, members, the uniform buffer's
+  visibility position), interned in an eighth interner. The reader API became `ReadEmittedCodeFacts`
+  (`EmittedCodeFacts`: the pairs and the push constant extent). Client: `EntryPointInstanceView::Constants()`.
+  Proof: `EntryPointConstantsTest` (hand-computed std140 and std430 layouts for both targets, unread data, resources
+  only, the 128-byte limit); rows in `SpvValidatorTest` (the extent, with a revert drill on the matrix major) and
+  `ShaderManifestRejectTest`. 27 of 27 tests. `EntryPointResourceStruct.slang` now cooks, so the mismatch row of
+  `AccessModelRejectTest` became `EntryPointUnusedResource.slang`: Slang's metadata marks every slot of the
+  parameters' constant buffer as used (`collectMetadataFromInst`), so an unread resource beside read data is a
+  mismatch. Open: decision D-R6 (section 6), and the merged layout does not read the constants.
 
 ## 5. Phase F, paused
 
@@ -212,3 +228,4 @@ decide how a pointer or a handle names its container before a merge can read it.
 | D-R3 | L10: the option name, and its default when Lodestone is not the top-level project. | **Answered:** `LODESTONE_BUILD_COOKER`, default `NOT EMSCRIPTEN`. |
 | D-R4 | L1: how `First` reports "no constraints" against "no match". | **Moot:** `First` is removed. |
 | D-R5 | L2: does `Single()` ignore an inert axis (L3) from the start, or only after L3? | After L3. Until then, two variants that differ only in an inert axis are an error that names the axis. |
+| D-R6 | L14: Slang's metadata marks every resource beside entry point constants as used when any part of the parameters is used, so an unread resource there fails the cook. What decides its visibility? | **Answered (2026-10-20):** reported as shader-slang/slang#13789; a workaround takes the visibility of those resources from the emitted code, with a canary test that fails when Slang fixes it. Old text: Open (2026-10-19). Options: take the visibility of those resources from the emitted code (the cross-check then cannot find a missing binding there); fix `collectMetadataFromInst` in Slang and report it upstream; or leave the cook failing, so an author moves such a resource to the global scope or a `ParameterBlock`. |

@@ -156,13 +156,14 @@ std::string GenerateDedupeReport(const CookedLibrary& library)
 
         // One line for each table. Placement, footprint, and visibility collapse at different rates,
         // and one number for all three would hide which one grows.
-        const std::array<std::pair<std::string_view, const TableStatistics*>, 6u> tables{
+        const std::array<std::pair<std::string_view, const TableStatistics*>, 7u> tables{
             std::pair{ std::string_view{ "sources" }, &module.SourceTable },
             std::pair{ std::string_view{ "resources" }, &module.ResourceTable },
             std::pair{ std::string_view{ "resource lists" }, &module.ResourceListTable },
             std::pair{ std::string_view{ "footprints" }, &module.FootprintListTable },
             std::pair{ std::string_view{ "visibility" }, &module.VisibilityTable },
-            std::pair{ std::string_view{ "sampler pairs" }, &module.SamplerPairTable }
+            std::pair{ std::string_view{ "sampler pairs" }, &module.SamplerPairTable },
+            std::pair{ std::string_view{ "entry point constants" }, &module.ConstantsTable }
         };
 
         uint32_t collisions = 0u;

@@ -56,6 +56,10 @@
       Measure peak commit and wall time against the count first: 1, 2, 4, 8, 16.
     - Consider one global session and core module shared by the workers, if Slang allows it. Measure
       the global-session convoy again first (handoff fault 9).
+- Entry point constants in the merged layout. Slang puts the push constant block of every SPIR-V entry point at
+  offset 0, so two stages of one pipeline that each have constants read the same bytes. `MergedLayoutView` must
+  give one push constant range for a pipeline, and fail when two stages state different members at one offset.
+  WGSL needs nothing: each stage's uniform buffer has its own binding.
 - Make `RunCookOnce` and the determinism path emit through one code path. The determinism branch
   replays memory artifacts to the real sink with its own `sink.Write`/`WriteArtifact` loop instead of
   the shared emit, so the two paths can diverge (they did). Route both through the same emit.

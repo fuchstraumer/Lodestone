@@ -114,11 +114,11 @@ namespace
         writer.EndObject();
     }
 
-    void WriteUniformMembers(JsonWriter& writer, const ReflectedBinding& binding)
+    void WriteUniformMembers(JsonWriter& writer, std::string_view key, std::span<const ReflectedUniformMember> members)
     {
-        writer.Key("uniformMembers");
+        writer.Key(key);
         writer.BeginArray();
-        for (const ReflectedUniformMember& member : binding.UniformMembers)
+        for (const ReflectedUniformMember& member : members)
         {
             writer.BeginObject();
             writer.KeyString("name", member.Name);
@@ -176,7 +176,7 @@ namespace
         writer.KeyString("storageFormat", magic_enum::enum_name(binding.StorageFormat));
         writer.KeyString("storageAccess", magic_enum::enum_name(binding.Access));
         writer.KeyBool("isComparisonSampler", binding.IsComparisonSampler);
-        WriteUniformMembers(writer, binding);
+        WriteUniformMembers(writer, "uniformMembers", binding.UniformMembers);
         writer.EndObject();
     }
 
@@ -299,6 +299,29 @@ namespace
         writer.EndArray();
     }
 
+    void WriteEntryPointConstants(JsonWriter& writer, const EntryPointConstants& constants)
+    {
+        writer.KeyString("delivery", magic_enum::enum_name(constants.Delivery));
+        writer.KeyUInt("byteSize", constants.ByteSize);
+        writer.KeyUInt("binding", constants.Binding);
+        WriteUniformMembers(writer, "members", constants.Members);
+    }
+
+    void WriteEntryPointConstantsTable(JsonWriter& writer, const CookedModule& module)
+    {
+        writer.Key("entryPointConstants");
+        writer.BeginArray();
+        for (size_t i = 0u; i < module.EntryPointConstantsTable.size(); ++i)
+        {
+            writer.BeginObject();
+            writer.KeyUInt("index", i);
+            writer.KeyUInt("contentHash", HashEntryPointConstants(module.EntryPointConstantsTable[i]));
+            WriteEntryPointConstants(writer, module.EntryPointConstantsTable[i]);
+            writer.EndObject();
+        }
+        writer.EndArray();
+    }
+
     void WriteSamplerPairTable(JsonWriter& writer, const CookedModule& module)
     {
         writer.Key("samplerPairLists");
@@ -387,6 +410,7 @@ namespace
             WriteIndexArray(writer, "visibilityIndices", variant.VisibilityIndices);
             WriteIndexArray(writer, "rasterIndices", variant.RasterIndices);
             WriteIndexArray(writer, "samplerPairIndices", variant.SamplerPairIndices);
+            WriteIndexArray(writer, "constantsIndices", variant.ConstantsIndices);
             WriteWorkgroups(writer, variant);
             writer.EndObject();
         }
@@ -444,6 +468,16 @@ namespace
                       module.RasterTable.HashName,
                       module.RasterTable.DedupeEnabled,
                       module.RasterTable.Interning);
+        WriteInterner(writer,
+                      "samplerPairs",
+                      module.SamplerPairTable.HashName,
+                      module.SamplerPairTable.DedupeEnabled,
+                      module.SamplerPairTable.Interning);
+        WriteInterner(writer,
+                      "entryPointConstants",
+                      module.ConstantsTable.HashName,
+                      module.ConstantsTable.DedupeEnabled,
+                      module.ConstantsTable.Interning);
         writer.EndObject();
     }
 
@@ -545,6 +579,16 @@ namespace
             writer.KeyUInt("targetTextByteLength", entryPoint.TargetCode.size());
             writer.KeyUInt("targetTextHash", HashSourceCode(entryPoint.TargetCode));
             WriteIndexArray(writer, "usedBindingIndices", entryPoint.UsedBindingIndices);
+            writer.Key("constants");
+            writer.BeginObject();
+            writer.KeyString("delivery", magic_enum::enum_name(entryPoint.Constants.Delivery));
+            writer.KeyUInt("byteSize", entryPoint.Constants.ByteSize);
+            if (entryPoint.Constants.ContainerBinding)
+            {
+                writer.KeyUInt("containerBinding", *entryPoint.Constants.ContainerBinding);
+            }
+            WriteUniformMembers(writer, "members", entryPoint.Constants.Members);
+            writer.EndObject();
             WriteVertexInputs(writer, entryPoint.Raster);
             WriteColorTargets(writer, entryPoint.Raster);
             writer.KeyBool("writesFragDepth", entryPoint.Raster.WritesFragDepth);
@@ -740,6 +784,10 @@ std::string DumpResolvedModule(std::string_view module_name, std::span<const Com
             writer.KeyUInt("targetTextHash", HashSourceCode(entryPoint.Code));
             WriteIndexArray(writer, "usedBindingIndices", entryPoint.Reflection.UsedBindingIndices);
             WriteSamplerPairs(writer, "samplerTexturePairs", entryPoint.SamplerTexturePairs);
+            writer.Key("constants");
+            writer.BeginObject();
+            WriteEntryPointConstants(writer, entryPoint.Reflection.Constants);
+            writer.EndObject();
             WriteVertexInputs(writer, entryPoint.Reflection.Raster);
             WriteColorTargets(writer, entryPoint.Reflection.Raster);
             writer.KeyBool("writesFragDepth", entryPoint.Reflection.Raster.WritesFragDepth);
@@ -842,6 +890,11 @@ std::string DumpInternedModule(const InternedModule& module)
                   module.SamplerPairInterner.HashName(),
                   module.SamplerPairInterner.IsEnabled(),
                   module.SamplerPairInterner.Statistics());
+    WriteInterner(writer,
+                  "entryPointConstants",
+                  module.ConstantsInterner.HashName(),
+                  module.ConstantsInterner.IsEnabled(),
+                  module.ConstantsInterner.Statistics());
     writer.EndObject();
 
     writer.Key("provenance");
@@ -853,6 +906,7 @@ std::string DumpInternedModule(const InternedModule& module)
     WriteProvenance(writer, "visibility", module.VisibilityInterner);
     WriteProvenance(writer, "rasterStates", module.RasterInterner);
     WriteProvenance(writer, "samplerPairs", module.SamplerPairInterner);
+    WriteProvenance(writer, "entryPointConstants", module.ConstantsInterner);
     writer.EndObject();
 
     writer.EndObject();
@@ -873,6 +927,7 @@ std::string DumpCookedModule(const CookedModule& module)
     writer.KeyUInt("visibilityListCount", module.VisibilityLists.size());
     writer.KeyUInt("rasterStateCount", module.RasterStates.size());
     writer.KeyUInt("samplerPairListCount", module.SamplerPairLists.size());
+    writer.KeyUInt("entryPointConstantsCount", module.EntryPointConstantsTable.size());
     writer.KeyUInt("variantCount", module.Variants.size());
 
     WriteEntryPointTable(writer, module.EntryPoints);
@@ -883,6 +938,7 @@ std::string DumpCookedModule(const CookedModule& module)
     WriteIndexListTable(writer, "visibilityLists", module.VisibilityLists);
     WriteRasterTable(writer, module);
     WriteSamplerPairTable(writer, module);
+    WriteEntryPointConstantsTable(writer, module);
     WriteVariantTable(writer, module.Variants);
     WriteInternerTable(writer, module);
 

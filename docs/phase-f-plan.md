@@ -106,7 +106,7 @@ The Bound form works on WGSL, so this slice needs no SPIR-V. It can run beside F
 | F2.4 | Allow a resource member in a shim impl. Keep `rejectResourceMembers` for a technique axis. | The technique-axis rejection test still fails the cook. |
 | F2.5 | Build the impl name from the extern (`IReadBuffer<PointLight>` gives `BoundReadBuffer<PointLight>`). Import the module that declares the element type. | `FindDeclaringModule` gives the import. `todo.md` holds the related import item. |
 | F2.6 | A cook test asset: a material that uses buffer, texture, and sampler shims in a `ParameterBlock` and in an entry point `uniform` parameter. | The cross-check agrees. Check the binding numbers: no global may move down a set (vocabulary §9e, measurement notes). |
-| F2.7 | Fix the cross-check for an entry point `uniform` container. Today it expects an empty name for `entryPointParams`. | F2.6 passes with F0.1 in place. `AccessModelRejectTest` uses `EntryPointResourceStruct.slang` as its mismatch row, so replace that row with another mismatch in the same step. |
+| F2.7 | **Done by rendergraph task L14 (2026-10-19):** the container is the `entryPointParams` binding on WGSL and entry point constants on SPIR-V, and the mismatch row is now `EntryPointUnusedResource.slang`. Fix the cross-check for an entry point `uniform` container. Today it expects an empty name for `entryPointParams`. | F2.6 passes with F0.1 in place. `AccessModelRejectTest` uses `EntryPointResourceStruct.slang` as its mismatch row, so replace that row with another mismatch in the same step. |
 
 ### F3 — The capability set
 

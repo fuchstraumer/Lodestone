@@ -95,6 +95,7 @@ namespace
         std::vector<manifest::Run> VisibilityLists;
         std::vector<manifest::SamplerTexturePair> SamplerTexturePairs;
         std::vector<manifest::Run> SamplerPairLists;
+        std::vector<manifest::EntryPointConstants> EntryPointConstants;
     };
 
     struct RasterTables
@@ -186,6 +187,9 @@ namespace
     manifest::Binding MakeBindingRecord(const ReflectedBinding& binding,
                                         StringTableBuilder& strings,
                                         std::vector<manifest::UniformMember>& member_records);
+    manifest::EntryPointConstants MakeEntryPointConstantsRecord(const EntryPointConstants& constants,
+                                                                StringTableBuilder& strings,
+                                                                std::vector<manifest::UniformMember>& member_records);
     manifest::Footprint MakeFootprintRecord(const ResourceFootprint& footprint) noexcept;
     manifest::EntryPointInstance MakeSlotRecord(const LibraryVariant& variant, size_t entry_point_index) noexcept;
     manifest::VertexInput MakeVertexInputRecord(const ReflectedVertexInput& input, StringTableBuilder& strings);
@@ -444,6 +448,28 @@ namespace
         out.resize(alignedSize, static_cast<std::byte>(0));
     }
 
+    /** Appends one record for each member to `member_records`, and returns the index of the first. */
+    uint32_t AppendMemberRecords(std::span<const ReflectedUniformMember> members,
+                                 StringTableBuilder& strings,
+                                 std::vector<manifest::UniformMember>& member_records)
+    {
+        const auto first = static_cast<uint32_t>(member_records.size());
+        member_records.reserve(member_records.size() + members.size());
+        for (const ReflectedUniformMember& member : members)
+        {
+            manifest::UniformMember memberRecord;
+            memberRecord.NameString = strings.Add(member.Name);
+            memberRecord.Offset = member.Data.Offset;
+            memberRecord.Size = member.Data.Size;
+            memberRecord.ArrayCount = member.Data.ArrayCount;
+            // widen these types to uint32_t, since this is all 8-byte aligned anyways
+            memberRecord.ElementStride = static_cast<uint32_t>(member.Data.ElementStride);
+            memberRecord.MatrixLayout = static_cast<uint32_t>(member.Data.MatrixLayout);
+            member_records.emplace_back(memberRecord);
+        }
+        return first;
+    }
+
     manifest::Binding MakeBindingRecord(const ReflectedBinding& binding,
                                         StringTableBuilder& strings,
                                         std::vector<manifest::UniformMember>& member_records)
@@ -465,22 +491,21 @@ namespace
         record.Access = static_cast<uint8_t>(binding.Access);
         record.SampleType = static_cast<uint8_t>(binding.SampleType);
 
-        record.FirstUniformMember = static_cast<uint32_t>(member_records.size());
+        record.FirstUniformMember = AppendMemberRecords(binding.UniformMembers, strings, member_records);
         record.UniformMemberCount = static_cast<uint32_t>(binding.UniformMembers.size());
-        member_records.reserve(member_records.size() + binding.UniformMembers.size());
-        for (const ReflectedUniformMember& member : binding.UniformMembers)
-        {
-            manifest::UniformMember memberRecord;
-            memberRecord.NameString = strings.Add(member.Name);
-            memberRecord.Offset = member.Data.Offset;
-            memberRecord.Size = member.Data.Size;
-            memberRecord.ArrayCount = member.Data.ArrayCount;
-            // widen these types to uint32_t, since this is all 8-byte aligned anyways
-            memberRecord.ElementStride = static_cast<uint32_t>(member.Data.ElementStride);
-            memberRecord.MatrixLayout = static_cast<uint32_t>(member.Data.MatrixLayout);
-            member_records.emplace_back(memberRecord);
-        }
+        return record;
+    }
 
+    manifest::EntryPointConstants MakeEntryPointConstantsRecord(const EntryPointConstants& constants,
+                                                                StringTableBuilder& strings,
+                                                                std::vector<manifest::UniformMember>& member_records)
+    {
+        manifest::EntryPointConstants record;
+        record.ByteSize = constants.ByteSize;
+        record.Binding = constants.Binding;
+        record.FirstUniformMember = AppendMemberRecords(constants.Members, strings, member_records);
+        record.UniformMemberCount = static_cast<uint32_t>(constants.Members.size());
+        record.Delivery = static_cast<uint8_t>(constants.Delivery);
         return record;
     }
 
@@ -518,6 +543,7 @@ namespace
         slot.WorkgroupZ = variant.Workgroups[entry_point_index].Z;
         slot.Raster = variant.RasterIndices[entry_point_index];
         slot.SamplerPairs = variant.SamplerPairIndices[entry_point_index];
+        slot.Constants = variant.ConstantsIndices[entry_point_index];
         return slot;
     }
 
@@ -721,6 +747,13 @@ namespace
             module.VisibilityLists, tables.VisibilityIndices, tables.VisibilityLists, &PassThroughIndex);
         AppendRuns(module.SamplerPairLists, tables.SamplerTexturePairs, tables.SamplerPairLists, &MakeSamplerPairRecord);
 
+        tables.EntryPointConstants.reserve(module.EntryPointConstantsTable.size());
+        for (const EntryPointConstants& constants : module.EntryPointConstantsTable)
+        {
+            tables.EntryPointConstants.push_back(
+                MakeEntryPointConstantsRecord(constants, strings, tables.UniformMembers));
+        }
+
         return tables;
     }
 
@@ -911,6 +944,7 @@ namespace
         environment.SpecConstants = AppendTable(extent, std::vector<manifest::SpecializationConstant>{});
         environment.SamplerPairLists = AppendTable(extent, layouts.SamplerPairLists);
         environment.SamplerTexturePairs = AppendTable(extent, layouts.SamplerTexturePairs);
+        environment.EntryPointConstants = AppendTable(extent, layouts.EntryPointConstants);
 
         AlignTo8(extent);
         std::memcpy(extent.data(), &environment, sizeof(manifest::EnvironmentHeader));

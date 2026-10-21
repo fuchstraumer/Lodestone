@@ -68,8 +68,8 @@ namespace
     bool RecordMatchesFootprint(const manifest::Footprint& record, const ResourceFootprint& footprint) noexcept;
     bool RecordMatchesBinding(const manifest::Binding& record, const ReflectedBinding& binding) noexcept;
     bool ManifestUniformMembersMatch(const manifest::EnvironmentView& view,
-                                     const manifest::Binding& read,
-                                     const ReflectedBinding& expected);
+                                     std::span<const manifest::UniformMember> read_members,
+                                     std::span<const ReflectedUniformMember> expected_members);
     CookError CheckManifestLayout(const CookedModule& module,
                                   const manifest::EnvironmentView& view,
                                   const LibraryVariant& variant,
@@ -426,8 +426,8 @@ namespace
         return std::memcmp(lhsFootprint, rhsFootprint, sizeof(manifest::Footprint)) == 0;
     }
 
-    /** Compares the instance of one entry point in two variants by content: source, layout, raster state, and
-     * workgroup size. Equal record indices are a shortcut only: unequal indices still compare content. */
+    /** Compares the instance of one entry point in two variants by content: source, layout, raster state, sampler
+     * and texture pairs, entry point constants, and workgroup size. Equal record indices are a shortcut only: unequal indices still compare content. */
     bool InstancesEqual(const manifest::EnvironmentView& view, uint32_t lhs_variant, uint32_t rhs_variant, uint32_t entry_point)
     {
         const manifest::EntryPointInstanceView lhs = view.VariantAt(lhs_variant).EntryPoint(entry_point);
@@ -465,6 +465,16 @@ namespace
         }
 
         if (!RecordsEqual(lhs.SamplerTexturePairs(), rhs.SamplerTexturePairs()))
+        {
+            return false;
+        }
+
+        const manifest::EntryPointConstants& lhsConstants = lhs.Constants().Record();
+        const manifest::EntryPointConstants& rhsConstants = rhs.Constants().Record();
+        if (lhsRecord.Constants != rhsRecord.Constants &&
+            (lhsConstants.Delivery != rhsConstants.Delivery || lhsConstants.ByteSize != rhsConstants.ByteSize ||
+             lhsConstants.Binding != rhsConstants.Binding ||
+             !RecordsEqual(view.UniformMembers(lhsConstants), view.UniformMembers(rhsConstants))))
         {
             return false;
         }
@@ -735,19 +745,18 @@ namespace
     }
 
     bool ManifestUniformMembersMatch(const manifest::EnvironmentView& view,
-                                     const manifest::Binding& read,
-                                     const ReflectedBinding& expected)
+                                     std::span<const manifest::UniformMember> read_members,
+                                     std::span<const ReflectedUniformMember> expected_members)
     {
-        const std::span<const manifest::UniformMember> readMembers = view.UniformMembers(read);
-        if (readMembers.size() != expected.UniformMembers.size())
+        if (read_members.size() != expected_members.size())
         {
             return false;
         }
 
-        for (size_t memberIndex = 0u; memberIndex < readMembers.size(); ++memberIndex)
+        for (size_t memberIndex = 0u; memberIndex < read_members.size(); ++memberIndex)
         {
-            const ReflectedUniformMember& expectedMember = expected.UniformMembers[memberIndex];
-            const manifest::UniformMember& readMember = readMembers[memberIndex];
+            const ReflectedUniformMember& expectedMember = expected_members[memberIndex];
+            const manifest::UniformMember& readMember = read_members[memberIndex];
 
             const bool matches = view.String(readMember.NameString) == expectedMember.Name &&
                                  readMember.Offset == expectedMember.Data.Offset &&
@@ -822,7 +831,7 @@ namespace
                 resource.ScopeName() != expected.Resource->ScopeName ||
                 !RecordMatchesBinding(read, *expected.Resource) ||
                 !RecordMatchesFootprint(*footprint, *expected.Footprint) ||
-                !ManifestUniformMembersMatch(view, read, *expected.Resource))
+                !ManifestUniformMembersMatch(view, view.UniformMembers(read), expected.Resource->UniformMembers))
             {
                 std::println(stderr,
                              "[lodestone] manifest binding '{}' of variant {} does not match the cook",
@@ -853,6 +862,28 @@ namespace
                          readPairs.size(),
                          expectedPairs.size());
             return CookError::ManifestSamplerPairMismatch;
+        }
+
+        // the binding position is local to the visibility list, which the walk above proved equal
+        const EntryPointConstants& expectedConstants =
+            module.EntryPointConstantsTable[variant.ConstantsIndices[entry_point_index]];
+        const manifest::EntryPointConstantsView readConstants =
+            read_variant.EntryPoint(static_cast<uint32_t>(entry_point_index)).Constants();
+        const manifest::EntryPointConstants& readRecord = readConstants.Record();
+        const bool constantsMatch = readConstants.Delivery() == expectedConstants.Delivery &&
+                                    readRecord.ByteSize == expectedConstants.ByteSize &&
+                                    readRecord.Binding == expectedConstants.Binding &&
+                                    ManifestUniformMembersMatch(view,
+                                                                view.UniformMembers(readRecord),
+                                                                expectedConstants.Members);
+        if (!constantsMatch)
+        {
+            std::println(stderr,
+                         "[lodestone] manifest variant {} entry point {} reads entry point constants that differ from "
+                         "the cook",
+                         variant.Index,
+                         entry_point_index);
+            return CookError::ManifestEntryPointConstantsMismatch;
         }
 
         return CookError::Success;

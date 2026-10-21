@@ -237,6 +237,7 @@ struct ReflectedRasterState
  * that clients can merge the lists of several stages in one pass. `EnvironmentView::Open` validates the
  * order. This is a list rather than a bit mask, because a mask would limit a module to the width of the
  * mask. */
+ 
 /** @brief The `uniform` parameters of ordinary data on one entry point, in the layout of one target: the entry
  * point constants. The byte size and the member offsets follow the target's layout rules, so two targets of one
  * variant can differ. `Binding` is the position in `UsedBindingIndices` of the uniform buffer that contains the
@@ -259,6 +260,9 @@ struct EntryPointReflection
     std::vector<uint32_t> UsedBindingIndices;
     ReflectedRasterState Raster;
     EntryPointConstants Constants;
+    /** Indices in the variant's bindings of the resources in the element of the entry point constants' buffer. The
+     * cook settles their visibility against the emitted code (shader-slang/slang#13789). Not stored in a manifest. */
+    std::vector<uint32_t> ConstantsElementBindings;
 };
 
 std::string DescribeRasterState(const ReflectedRasterState& raster);

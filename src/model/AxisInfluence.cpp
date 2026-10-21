@@ -69,6 +69,8 @@ namespace
 
         // the pairs follow from the code and the layout, and a consumer reads them, so they are part of the instance
         hasher.Append(HashSamplerPairList(module.SamplerPairLists[variant.SamplerPairIndices[entry_point_index]]));
+        hasher.Append(
+            HashEntryPointConstants(module.EntryPointConstantsTable[variant.ConstantsIndices[entry_point_index]]));
 
         return hasher.Finalize();
     }
@@ -124,12 +126,15 @@ namespace
                                                      ResolveSource(module, rhs, entry_point_index));
         const bool pairsEqual = module.SamplerPairLists[lhs.SamplerPairIndices[entry_point_index]] ==
                                 module.SamplerPairLists[rhs.SamplerPairIndices[entry_point_index]];
+        const bool constantsEqual = module.EntryPointConstantsTable[lhs.ConstantsIndices[entry_point_index]] ==
+                                    module.EntryPointConstantsTable[rhs.ConstantsIndices[entry_point_index]];
 
         return workgroupsEqual &&
                rasterStatesEqual &&
                layoutsEqual &&
                sourcesEqual &&
-               pairsEqual;
+               pairsEqual &&
+               constantsEqual;
     }
 
     bool GroupSharesOneInstance(const CookedModule& module,

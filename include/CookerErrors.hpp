@@ -39,6 +39,7 @@ enum class CookError : uint16_t
     ReflectionUnsupportedBindingKind = 49,
     ReflectionSamplerPairUnresolved = 50, // a sampler and texture pair in the emitted code does not resolve to two used bindings
     SamplerPairsTargetMismatch = 51, // two profiles of one variant read different sampler and texture pairs
+    EntryPointConstantsTooLarge = 52, // an entry point's push constant block is larger than its profile guarantees
 
     NoModulesSpecified = 60,
     NoOutputSpecified = 61,
@@ -83,6 +84,7 @@ enum class CookError : uint16_t
     ManifestShaderLayoutVisiblityIndexInvalid = 111,
     ManifestShaderLayoutResourceListIndexInvalid = 112,
     ManifestSamplerPairMismatch = 113, // an entry point's sampler and texture pairs read back differently than the cook produced
+    ManifestEntryPointConstantsMismatch = 114, // an entry point's constants read back differently than the cook produced
 
     // output and diagnostic sink operation errors
     OutputPathInvalid = 120,

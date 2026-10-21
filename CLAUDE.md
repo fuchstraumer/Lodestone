@@ -115,20 +115,20 @@ it exits 1 on `NoOutputSpecified`, which reads like a failure rather than a usag
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
-Twenty-six test targets exist. Twenty-one are unit tests, and each one proves a claim the repository
+Twenty-eight test targets exist. Twenty-three are unit tests, and each one proves a claim the repository
 makes. Eighteen need no Slang and no asset, and together they run in about half a second.
 `WgslValidatorTest` links Tint to read WGSL. `SpvValidatorTest` links SPIRV-Tools to assemble SPIR-V.
-`AccessModelRejectTest`, `AxisDefaultTest`, and `DerivedConstantTest` cook small modules through Slang,
-and each takes about one second.
+`AccessModelRejectTest`, `AxisDefaultTest`, `DerivedConstantTest`, and `EntryPointConstantsTest` cook small modules
+through Slang, and each takes about one second. `SlangMetadataCanaryTest` calls Slang directly.
 
 | Target | Proves |
 |---|---|
 | `AttributeExpressionTest` | The attribute expression grammar — arithmetic, comparison, and logic — and every rejection it must make. |
 | `ContentInternerTest` | A hash never decides equality. It supplies a hash that returns one constant, so only the byte comparison can separate the payloads. |
 | `PermutationIndexTest` | A variant index is unique, dense, and stable, and a partial assignment resolves to one variant. |
-| `ShaderManifestRejectTest` | The bundle reader rejects a short, misaligned, or damaged file, and opens a real one. It rejects an unknown code format and a SPIR-V source that is not whole words, and reads SPIR-V back as words. It also proves that the header region opens alone, that an extent read on its own opens against that bundle, that an environment the cook skipped reads as absent, and that a damaged directory entry or variant key table is rejected by name. It proves that the sampler and texture pairs read back through the layout, that a pair with the wrong binding kind, a position past the visibility list, or a bad list index is rejected, that a profile with no reader reads as not recorded, and that the round trip fails on a pair that differs. It also proves `VerifySamplerPairsAcrossProfiles`: two profiles that read different pairs fail, and a profile that did not record is not compared. |
+| `ShaderManifestRejectTest` | The bundle reader rejects a short, misaligned, or damaged file, and opens a real one. It rejects an unknown code format and a SPIR-V source that is not whole words, and reads SPIR-V back as words. It also proves that the header region opens alone, that an extent read on its own opens against that bundle, that an environment the cook skipped reads as absent, and that a damaged directory entry or variant key table is rejected by name. It proves that the sampler and texture pairs read back through the layout, that a pair with the wrong binding kind, a position past the visibility list, or a bad list index is rejected, that a profile with no reader reads as not recorded, and that the round trip fails on a pair that differs. It also proves `VerifySamplerPairsAcrossProfiles`: two profiles that read different pairs fail, and a profile that did not record is not compared. It proves that the entry point constants read back and resolve through the layout to their uniform buffer, that the round trip fails on constants that differ, and that an unknown delivery, a uniform buffer of another size, a position past the visibility list, a position on a push constant block, a member run past the table, or a bad record index is rejected. |
 | `WgslValidatorTest` | The WGSL cross-check on Tint. It parses fixed WGSL, reads the used bindings from Tint's inspector, and compares them against hand-written reflection. It proves a match, and a mismatch of kind, shape, access, or name. It also proves that a comparison sampler and a depth texture read back correctly, that a storage buffer's structured or raw shape does not change the WGSL kind, and that invalid WGSL is a parse error, not a mismatch. It proves that the sampler and texture pairs come from Tint, a comparison sampler too, and that the read path (`--no-validate`) gives the same pairs as the validate path. |
-| `SpvValidatorTest` | The SPIR-V cross-check on SPIRV-Tools. It assembles Slang's own output for one entry point from text, and compares it against hand-written reflection. It proves a match, a moved binding, a missing and an extra binding, and a mismatch of kind, access, name, and depth shape. It proves that a builtin in the interface list is not read as a binding, that the capabilities read back, and that a module spirv-val rejects, or code that is not whole words, is an error and not a mismatch. It proves that the pairs come from each OpSampledImage, traced back through the loads to the variables, on both read paths, and that an image that does not trace back to a variable fails with `ReflectionSamplerPairUnresolved`. |
+| `SpvValidatorTest` | The SPIR-V cross-check on SPIRV-Tools. It assembles Slang's own output for one entry point from text, and compares it against hand-written reflection. It proves a match, a moved binding, a missing and an extra binding, and a mismatch of kind, access, name, and depth shape. It proves that a builtin in the interface list is not read as a binding, that the capabilities read back, and that a module spirv-val rejects, or code that is not whole words, is an error and not a mismatch. It proves that the pairs come from each OpSampledImage, traced back through the loads to the variables, on both read paths, and that an image that does not trace back to a variable fails with `ReflectionSamplerPairUnresolved`. It proves that the push constant extent is the end of the last member, read from the member offsets: a module with no push constant block has none, Slang's block of two `float4x4` and a `float4` covers 144 bytes, a gap before the last member counts, and a non-square matrix strides its rows when `RowMajor` and its columns when `ColMajor`. |
 | `ReflectionSchemaTest` | The pure data of the binding schema, with no Slang. The `ResourceShape` flag layout (a base shape in the low nibble plus array, multisample, shadow, and feedback flags, read with `GetBaseShape`), the `ToString` tables for `ResourceShape`, `BindingKind`, and `TextureSampleType`, and the `ReflectedUniformMember` equality that dedup rests on, which includes matrix layout and element stride. It also proves that every `CookError` band has names, above the 127 limit of magic_enum's default range. |
 | `StageDumpTest` | A stage dump holds the model and no target text, it names itself the way `--dump-stage` names it, and two dumps of one input agree byte for byte. |
 | `SymbolTableTest` | The tokenizer that powers axis-reachability pruning: it strips `extern static const` declarations and reserved keywords, and reports the axis names no reachable source uses. |
@@ -138,7 +138,9 @@ and each takes about one second.
 | `ResolveStageTest` | Stage 4 resolves a hand-built `RawVariant` with no Slang present. This test is the proof that the stage 3 and stage 4 split worked, and before phase D step D5 it could not be written at all. |
 | `AxisDefaultTest` | The declared default of each axis, from the shader initializer to `ManifestIndex::AxisDefault`. `tests/assets/AxisDefaults/AxisDefaults.slang` declares every default as a value other than the first, in all four domains, with a literal initializer (which reflection also reads, so the two readers are compared) and an expression initializer (which only the source text can read). It proves that a missing default and a default outside the declared values each fail the cook, and that a policy which drops the default cooks, keeps the default in the manifest, and leaves no variant for it. |
 | `DerivedConstantTest` | Derived constants in size expressions, from the shader source to the element count in the manifest. `tests/assets/DerivedConstants/DerivedConstants.slang` sizes a buffer with `LIGHT_SLOTS`, which uses another derived constant, two axes, and a constant from an `__include`d fragment. The test compares each variant's count with a hand-computed value, because nothing else checks it: reflection cannot fold the expression. It proves that a function-local constant with the name of an axis fails the cook, and that Slang rejects a cycle of constants before stage 4 runs (E39999). It also reads a `[ls_extent_1d]` width from the manifest (task L18). |
-| `AccessModelRejectTest` | The table of cooks that must fail. A pointer member under a bound access model, a reflection mismatch, and a codegen error each fail the cook with their own error. A control module still cooks. |
+| `AccessModelRejectTest` | The table of cooks that must fail. A pointer member under a bound access model, a reflection mismatch, and a codegen error each fail the cook with their own error. A control module still cooks, and so does `EntryPointUnusedResource.slang`, which needs the workaround for shader-slang/slang#13789. No row proves a reflection mismatch end to end now: the validator unit tests prove each mismatch kind. |
+| `SlangMetadataCanaryTest` | Shader-slang/slang#13789 still exists: Slang's metadata reports an unused resource beside entry point constants as used. When Slang fixes the issue, this test fails, and its header comment lists the workaround code to delete. |
+| `EntryPointConstantsTest` | The entry point constants (task L14), from the shader source to the manifest, for both targets. `tests/assets/EntryPointConstants/EntryPointConstants.slang` declares a struct parameter with a resource and two scalars, loose parameters, data that is never read, and resources only. The test compares each delivery, byte size, and member with values computed by hand from std140 (the WGSL uniform buffer) and std430 (the SPIR-V push constant block), so the two targets of one variant differ in size. It proves that the WGSL constants resolve to the `entryPointParams` uniform buffer in the layout, that the resource in the struct is a binding on both targets, that unread data gives no constants, and that a 144-byte push constant block fails the SPIR-V cook with `EntryPointConstantsTooLarge` and cooks for WGSL. |
 | `PermutationConstraintTest` | The axis constraint engine. `ActiveWhen` gates an axis the way the old parent link did, `Require` prunes a forbidden combination, and the load check rejects a forward reference, an unknown symbol, and a malformed expression. |
 | `SuggestTest` | The nearest-name suggestion. It measures the edit distance between a mistyped name and the accepted names, and returns the closest one. The cooker and the client both use it for a name rejection. |
 | `EnumTagDecodeTest` | The enum tag-blob decode (`compile/EnumTagDecode`). It reads each integer width, sign-extends a signed tag, zero-extends an unsigned tag, and accepts the `UInt64` wrap above 2^63. It names no Slang type, so the reflection read of an enum case value has a proof that needs no compiler. |
@@ -226,7 +228,8 @@ Test shaders live in `tests/assets/`. The KitchenSink set in `tests/assets/Kitch
 reference. `scripts/check-known-good.py` cooks each KitchenSink module on its own, once for each target,
 and compares its six stage dumps against `tests/known_good/`. A dump is named
 `<module>_<target>_<Stage>.json`. The `wgsl` and `spirv` dumps of one module differ only in the code
-length and the code hash. The reflection is the same for both targets.
+length and the code hash. The reflection is the same for both targets, except for entry point constants: their
+layout and delivery follow the target, and no KitchenSink module declares any.
 
 ## Where the code lives
 
@@ -498,8 +501,26 @@ Five validators run inside that loop. None of them is a stage.
   gives the WGSL pairs (`GetSamplerTextureUses`), and the SPIR-V reader follows each `OpSampledImage` back through
   the loads to its variables. `ResolveSamplerTexturePairs` maps each placement to a position in the entry point's
   used bindings, and fails with `ReflectionSamplerPairUnresolved` when reflection has no texture or sampler there.
-  The pairs are cook output, so `--no-validate` still reads them (`ReadSamplerTexturePairs`, no comparison). A
+  The pairs are cook output, so `--no-validate` still reads them (`ReadEmittedCodeFacts`, no comparison). A
   profile with no reader cooks with no pairs, and the manifest records that they were not read.
+
+  The same read settles the entry point constants (task L14): the `uniform` parameters of ordinary data. Slang
+  puts them in a uniform buffer named `entryPointParams` on WGSL, which stage 3 drafts as a binding, and in a push
+  constant block on SPIR-V, which has no placement. Slang's metadata does not track push constants, so stage 3
+  states a block whenever the layout has data, and `ReconcileEntryPointConstants` (in `BuildModuleStep.cpp`) clears
+  it when the SPIR-V declares no block, because Slang removes data that the entry point does not read. A block
+  that reflection does not state, or that covers more bytes than reflection's size, is a `ReflectionMismatch`. A
+  block above the profile's `MaxPushConstantBytes` (128 for `spirv`, the Vulkan minimum) fails with
+  `EntryPointConstantsTooLarge`.
+
+  A known limit, measured on 2026-10-19: when an entry point has ordinary data, Slang's metadata marks every slot of
+  the parameters' constant buffer as used once any part is used (`collectMetadataFromInst` in
+  `slang-ir-metadata.cpp` inserts the whole slot range of the parameter). A resource parameter beside that data
+  that the entry point does not read is then visible to reflection and absent from the code. Reported as
+  shader-slang/slang#13789. `ApplySlangWorkaround13789` (in `BuildModuleStep.cpp`) removes such a resource from the
+  visibility when the emitted code does not declare it, and prints a warning for each one. It reads only the
+  resources in the constants element (`ConstantsElementBindings`), so every other binding keeps the full
+  cross-check. `SlangMetadataCanaryTest` fails when Slang fixes the issue, so the workaround cannot outlive it.
 - **The sampler pair cross-check**, after the last module and before the emit. `VerifySamplerPairsAcrossProfiles`
   (in `model/CookedLibrary.cpp`) compares the pairs of each variant that two profiles cooked, by resource scope
   and name. The two readers are independent, so agreement is a second opinion. It skips an entry point with a
@@ -742,6 +763,18 @@ union for a pipeline, each placement pair once, with the stages that sample it. 
 layout rule (a sampler paired with a texture that cannot filter must be non-filtering), and a Vulkan renderer can
 check a format's filter support with it before it binds. Pairs come from static use: a dynamic index pairs the
 array bindings, and a future bindless access model can hide a pair from the code.
+
+Each entry point instance records its entry point constants (format version 11, task L14): the `uniform`
+parameters of ordinary data, in the layout of the profile's target. `EntryPointInstance::Constants` indexes the
+interned `EntryPointConstants` records (`EnvironmentHeader::EntryPointConstants`). A record holds the delivery
+(`EntryPointConstantsDelivery`: `None`, `UniformBuffer`, or `PushConstant`), the byte size, a run of uniform
+members, and for a uniform buffer the position of that buffer in the visibility list. The client reads it with
+`EntryPointInstanceView::Constants()`. The size and the offsets follow the target's rules (std140 for the WGSL
+uniform buffer, std430 for the SPIR-V push constant block), so the two profiles of one variant can differ. A
+renderer writes a buffer for `UniformBuffer`, and declares a push constant range from offset 0 for `PushConstant`.
+`Open` checks each record and each uniform buffer position. The constants are part of an entry point instance, so
+the axis relevance and its validator compare them. The merged layout does not read them yet: two stages of one
+SPIR-V pipeline each put their block at push constant offset 0.
 
 Each profile records its `ShaderCodeFormat` (since format version 7). A SPIR-V source is read as words, so
 `Open` rejects a SPIR-V source that is not on a 4-byte boundary or not whole words. The sources are packed
