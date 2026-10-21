@@ -333,7 +333,7 @@ constexpr const char* k_AllWarningsAsErrors = "all";
 // nothing records them yet: the work is tracked in `todo.md`.
 constexpr const char* k_DisabledWarnings = "31010,41012";
 // Order reaches Slang, and the two warning level rows must stay in this order.
-constexpr std::array<CompilerOptionRow, 8u> k_CompilerOptionRows{
+constexpr std::array<CompilerOptionRow, 9u> k_CompilerOptionRows{
     CompilerOptionRow{ .Name = slang::CompilerOptionName::WarningLevel,
                            .Kind = slang::CompilerOptionValueKind::Int,
                            .IntValue = SLANG_WARNING_LEVEL_PEDANTIC },
@@ -356,6 +356,11 @@ constexpr std::array<CompilerOptionRow, 8u> k_CompilerOptionRows{
                            .Kind = slang::CompilerOptionValueKind::Int,
                            .IntValue = 1 },
     CompilerOptionRow{ .Name = slang::CompilerOptionName::UseUpToDateBinaryModule,
+                           .Kind = slang::CompilerOptionValueKind::Int,
+                           .IntValue = 1 },
+    // SPIR-V keeps the source name of the entry point in OpEntryPoint, in place of "main", so the manifest's entry
+    // point name is the name a renderer gives to the pipeline. The cook compares the two.
+    CompilerOptionRow{ .Name = slang::CompilerOptionName::VulkanUseEntryPointName,
                            .Kind = slang::CompilerOptionValueKind::Int,
                            .IntValue = 1 }
 };

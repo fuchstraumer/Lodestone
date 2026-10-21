@@ -67,6 +67,8 @@ struct EmittedCodeFacts
     /** The (group, binding) of each resource the code declares. Only the read path fills it. The cook uses it to
      * settle the visibility that Slang's metadata cannot report (shader-slang/slang#13789). */
     std::vector<std::pair<uint32_t, uint32_t>> DeclaredPlacements;
+    /** The entry point name that the code declares. */
+    std::string EntryPointName;
 };
 
 /** @brief The answer a validator gives about one entry point. `Matches` being `true` means the bindings and

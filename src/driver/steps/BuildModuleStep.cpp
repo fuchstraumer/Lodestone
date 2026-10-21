@@ -405,6 +405,18 @@ namespace
                                     const EmittedCodeFacts& facts,
                                     DiagnosticSink& diagnostics)
     {
+        const CompiledEntryPoint& entryPoint = variant.EntryPoints[entry_point_index];
+        if (!facts.EntryPointName.empty() && facts.EntryPointName != entryPoint.Name)
+        {
+            return ReportError(diagnostics,
+                               CookError::ReflectionMismatch,
+                               std::format("{}{} for target {}: the code names its entry point '{}'",
+                                           entryPoint.Name,
+                                           entryPoint.VariantSuffix,
+                                           target.Name,
+                                           facts.EntryPointName));
+        }
+
         const CookError resolved =
             ResolveSamplerTexturePairs(variant, entry_point_index, facts.SamplerTexturePairs, diagnostics);
         if (resolved != CookError::Success)

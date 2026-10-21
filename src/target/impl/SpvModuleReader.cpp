@@ -110,8 +110,8 @@ namespace
                         std::span<const uint32_t> words,
                         std::span<const spv_parsed_operand_t> operands)
     {
-        // execution model is in words[1]. Slang names every entry point "main": the original name is on
-        // the OpName of the function id.
+        // execution model is in words[1]. The cook sets VulkanUseEntryPointName, so the name is the source name and
+        // not "main"
         EntryPointInfo entryPoint;
         entryPoint.Stage = StageFromExecutionModel(static_cast<spv::ExecutionModel>(words[1]));
         entryPoint.Name = reinterpret_cast<const char*>(words.data() + operands[2].offset);
@@ -796,6 +796,7 @@ CookResult<EmittedCodeFacts> CollectEmittedCodeFacts(const ParseState& parse_sta
     }
 
     EmittedCodeFacts facts{ .SamplerTexturePairs = std::move(*pairs), .PushConstantExtent = *pushExtent };
+    facts.EntryPointName = parse_state.EntryPoint.Name;
     for (const DeclaredBinding& binding : CollectDeclaredBindings(parse_state))
     {
         facts.DeclaredPlacements.emplace_back(binding.Group, binding.Binding);
