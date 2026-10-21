@@ -4,6 +4,8 @@
 #include "CookerErrors.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include <cstdint>
+#include <optional>
+#include <utility>
 #include <span>
 #include <string>
 #include <string_view>
@@ -51,6 +53,22 @@ struct SamplerTexturePlacement
     friend bool operator==(const SamplerTexturePlacement&, const SamplerTexturePlacement&) = default;
 };
 
+/** @brief What a target reader reads from the emitted code of one entry point that reflection cannot report. This is
+ * cook output, not a comparison, so the cook reads it with `--no-validate` too. */
+struct EmittedCodeFacts
+{
+    /** The sampler and texture pairs the emitted code samples with. Reflection cannot report which sampler a texture
+     * is sampled with, so only the emitted code can. */
+    std::vector<SamplerTexturePlacement> SamplerTexturePairs;
+    /** The bytes that the push constant block of the entry point covers, from offset 0 to the end of its last
+     * member. No value when the code declares no push constant block. Slang removes a block the entry point does
+     * not read, and reflection cannot tell that, so this decides whether the entry point constants exist. */
+    std::optional<uint32_t> PushConstantExtent;
+    /** The (group, binding) of each resource the code declares. Only the read path fills it. The cook uses it to
+     * settle the visibility that Slang's metadata cannot report (shader-slang/slang#13789). */
+    std::vector<std::pair<uint32_t, uint32_t>> DeclaredPlacements;
+};
+
 /** @brief The answer a validator gives about one entry point. `Matches` being `true` means the bindings and
  * specializations match the expected value. If `Matches` is `false`, `Report` specifies how/where it is
  * false.
@@ -63,9 +81,7 @@ struct BindingComparison
       * This happens as a separate pass bc especially with SPIR-V there's a whole tangled nest of 
       * related,nested,dependent etc caps and features that are really easy to miss otherwise */
     std::vector<std::string> Capabilities;
-    /** The sampler and texture pairs the emitted code samples with. This is cook output, not a comparison:
-      * reflection cannot state which sampler a texture is sampled with, so only the emitted code can. */
-    std::vector<SamplerTexturePlacement> SamplerTexturePairs;
+    EmittedCodeFacts Emitted;
 };
 
 /**@brief A valuble second opinon about what one entry point really declared. The emitted artifact
@@ -87,19 +103,17 @@ public:
     [[nodiscard]] CookResult<BindingComparison> ValidateEntryPoint(std::span<const std::byte> target_code,
                                                                    std::span<const ReflectedBinding*> used,
                                                                    DiagnosticSink& sink) const;
-    /**@brief Reads the sampler and texture pairs of one entry point, and compares nothing. The cook calls this
-     * when `--no-validate` skips `ValidateEntryPoint`, because the pairs are cook output and not a check. */
-    [[nodiscard]] CookResult<std::vector<SamplerTexturePlacement>> ReadSamplerTexturePairs(
-        std::span<const std::byte> target_code,
-        DiagnosticSink& sink) const;
+    /**@brief Reads the facts of one entry point's emitted code, and compares nothing. The cook calls this when
+     * `--no-validate` skips `ValidateEntryPoint`, because the facts are cook output and not a check. */
+    [[nodiscard]] CookResult<EmittedCodeFacts> ReadEmittedCodeFacts(std::span<const std::byte> target_code,
+                                                                    DiagnosticSink& sink) const;
 
 protected:
     [[nodiscard]] virtual CookResult<BindingComparison> validateEntryPoint(std::span<const std::byte> target_code,
                                                                            std::span<const ReflectedBinding*> used,
                                                                            DiagnosticSink& sink) const = 0;
-    [[nodiscard]] virtual CookResult<std::vector<SamplerTexturePlacement>> readSamplerTexturePairs(
-        std::span<const std::byte> target_code,
-        DiagnosticSink& sink) const = 0;
+    [[nodiscard]] virtual CookResult<EmittedCodeFacts> readEmittedCodeFacts(std::span<const std::byte> target_code,
+                                                                            DiagnosticSink& sink) const = 0;
 };
 
 struct TargetProfile
@@ -113,6 +127,10 @@ struct TargetProfile
     /** @brief Null when this target cannot check its own output. This shoudln't happen,
      *  but will during the intermediate stages of us deploying new target backends */
     const ResolvedLibraryValidator* Validator{ nullptr };
+    /** @brief The largest push constant block every device of this target supports, in bytes. Vulkan guarantees
+     * 128 (`maxPushConstantsSize`). A block that is larger fails the cook, because a device that supports only the
+     * minimum cannot create the pipeline. Zero for a target with no push constants. */
+    uint32_t MaxPushConstantBytes{ 0u };
 };
 
 /**@brief Finds the profile one `--target` name selects. Returns an unexpected value for a name the

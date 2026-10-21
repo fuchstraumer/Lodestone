@@ -109,20 +109,20 @@ CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::span<const 
         // now resources should be precisely sorted, we can use the comparison iterator
         BindingComparison epResult = CompareBindings(wgslBindings, bindings);
         // the pairs are cook output, so they are read whether or not the bindings match
-        epResult.SamplerTexturePairs = ReadPairs(epInspector, entrypoint.name);
+        epResult.Emitted.SamplerTexturePairs = ReadPairs(epInspector, entrypoint.name);
         if (!epResult.Matches)
         {
             return epResult;
         }
-        result.SamplerTexturePairs.append_range(std::move(epResult.SamplerTexturePairs));
+        result.Emitted.SamplerTexturePairs.append_range(std::move(epResult.Emitted.SamplerTexturePairs));
     }
 
     return result;
 }
 
-CookResult<std::vector<SamplerTexturePlacement>> WgslValidator::readSamplerTexturePairs(
-    std::span<const std::byte> source_code,
-    DiagnosticSink& sink) const
+// WGSL has no push constants, so the facts contain the pairs only
+CookResult<EmittedCodeFacts> WgslValidator::readEmittedCodeFacts(std::span<const std::byte> source_code,
+                                                                 DiagnosticSink& sink) const
 {
     CookResult<tint::Program> entrypointProgram = ParseWgsl(source_code, sink);
     if (!entrypointProgram)
@@ -131,12 +131,16 @@ CookResult<std::vector<SamplerTexturePlacement>> WgslValidator::readSamplerTextu
     }
 
     tint::inspector::Inspector epInspector(*entrypointProgram);
-    std::vector<SamplerTexturePlacement> pairs;
+    EmittedCodeFacts facts;
     for (const auto& entrypoint : epInspector.GetEntryPoints())
     {
-        pairs.append_range(ReadPairs(epInspector, entrypoint.name));
+        facts.SamplerTexturePairs.append_range(ReadPairs(epInspector, entrypoint.name));
+        for (const tint::inspector::ResourceBinding& binding : epInspector.GetResourceBindings(entrypoint.name))
+        {
+            facts.DeclaredPlacements.emplace_back(binding.bind_group, binding.binding);
+        }
     }
-    return pairs;
+    return facts;
 }
 
 namespace

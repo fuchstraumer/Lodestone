@@ -64,7 +64,8 @@ namespace
                            .Language = TargetLanguage::Spirv,
                            .SlangProfileName = "spirv_1_5",
                            .Access = AccessModel::Bound,
-                           .Validator = &k_SpvValidator },
+                           .Validator = &k_SpvValidator,
+                           .MaxPushConstantBytes = 128u },
     };
 
     constexpr std::array<std::string_view, 2u> k_TargetProfileNames
@@ -85,11 +86,10 @@ CookResult<BindingComparison> ResolvedLibraryValidator::ValidateEntryPoint(std::
     return validateEntryPoint(target_code, sortedUsed, sink);
 }
 
-CookResult<std::vector<SamplerTexturePlacement>> ResolvedLibraryValidator::ReadSamplerTexturePairs(
-    std::span<const std::byte> target_code,
-    DiagnosticSink& sink) const
+CookResult<EmittedCodeFacts> ResolvedLibraryValidator::ReadEmittedCodeFacts(std::span<const std::byte> target_code,
+                                                                          DiagnosticSink& sink) const
 {
-    return readSamplerTexturePairs(target_code, sink);
+    return readEmittedCodeFacts(target_code, sink);
 }
 
 std::string_view ToString(AccessModel model) noexcept

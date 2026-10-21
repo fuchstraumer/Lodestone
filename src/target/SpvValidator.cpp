@@ -25,7 +25,7 @@ namespace lodestone
 {
 
 using spirv::CollectDeclaredBindings;
-using spirv::CollectSamplerTexturePairs;
+using spirv::CollectEmittedCodeFacts;
 using spirv::DeclaredBinding;
 using spirv::ParseModule;
 using spirv::ParseState;
@@ -74,18 +74,17 @@ CookResult<BindingComparison> SpvValidator::validateEntryPoint(std::span<const s
         comparison.Capabilities.emplace_back(capability);
     }
 
-    CookResult<std::vector<SamplerTexturePlacement>> pairs = CollectSamplerTexturePairs(state, sink);
-    if (!pairs)
+    CookResult<EmittedCodeFacts> facts = CollectEmittedCodeFacts(state, sink);
+    if (!facts)
     {
-        return std::unexpected(pairs.error());
+        return std::unexpected(facts.error());
     }
-    comparison.SamplerTexturePairs = std::move(*pairs);
+    comparison.Emitted = std::move(*facts);
     return comparison;
 }
 
-CookResult<std::vector<SamplerTexturePlacement>> SpvValidator::readSamplerTexturePairs(
-    std::span<const std::byte> source_code,
-    DiagnosticSink& sink) const
+CookResult<EmittedCodeFacts> SpvValidator::readEmittedCodeFacts(std::span<const std::byte> source_code,
+                                                                DiagnosticSink& sink) const
 {
     ParseState state;
     const CookError parsed = ParseModule(context, source_code, false, state, sink);
@@ -93,7 +92,7 @@ CookResult<std::vector<SamplerTexturePlacement>> SpvValidator::readSamplerTextur
     {
         return std::unexpected(parsed);
     }
-    return CollectSamplerTexturePairs(state, sink);
+    return CollectEmittedCodeFacts(state, sink);
 }
 
 namespace
