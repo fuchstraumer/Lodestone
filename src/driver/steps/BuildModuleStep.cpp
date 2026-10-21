@@ -56,6 +56,30 @@ namespace
                                          size_t entry_point_index,
                                          std::span<const SamplerTexturePlacement> placements,
                                          DiagnosticSink& diagnostics);
+    // settles the entry point constants of one entry point against its emitted code. Reflection states a push
+    // constant block whenever the parameters contain ordinary data, and Slang's metadata does not report whether the
+    // entry point reads it, so the code decides: no block in the code means that Slang removed unused data. A block
+    // that reflection does not state, or that covers more bytes than reflection's size, is a reflection mismatch. A
+    // block larger than the profile's limit fails with `EntryPointConstantsTooLarge`.
+    CookError ReconcileEntryPointConstants(const TargetProfile& target,
+                                           CompiledEntryPoint& entry_point,
+                                           std::optional<uint32_t> push_constant_extent,
+                                           DiagnosticSink& diagnostics);
+    // Workaround for shader-slang/slang#13789. Slang's metadata reports every resource in the element of the entry
+    // point constants' buffer as used when any part of the buffer is used. This removes such a resource from the
+    // entry point's visibility when the emitted code does not declare it, and prints a note for each one.
+    // SlangMetadataCanaryTest fails when Slang fixes the issue: then delete this function, its call, and
+    // `ConstantsElementBindings`.
+    CookError ApplySlangWorkaround13789(const TargetProfile& target,
+                                        CompiledVariant& variant,
+                                        size_t entry_point_index,
+                                        DiagnosticSink& diagnostics);
+    // the two steps that turn the facts of one entry point's emitted code into cook output
+    CookError ApplyEmittedCodeFacts(const TargetProfile& target,
+                                    CompiledVariant& variant,
+                                    size_t entry_point_index,
+                                    const EmittedCodeFacts& facts,
+                                    DiagnosticSink& diagnostics);
     void ReportUnreferencedBindings(const CompiledVariant& variant, DiagnosticSink& diagnostics);
     [[nodiscard]] CookResult<CookStatistics> CompileModuleVariants(const SharedCookState& shared_state,
                                                                    const TargetProfile& target,
@@ -247,22 +271,28 @@ namespace
 
         for (size_t i = 0u; i < variant.EntryPoints.size(); ++i)
         {
+            const CookError workaround = ApplySlangWorkaround13789(target, variant, i, diagnostics);
+            if (workaround != CookError::Success)
+            {
+                return std::unexpected(workaround);
+            }
+
             const CompiledEntryPoint& entryPoint = variant.EntryPoints[i];
             if (!validate)
             {
-                const CookResult<std::vector<SamplerTexturePlacement>> pairs =
-                    target.Validator->ReadSamplerTexturePairs(entryPoint.Code, diagnostics);
+                const CookResult<EmittedCodeFacts> facts =
+                    target.Validator->ReadEmittedCodeFacts(entryPoint.Code, diagnostics);
 
-                if (!pairs)
+                if (!facts)
                 {
-                    return std::unexpected(pairs.error());
+                    return std::unexpected(facts.error());
                 }
 
-                const CookError resolved = ResolveSamplerTexturePairs(variant, i, *pairs, diagnostics);
+                const CookError applied = ApplyEmittedCodeFacts(target, variant, i, *facts, diagnostics);
 
-                if (resolved != CookError::Success)
+                if (applied != CookError::Success)
                 {
-                    return std::unexpected(resolved);
+                    return std::unexpected(applied);
                 }
 
                 continue;
@@ -313,16 +343,124 @@ namespace
                 continue;
             }
 
-            const CookError resolved =
-                ResolveSamplerTexturePairs(variant, i, comparison->SamplerTexturePairs, diagnostics);
+            const CookError applied = ApplyEmittedCodeFacts(target, variant, i, comparison->Emitted, diagnostics);
 
-            if (resolved != CookError::Success)
+            if (applied != CookError::Success)
             {
-                return std::unexpected(resolved);
+                return std::unexpected(applied);
             }
         }
 
         return mismatchCount;
+    }
+
+    CookError ApplySlangWorkaround13789(const TargetProfile& target,
+                                        CompiledVariant& variant,
+                                        size_t entry_point_index,
+                                        DiagnosticSink& diagnostics)
+    {
+        CompiledEntryPoint& entryPoint = variant.EntryPoints[entry_point_index];
+        std::vector<uint32_t>& elementBindings = entryPoint.Reflection.ConstantsElementBindings;
+        if (elementBindings.empty())
+        {
+            return CookError::Success;
+        }
+
+        const CookResult<EmittedCodeFacts> facts = target.Validator->ReadEmittedCodeFacts(entryPoint.Code, diagnostics);
+        if (!facts)
+        {
+            return facts.error();
+        }
+
+        // the element follows the container in placement order, so a removal never moves the container's position
+        std::vector<uint32_t>& used = entryPoint.Reflection.UsedBindingIndices;
+        for (const uint32_t bindingIndex : elementBindings)
+        {
+            const ReflectedBinding& binding = variant.Bindings[bindingIndex];
+            const BoundPlacement* placement = GetBoundPlacement(binding.Placement);
+            const auto key = std::pair{ placement->Group, placement->Binding };
+            const bool declared = std::ranges::find(facts->DeclaredPlacements, key) != facts->DeclaredPlacements.end();
+            const auto position = std::ranges::find(used, bindingIndex);
+            if (declared || position == used.end())
+            {
+                continue;
+            }
+
+            used.erase(position);
+            ReportWarning(diagnostics,
+                       std::format("workaround for shader-slang/slang#13789: {}{} for target {} does not use '{}', "
+                                   "which Slang's metadata reports as used",
+                                   entryPoint.Name,
+                                   entryPoint.VariantSuffix,
+                                   target.Name,
+                                   binding.Name));
+        }
+
+        return CookError::Success;
+    }
+
+    CookError ApplyEmittedCodeFacts(const TargetProfile& target,
+                                    CompiledVariant& variant,
+                                    size_t entry_point_index,
+                                    const EmittedCodeFacts& facts,
+                                    DiagnosticSink& diagnostics)
+    {
+        const CookError resolved =
+            ResolveSamplerTexturePairs(variant, entry_point_index, facts.SamplerTexturePairs, diagnostics);
+        if (resolved != CookError::Success)
+        {
+            return resolved;
+        }
+
+        return ReconcileEntryPointConstants(target,
+                                            variant.EntryPoints[entry_point_index],
+                                            facts.PushConstantExtent,
+                                            diagnostics);
+    }
+
+    CookError ReconcileEntryPointConstants(const TargetProfile& target,
+                                           CompiledEntryPoint& entry_point,
+                                           std::optional<uint32_t> push_constant_extent,
+                                           DiagnosticSink& diagnostics)
+    {
+        EntryPointConstants& constants = entry_point.Reflection.Constants;
+        const bool reflected = constants.Delivery == EntryPointConstantsDelivery::PushConstant;
+        if (!push_constant_extent)
+        {
+            if (reflected)
+            {
+                constants = EntryPointConstants{};
+            }
+            return CookError::Success;
+        }
+
+        if (!reflected || *push_constant_extent > constants.ByteSize)
+        {
+            const std::string errStr = std::format(
+                "REFLECTION MISMATCH in {}{} for target {}: the code declares a push constant block of {} bytes, "
+                "and reflection states {}",
+                entry_point.Name,
+                entry_point.VariantSuffix,
+                target.Name,
+                *push_constant_extent,
+                reflected ? std::format("{} bytes", constants.ByteSize) : std::string{ "none" });
+            return ReportError(diagnostics, CookError::ReflectionMismatch, errStr);
+        }
+
+        if (constants.ByteSize > target.MaxPushConstantBytes)
+        {
+            const std::string errStr = std::format(
+                "entry point {}{} for target {} has a push constant block of {} bytes, and every device of the "
+                "target supports only {}. Move part of the data into a buffer",
+                entry_point.Name,
+                entry_point.VariantSuffix,
+                target.Name,
+                constants.ByteSize,
+                target.MaxPushConstantBytes);
+            return ReportError(diagnostics, CookError::EntryPointConstantsTooLarge, errStr);
+        }
+
+        return CookError::Success;
     }
 
     CookError ResolveSamplerTexturePairs(CompiledVariant& variant,
