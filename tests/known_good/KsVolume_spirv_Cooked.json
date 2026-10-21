@@ -9,6 +9,7 @@
     "visibilityListCount": 3,
     "rasterStateCount": 1,
     "samplerPairListCount": 2,
+    "entryPointConstantsCount": 1,
     "variantCount": 288,
     "entryPoints": [
         {
@@ -1011,6 +1012,16 @@
             ]
         }
     ],
+    "entryPointConstants": [
+        {
+            "index": 0,
+            "contentHash": 8376124999220038186,
+            "delivery": "None",
+            "byteSize": 0,
+            "binding": 0,
+            "members": []
+        }
+    ],
     "variants": [
         {
             "index": 0,
@@ -1059,6 +1070,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -1121,6 +1136,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1181,6 +1200,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -1243,6 +1266,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1303,6 +1330,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -1365,6 +1396,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1425,6 +1460,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -1487,6 +1526,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1547,6 +1590,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -1609,6 +1656,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1669,6 +1720,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -1731,6 +1786,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1791,6 +1850,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -1853,6 +1916,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -1913,6 +1980,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -1975,6 +2046,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2035,6 +2110,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -2097,6 +2176,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2157,6 +2240,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -2219,6 +2306,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2279,6 +2370,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -2341,6 +2436,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2401,6 +2500,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -2463,6 +2566,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2523,6 +2630,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -2585,6 +2696,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2645,6 +2760,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -2707,6 +2826,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2767,6 +2890,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -2829,6 +2956,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -2889,6 +3020,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -2951,6 +3086,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3011,6 +3150,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -3073,6 +3216,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3133,6 +3280,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -3195,6 +3346,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3255,6 +3410,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -3317,6 +3476,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3377,6 +3540,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -3439,6 +3606,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3499,6 +3670,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -3561,6 +3736,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3621,6 +3800,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -3683,6 +3866,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3743,6 +3930,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -3805,6 +3996,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3865,6 +4060,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -3927,6 +4126,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -3987,6 +4190,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -4049,6 +4256,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4109,6 +4320,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -4171,6 +4386,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4231,6 +4450,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -4293,6 +4516,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4353,6 +4580,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -4415,6 +4646,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4475,6 +4710,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -4537,6 +4776,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4597,6 +4840,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -4659,6 +4906,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4719,6 +4970,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -4781,6 +5036,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4841,6 +5100,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -4903,6 +5166,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -4963,6 +5230,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -5025,6 +5296,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5085,6 +5360,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -5147,6 +5426,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5207,6 +5490,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -5269,6 +5556,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5329,6 +5620,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -5391,6 +5686,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5451,6 +5750,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -5513,6 +5816,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5573,6 +5880,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -5635,6 +5946,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5695,6 +6010,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -5757,6 +6076,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5817,6 +6140,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -5879,6 +6206,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -5939,6 +6270,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -6001,6 +6336,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6061,6 +6400,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -6123,6 +6466,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6183,6 +6530,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -6245,6 +6596,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6305,6 +6660,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -6367,6 +6726,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6427,6 +6790,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -6489,6 +6856,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6549,6 +6920,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -6611,6 +6986,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6671,6 +7050,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -6733,6 +7116,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6793,6 +7180,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -6855,6 +7246,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -6915,6 +7310,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -6977,6 +7376,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7037,6 +7440,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -7099,6 +7506,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7159,6 +7570,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -7221,6 +7636,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7281,6 +7700,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -7343,6 +7766,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7403,6 +7830,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -7465,6 +7896,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7525,6 +7960,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -7587,6 +8026,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7647,6 +8090,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -7709,6 +8156,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7769,6 +8220,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -7831,6 +8286,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -7891,6 +8350,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -7953,6 +8416,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8013,6 +8480,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -8075,6 +8546,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8135,6 +8610,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -8197,6 +8676,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8257,6 +8740,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -8319,6 +8806,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8379,6 +8870,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -8441,6 +8936,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8501,6 +9000,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -8563,6 +9066,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8623,6 +9130,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -8685,6 +9196,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8745,6 +9260,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -8807,6 +9326,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8867,6 +9390,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -8929,6 +9456,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -8989,6 +9520,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -9051,6 +9586,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9111,6 +9650,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -9173,6 +9716,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9233,6 +9780,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -9295,6 +9846,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9355,6 +9910,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -9417,6 +9976,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9477,6 +10040,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -9539,6 +10106,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9599,6 +10170,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -9661,6 +10236,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9721,6 +10300,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -9783,6 +10366,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9843,6 +10430,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -9905,6 +10496,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -9965,6 +10560,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -10027,6 +10626,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10087,6 +10690,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -10149,6 +10756,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10209,6 +10820,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -10271,6 +10886,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10331,6 +10950,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -10393,6 +11016,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10453,6 +11080,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -10515,6 +11146,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10575,6 +11210,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -10637,6 +11276,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10697,6 +11340,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -10759,6 +11406,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10819,6 +11470,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -10881,6 +11536,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -10941,6 +11600,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -11003,6 +11666,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11063,6 +11730,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -11125,6 +11796,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11185,6 +11860,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -11247,6 +11926,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11307,6 +11990,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -11369,6 +12056,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11429,6 +12120,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -11491,6 +12186,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11551,6 +12250,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -11613,6 +12316,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11673,6 +12380,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -11735,6 +12446,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11795,6 +12510,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -11857,6 +12576,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -11917,6 +12640,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -11979,6 +12706,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12039,6 +12770,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -12101,6 +12836,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12161,6 +12900,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -12223,6 +12966,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12283,6 +13030,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -12345,6 +13096,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12405,6 +13160,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -12467,6 +13226,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12527,6 +13290,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -12589,6 +13356,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12649,6 +13420,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -12711,6 +13486,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12771,6 +13550,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -12833,6 +13616,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -12893,6 +13680,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -12955,6 +13746,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13015,6 +13810,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -13077,6 +13876,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13137,6 +13940,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -13199,6 +14006,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13259,6 +14070,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -13321,6 +14136,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13381,6 +14200,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -13443,6 +14266,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13503,6 +14330,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -13565,6 +14396,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13625,6 +14460,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -13687,6 +14526,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13747,6 +14590,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -13809,6 +14656,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13869,6 +14720,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -13931,6 +14786,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -13991,6 +14850,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -14053,6 +14916,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14113,6 +14980,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -14175,6 +15046,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14235,6 +15110,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -14297,6 +15176,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14357,6 +15240,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -14419,6 +15306,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14479,6 +15370,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -14541,6 +15436,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14601,6 +15500,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -14663,6 +15566,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14723,6 +15630,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -14785,6 +15696,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14845,6 +15760,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -14907,6 +15826,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -14967,6 +15890,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -15029,6 +15956,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15089,6 +16020,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -15151,6 +16086,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15211,6 +16150,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -15273,6 +16216,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15333,6 +16280,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -15395,6 +16346,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15455,6 +16410,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -15517,6 +16476,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15577,6 +16540,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -15639,6 +16606,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15699,6 +16670,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -15761,6 +16736,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15821,6 +16800,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -15883,6 +16866,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -15943,6 +16930,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -16005,6 +16996,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16065,6 +17060,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -16127,6 +17126,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16187,6 +17190,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -16249,6 +17256,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16309,6 +17320,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -16371,6 +17386,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16431,6 +17450,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -16493,6 +17516,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16553,6 +17580,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -16615,6 +17646,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16675,6 +17710,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -16737,6 +17776,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16797,6 +17840,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -16859,6 +17906,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -16919,6 +17970,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -16981,6 +18036,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -17041,6 +18100,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -17103,6 +18166,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -17163,6 +18230,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -17225,6 +18296,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -17285,6 +18360,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -17347,6 +18426,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -17407,6 +18490,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -17469,6 +18556,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -17529,6 +18620,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -17591,6 +18686,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -17651,6 +18750,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -17713,6 +18816,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -17773,6 +18880,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -17835,6 +18946,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -17895,6 +19010,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -17957,6 +19076,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -18017,6 +19140,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -18079,6 +19206,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -18139,6 +19270,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -18201,6 +19336,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -18261,6 +19400,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -18323,6 +19466,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -18383,6 +19530,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -18445,6 +19596,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -18505,6 +19660,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -18567,6 +19726,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 4,
@@ -18623,6 +19786,22 @@
             "byteComparisons": 573
         },
         "rasterStates": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 576,
+            "uniqueEntries": 1,
+            "hashCollisions": 0,
+            "byteComparisons": 575
+        },
+        "samplerPairs": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 576,
+            "uniqueEntries": 2,
+            "hashCollisions": 0,
+            "byteComparisons": 574
+        },
+        "entryPointConstants": {
             "hashName": "xxHash3_64",
             "dedupeEnabled": true,
             "artifactsSeen": 576,

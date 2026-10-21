@@ -16,6 +16,7 @@
             "visibilityIndices": [],
             "rasterIndices": [],
             "samplerPairIndices": [],
+            "constantsIndices": [],
             "workgroups": []
         }
     ],
@@ -75,6 +76,14 @@
             "uniqueEntries": 0,
             "hashCollisions": 0,
             "byteComparisons": 0
+        },
+        "entryPointConstants": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 0,
+            "uniqueEntries": 0,
+            "hashCollisions": 0,
+            "byteComparisons": 0
         }
     },
     "provenance": {
@@ -106,6 +115,7 @@
         ],
         "visibility": [],
         "rasterStates": [],
-        "samplerPairs": []
+        "samplerPairs": [],
+        "entryPointConstants": []
     }
 }

@@ -54,6 +54,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -106,6 +110,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -160,6 +168,10 @@
                 0,
                 2
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -212,6 +224,10 @@
             "samplerPairIndices": [
                 0,
                 2
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -266,6 +282,10 @@
                 0,
                 2
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -318,6 +338,10 @@
             "samplerPairIndices": [
                 0,
                 2
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -372,6 +396,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -424,6 +452,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -478,6 +510,10 @@
                 0,
                 2
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -530,6 +566,10 @@
             "samplerPairIndices": [
                 0,
                 2
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -584,6 +624,10 @@
                 0,
                 2
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -636,6 +680,10 @@
             "samplerPairIndices": [
                 0,
                 2
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -690,6 +738,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -742,6 +794,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -796,6 +852,10 @@
                 0,
                 2
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -848,6 +908,10 @@
             "samplerPairIndices": [
                 0,
                 2
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -902,6 +966,10 @@
                 0,
                 2
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -954,6 +1022,10 @@
             "samplerPairIndices": [
                 0,
                 2
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -1008,6 +1080,10 @@
                 0,
                 1
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -1060,6 +1136,10 @@
             "samplerPairIndices": [
                 0,
                 1
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -1114,6 +1194,10 @@
                 0,
                 2
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -1166,6 +1250,10 @@
             "samplerPairIndices": [
                 0,
                 2
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -1220,6 +1308,10 @@
                 0,
                 2
             ],
+            "constantsIndices": [
+                0,
+                0
+            ],
             "workgroups": [
                 {
                     "x": 1,
@@ -1272,6 +1364,10 @@
             "samplerPairIndices": [
                 0,
                 2
+            ],
+            "constantsIndices": [
+                0,
+                0
             ],
             "workgroups": [
                 {
@@ -1343,6 +1439,14 @@
             "uniqueEntries": 3,
             "hashCollisions": 0,
             "byteComparisons": 45
+        },
+        "entryPointConstants": {
+            "hashName": "xxHash3_64",
+            "dedupeEnabled": true,
+            "artifactsSeen": 48,
+            "uniqueEntries": 1,
+            "hashCollisions": 0,
+            "byteComparisons": 47
         }
     },
     "provenance": {
@@ -3101,6 +3205,253 @@
                         "entryPoint": "ResolveFS",
                         "variant": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
                         "variantIndex": 22
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+                        "variantIndex": 23
+                    }
+                ]
+            }
+        ],
+        "entryPointConstants": [
+            {
+                "index": 0,
+                "mappedFrom": [
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 0
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 0
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 1
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 1
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 2
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 2
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 3
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 3
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+                        "variantIndex": 4
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+                        "variantIndex": 4
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+                        "variantIndex": 5
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Linear, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+                        "variantIndex": 5
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 6
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 6
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 7
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 7
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 8
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 8
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 9
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 9
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+                        "variantIndex": 10
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+                        "variantIndex": 10
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+                        "variantIndex": 11
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Reinhard, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+                        "variantIndex": 11
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 12
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 12
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 13
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 13
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 14
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 14
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 15
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 15
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+                        "variantIndex": 16
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+                        "variantIndex": 16
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+                        "variantIndex": 17
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Aces, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+                        "variantIndex": 17
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 18
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 18
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 19
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=false, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 19
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 20
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=1",
+                        "variantIndex": 20
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 21
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=false, SAMPLE_COUNT=2",
+                        "variantIndex": 21
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+                        "variantIndex": 22
+                    },
+                    {
+                        "entryPoint": "ResolveFS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=1",
+                        "variantIndex": 22
+                    },
+                    {
+                        "entryPoint": "FullscreenVS",
+                        "variant": "TONE_MAP=ToneMapOperator::Filmic, APPLY_BLOOM=true, APPLY_VIGNETTE=true, SAMPLE_COUNT=2",
+                        "variantIndex": 23
                     },
                     {
                         "entryPoint": "ResolveFS",
