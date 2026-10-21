@@ -583,6 +583,17 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
         const uint32_t ownedBaseSize = static_cast<uint32_t>(rawVariant.Bindings.size());
         AppendBindingDrafts(entryPointDrafts, rawVariant.Bindings, rawVariant.SizeAttributes);
 
+        // the container was a position in the drafts, and the drafts keep their order when they are appended
+        if (rawEntryPoint.Constants.ContainerBinding)
+        {
+            *rawEntryPoint.Constants.ContainerBinding += ownedBaseSize;
+        }
+
+        for (uint32_t& binding : rawEntryPoint.ConstantsElementBindings)
+        {
+            binding += ownedBaseSize;
+        }
+
         // filter to create a new subspan for only this entrypoints bindings, and run the collection of used binding indices on just that
         std::span<const RawBinding> entryPointBindings = std::span{ rawVariant.Bindings }.subspan(ownedBaseSize);
         std::vector entryPointIndices = CollectUsedBindingIndices(linked_variant, i, entryPointBindings, ownedBaseSize);
@@ -877,7 +888,13 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
         {
             return;
         }
+        
         uint32_t memberSize = static_cast<uint32_t>(leaf.Type->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
+        // a resource or a varying input in the struct takes no uniform bytes, and it is not a member of the block
+        if (memberSize == 0u)
+        {
+            return;
+        }
         const bool isArray = leaf.Type->getKind() == slang::TypeReflection::Kind::Array;
         uint32_t arrayCount = 1u;
         uint16_t stride = 0u;
@@ -1207,14 +1224,130 @@ CookResult<RawEntryPoint> SlangReflector::extractRawEntryPoint(const LinkedVaria
         return std::unexpected(scope.error());
     }
 
-    const CookError walkError =
-        collectBindingRangeDrafts(entryPointLayout->getTypeLayout(), scope.value(), out_drafts);
+    // With ordinary data among the parameters, Slang puts the parameters in a constant buffer, and their
+    // resources are in the element of that buffer. Without ordinary data, the parameters are a plain struct.
+    slang::TypeLayoutReflection* parametersLayout = entryPointLayout->getTypeLayout();
+    if (parametersLayout != nullptr &&
+        parametersLayout->getKind() == slang::TypeReflection::Kind::ConstantBuffer)
+    {
+        CookResult<slang::TypeLayoutReflection*> elementLayout = readEntryPointConstants(linked_variant,
+                                                                                         entry_point_index,
+                                                                                         entryPointLayout,
+                                                                                         scope.value(),
+                                                                                         rawEntryPoint,
+                                                                                         out_drafts);
+        if (!elementLayout)
+        {
+            return std::unexpected(elementLayout.error());
+        }
+        parametersLayout = *elementLayout;
+    }
+
+    const auto elementBegin = static_cast<uint32_t>(out_drafts.size());
+    const CookError walkError = collectBindingRangeDrafts(parametersLayout, scope.value(), out_drafts);
     if (!walkError)
     {
         return std::unexpected(walkError);
     }
+    // positions in the drafts here, and the caller makes them indices in the variant's bindings
+    if (rawEntryPoint.Constants.Delivery != EntryPointConstantsDelivery::None)
+    {
+        for (auto draft = elementBegin; draft < static_cast<uint32_t>(out_drafts.size()); ++draft)
+        {
+            rawEntryPoint.ConstantsElementBindings.push_back(draft);
+        }
+    }
 
     return rawEntryPoint;
+}
+
+/** Reads the ordinary data of the `uniform` parameters of one entry point into `out_entry_point.Constants`, and
+ * returns the element layout that contains the resources of those parameters, for the caller to walk.
+ *
+ * The range type of the constant buffer tells the delivery. A `ConstantBuffer` range is a uniform buffer with a
+ * placement (WGSL). We draft it as a binding with the name that the target code uses, so the cross-check and the
+ * layout read it like any other binding. A `PushConstant` range has no placement (SPIR-V, for raster and compute
+ * stages). Both targets remove the data when the entry point does not read it. The metadata reports that for the
+ * uniform buffer only, so a push constant block is stated here and settled against the emitted code later. `ContainerBinding` is a position in `out_drafts` here, and the caller
+ * makes it an index in the variant's bindings. */
+CookResult<slang::TypeLayoutReflection*> SlangReflector::readEntryPointConstants(
+    const LinkedVariant& linked_variant,
+    int64_t entry_point_index,
+    slang::EntryPointReflection* entry_point_layout,
+    const BindingScope& scope,
+    RawEntryPoint& out_entry_point,
+    std::vector<RawBindingDraft>& out_drafts) const
+{
+    slang::TypeLayoutReflection* parametersLayout = entry_point_layout->getTypeLayout();
+    slang::TypeLayoutReflection* elementLayout = parametersLayout->getElementTypeLayout();
+    const std::optional<uint32_t> byteSize =
+        elementLayout != nullptr ? ResolvedNumber(elementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM))
+                                 : std::nullopt;
+    if (!byteSize || parametersLayout->getBindingRangeCount() < 1)
+    {
+        return std::unexpected(ReportError(
+            *sink,
+            CookError::ReflectionUnavailable,
+            std::format("entry point {} has uniform parameters with no readable layout", out_entry_point.Name)));
+    }
+
+    RawEntryPointConstants& constants = out_entry_point.Constants;
+    constants.ByteSize = *byteSize;
+    const CookError membersError = collectStructMembers(elementLayout, constants.Members);
+    if (!membersError)
+    {
+        return std::unexpected(membersError);
+    }
+
+    const slang::BindingType containerType = parametersLayout->getBindingRangeType(0);
+    if (containerType == slang::BindingType::PushConstant)
+    {
+        // the metadata does not track push constants (measured 2026-10-19: isParameterLocationUsed reports none),
+        // so stage 3 states the block, and the read of the emitted code removes it when Slang removed it
+        constants.Delivery = EntryPointConstantsDelivery::PushConstant;
+        return elementLayout;
+    }
+
+    if (containerType != slang::BindingType::ConstantBuffer)
+    {
+        return std::unexpected(ReportError(*sink,
+                                           CookError::ReflectionUnsupportedBindingKind,
+                                           std::format("entry point {} delivers its uniform parameters in a range of type {}",
+                                                       out_entry_point.Name,
+                                                       static_cast<int>(containerType))));
+    }
+
+    const std::optional<uint32_t> containerOffset =
+        ReadOffset(parametersLayout->getContainerVarLayout(), SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+    if (!containerOffset)
+    {
+        ReportUnresolvedLocation("entry point constants", 0);
+        return std::unexpected(CookError::ReflectionUnavailable);
+    }
+
+    const BoundPlacement containerPlacement{ .Group = scope.Base.Group,
+                                             .Binding = scope.Base.Binding + *containerOffset };
+    RawBindingDraft container;
+    container.Binding.Name = std::string{ k_EntryPointScopeName };
+    container.Binding.Placement = containerPlacement;
+    container.Binding.Kind = BindingKind::UniformBuffer;
+    container.Binding.ByteSize = constants.ByteSize;
+    container.Binding.UniformMembers = constants.Members;
+
+    const Slang::ComPtr<slang::IMetadata>& metadata =
+        linked_variant.EntryPointMetadata[static_cast<size_t>(entry_point_index)];
+    bool isUsed = false;
+    metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
+                                      containerPlacement.Group,
+                                      containerPlacement.Binding,
+                                      isUsed);
+    if (isUsed)
+    {
+        constants.Delivery = EntryPointConstantsDelivery::UniformBuffer;
+        constants.ContainerBinding = static_cast<uint32_t>(out_drafts.size());
+    }
+    out_drafts.emplace_back(std::move(container));
+    return elementLayout;
 }
 
 #ifdef __clang__

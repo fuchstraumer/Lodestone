@@ -50,6 +50,13 @@ private:
     [[nodiscard]] CookError collectSubObjectDrafts(slang::TypeLayoutReflection* containing_layout,
                                                    const BindingScope& scope,
                                                    std::vector<RawBindingDraft>& out_drafts) const;
+    [[nodiscard]] CookResult<slang::TypeLayoutReflection*> readEntryPointConstants(
+        const LinkedVariant& linked_variant,
+        int64_t entry_point_index,
+        slang::EntryPointReflection* entry_point_layout,
+        const BindingScope& scope,
+        RawEntryPoint& out_entry_point,
+        std::vector<RawBindingDraft>& out_drafts) const;
     [[nodiscard]] CookResult<BindingScope> entryPointScope(slang::EntryPointReflection* entry_point_layout,
                                                            std::string_view entry_point_name) const;
     [[nodiscard]] CookError collectRawSizeAttributes(slang::VariableReflection* leaf_variable,
