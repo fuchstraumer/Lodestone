@@ -108,6 +108,18 @@ struct RawBinding
     std::vector<ReflectedUniformMember> UniformMembers;
 };
 
+/** The `uniform` parameters of ordinary data on one entry point, as Slang lays them out for one target. The
+ * byte size and the member offsets follow the target's layout rules, so the two targets of one variant can
+ * differ. `ContainerBinding` is the index in `RawVariant::Bindings` of the uniform buffer that contains the
+ * data, and it is set only when `Delivery` is `UniformBuffer`. */
+struct RawEntryPointConstants
+{
+    EntryPointConstantsDelivery Delivery{ EntryPointConstantsDelivery::None };
+    uint32_t ByteSize{ 0u };
+    std::optional<uint32_t> ContainerBinding;
+    std::vector<ReflectedUniformMember> Members;
+};
+
 struct RawEntryPoint
 {
     std::string Name;
@@ -119,6 +131,11 @@ struct RawEntryPoint
     /** Indices into `RawVariant::Bindings`, in placement order (`PlacementLess`). This is visibility. */
     std::vector<uint32_t> UsedBindingIndices;
     ReflectedRasterState Raster;
+    RawEntryPointConstants Constants;
+    /** Indices in `RawVariant::Bindings` of the resources in the element of the entry point constants' buffer.
+     * Slang's metadata reports each of them as used when any part of the buffer is used (shader-slang/slang#13789),
+     * so their visibility is settled against the emitted code later. */
+    std::vector<uint32_t> ConstantsElementBindings;
 };
 
 struct RawVariant
