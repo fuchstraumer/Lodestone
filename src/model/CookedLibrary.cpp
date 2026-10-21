@@ -130,6 +130,7 @@ void DisableDedupe(InternedModule& module) noexcept
     module.VisibilityInterner.Disable();
     module.RasterInterner.Disable();
     module.SamplerPairInterner.Disable();
+    module.ConstantsInterner.Disable();
 }
 
 CookError AppendVariantToModule(InternedModule& module,
@@ -173,6 +174,7 @@ CookError AppendVariantToModule(InternedModule& module,
     record.RasterIndices.reserve(variant.EntryPoints.size());
     record.Workgroups.reserve(variant.EntryPoints.size());
     record.SamplerPairIndices.reserve(variant.EntryPoints.size());
+    record.ConstantsIndices.reserve(variant.EntryPoints.size());
     // we could probably make this more efficient in the future, it'll be moving a good bit of data
     // around as variant size grows
     // todo-ship: once we have a better logger with levels, it'd be interesting to see how uniqueness count
@@ -198,6 +200,9 @@ CookError AppendVariantToModule(InternedModule& module,
 
         const InternResult samplerPairs = module.SamplerPairInterner.Intern(entryPoint.SamplerTexturePairs, origin);
         record.SamplerPairIndices.push_back(samplerPairs.Index);
+
+        const InternResult constants = module.ConstantsInterner.Intern(entryPoint.Reflection.Constants, origin);
+        record.ConstantsIndices.push_back(constants.Index);
     }
 
     module.Variants.emplace_back(std::move(record));
@@ -235,6 +240,7 @@ CookedModule FreezeModuleTables(InternedModule&& interned)
     module.VisibilityLists = interned.VisibilityInterner.ConsumeTable();
     module.RasterStates = interned.RasterInterner.ConsumeTable();
     module.SamplerPairLists = interned.SamplerPairInterner.ConsumeTable();
+    module.EntryPointConstantsTable = interned.ConstantsInterner.ConsumeTable();
     module.ObservedCapabilities = std::move(interned.ObservedCapabilities);
 
     module.SourceTable = DescribeTable(interned.SourceInterner);
@@ -244,6 +250,7 @@ CookedModule FreezeModuleTables(InternedModule&& interned)
     module.VisibilityTable = DescribeTable(interned.VisibilityInterner);
     module.RasterTable = DescribeTable(interned.RasterInterner);
     module.SamplerPairTable = DescribeTable(interned.SamplerPairInterner);
+    module.ConstantsTable = DescribeTable(interned.ConstantsInterner);
 
     return module;
 }

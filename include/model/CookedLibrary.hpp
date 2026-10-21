@@ -55,6 +55,8 @@ struct LibraryVariant
     std::vector<WorkgroupSize> Workgroups;
     /** One index into `CookedModule::SamplerPairLists` for each entry point. */
     std::vector<uint32_t> SamplerPairIndices;
+    /** One index into `CookedModule::EntryPointConstantsTable` for each entry point. */
+    std::vector<uint32_t> ConstantsIndices;
 };
 
 /**@brief Indices into `CookedModule::Resources`: the resources one variant declares. */
@@ -113,6 +115,7 @@ struct InternedModule
     ContentInterner<VisibilityList> VisibilityInterner{ &HashVisibilityList, k_HashName };
     ContentInterner<ReflectedRasterState> RasterInterner{ &HashReflectedRasterState, k_HashName };
     ContentInterner<SamplerPairList> SamplerPairInterner{ &HashSamplerPairList, k_HashName };
+    ContentInterner<EntryPointConstants> ConstantsInterner{ &HashEntryPointConstants, k_HashName };
     // Required capabilities read back from the target's validator in any variant, stored as names since those
     // are easiest to associate with renderer runtime caps (e.g., Vulkan device features/extensions)
     std::vector<std::string> ObservedCapabilities;
@@ -126,6 +129,7 @@ struct InternedModule
         VisibilityInterner.Disable();
         RasterInterner.Disable();
         SamplerPairInterner.Disable();
+        ConstantsInterner.Disable();
     }
 };
 
@@ -146,6 +150,7 @@ struct CookedModule
     std::vector<VisibilityList> VisibilityLists;
     std::vector<ReflectedRasterState> RasterStates;
     std::vector<SamplerPairList> SamplerPairLists;
+    std::vector<EntryPointConstants> EntryPointConstantsTable;
     std::vector<VariantKey> VariantKeys;
     std::vector<LibraryVariant> Variants;
     std::vector<std::string> ObservedCapabilities;
@@ -157,6 +162,7 @@ struct CookedModule
     TableStatistics VisibilityTable;
     TableStatistics RasterTable;
     TableStatistics SamplerPairTable;
+    TableStatistics ConstantsTable;
 };
 
 /** @brief One cooked form of the library: a target and the access model it binds with. */
