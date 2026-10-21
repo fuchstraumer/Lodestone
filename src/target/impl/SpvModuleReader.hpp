@@ -2,6 +2,7 @@
 #ifndef LODESTONE_TARGET_SPV_MODULE_READER_HPP
 #define LODESTONE_TARGET_SPV_MODULE_READER_HPP
 #include "CookerErrors.hpp"
+#include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "target/TargetProfile.hpp"
 #include <cstddef>
@@ -148,6 +149,8 @@ struct DeclaredBinding
     BindingKind Kind{ BindingKind::Invalid };
     ResourceShape Shape{ ResourceShape::Invalid };
     ResourceAccess Access{ ResourceAccess::Invalid };
+    // set only for a storage image. A format outside the curated set reads as Invalid, the same as reflection
+    TextureFormat StorageFormat{ TextureFormat::Invalid };
     std::string_view Name;
     std::string_view Unsupported;
 };

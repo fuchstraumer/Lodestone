@@ -160,6 +160,13 @@ namespace
                                ToString(reflected.Shape)));
         }
 
+        if ((declared.Kind == BindingKind::StorageTexture) && (declared.StorageFormat != reflected.StorageFormat))
+        {
+            report(std::format("declared with format {}, reflection has format {}",
+                               magic_enum::enum_name(declared.StorageFormat),
+                               magic_enum::enum_name(reflected.StorageFormat)));
+        }
+
         if (AccessIsStated(declared.Kind) && (declared.Access != reflected.Access))
         {
             report(std::format("declared with access {}, reflection has access {}",

@@ -4,7 +4,6 @@
   no axis names, so it cannot outlive that manifest. A persisted form needs (axis name, value) pairs
   with owned strings, and a load that re-keys them through a query.
 # Resource Layer
-- The WGSL cross-check does not compare a storage texture format. Slang `ac945e5` reflected `RWTexture3D<float>` (no `[format]`) as `Invalid` while the emitted WGSL said `r32float`, and nothing failed. Slang `e9fc02c8d` reflects `R32Float`. Compare the format against Tint's inspector, so the next disagreement fails the cook.
 - Reflection joins a scope with `_` (`JoinScopeName` in `SlangReflector.cpp`), which is the WGSL
   spelling. SPIR-V uses `.`. Store `.`, and let each validator make its own form. `SpvValidator` compares
   the last name segment only until then.
@@ -31,14 +30,6 @@
 - Let a module policy section inherit another target section, for example `inherit = "wgsl"`. Phase F
   step F1.5 makes a missing section fail the cook.
 # Cook driver and manifest
-- Add a guard that fails loudly if a cook emits no manifest, so this validator cannot be orphaned again
-  without a test going red. (2026-09-24: `--target` is now required, which closes the zero-target
-  case. A guard in the emit path is still open.)
-- Verify that the cook actually wrote the files it claims. Part of a bug hid behind stale artifacts
-  on disk, not missing ones: a reader saw an old file and thought the cook succeeded. After a cook,
-  check with `std::filesystem::last_write_time` that each expected artifact is newer than the cook's
-  start time, and that every expected artifact exists. `check-known-good.py` should also refuse to
-  compare an artifact whose timestamp predates the cook it just ran.
 - Tune the worker thread count against memory, and measure it. `ThreadPool::Initialize` uses
   `hardware_concurrency` and ignores `SlangCompilerCreateInfo::ExpectedBatchSize`. Nothing measures the
   count against anything.

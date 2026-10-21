@@ -265,6 +265,45 @@ namespace
         // NonWritable / NonReadable on the variable instead.
     }
 
+    /** Maps the curated formats that `FromSlangImageFormat` maps, so that the two sides compare. Any other format,
+     * `Unknown` included, is Invalid on both sides. */
+    TextureFormat TextureFormatFromSpirv(spv::ImageFormat format) noexcept
+    {
+        switch (format)
+        {
+        case spv::ImageFormat::R8:
+            return TextureFormat::R8Unorm;
+        case spv::ImageFormat::Rg8:
+            return TextureFormat::RG8Unorm;
+        case spv::ImageFormat::Rgba8:
+            return TextureFormat::RGBA8Unorm;
+        case spv::ImageFormat::R16f:
+            return TextureFormat::R16Float;
+        case spv::ImageFormat::Rg16f:
+            return TextureFormat::RG16Float;
+        case spv::ImageFormat::Rgba16f:
+            return TextureFormat::RGBA16Float;
+        case spv::ImageFormat::R32f:
+            return TextureFormat::R32Float;
+        case spv::ImageFormat::Rg32f:
+            return TextureFormat::RG32Float;
+        case spv::ImageFormat::Rgba32f:
+            return TextureFormat::RGBA32Float;
+        case spv::ImageFormat::R32ui:
+            return TextureFormat::R32Uint;
+        case spv::ImageFormat::Rg32ui:
+            return TextureFormat::RG32Uint;
+        case spv::ImageFormat::Rgba32ui:
+            return TextureFormat::RGBA32Uint;
+        case spv::ImageFormat::Rgb10A2:
+            return TextureFormat::R10G10B10A2Unorm;
+        case spv::ImageFormat::R11fG11fB10f:
+            return TextureFormat::R11G11B10Ufloat;
+        default:
+            return TextureFormat::Invalid;
+        }
+    }
+
     void OnOpTypeScalar(ParseState& parse_state, std::span<const uint32_t> words, uint32_t result_id)
     {
         // OpTypeInt: words[2] width, words[3] signedness. OpTypeFloat: words[2] width (words[3] is an
@@ -543,6 +582,10 @@ namespace
                 declared.Kind = (pointee.SampledMode == 2u) ? BindingKind::StorageTexture : BindingKind::Texture;
                 declared.Shape = pointee.Shape;
                 declared.Access = variable.Access;
+                if (declared.Kind == BindingKind::StorageTexture)
+                {
+                    declared.StorageFormat = TextureFormatFromSpirv(static_cast<spv::ImageFormat>(pointee.Format));
+                }
                 break;
             default:
                 declared.Unsupported = "a UniformConstant variable of a type this validator does not read";

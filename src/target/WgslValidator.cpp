@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 #include "tint/tint.h"
+#include <magic_enum/magic_enum.hpp>
 
 namespace lodestone
 {
@@ -235,6 +236,46 @@ namespace
         return reflectionTintType == tint_kind;
     }
 
+    /** Maps the curated formats that `FromSlangImageFormat` maps, so that the two sides compare. Any other format is
+     * Invalid on both sides. */
+    TextureFormat TextureFormatFromTint(tint::inspector::ResourceBinding::TexelFormat format) noexcept
+    {
+        using tTexelFormat = tint::inspector::ResourceBinding::TexelFormat;
+        switch (format)
+        {
+        case tTexelFormat::kR8Unorm:
+            return TextureFormat::R8Unorm;
+        case tTexelFormat::kRg8Unorm:
+            return TextureFormat::RG8Unorm;
+        case tTexelFormat::kRgba8Unorm:
+            return TextureFormat::RGBA8Unorm;
+        case tTexelFormat::kR16Float:
+            return TextureFormat::R16Float;
+        case tTexelFormat::kRg16Float:
+            return TextureFormat::RG16Float;
+        case tTexelFormat::kRgba16Float:
+            return TextureFormat::RGBA16Float;
+        case tTexelFormat::kR32Float:
+            return TextureFormat::R32Float;
+        case tTexelFormat::kRg32Float:
+            return TextureFormat::RG32Float;
+        case tTexelFormat::kRgba32Float:
+            return TextureFormat::RGBA32Float;
+        case tTexelFormat::kR32Uint:
+            return TextureFormat::R32Uint;
+        case tTexelFormat::kRg32Uint:
+            return TextureFormat::RG32Uint;
+        case tTexelFormat::kRgba32Uint:
+            return TextureFormat::RGBA32Uint;
+        case tTexelFormat::kRgb10A2Unorm:
+            return TextureFormat::R10G10B10A2Unorm;
+        case tTexelFormat::kRg11B10Ufloat:
+            return TextureFormat::R11G11B10Ufloat;
+        default:
+            return TextureFormat::Invalid;
+        }
+    }
+
     std::string_view TintTypeToString(tint::inspector::ResourceBinding::ResourceType tint_kind)
     {
         switch (tint_kind)
@@ -326,6 +367,22 @@ namespace
                                                                     ToString(reflectedBinding->Kind),
                                                                     TintTypeToString(tintKind));
                     comparison.Report += messageFirstHalf + messageSecondHalf;
+                }
+                else if (reflectedBinding->Kind == BindingKind::StorageTexture)
+                {
+                    // WGSL spells the format of every storage texture, so the parse states it for each one
+                    const TextureFormat declaredFormat = TextureFormatFromTint(declaredBinding.image_format);
+                    if (declaredFormat != reflectedBinding->StorageFormat)
+                    {
+                        comparison.Matches = false;
+                        comparison.Report += std::format("  wgsl declares @group({}) @binding({}) {} with format {} : "
+                                                         "reflection has format {}\n",
+                                                         declaredBinding.bind_group,
+                                                         declaredBinding.binding,
+                                                         unmangledName,
+                                                         magic_enum::enum_name(declaredFormat),
+                                                         magic_enum::enum_name(reflectedBinding->StorageFormat));
+                    }
                 }
 
                 ++iterSource;

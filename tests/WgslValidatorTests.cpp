@@ -35,6 +35,7 @@ using lodestone::ResourceAccess;
 using lodestone::ResourceShape;
 using lodestone::SamplerTexturePlacement;
 using lodestone::TargetProfile;
+using lodestone::TextureFormat;
 using lodestone::WgslValidator;
 
 namespace
@@ -73,6 +74,17 @@ fn MainCS(@builtin(global_invocation_id) id : vec3<u32>)
     let shadow = textureSampleCompareLevel(ShadowedTexture_0, ShadowSampler_0, uv, 0i, 0.5);
     let raw = f32(DefaultAccess_0[idx]);
     OutputSpectrum_0[idx] = inSample + vec4<f32>(params + height.x + shadow + raw, 0.0, 0.0, 0.0);
+}
+)";
+
+// One storage texture, so that the format has a row of its own. WGSL spells the format of every storage texture.
+constexpr std::string_view k_WgslStorageTexture = R"(
+@group(0) @binding(0) var OutVolume_0 : texture_storage_3d<r32float, read_write>;
+
+@compute @workgroup_size(4, 4, 4)
+fn MainCS(@builtin(global_invocation_id) id : vec3<u32>)
+{
+    textureStore(OutVolume_0, id, vec4<f32>(1.0, 0.0, 0.0, 0.0));
 }
 )";
 
@@ -247,6 +259,26 @@ int main()
         validator.ValidateEntryPoint(std::as_bytes(std::span{ k_Wgsl }), structuredPointers, sink);
     runner.Check(structuredResult.has_value() && structuredResult->Matches,
                  "a storage buffer reflected as structured still matches, because the shape is not a wgsl kind");
+
+    runner.BeginSection("the storage texture format is compared");
+    // Slang ac945e5 reflected `RWTexture3D<float>` with no `[format]` as Invalid while the WGSL said r32float, and
+    // nothing failed. Each row changes only the reflected format.
+    const auto validateStorageFormat = [&](TextureFormat format)
+    {
+        std::vector<ReflectedBinding> storage{ MakeReflected("OutVolume", 0u, 0u, BindingKind::StorageTexture,
+                                                             ResourceShape::Texture3D, ResourceAccess::ReadWrite) };
+        storage[0].StorageFormat = format;
+        std::vector<const ReflectedBinding*> storagePointers = PointersTo(storage);
+        return validator.ValidateEntryPoint(std::as_bytes(std::span{ k_WgslStorageTexture }), storagePointers, sink);
+    };
+    const CookResult<BindingComparison> formatMatch = validateStorageFormat(TextureFormat::R32Float);
+    runner.Check(formatMatch.has_value() && formatMatch->Matches, "a storage texture with the format of the wgsl matches");
+    const CookResult<BindingComparison> formatInvalid = validateStorageFormat(TextureFormat::Invalid);
+    runner.Check(formatInvalid.has_value() && !formatInvalid->Matches,
+                 "a storage texture that reflection reads with no format fails");
+    const CookResult<BindingComparison> formatOther = validateStorageFormat(TextureFormat::RGBA32Float);
+    runner.Check(formatOther.has_value() && !formatOther->Matches,
+                 "a storage texture that reflection reads with another format fails");
 
     runner.BeginSection("a name mismatch fails the cross-check");
     std::vector<ReflectedBinding> wrongName = MakeAgreeingReflection();

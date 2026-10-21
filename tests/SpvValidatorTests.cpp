@@ -37,6 +37,7 @@ using lodestone::ResourceAccess;
 using lodestone::ResourceShape;
 using lodestone::SamplerTexturePlacement;
 using lodestone::SpvValidator;
+using lodestone::TextureFormat;
 
 namespace
 {
@@ -238,6 +239,37 @@ ReflectedBinding MakeReflected(std::string_view name,
     return reflected;
 }
 
+// One storage image with a declared format, so that the format has a row of its own. Sampled 2 is a storage image.
+constexpr std::string_view k_StorageImageCs = R"(
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %WriteCS "main" %OutVolume
+               OpExecutionMode %WriteCS LocalSize 4 4 4
+               OpName %OutVolume "OutVolume"
+               OpDecorate %OutVolume DescriptorSet 0
+               OpDecorate %OutVolume Binding 0
+       %void = OpTypeVoid
+     %fnVoid = OpTypeFunction %void
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+     %v3uint = OpTypeVector %uint 3
+    %v4float = OpTypeVector %float 4
+      %image = OpTypeImage %float 3D 0 0 0 2 R32f
+   %ptrImage = OpTypePointer UniformConstant %image
+  %OutVolume = OpVariable %ptrImage UniformConstant
+     %uint_0 = OpConstant %uint 0
+    %float_0 = OpConstant %float 0
+    %float_1 = OpConstant %float 1
+      %coord = OpConstantComposite %v3uint %uint_0 %uint_0 %uint_0
+      %texel = OpConstantComposite %v4float %float_1 %float_0 %float_0 %float_0
+    %WriteCS = OpFunction %void None %fnVoid
+      %entry = OpLabel
+     %loaded = OpLoad %image %OutVolume
+               OpImageWrite %loaded %coord %texel
+               OpReturn
+               OpFunctionEnd
+)";
+
 /** What Slang's reflection says about `ShadeCS`. The scope is `entryPointParams` on the two parameters. */
 std::vector<ReflectedBinding> MakeAgreeingReflection()
 {
@@ -357,6 +389,31 @@ int main()
         Assemble(Replace(k_ShadeCs, "OpTypeImage %float 2D 2 0 0 1", "OpTypeImage %float 2D 1 0 0 1"));
     runner.Check(Mismatches(validator.ValidateEntryPoint(depthTexture, agreeingPointers, sink)),
                  "a depth texture (Depth 1) against a plain one is a shape mismatch");
+
+    runner.BeginSection("the storage image format is compared");
+    // Slang ac945e5 reflected `RWTexture3D<float>` with no `[format]` as Invalid while the target code stated
+    // r32float, and nothing failed
+    const std::vector<std::byte> storageImage = Assemble(k_StorageImageCs);
+    const auto storageReflection = [](TextureFormat format)
+    {
+        std::vector<ReflectedBinding> reflected{ MakeReflected("OutVolume", 0u, 0u, BindingKind::StorageTexture,
+                                                               ResourceShape::Texture3D, ResourceAccess::ReadWrite) };
+        reflected[0].StorageFormat = format;
+        return reflected;
+    };
+    const std::vector<ReflectedBinding> formatAgrees = storageReflection(TextureFormat::R32Float);
+    std::vector<const ReflectedBinding*> formatAgreesPointers = PointersTo(formatAgrees);
+    const CookResult<BindingComparison> formatMatch = validator.ValidateEntryPoint(storageImage, formatAgreesPointers, sink);
+    runner.Check(formatMatch.has_value() && formatMatch->Matches, "a storage image with the format of the module matches");
+
+    const std::vector<ReflectedBinding> formatMissing = storageReflection(TextureFormat::Invalid);
+    std::vector<const ReflectedBinding*> formatMissingPointers = PointersTo(formatMissing);
+    runner.Check(Mismatches(validator.ValidateEntryPoint(storageImage, formatMissingPointers, sink)),
+                 "a storage image that reflection reads with no format is a mismatch");
+
+    const std::vector<std::byte> otherFormat = Assemble(Replace(k_StorageImageCs, "2 R32f", "2 Rgba32f"));
+    runner.Check(Mismatches(validator.ValidateEntryPoint(otherFormat, formatAgreesPointers, sink)),
+                 "a storage image that the module declares with another format is a mismatch");
 
     std::vector<ReflectedBinding> wrongName = agreeing;
     wrongName[1].Name = "normalMap";
