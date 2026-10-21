@@ -1,5 +1,6 @@
 #include "model/ResolveStage.hpp"
 #include "CookerErrors.hpp"
+#include "ShaderLibraryTypes.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "compile/RawLibrary.hpp"
@@ -13,6 +14,7 @@
 #include <array>
 #include <format>
 #include <functional>
+#include <iterator>
 #include <numeric>
 #include <optional>
 #include <ranges>
@@ -240,6 +242,25 @@ namespace
         entryPoint.Reflection.Workgroup = raw_entry_point.Workgroup;
         entryPoint.Reflection.UsedBindingIndices = raw_entry_point.UsedBindingIndices;
         entryPoint.Reflection.Raster = raw_entry_point.Raster;
+        entryPoint.Reflection.ConstantsElementBindings = raw_entry_point.ConstantsElementBindings;
+
+        const RawEntryPointConstants& rawConstants = raw_entry_point.Constants;
+        EntryPointConstants& constants = entryPoint.Reflection.Constants;
+        constants.Delivery = rawConstants.Delivery;
+        if (constants.Delivery != EntryPointConstantsDelivery::None)
+        {
+            constants.ByteSize = rawConstants.ByteSize;
+            constants.Members = rawConstants.Members;
+        }
+        // stage 3 sets the container only when the metadata reports it as used, and the same query decides
+        // visibility, so the container is always in the visibility list
+        if (constants.Delivery == EntryPointConstantsDelivery::UniformBuffer)
+        {
+            const auto container = std::ranges::find(raw_entry_point.UsedBindingIndices, *rawConstants.ContainerBinding);
+            constants.Binding =
+                static_cast<uint32_t>(std::distance(raw_entry_point.UsedBindingIndices.begin(), container));
+        }
+        
         return entryPoint;
     }
 
