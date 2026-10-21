@@ -5,9 +5,10 @@
 # This file is included, not added as a subdirectory, so CMAKE_CURRENT_SOURCE_DIR is the repository root.
 # The client targets (lodestone::client_library, lodestone::json, lodestone::suggest) must exist first.
 
-# cmake/ contains our own FindVulkanHeaders.cmake; must be set before any find_package calls
+# cmake/ contains our own FindVulkanHeaders.cmake; must be set before any find_package calls. Slang calls
+# find_package(VulkanHeaders) even when a parent project found Vulkan first, so the path is always added.
+list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 if (NOT TARGET Vulkan::Vulkan)
-    list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
     find_package(Vulkan REQUIRED)
     set(VulkanHeaders_INCLUDE_DIR ${Vulkan_INCLUDE_DIR} CACHE PATH "" FORCE)
 endif()

@@ -14,8 +14,8 @@ function(add_lodestone_unit_test NAME)
     # Both paths are here because a test includes a cooker header and a client header by name only,
     # the way the library's own sources do.
     target_include_directories(${NAME} PRIVATE
-        "${CMAKE_SOURCE_DIR}/include"
-        "${CMAKE_SOURCE_DIR}/client/include")
+        "${PROJECT_SOURCE_DIR}/include"
+        "${PROJECT_SOURCE_DIR}/client/include")
 
     target_link_libraries(${NAME} PRIVATE lodestone slang lodestone::client_library)
     if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -35,7 +35,7 @@ add_lodestone_unit_test(EntryPointParamsCookTest CookTest.cpp
               --target=wgsl
               --target=spirv
               --verify-deterministic
-              "${CMAKE_SOURCE_DIR}/tests/assets/EntryPointParams.slang")
+              "${PROJECT_SOURCE_DIR}/tests/assets/EntryPointParams.slang")
 # The same driver, on the probe module added for the parameter block walk. `ParameterBlocks.slang` declares
 # a block of resources, a block of ordinary data, a block inside a block, and a block on each of two
 # entry points. Slang describes a block with descriptor ranges alone, so a cooker that walks the
@@ -45,7 +45,7 @@ add_lodestone_unit_test(ParameterBlocksCookTest CookTest.cpp
               --target=wgsl
               --target=spirv
               --verify-deterministic
-              "${CMAKE_SOURCE_DIR}/tests/assets/ParameterBlocks.slang")
+              "${PROJECT_SOURCE_DIR}/tests/assets/ParameterBlocks.slang")
 # The same driver, on the module added with interface axes. `InterfaceAxisTest.slang` declares an
 # interface axis: an `extern struct SHADE_MODE : IShadeMode` that a per-variant `export struct` makes
 # concrete. Its three implementations are tagged `ls_axis_interface_impl` and reach the module through
@@ -57,7 +57,7 @@ add_lodestone_unit_test(InterfaceAxisCookTest CookTest.cpp
               --target=wgsl
               --target=spirv
               --verify-deterministic
-              "${CMAKE_SOURCE_DIR}/tests/assets/InterfaceAxis/InterfaceAxisTest.slang")
+              "${PROJECT_SOURCE_DIR}/tests/assets/InterfaceAxis/InterfaceAxisTest.slang")
 # The same driver, on an enum-axis module. `EnumAxisTest.slang` declares an `[ls_axis_enum]` extern
 # const whose Slang enum has explicit, non-ascending case values. The axis read reflects the enum's
 # cases (names and values); the manifest stores the case names, and the digit stays the declaration
@@ -68,7 +68,7 @@ add_lodestone_unit_test(EnumAxisCookTest CookTest.cpp
               --target=wgsl
               --target=spirv
               --verify-deterministic
-              "${CMAKE_SOURCE_DIR}/tests/assets/EnumAxis/EnumAxisTest.slang")
+              "${PROJECT_SOURCE_DIR}/tests/assets/EnumAxis/EnumAxisTest.slang")
 # The same driver, on the multi-module KitchenSink set. This is the stress and coverage asset: four
 # consumer modules cook together against one policy, and KsTypes and KsShading are imported for their
 # enum and interface declarations. It crosses every axis kind, groups resources into nested parameter
@@ -79,11 +79,11 @@ add_lodestone_unit_test(KitchenSinkCookTest CookTest.cpp
               --target=wgsl
               --target=spirv
               --verify-deterministic
-              --policy-file "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KitchenSink.toml"
-              "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KsGeometry.slang"
-              "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KsMaterial.slang"
-              "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KsVolume.slang"
-              "${CMAKE_SOURCE_DIR}/tests/assets/KitchenSink/KsPost.slang")
+              --policy-file "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KitchenSink.toml"
+              "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KsGeometry.slang"
+              "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KsMaterial.slang"
+              "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KsVolume.slang"
+              "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KsPost.slang")
 # The one test in this suite that asserts a cook FAILS.
 #
 # Every other cook test checks that a good module cooks. A check that never fires and a check that
@@ -95,28 +95,28 @@ add_lodestone_unit_test(KitchenSinkCookTest CookTest.cpp
 # module and one line, and no new target.
 add_lodestone_unit_test(AccessModelRejectTest AccessModelRejectTests.cpp)
 target_compile_definitions(AccessModelRejectTest PRIVATE
-    LODESTONE_TEST_ASSET_DIR="${CMAKE_SOURCE_DIR}/tests/assets")
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets")
 add_lodestone_unit_test(AttributeExpressionTest AttributeExpressionTests.cpp)
 # The declared default of each axis, from the shader initializer to the client query layer. It cooks through
 # Slang, so it takes about one second.
 add_lodestone_unit_test(AxisDefaultTest AxisDefaultTests.cpp)
 target_compile_definitions(AxisDefaultTest PRIVATE
-    LODESTONE_TEST_ASSET_DIR="${CMAKE_SOURCE_DIR}/tests/assets/AxisDefaults")
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/AxisDefaults")
 # Derived constants in size expressions, from the shader source to the element count in the manifest. It cooks
 # through Slang, so it takes about one second.
 add_lodestone_unit_test(DerivedConstantTest DerivedConstantTests.cpp)
 target_compile_definitions(DerivedConstantTest PRIVATE
-    LODESTONE_TEST_ASSET_DIR="${CMAKE_SOURCE_DIR}/tests/assets/DerivedConstants")
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/DerivedConstants")
 # The entry point constants of both targets, from the shader source to the manifest, against hand-computed layouts.
 # It cooks through Slang, so it takes about one second.
 add_lodestone_unit_test(EntryPointConstantsTest EntryPointConstantsTests.cpp)
 target_compile_definitions(EntryPointConstantsTest PRIVATE
-    LODESTONE_TEST_ASSET_DIR="${CMAKE_SOURCE_DIR}/tests/assets/EntryPointConstants")
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/EntryPointConstants")
 # The resource roles and tags (task L17), from the shader source to the manifest, and each rule's failure. It cooks
 # through Slang, so it takes about one second.
 add_lodestone_unit_test(ResourceRoleTest ResourceRoleTests.cpp)
 target_compile_definitions(ResourceRoleTest PRIVATE
-    LODESTONE_TEST_ASSET_DIR="${CMAKE_SOURCE_DIR}/tests/assets/ResourceRoles")
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/ResourceRoles")
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)
@@ -148,7 +148,7 @@ add_lodestone_unit_test(MergedLayoutTest MergedLayoutTests.cpp)
 # builds while lodestone is mid-refactor. Build it directly: --target DeclKindProbe
 add_executable(DeclKindProbe DeclKindProbe.cpp)
 set_target_properties(DeclKindProbe PROPERTIES FOLDER "Tests" CXX_STANDARD 23 CXX_STANDARD_REQUIRED YES)
-target_include_directories(DeclKindProbe PRIVATE "${CMAKE_SOURCE_DIR}/third_party/slang/include")
+target_include_directories(DeclKindProbe PRIVATE "${PROJECT_SOURCE_DIR}/third_party/slang/include")
 target_link_libraries(DeclKindProbe PRIVATE slang)
 copy_slang_dlls_to_target(DeclKindProbe)
 
@@ -157,6 +157,6 @@ copy_slang_dlls_to_target(DeclKindProbe)
 # Slang update: exit code 0 means the fault is gone. Build it directly: --target SlangPrelinkRepro
 add_executable(SlangPrelinkRepro SlangPrelinkRepro.cpp)
 set_target_properties(SlangPrelinkRepro PROPERTIES FOLDER "Tests" CXX_STANDARD 23 CXX_STANDARD_REQUIRED YES)
-target_include_directories(SlangPrelinkRepro PRIVATE "${CMAKE_SOURCE_DIR}/third_party/slang/include")
+target_include_directories(SlangPrelinkRepro PRIVATE "${PROJECT_SOURCE_DIR}/third_party/slang/include")
 target_link_libraries(SlangPrelinkRepro PRIVATE slang)
 copy_slang_dlls_to_target(SlangPrelinkRepro)

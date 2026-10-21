@@ -16,8 +16,13 @@ set(SLANG_EXCLUDE_DAWN ON CACHE BOOL "Optionally exclude webgpu_dawn from the bu
 set(SLANG_EXCLUDE_TINT ON CACHE BOOL "Optionally exclude slang-tint from the build")
 set(SLANG_ENABLE_RELEASE_LTO ON CACHE BOOL "Enable LTO for release builds")
 set(SLANG_USE_SYSTEM_VULKAN_HEADERS ON)
-set(SLANG_ENABLE_MIMALLOC ON)
-set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC ON)
+# a parent project that builds its own mimalloc-static sets these OFF, so Slang does not add a second target
+if (NOT DEFINED SLANG_ENABLE_MIMALLOC)
+    set(SLANG_ENABLE_MIMALLOC ON)
+endif()
+if (NOT DEFINED SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC)
+    set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC ON)
+endif()
 
 if (TARGET SPIRV-Tools-static)
     set(SLANG_USE_SYSTEM_SPIRV_TOOLS ON)

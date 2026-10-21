@@ -8,8 +8,8 @@ set_target_properties(manifest_dump PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQU
 # Only needs the client-facing manifest reader + shader vocabulary, not the cooker or Slang itself.
 target_include_directories(manifest_dump PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
-    "${CMAKE_SOURCE_DIR}/client/include"
-    "${CMAKE_SOURCE_DIR}/third_party/magic_enum/include")
+    "${PROJECT_SOURCE_DIR}/client/include"
+    "${PROJECT_SOURCE_DIR}/third_party/magic_enum/include")
 target_link_libraries(manifest_dump PRIVATE lodestone::client_library lodestone::json)
 
 if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
