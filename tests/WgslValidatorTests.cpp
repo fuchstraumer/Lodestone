@@ -29,6 +29,7 @@
 using lodestone::BindingComparison;
 using lodestone::BindingKind;
 using lodestone::CookResult;
+using lodestone::EmittedCodeFacts;
 using lodestone::ReflectedBinding;
 using lodestone::ResourceAccess;
 using lodestone::ResourceShape;
@@ -193,11 +194,11 @@ int main()
         });
         return pairs;
     };
-    runner.Check(match.has_value() && sortedPairs(match->SamplerTexturePairs) == expectedPairs,
+    runner.Check(match.has_value() && sortedPairs(match->Emitted.SamplerTexturePairs) == expectedPairs,
                  "the validate path reads each texture with the sampler it is sampled with, a comparison sampler too");
-    const CookResult<std::vector<SamplerTexturePlacement>> readPairs =
-        validator.ReadSamplerTexturePairs(std::as_bytes(std::span{ k_Wgsl }), sink);
-    runner.Check(readPairs.has_value() && sortedPairs(*readPairs) == expectedPairs,
+    const CookResult<EmittedCodeFacts> readFacts =
+        validator.ReadEmittedCodeFacts(std::as_bytes(std::span{ k_Wgsl }), sink);
+    runner.Check(readFacts.has_value() && sortedPairs(readFacts->SamplerTexturePairs) == expectedPairs,
                  "the read path gives the same pairs, and compares nothing");
 
     runner.BeginSection("a kind mismatch fails the cross-check");

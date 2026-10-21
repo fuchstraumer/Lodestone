@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -30,6 +31,7 @@ using lodestone::BindingComparison;
 using lodestone::BindingKind;
 using lodestone::CookError;
 using lodestone::CookResult;
+using lodestone::EmittedCodeFacts;
 using lodestone::ReflectedBinding;
 using lodestone::ResourceAccess;
 using lodestone::ResourceShape;
@@ -108,6 +110,80 @@ constexpr std::string_view k_ShadeCs = R"(
   %__sampled = OpImageSampleExplicitLod %v4float %37 %uv Lod %float_0
          %40 = OpCopyObject %v4float %__sampled
                OpStore %23 %40
+               OpReturn
+               OpFunctionEnd
+)";
+
+// Slang's own output for EntryPointConstantsTooLarge.slang: the entry point constants as a push constant block of
+// two float4x4 and a float4. The block covers 64 + 64 + 16 = 144 bytes.
+constexpr std::string_view k_LargeCs = R"(
+               OpCapability Shader
+               OpExtension "SPV_KHR_storage_buffer_storage_class"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %LargeCS "main" %Output %entryPointParams %gl_GlobalInvocationID
+               OpExecutionMode %LargeCS LocalSize 64 1 1
+               OpSource Slang 1
+               OpName %RWStructuredBuffer "RWStructuredBuffer"
+               OpMemberName %RWStructuredBuffer 0 "__member0"
+               OpName %Output "Output"
+               OpName %EntryPointParams_std430 "EntryPointParams_std430"
+               OpMemberName %EntryPointParams_std430 0 "view"
+               OpMemberName %EntryPointParams_std430 1 "projection"
+               OpMemberName %EntryPointParams_std430 2 "tint"
+               OpName %entryPointParams "entryPointParams"
+               OpName %LargeCS "LargeCS"
+               OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+               OpDecorate %_ptr_StorageBuffer_v4float ArrayStride 16
+               OpDecorate %_runtimearr_v4float ArrayStride 16
+               OpDecorate %RWStructuredBuffer Block
+               OpMemberDecorate %RWStructuredBuffer 0 Offset 0
+               OpDecorate %Output Binding 0
+               OpDecorate %Output DescriptorSet 0
+               OpDecorate %EntryPointParams_std430 Block
+               OpMemberDecorate %EntryPointParams_std430 0 Offset 0
+               OpMemberDecorate %EntryPointParams_std430 0 RowMajor
+               OpMemberDecorate %EntryPointParams_std430 0 MatrixStride 16
+               OpMemberDecorate %EntryPointParams_std430 1 Offset 64
+               OpMemberDecorate %EntryPointParams_std430 1 RowMajor
+               OpMemberDecorate %EntryPointParams_std430 1 MatrixStride 16
+               OpMemberDecorate %EntryPointParams_std430 2 Offset 128
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+     %v3uint = OpTypeVector %uint 3
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_StorageBuffer_v4float = OpTypePointer StorageBuffer %v4float
+%_runtimearr_v4float = OpTypeRuntimeArray %v4float
+%RWStructuredBuffer = OpTypeStruct %_runtimearr_v4float
+%_ptr_StorageBuffer_RWStructuredBuffer = OpTypePointer StorageBuffer %RWStructuredBuffer
+%mat4v4float = OpTypeMatrix %v4float 4
+%EntryPointParams_std430 = OpTypeStruct %mat4v4float %mat4v4float %v4float
+%_ptr_PushConstant_EntryPointParams_std430 = OpTypePointer PushConstant %EntryPointParams_std430
+%_ptr_PushConstant_mat4v4float = OpTypePointer PushConstant %mat4v4float
+      %int_2 = OpConstant %int 2
+%_ptr_PushConstant_v4float = OpTypePointer PushConstant %v4float
+      %int_1 = OpConstant %int 1
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
+     %Output = OpVariable %_ptr_StorageBuffer_RWStructuredBuffer StorageBuffer
+%entryPointParams = OpVariable %_ptr_PushConstant_EntryPointParams_std430 PushConstant
+    %LargeCS = OpFunction %void None %3
+          %4 = OpLabel
+          %7 = OpLoad %v3uint %gl_GlobalInvocationID
+         %10 = OpCompositeExtract %uint %7 0
+         %16 = OpAccessChain %_ptr_StorageBuffer_v4float %Output %int_0 %10
+         %26 = OpAccessChain %_ptr_PushConstant_mat4v4float %entryPointParams %int_0
+         %27 = OpLoad %mat4v4float %26
+         %30 = OpAccessChain %_ptr_PushConstant_v4float %entryPointParams %int_2
+         %31 = OpLoad %v4float %30
+         %32 = OpVectorTimesMatrix %v4float %31 %27
+         %34 = OpAccessChain %_ptr_PushConstant_mat4v4float %entryPointParams %int_1
+         %35 = OpLoad %mat4v4float %34
+         %36 = OpVectorTimesMatrix %v4float %32 %35
+               OpStore %16 %36
                OpReturn
                OpFunctionEnd
 )";
@@ -228,10 +304,10 @@ int main()
     {
         SamplerTexturePlacement{ .TextureGroup = 0u, .TextureBinding = 1u, .SamplerGroup = 0u, .SamplerBinding = 2u },
     };
-    runner.Check(match.has_value() && match->SamplerTexturePairs == expectedPairs,
+    runner.Check(match.has_value() && match->Emitted.SamplerTexturePairs == expectedPairs,
                  "the validate path traces the image and the sampler of OpSampledImage to their bindings");
-    const CookResult<std::vector<SamplerTexturePlacement>> readPairs = validator.ReadSamplerTexturePairs(shadeCs, sink);
-    runner.Check(readPairs.has_value() && *readPairs == expectedPairs,
+    const CookResult<EmittedCodeFacts> readFacts = validator.ReadEmittedCodeFacts(shadeCs, sink);
+    runner.Check(readFacts.has_value() && readFacts->SamplerTexturePairs == expectedPairs,
                  "the read path gives the same pairs, and compares nothing");
 
     // An image that does not come from a resource variable cannot name a binding. Dropping the pair would make
@@ -241,7 +317,7 @@ int main()
                                           "    %float_0 = OpConstant %float 0\n%undefImage = OpUndef %28");
     const std::vector<std::byte> undefImage = Assemble(undefText);
     runner.Check(!undefImage.empty(), "the fixture with an undefined image assembles");
-    const CookResult<std::vector<SamplerTexturePlacement>> unresolved = validator.ReadSamplerTexturePairs(undefImage, sink);
+    const CookResult<EmittedCodeFacts> unresolved = validator.ReadEmittedCodeFacts(undefImage, sink);
     runner.Check(!unresolved.has_value() && unresolved.error() == CookError::ReflectionSamplerPairUnresolved,
                  "a sampled image that does not trace back to a variable fails with ReflectionSamplerPairUnresolved");
 
@@ -301,6 +377,33 @@ int main()
     const CookResult<BindingComparison> partial = validator.ValidateEntryPoint(partialWord, agreeingPointers, sink);
     runner.Check(!partial.has_value() && (partial.error() == CookError::TargetValidationEntryPointParseFailed),
                  "code that is not whole words is a parse failure");
+
+    runner.BeginSection("the push constant extent is the end of the last member, from the decorations");
+    const CookResult<EmittedCodeFacts> noPush = validator.ReadEmittedCodeFacts(shadeCs, sink);
+    runner.Check(noPush.has_value() && !noPush->PushConstantExtent.has_value(),
+                 "a module with no push constant variable has no extent");
+
+    auto extentOf = [&](const std::string& text) -> std::optional<uint32_t>
+    {
+        const std::vector<std::byte> code = Assemble(text);
+        const CookResult<EmittedCodeFacts> facts = validator.ReadEmittedCodeFacts(code, sink);
+        return facts.has_value() ? facts->PushConstantExtent : std::nullopt;
+    };
+    const std::string large{ k_LargeCs };
+    runner.Check(extentOf(large) == 144u, "Slang's block of two float4x4 and a float4 covers 144 bytes");
+    runner.Check(extentOf(Replace(large, "%EntryPointParams_std430 2 Offset 128", "%EntryPointParams_std430 2 Offset 200")) ==
+                     216u,
+                 "the extent reads the member offsets, so a gap before the last member counts");
+    // a matrix of 2 columns of float4 is 4 rows of 2 floats. RowMajor puts a row at each stride: 3 * 16 + 2 * 4 = 56.
+    // ColMajor puts a column at each stride: 1 * 16 + 4 * 4 = 32. The read path skips spirv-val, so the function body
+    // need not agree with the narrower type
+    const std::string twoColumns = Replace(Replace(large, "%mat4v4float = OpTypeMatrix %v4float 4", "%mat4v4float = OpTypeMatrix %v4float 2"),
+                                           "%EntryPointParams_std430 2 Offset 128",
+                                           "%EntryPointParams_std430 2 Offset 0");
+    runner.Check(extentOf(twoColumns) == 64u + 56u, "a RowMajor matrix strides its rows");
+    runner.Check(extentOf(Replace(twoColumns, "%EntryPointParams_std430 1 RowMajor", "%EntryPointParams_std430 1 ColMajor")) ==
+                     64u + 32u,
+                 "a ColMajor matrix strides its columns");
 
     return runner.Report();
 }

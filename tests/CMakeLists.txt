@@ -107,6 +107,13 @@ target_compile_definitions(AxisDefaultTest PRIVATE
 add_lodestone_unit_test(DerivedConstantTest DerivedConstantTests.cpp)
 target_compile_definitions(DerivedConstantTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${CMAKE_SOURCE_DIR}/tests/assets/DerivedConstants")
+# The entry point constants of both targets, from the shader source to the manifest, against hand-computed layouts.
+# It cooks through Slang, so it takes about one second.
+add_lodestone_unit_test(EntryPointConstantsTest EntryPointConstantsTests.cpp)
+target_compile_definitions(EntryPointConstantsTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${CMAKE_SOURCE_DIR}/tests/assets/EntryPointConstants")
+# A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
+add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)
 add_lodestone_unit_test(PermutationIndexTest PermutationIndexTests.cpp)
 add_lodestone_unit_test(ShaderManifestRejectTest ShaderManifestRejectTests.cpp)

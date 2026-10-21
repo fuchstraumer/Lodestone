@@ -180,6 +180,43 @@ CookedLibrary MakeSampledLibrary(lodestone::SamplerPairList wgsl_pairs, lodeston
     return library;
 }
 
+/** The small module, cooked for WGSL only, with entry point constants: a 16-byte uniform buffer named
+ * `entryPointParams` at visibility position 0. With `with_constants` false, the instances name the empty record. */
+CookedLibrary MakeConstantsLibrary(bool with_constants)
+{
+    CookedModule module = MakeSmallModule();
+    lodestone::ReflectedUniformMember tint;
+    tint.Name = "tint";
+    tint.Data.Offset = 0u;
+    tint.Data.Size = 16u;
+    lodestone::ReflectedBinding container;
+    container.Name = "entryPointParams";
+    container.Placement = lodestone::BoundPlacement{ .Group = 0u, .Binding = 1u };
+    container.Kind = lodestone::BindingKind::UniformBuffer;
+    container.ByteSize = 16u;
+    container.UniformMembers = { tint };
+
+    module.Resources = { container };
+    module.ResourceLists = { lodestone::ResourceList{ 0u } };
+    module.FootprintLists = { lodestone::FootprintList{ std::monostate{} } };
+    module.VisibilityLists = { lodestone::VisibilityList{ 0u } };
+    module.EntryPointConstantsTable.push_back(
+        lodestone::EntryPointConstants{ .Delivery = lodestone::EntryPointConstantsDelivery::UniformBuffer,
+                                        .ByteSize = 16u,
+                                        .Binding = 0u,
+                                        .Members = { tint } });
+    for (lodestone::LibraryVariant& variant : module.Variants)
+    {
+        variant.ConstantsIndices = { with_constants ? 1u : 0u };
+    }
+
+    CookedLibrary library = MakeSmallLibrary();
+    library.Environments = {};
+    library.Environments.emplace_back(std::move(module));
+    library.Environments.emplace_back(std::nullopt);
+    return library;
+}
+
 template<typename ValueType>
 void WriteValue(std::vector<std::byte>& bytes, size_t offset, ValueType value)
 {
@@ -422,6 +459,82 @@ int main()
     oneUnrecorded.Profiles[1].SamplerTexturePairsRecorded = false;
     runner.Check(lodestone::VerifySamplerPairsAcrossProfiles(oneUnrecorded) == lodestone::CookError::Success,
                  "a profile that did not record its pairs is not compared");
+
+    runner.BeginSection("the entry point constants read back, and a damaged record is rejected");
+    const CookedLibrary constantsLibrary = MakeConstantsLibrary(true);
+    const lodestone::CookResult<std::vector<std::byte>> constantsManifest = EmitShaderManifest(constantsLibrary);
+    runner.Check(constantsManifest.has_value(), "the emitter accepts a module with entry point constants");
+    if (constantsManifest.has_value())
+    {
+        const std::vector<std::byte>& constantsBytes = *constantsManifest;
+        runner.Check(lodestone::VerifyManifestRoundTrip(constantsLibrary, constantsBytes) == lodestone::CookError::Success,
+                     "the round trip reads the constants back");
+        runner.Check(lodestone::VerifyManifestRoundTrip(MakeConstantsLibrary(false), constantsBytes) ==
+                         lodestone::CookError::ManifestEntryPointConstantsMismatch,
+                     "a manifest whose constants differ from the cook fails the round trip");
+
+        const ManifestResult<BundleView> constantsBundle = BundleView::Open(constantsBytes);
+        const ManifestResult<EnvironmentView> constantsEnvironment =
+            constantsBundle.has_value() ? constantsBundle->OpenEnvironment(0u, 0u)
+                                        : ManifestResult<EnvironmentView>{ std::unexpected(constantsBundle.error()) };
+        runner.Check(constantsEnvironment.has_value(), "the environment with constants opens");
+        if (constantsEnvironment.has_value())
+        {
+            const lodestone::manifest::EntryPointInstanceView instance =
+                constantsEnvironment->VariantAt(0u).EntryPoint(0u);
+            const lodestone::manifest::EntryPointConstantsView constants = instance.Constants();
+            runner.Check(constants.Delivery() == lodestone::EntryPointConstantsDelivery::UniformBuffer &&
+                             constants.ByteSize() == 16u && constants.Members().Size() == 1u &&
+                             constants.Members()[0u].Name() == "tint" &&
+                             instance.Layout()[constants.BindingPosition()].Name() == "entryPointParams",
+                         "the constants resolve through the layout to their uniform buffer");
+        }
+
+        const EnvironmentDirectoryEntry constantsEntry = ReadRecord<EnvironmentDirectoryEntry>(
+            constantsBytes, ReadRecord<Header>(constantsBytes, 0u).EnvironmentDirectoryOffset);
+        const EnvironmentHeader constantsHeader =
+            ReadRecord<EnvironmentHeader>(constantsBytes, constantsEntry.ExtentOffset);
+        // record 1: record 0 is the empty record that `AddDefaultInstanceTables` adds
+        const size_t recordOffset = constantsEntry.ExtentOffset + constantsHeader.EntryPointConstants.Offset +
+                                    sizeof(lodestone::manifest::EntryPointConstants);
+        const auto goodRecord = ReadRecord<lodestone::manifest::EntryPointConstants>(constantsBytes, recordOffset);
+        auto rejectRecord = [&](const lodestone::manifest::EntryPointConstants& record) -> ErrorCode
+        {
+            std::vector<std::byte> damaged = constantsBytes;
+            WriteValue(damaged, recordOffset, record);
+            return EnvironmentErrorFrom(damaged, 0u);
+        };
+
+        lodestone::manifest::EntryPointConstants unknownDelivery = goodRecord;
+        unknownDelivery.Delivery = 7u;
+        runner.Check(rejectRecord(unknownDelivery) == ErrorCode::InvalidEntryPointConstants,
+                     "an unknown delivery is rejected");
+        lodestone::manifest::EntryPointConstants wrongSize = goodRecord;
+        wrongSize.ByteSize = 32u;
+        runner.Check(rejectRecord(wrongSize) == ErrorCode::InvalidEntryPointConstants,
+                     "a uniform buffer of a different size than the constants is rejected");
+        lodestone::manifest::EntryPointConstants pastVisibility = goodRecord;
+        pastVisibility.Binding = 5u;
+        runner.Check(rejectRecord(pastVisibility) == ErrorCode::InvalidEntryPointConstants,
+                     "a binding position past the visibility list is rejected");
+        lodestone::manifest::EntryPointConstants positionedPush = goodRecord;
+        positionedPush.Delivery = std::to_underlying(lodestone::EntryPointConstantsDelivery::PushConstant);
+        positionedPush.Binding = 1u;
+        runner.Check(rejectRecord(positionedPush) == ErrorCode::InvalidEntryPointConstants,
+                     "a push constant block with a binding position is rejected");
+        lodestone::manifest::EntryPointConstants membersPastTable = goodRecord;
+        membersPastTable.FirstUniformMember = 1000u;
+        runner.Check(rejectRecord(membersPastTable) == ErrorCode::InvalidEntryPointConstants,
+                     "a member run past the member table is rejected");
+
+        std::vector<std::byte> badIndex = constantsBytes;
+        WriteValue(badIndex,
+                   constantsEntry.ExtentOffset + constantsHeader.EntryPointInstanceTableOffset +
+                       offsetof(lodestone::manifest::EntryPointInstance, Constants),
+                   9u);
+        runner.Check(EnvironmentErrorFrom(badIndex, 0u) == ErrorCode::InvalidEntryPointInstanceConstantsIndex,
+                     "an instance that names a constants record past the table is rejected");
+    }
 
     return runner.Report();
 }

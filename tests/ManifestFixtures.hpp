@@ -24,17 +24,19 @@ struct FixtureInstance
     uint32_t Visibility;
     uint32_t Raster;
     uint32_t SamplerPairs;
+    uint32_t Constants;
     WorkgroupSize Workgroup;
 };
 
 /** Returns an instance that reads source `source` and visibility list `visibility`, with raster state 0, sampler
- * pair list 0, and a 64x1x1 workgroup. Most fixtures vary only those two indices. */
+ * pair list 0, entry point constants 0, and a 64x1x1 workgroup. Most fixtures vary only those two indices. */
 inline FixtureInstance ComputeInstance(uint32_t source, uint32_t visibility)
 {
     return FixtureInstance{ .Source = source,
                             .Visibility = visibility,
                             .Raster = 0u,
                             .SamplerPairs = 0u,
+                            .Constants = 0u,
                             .Workgroup = WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u } };
 }
 
@@ -58,17 +60,19 @@ inline LibraryVariant MakeFixtureVariant(const PermutationSpace& space,
         variant.VisibilityIndices.push_back(instance.Visibility);
         variant.RasterIndices.push_back(instance.Raster);
         variant.SamplerPairIndices.push_back(instance.SamplerPairs);
+        variant.ConstantsIndices.push_back(instance.Constants);
         variant.Workgroups.push_back(instance.Workgroup);
     }
     return variant;
 }
 
 /** Adds the entry 0 that `ComputeInstance` refers to in each instance table that fixtures do not fill themselves:
- * an empty raster state and an empty sampler pair list. */
+ * an empty raster state, an empty sampler pair list, and entry point constants with no delivery. */
 inline void AddDefaultInstanceTables(CookedModule& module)
 {
     module.RasterStates.emplace_back();
     module.SamplerPairLists.emplace_back();
+    module.EntryPointConstantsTable.emplace_back();
 }
 
 } // namespace lodestone::tests

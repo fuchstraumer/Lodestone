@@ -42,10 +42,12 @@ constexpr std::array<RejectionCase, 4u> k_Cases
                    .TargetName = "wgsl",
                    .Expected = CookError::PointerTypeNotSupported,
                    .Claim = "a pointer member under a bound access model fails the cook" },
-    RejectionCase{ .ModuleFile = "EntryPointResourceStruct.slang",
+    // Slang's metadata reports the unused resource as used (shader-slang/slang#13789), and the workaround removes
+    // it from the visibility. Without the workaround, this row fails with ReflectionMismatch.
+    RejectionCase{ .ModuleFile = "EntryPointUnusedResource.slang",
                    .TargetName = "wgsl",
-                   .Expected = CookError::ReflectionMismatch,
-                   .Claim = "a reflection mismatch fails the cook, and is not only a warning" },
+                   .Expected = CookError::Success,
+                   .Claim = "an unread resource beside entry point constants cooks (shader-slang/slang#13789)" },
     RejectionCase{ .ModuleFile = "SpecConstantWorkgroupSize.slang",
                    .TargetName = "wgsl",
                    .Expected = CookError::CodeGenerationFailed,
