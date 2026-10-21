@@ -108,6 +108,7 @@ namespace
             "a sampler and texture pair names a position past the visibility list, a binding of the wrong kind, or is not sorted and unique",
             "an entry point instance names an entry point constants record past the table",
             "an entry point constants record has an unknown delivery, a member run past the member table, a position on a push constant block, data with no delivery, or a uniform buffer position that does not name a uniform buffer of its size",
+            "a merged layout got two push constant blocks whose members differ where the blocks overlap",
         });
 
     static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ErrorCode::Count),

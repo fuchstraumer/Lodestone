@@ -82,6 +82,9 @@ enum class ErrorCode : uint32_t
     // a delivery that is not known, a binding position that is not a uniform buffer of the same size, a position
     // on a push constant block, or a member run outside the member table
     InvalidEntryPointConstants = 55,
+    // two stages put push constant blocks at offset 0, and the members of the shorter block are not the first
+    // members of the longer block
+    MergedLayoutPushConstantConflict = 56,
     Count
 };
 

@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <optional>
 #include <span>
 #include <string_view>
 
@@ -353,6 +354,16 @@ private:
     uint32_t index{};
 };
 
+/** The push constant block of one pipeline. Slang puts the block of each stage at offset 0, so the blocks of
+ * the stages overlap, and each byte has one meaning for all stages. `Constants` is the block of the stage
+ * with the largest byte size. A renderer declares one push constant range from offset 0, with that byte size
+ * and with `Stages`. */
+struct MergedPushConstants
+{
+    EntryPointConstantsView Constants;
+    ShaderStageKind Stages{ ShaderStageKind::Invalid };
+};
+
 /** @brief The merged resources of the entry point instances of one pipeline, in placement order.
  *
  * Pipeline layouts need each resource once, with every stage that reads it. `Merge` takes one instance
@@ -408,6 +419,9 @@ public:
      * - a resource is not Bound (`MergedLayoutPlacementUnsupported`) (other binding/layout forms coming later)
      * - two resources at one (group, binding) differ in kind, shape, access, storage format, sample type,
      *   comparison, array count, or byte size (`MergedLayoutConflict`). Names are not compared.
+     * - two push constant blocks differ where they overlap (`MergedLayoutPushConstantConflict`): the members of
+     *   the shorter block must be the first members of the longer block, with the same offset, size, array
+     *   count, element stride, and matrix layout. Names are not compared.
      *
      * On failure, `RecordIndex` stores the index of the binding record, and `Detail` stores the position of
      * the instance. */
@@ -469,6 +483,10 @@ public:
     /** @brief True when the profile of every stage recorded its pairs, so the union is complete. */
     [[nodiscard]] bool HasSamplerTexturePairs() const noexcept;
 
+    /** @brief The push constant block of the pipeline. Empty when no stage has the `PushConstant` delivery. A
+     * `UniformBuffer` delivery is a resource in the merged layout, so it is not here. */
+    [[nodiscard]] std::optional<MergedPushConstants> PushConstants() const noexcept;
+
 private:
     MergedLayoutView() noexcept = default;
     uint32_t stageCount{ 0u };
@@ -476,6 +494,7 @@ private:
     std::array<LayoutRange, k_MaxPipelineStages> layoutRanges{};
     std::array<ShaderStageKind, k_MaxPipelineStages> shaderStages{};
     std::array<std::span<const SamplerTexturePair>, k_MaxPipelineStages> pairLists{};
+    std::optional<MergedPushConstants> pushConstants;
 };
 
 } // namespace lodestone::manifest

@@ -425,6 +425,95 @@ void TestSamplerPairs(lodestone::tests::TestRunner& runner, const PermutationSpa
                  "a pipeline that samples nothing has no pairs");
 }
 
+// The push constant blocks of a pipeline. Entry 1 is a 64-byte block with one matrix, entry 2 adds a float4
+// after it (80 bytes), and entry 3 is a float4 at offset 0, which a matrix at offset 0 cannot share.
+void TestPushConstants(lodestone::tests::TestRunner& runner, const PermutationSpace& space)
+{
+    runner.BeginSection("push constants");
+
+    const auto member = [](const char* name, uint32_t offset, uint32_t size, lodestone::MatrixLayout layout) {
+        lodestone::ReflectedUniformMember result;
+        result.Name = name;
+        result.Data.Offset = offset;
+        result.Data.Size = size;
+        result.Data.MatrixLayout = layout;
+        return result;
+    };
+    const lodestone::ReflectedUniformMember transform = member("transform", 0u, 64u, lodestone::MatrixLayout::ColumnMajor);
+    // another name at the same layout: names are not compared
+    const lodestone::ReflectedUniformMember worldViewProjection =
+        member("worldViewProjection", 0u, 64u, lodestone::MatrixLayout::ColumnMajor);
+    const lodestone::ReflectedUniformMember tint = member("tint", 64u, 16u, lodestone::MatrixLayout::Invalid);
+    const lodestone::ReflectedUniformMember tintAtZero = member("tint", 0u, 16u, lodestone::MatrixLayout::Invalid);
+    const auto push = [](uint32_t size, std::vector<lodestone::ReflectedUniformMember> members) {
+        return lodestone::EntryPointConstants{ .Delivery = lodestone::EntryPointConstantsDelivery::PushConstant,
+                                               .ByteSize = size,
+                                               .Binding = 0u,
+                                               .Members = std::move(members) };
+    };
+
+    lodestone::CookedModule module = BuildModule(space, GoodVisibilityLists(), k_GoodVisibility);
+    module.EntryPointConstantsTable.push_back(push(64u, { transform }));
+    module.EntryPointConstantsTable.push_back(push(80u, { worldViewProjection, tint }));
+    module.EntryPointConstantsTable.push_back(push(16u, { tintAtZero }));
+    // case 0: VS 64 bytes, FS 80 bytes, CS none. case 1: VS 64 bytes, FS the float4 at 0. case 2: none
+    module.Variants[0].ConstantsIndices = { 1u, 2u, 0u };
+    module.Variants[1].ConstantsIndices = { 1u, 3u, 0u };
+
+    lodestone::CookedLibrary library;
+    library.ModuleNames = { "MergeTestModule" };
+    library.Profiles = { lodestone::CookedProfile{ .TargetName = "wgsl",
+                                                   .AccessModel = lodestone::PlacementKind::Bound,
+                                                   .CodeFormat = lodestone::ShaderCodeFormat::Wgsl,
+                                                   .SamplerTexturePairsRecorded = true } };
+    library.Environments.emplace_back(std::move(module));
+    const lodestone::CookResult<std::vector<std::byte>> manifest = lodestone::EmitShaderManifest(library);
+    const ManifestResult<EnvironmentView> opened =
+        manifest.has_value() ? OpenEnvironment(*manifest) : ManifestResult<EnvironmentView>{ std::unexpected(lodestone::manifest::ErrorState{}) };
+    runner.Check(opened.has_value(), "a module with push constant blocks emits and opens");
+    if (!opened.has_value())
+    {
+        return;
+    }
+
+    const VariantView caseZero = opened->VariantAt(0u);
+    const std::array raster{ caseZero.EntryPoint(k_VertexEntryPoint), caseZero.EntryPoint(k_FragmentEntryPoint) };
+    const ManifestResult<MergedLayoutView> merged = MergedLayoutView::Merge(raster);
+    runner.Check(merged.has_value() && merged->PushConstants().has_value(),
+                 "a block that is a prefix of the other block merges");
+    if (merged.has_value() && merged->PushConstants().has_value())
+    {
+        const lodestone::manifest::MergedPushConstants block = *merged->PushConstants();
+        runner.Check(block.Constants.ByteSize() == 80u && block.Constants.Members().Size() == 2u,
+                     "the merged block is the block with the largest byte size");
+        runner.Check(block.Stages == (ShaderStageKind::Vertex | ShaderStageKind::Fragment),
+                     "the merged block names both stages");
+    }
+
+    const std::array reversed{ caseZero.EntryPoint(k_FragmentEntryPoint), caseZero.EntryPoint(k_VertexEntryPoint) };
+    const ManifestResult<MergedLayoutView> reversedMerge = MergedLayoutView::Merge(reversed);
+    runner.Check(reversedMerge.has_value() && reversedMerge->PushConstants().has_value() &&
+                     reversedMerge->PushConstants()->Constants.ByteSize() == 80u,
+                 "the order of the stages does not change the merged block");
+
+    const std::array vertexAndCompute{ caseZero.EntryPoint(k_VertexEntryPoint), caseZero.EntryPoint(k_ComputeEntryPoint) };
+    const ManifestResult<MergedLayoutView> partial = MergedLayoutView::Merge(vertexAndCompute);
+    runner.Check(partial.has_value() && partial->PushConstants().has_value() &&
+                     partial->PushConstants()->Stages == ShaderStageKind::Vertex,
+                 "a stage with no block does not appear in the stage mask");
+
+    const std::array computeOnly{ caseZero.EntryPoint(k_ComputeEntryPoint) };
+    const ManifestResult<MergedLayoutView> none = MergedLayoutView::Merge(computeOnly);
+    runner.Check(none.has_value() && !none->PushConstants().has_value(), "a pipeline with no block has no push constants");
+
+    const VariantView caseOne = opened->VariantAt(1u);
+    const std::array conflicting{ caseOne.EntryPoint(k_VertexEntryPoint), caseOne.EntryPoint(k_FragmentEntryPoint) };
+    const ManifestResult<MergedLayoutView> conflict = MergedLayoutView::Merge(conflicting);
+    runner.Check(!conflict.has_value() && conflict.error().Code == ErrorCode::MergedLayoutPushConstantConflict &&
+                     conflict.error().Detail == 1u && conflict.error().RecordIndex == 3u,
+                 "two blocks that differ at offset 0 fail, and the error names the second instance and its record");
+}
+
 int main()
 {
     lodestone::tests::TestRunner runner{ "MergedLayoutTests" };
@@ -443,6 +532,7 @@ int main()
 
     TestOpenRejectsOrder(runner, space);
     TestSamplerPairs(runner, space);
+    TestPushConstants(runner, space);
     return runner.Report();
 }
 

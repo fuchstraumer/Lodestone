@@ -1,16 +1,21 @@
+#include "ShaderManifestLayout.hpp"
 #include "ShaderManifest.hpp"
+#include "ShaderManifestFormat.hpp"
 #include "ShaderManifestRead.hpp"
 #include "EnumClassUtils.hpp"
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "VariantKey.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <iterator>
 #include <limits>
+#include <optional>
 #include <ranges>
 #include <span>
 #include <string_view>
@@ -487,6 +492,29 @@ namespace
         return lhs == rhs;
     }
 
+    // The blocks overlap from offset 0, so the bytes of the shorter block must have the same meaning in the
+    // longer block. The members are in declaration order, so the shorter list must be a prefix of the longer list.
+    bool SharePushConstantPrefix(const EntryPointConstantsView& lhs, const EntryPointConstantsView& rhs) noexcept
+    {
+        const UniformMemberRange lhsMembers = lhs.Members();
+        const UniformMemberRange rhsMembers = rhs.Members();
+        const uint32_t sharedCount = std::min(lhsMembers.Size(), rhsMembers.Size());
+        for (uint32_t i = 0u; i < sharedCount; ++i)
+        {
+            const UniformMemberView left = lhsMembers[i];
+            const UniformMemberView right = rhsMembers[i];
+            if (left.Offset() != right.Offset() ||
+                left.Size() != right.Size() ||
+                left.ArrayCount() != right.ArrayCount() ||
+                left.ElementStride() != right.ElementStride() ||
+                left.Layout() != right.Layout())
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
 } // namespace
 
 ManifestResult<MergedLayoutView> MergedLayoutView::Merge(std::span<const EntryPointInstanceView> entry_points) noexcept
@@ -518,6 +546,33 @@ ManifestResult<MergedLayoutView> MergedLayoutView::Merge(std::span<const EntryPo
         view.layoutRanges[i] = instance.Layout();
         view.pairLists[i] = instance.SamplerTexturePairs();
         view.pairsRecorded = view.pairsRecorded && instance.Environment().HasSamplerTexturePairs();
+
+        const EntryPointConstantsView constants = instance.Constants();
+        if (constants.Delivery() == EntryPointConstantsDelivery::PushConstant)
+        {
+            if (!view.pushConstants.has_value())
+            {
+                view.pushConstants = MergedPushConstants{ .Constants = constants, .Stages = stage };
+            }
+            else
+            {
+                
+                if (!SharePushConstantPrefix(view.pushConstants->Constants, constants))
+                {
+                    return std::unexpected(ErrorState{ .Code = ErrorCode::MergedLayoutPushConstantConflict,
+                                                       .Table = ShaderManifestTable::EntryPointConstants,
+                                                       .RecordIndex = instance.Record().Constants,
+                                                       .Detail = static_cast<uint32_t>(i) });
+                }
+
+                if (constants.ByteSize() > view.pushConstants->Constants.ByteSize())
+                {
+                    view.pushConstants->Constants = constants;
+                }
+
+                view.pushConstants->Stages |= stage;
+            }
+        }
 
         // will need to validate/verify layouts as bound/pointer/bindless etc here as appropriate, too
     }
@@ -583,6 +638,11 @@ MergedLayoutView::Iterator MergedLayoutView::end() const noexcept
 uint32_t MergedLayoutView::StageCount() const noexcept
 {
     return stageCount;
+}
+
+std::optional<MergedPushConstants> MergedLayoutView::PushConstants() const noexcept
+{
+    return pushConstants;
 }
 
 MergedLayoutView::Iterator::Iterator(const MergedLayoutView* _layout,
