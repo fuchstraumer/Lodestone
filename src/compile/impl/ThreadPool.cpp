@@ -5,20 +5,18 @@
 #include "SlangReflector.hpp"
 #include "SlangVariantCompiler.hpp"
 #include "Diagnostics.hpp"
+#include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "permute/PermutationSpace.hpp"
-#include "slang-com-ptr.h"
-#include "slang.h"
-
-#include <array>
+#include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
-#include <filesystem>
+#include <format>
 #include <latch>
 #include <mutex>
-#include <stdexcept>
+#include <span>
 #include <stop_token>
 #include <string>
 #include <thread>
@@ -32,7 +30,8 @@ ThreadPool::ThreadPool() noexcept = default;
 
 ThreadPool::~ThreadPool()
 {
-    // dump module binaries to disk
+    // stop and join the workers before the serialized modules and the condition variable are destroyed
+    workers.clear();
 }
 
 CookError ThreadPool::Initialize(SlangCompilerCreateInfo create_info, std::vector<SerializedModule> serialized_modules)
@@ -40,14 +39,14 @@ CookError ThreadPool::Initialize(SlangCompilerCreateInfo create_info, std::vecto
     createInfo = std::move(create_info);
     serializedModules = std::move(serialized_modules);
 
-    numThreads = createInfo.MultithreadVariantBuild ? std::thread::hardware_concurrency() : 1u;
+    // hardware_concurrency returns 0 when the count is unknown, and zero workers would compile nothing
+    numThreads = createInfo.MultithreadVariantBuild ? std::max(std::thread::hardware_concurrency(), 1u) : 1u;
     if (numThreads > 1u)
     {
         // take off one thread for the main thread, since it works as a helper after dispatching
         --numThreads;
     }
 
-    // todo-ship: hook up the actual stop_token to allow graceful shutdown of worker threads
     workers.reserve(numThreads);
     for (size_t i = 0; i < numThreads; ++i)
     {
@@ -68,6 +67,55 @@ std::span<const SerializedModule> ThreadPool::SerializedModules() const noexcept
     return serializedModules;
 }
 
+CookError ThreadPool::prepareContext(SlangModuleContext& module_context,
+                                     CompileBatch& batch,
+                                     DiagnosticSink& thread_sink)
+{
+    CookError error = module_context.Initialize(createInfo, thread_sink);
+    if (error == CookError::Success)
+    {
+        error = module_context.RunWorkerSetup(serializedModules);
+    }
+
+    if (error != CookError::Success)
+    {
+        // the usual cause is a module cache from another Slang version
+        static_cast<void>(ReportError(thread_sink,
+                                      error,
+                                      std::format("a compile thread cannot prepare its Slang session ({})", ToString(error))));
+        CookError expected = CookError::Success;
+        batch.SetupError.compare_exchange_strong(expected, error);
+    }
+
+    return error;
+}
+
+void ThreadPool::runJobs(SlangModuleContext& module_context, CompileBatch& batch)
+{
+    while (true)
+    {
+        // all we need is a unique index, not a strictly ordered one
+        const int32_t jobIndex = batch.NextJobIndex.fetch_add(1, std::memory_order_relaxed);
+        if (jobIndex >= std::ssize(batch.Variants))
+        {
+            return;
+        }
+
+        const auto jobIndexU = static_cast<size_t>(jobIndex);
+        SlangVariantCompiler variantCompiler;
+        // todo: standardize how these two take diagnostic sinks, instead of one being pointer and one being reference
+        CookResult<LinkedVariant> variantBuildResult =
+            variantCompiler.CompileVariant(module_context, batch.Variants[jobIndexU], batch.DiagnosticSinks[jobIndexU]);
+        SlangReflector variantReflector(module_context.EntryPointNames(),
+                                        &batch.DiagnosticSinks[jobIndexU],
+                                        module_context.GlobalSession(),
+                                        module_context.PlacementKindForTarget());
+
+        batch.Results[jobIndexU] = variantBuildResult ? variantReflector.Reflect(*variantBuildResult, batch.Variants[jobIndexU])
+                                                      : std::unexpected(variantBuildResult.error());
+    }
+}
+
 SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDescriptor>& variants,
                                                      DiagnosticSink& diagnostic_sink)
 {
@@ -75,12 +123,13 @@ SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDe
     // and we'll merge them into the main sink (no matter it's type) after the work completes.
     std::vector<RecordingDiagnosticSink> diagnosticSinks;
     diagnosticSinks.resize(variants.size());
+    // one sink for each worker, and the last one for the calling thread
     std::vector<RecordingDiagnosticSink> threadSinks;
-    threadSinks.resize(workers.size());
-    
+    threadSinks.resize(workers.size() + 1u);
+
     SlangCompiler::CompileResultList results(variants.size(), std::unexpected(CookError::VariantNotCompiled));
     std::latch done{ std::ssize(workers) };
-    
+
     CompileBatch currBatch
     {
         .Variants = variants,
@@ -104,44 +153,34 @@ SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDe
     {
         // only enter here if multithreading already enabled: if not, let the singular worker toil away
         SlangModuleContext moduleContext;
-        CookError contextError = moduleContext.Initialize(createInfo, diagnostic_sink);
-        if (contextError != CookError::Success)
+        if (prepareContext(moduleContext, currBatch, threadSinks.back()) == CookError::Success)
         {
-            //currBatch.ThreadSinks[thread_idx].Report(CookError::ModuleContextInitializationFailed);
-            throw std::runtime_error("Module context initialization failed");
-        }
-
-        contextError = moduleContext.RunWorkerSetup(serializedModules);
-        if (contextError != CookError::Success)
-        {
-            throw std::runtime_error("Module context setup failed");
-        }
-        
-        while (true)
-        {
-            // all we need is a unique index, not a strictly ordered one
-            const int32_t jobIndex = currBatch.NextJobIndex.fetch_add(1, std::memory_order_relaxed);
-
-            if (jobIndex >= std::ssize(currBatch.Variants))
-            {
-                // all done;
-                break;
-            }
-
-            // rolling eyes because i have to convert jobindex to unsigned to avoid goofy signed/unsigned comparison warnings
-            const auto jobIndexU = static_cast<size_t>(jobIndex);
-            SlangVariantCompiler variantCompiler;
-            // todo: standardize how these two take diagnostic sinks, instead of one being pointer and one being reference
-            CookResult<LinkedVariant> variantBuildResult = variantCompiler.CompileVariant(moduleContext, currBatch.Variants[jobIndexU], currBatch.DiagnosticSinks[jobIndexU]);
-            SlangReflector variantReflector(moduleContext.EntryPointNames(), &currBatch.DiagnosticSinks[jobIndexU], moduleContext.GlobalSession(), moduleContext.PlacementKindForTarget());
-
-            currBatch.Results[jobIndexU] = variantBuildResult ? variantReflector.Reflect(*variantBuildResult, currBatch.Variants[jobIndexU]) : std::unexpected(variantBuildResult.error());
+            runJobs(moduleContext, currBatch);
         }
     }
 
     done.wait();
 
-    for (auto&& sink : diagnosticSinks)
+    {
+        // the batch lives on this stack frame. clear the pointer so that no later reader can follow it
+        const std::scoped_lock<std::mutex> jobsMutex(mutex);
+        activeBatch = nullptr;
+    }
+
+    // a job that no thread took is left only when every thread failed its setup. it gets the setup error
+    if (currBatch.SetupError.load() != CookError::Success)
+    {
+        for (CookResult<RawVariant>& result : results)
+        {
+            if (!result && result.error() == CookError::VariantNotCompiled)
+            {
+                result = std::unexpected(CookError::WorkerSetupFailed);
+            }
+        }
+    }
+
+    // thread setup first, so that the cause of a failure prints before its effects
+    for (auto&& sink : threadSinks)
     {
         for (auto&& record : sink.Records())
         {
@@ -149,7 +188,7 @@ SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDe
         }
     }
 
-    for (auto&& sink : threadSinks)
+    for (auto&& sink : diagnosticSinks)
     {
         for (auto&& record : sink.Records())
         {
@@ -186,42 +225,11 @@ void ThreadPool::workerFunction(const std::stop_token& stop_token,
             batch = activeBatch;
         }
 
+        // a failed setup skips this batch only. the thread must stay, because the latch of each later batch counts it
         SlangModuleContext moduleContext;
-        CookError contextError = moduleContext.Initialize(createInfo, batch->ThreadSinks[thread_idx]);
-        if (contextError != CookError::Success)
+        if (prepareContext(moduleContext, *batch, batch->ThreadSinks[thread_idx]) == CookError::Success)
         {
-            //batch->ThreadSinks[thread_idx].Report(CookError::ModuleContextInitializationFailed);
-            batch->DoneLatch->count_down();
-            return;
-        }
-
-        contextError = moduleContext.RunWorkerSetup(serializedModules);
-        if (contextError != CookError::Success)
-        {
-            //batch->ThreadSinks[thread_idx].Report(CookError::ModuleContextInitializationFailed);
-            batch->DoneLatch->count_down();
-            return;
-        }
-
-        while (true)
-        {
-            // all we need is a unique index, not a strictly ordered one
-            const int32_t jobIndex = batch->NextJobIndex.fetch_add(1, std::memory_order_relaxed);
-
-            if (jobIndex >= std::ssize(batch->Variants))
-            {
-                // all done;
-                break;
-            }
-
-            // rolling eyes because i have to convert jobindex to unsigned to avoid goofy signed/unsigned comparison warnings
-            const auto jobIndexU = static_cast<size_t>(jobIndex);
-            SlangVariantCompiler variantCompiler;
-            // todo: standardize how these two take diagnostic sinks, instead of one being pointer and one being reference
-            CookResult<LinkedVariant> variantBuildResult = variantCompiler.CompileVariant(moduleContext, batch->Variants[jobIndexU], batch->DiagnosticSinks[jobIndexU]);
-            SlangReflector variantReflector(moduleContext.EntryPointNames(), &batch->DiagnosticSinks[jobIndexU], moduleContext.GlobalSession(), moduleContext.PlacementKindForTarget());
-
-            batch->Results[jobIndexU] = variantBuildResult ? variantReflector.Reflect(*variantBuildResult, batch->Variants[jobIndexU]) : std::unexpected(variantBuildResult.error());
+            runJobs(moduleContext, *batch);
         }
 
         batch->DoneLatch->count_down();

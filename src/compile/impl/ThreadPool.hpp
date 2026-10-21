@@ -24,6 +24,8 @@
 namespace lodestone
 {
 
+class SlangModuleContext;
+
 /**@brief The SlangCompiler will initialize this threadpool, and pass it a global session to inherit
  * from. For each child worker, it'll pass the inherited session to it - which it will take as a copy,
  * since Slang global sessions are not thread safe. It'll persist this session throughout it's workloop,
@@ -69,7 +71,17 @@ private:
         std::latch* DoneLatch{ nullptr };
         std::span<RecordingDiagnosticSink> DiagnosticSinks;
         std::span<RecordingDiagnosticSink> ThreadSinks;
+        // the first setup error of any thread. a failed thread takes no job, so the other threads compile the batch
+        std::atomic<CookError> SetupError{ CookError::Success };
     };
+
+    /**@brief Creates a session for one thread and primes it from the serialized modules. A failure is reported to
+     * the sink and stored in the batch. */
+    [[nodiscard]] CookError prepareContext(SlangModuleContext& module_context,
+                                           CompileBatch& batch,
+                                           DiagnosticSink& thread_sink);
+    /**@brief Takes jobs from the batch until no job is left. */
+    static void runJobs(SlangModuleContext& module_context, CompileBatch& batch);
 
     CompileBatch* activeBatch{ nullptr };
 
@@ -78,11 +90,9 @@ private:
                         size_t thread_idx);
     std::mutex mutex;
     std::condition_variable_any condition;
-    std::condition_variable idleCondition;
     std::vector<std::jthread> workers;
     std::vector<SerializedModule> serializedModules;
     size_t numThreads{ 1u };
-    int32_t activeJobs{ 0 };
     int32_t activeBatchIndex{ 0 };
 };
 } // namespace lodestone
