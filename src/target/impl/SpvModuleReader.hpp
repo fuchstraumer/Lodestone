@@ -100,8 +100,10 @@ struct IdRecord
     // OpTypeInt / OpTypeFloat
     uint32_t ScalarWidth{ 0u };
     bool ScalarSigned{ false };
-    // OpTypeArray / OpTypeRuntimeArray. LengthId is the id of a constant, and 0 for a runtime array
+    // OpTypeArray / OpTypeRuntimeArray. LengthId is the id of a constant, and 0 for a runtime array.
+    // OpTypeVector and OpTypeMatrix use ElementType for the component or column type, and ComponentCount
     uint32_t ElementType{ 0u };
+    uint32_t ComponentCount{ 0u };
     uint32_t LengthId{ 0u };
     uint32_t ArrayStride{ 0u };
     ConstantKind Constant{ ConstantKind::None };
@@ -166,6 +168,14 @@ CookError ParseModule(spv_context_t* context,
  * pair that the cook drops would make a sampler look unpaired. */
 CookResult<std::vector<SamplerTexturePlacement>> CollectSamplerTexturePairs(const ParseState& parse_state,
                                                                              DiagnosticSink& sink);
+
+/** Returns the bytes that the module's push constant block covers: the end of its last member, with no trailing
+ * padding, from the member offsets and the type sizes. No value when the module declares no push constant variable.
+ * A member type that this reader cannot size fails. */
+CookResult<std::optional<uint32_t>> ReadPushConstantExtent(const ParseState& parse_state, DiagnosticSink& sink);
+
+/** The sampler and texture pairs and the push constant extent of one module. */
+CookResult<EmittedCodeFacts> CollectEmittedCodeFacts(const ParseState& parse_state, DiagnosticSink& sink);
 
 } // namespace lodestone::spirv
 

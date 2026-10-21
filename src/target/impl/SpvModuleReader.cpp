@@ -12,6 +12,7 @@
 #include <cstring>
 #include <expected>
 #include <format>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -281,6 +282,14 @@ namespace
         record.LengthId = words.size() > 3u ? words[3] : 0u;
     }
 
+    void OnOpTypeComposite(ParseState& parse_state, std::span<const uint32_t> words, uint32_t result_id)
+    {
+        // OpTypeVector: words[2] component type, words[3] count. OpTypeMatrix: words[2] column type, words[3] count
+        IdRecord& record = parse_state.Ids[result_id];
+        record.ElementType = words[2];
+        record.ComponentCount = words[3];
+    }
+
     void OnOpVariable(ParseState& parse_state, std::span<const uint32_t> words, uint32_t result_id)
     {
         // the prelude already stored TypeId (the pointer type)
@@ -413,6 +422,10 @@ namespace
         case spv::Op::OpTypeArray:
         case spv::Op::OpTypeRuntimeArray:
             OnOpTypeArray(*parseState, words, resultId);
+            break;
+        case spv::Op::OpTypeVector:
+        case spv::Op::OpTypeMatrix:
+            OnOpTypeComposite(*parseState, words, resultId);
             break;
         case spv::Op::OpVariable:
             OnOpVariable(*parseState, words, resultId);
@@ -671,6 +684,123 @@ std::vector<DeclaredBinding> CollectDeclaredBindings(const ParseState& parse_sta
     }
 
     return declared;
+}
+
+namespace
+{
+    // NOLINTBEGIN(misc-no-recursion)
+    /** The bytes one value of `type_id` covers, with no trailing padding. A matrix member reads its stride and its
+     * major order from the member decorations. SPIR-V `ColMajor` puts a column at each stride, and `RowMajor` a
+     * row. No value for a type that this reader cannot size. */
+    std::optional<uint64_t> TypeExtent(const ParseState& parse_state,
+                                       uint32_t type_id,
+                                       uint32_t matrix_stride,
+                                       MatrixLayout matrix_major)
+    {
+        const IdRecord& type = parse_state.Ids[type_id];
+        switch (type.OpCode)
+        {
+        case spv::Op::OpTypeInt:
+        case spv::Op::OpTypeFloat:
+            return type.ScalarWidth / 8u;
+        case spv::Op::OpTypeVector:
+        {
+            const std::optional<uint64_t> component = TypeExtent(parse_state, type.ElementType, 0u, MatrixLayout::Invalid);
+            return component ? std::optional{ *component * type.ComponentCount } : std::nullopt;
+        }
+        case spv::Op::OpTypeMatrix:
+        {
+            // ElementType is the column vector, so its component count is the row count
+            const IdRecord& column = parse_state.Ids[type.ElementType];
+            const std::optional<uint64_t> scalar = TypeExtent(parse_state, column.ElementType, 0u, MatrixLayout::Invalid);
+            if (!scalar || matrix_stride == 0u)
+            {
+                return std::nullopt;
+            }
+            const bool rowMajor = matrix_major == MatrixLayout::RowMajor;
+            const uint64_t strided = rowMajor ? column.ComponentCount : type.ComponentCount;
+            const uint64_t packed = rowMajor ? type.ComponentCount : column.ComponentCount;
+            return (strided - 1u) * matrix_stride + packed * *scalar;
+        }
+        case spv::Op::OpTypeArray:
+        {
+            const uint64_t length = parse_state.Ids[type.LengthId].ConstantBits;
+            const std::optional<uint64_t> element = TypeExtent(parse_state, type.ElementType, matrix_stride, matrix_major);
+            if (!element || length == 0u || type.ArrayStride == 0u)
+            {
+                return std::nullopt;
+            }
+            return (length - 1u) * type.ArrayStride + *element;
+        }
+        case spv::Op::OpTypeStruct:
+        {
+            uint64_t extent = 0u;
+            for (const MemberRecord& member : std::span{ parse_state.Members }.subspan(type.FirstMember, type.MemberCount))
+            {
+                const std::optional<uint64_t> memberExtent =
+                    TypeExtent(parse_state, member.TypeId, member.MatrixStride, member.MatrixMajor);
+                if (!memberExtent || member.Offset == ~0u)
+                {
+                    return std::nullopt;
+                }
+                extent = std::max(extent, member.Offset + *memberExtent);
+            }
+            return extent;
+        }
+        default:
+            return std::nullopt;
+        }
+    }
+    // NOLINTEND(misc-no-recursion)
+
+} // namespace
+
+CookResult<std::optional<uint32_t>> ReadPushConstantExtent(const ParseState& parse_state, DiagnosticSink& sink)
+{
+    for (const IdRecord& variable : parse_state.Ids)
+    {
+        if (variable.OpCode != spv::Op::OpVariable ||
+            variable.StorageClass != static_cast<uint32_t>(spv::StorageClass::PushConstant))
+        {
+            continue;
+        }
+
+        const uint32_t blockType = parse_state.Ids[variable.TypeId].PointeeType;
+        const std::optional<uint64_t> extent = TypeExtent(parse_state, blockType, 0u, MatrixLayout::Invalid);
+        if (!extent)
+        {
+            return std::unexpected(ReportError(sink,
+                                               CookError::TargetValidationEntryPointInvalid,
+                                               std::format("push constant block '{}' contains a type that the SPIR-V "
+                                                           "reader cannot size",
+                                                           variable.Name)));
+        }
+        return static_cast<uint32_t>(*extent);
+    }
+
+    return std::optional<uint32_t>{};
+}
+
+CookResult<EmittedCodeFacts> CollectEmittedCodeFacts(const ParseState& parse_state, DiagnosticSink& sink)
+{
+    CookResult<std::vector<SamplerTexturePlacement>> pairs = CollectSamplerTexturePairs(parse_state, sink);
+    if (!pairs)
+    {
+        return std::unexpected(pairs.error());
+    }
+
+    CookResult<std::optional<uint32_t>> pushExtent = ReadPushConstantExtent(parse_state, sink);
+    if (!pushExtent)
+    {
+        return std::unexpected(pushExtent.error());
+    }
+
+    EmittedCodeFacts facts{ .SamplerTexturePairs = std::move(*pairs), .PushConstantExtent = *pushExtent };
+    for (const DeclaredBinding& binding : CollectDeclaredBindings(parse_state))
+    {
+        facts.DeclaredPlacements.emplace_back(binding.Group, binding.Binding);
+    }
+    return facts;
 }
 
 } // namespace lodestone::spirv
