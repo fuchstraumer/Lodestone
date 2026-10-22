@@ -13,7 +13,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 14u;
+inline constexpr uint32_t k_ShaderManifestVersion = 15u;
 
 // NOLINTBEGIN(readability-enum-initial-value, performance-enum-size)
 enum class ErrorCode : uint32_t
@@ -223,6 +223,8 @@ enum class ProfileFlags : uint16_t
     None = 0u,
     /** Clear when nothing read the pairs, so an empty list does not mean "no pairs". */
     SamplerTexturePairsRecorded = 1u << 0u,
+    /** Clear when no reader ran, so empty capability names and zero workgroup memory do not mean "needs nothing". */
+    CodeFactsRead = 1u << 1u,
 };
 
 /** @brief Where one (profile, module) environment sits in the file. A size of zero means it was not cooked. */

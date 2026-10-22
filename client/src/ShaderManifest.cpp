@@ -748,6 +748,34 @@ bool EnvironmentView::HasSamplerTexturePairs() const noexcept
     return (ProfileRecord().Flags & k_Recorded) != 0u;
 }
 
+bool EnvironmentView::HasCodeFacts() const noexcept
+{
+    constexpr uint16_t k_Read = std::to_underlying(ProfileFlags::CodeFactsRead);
+    return (ProfileRecord().Flags & k_Read) != 0u;
+}
+
+uint32_t EnvironmentView::MakeDeviceCapabilities(CapabilitySupportFn supports,
+                                                 void* user,
+                                                 std::span<uint64_t> masks) const noexcept
+{
+    const uint32_t wordCount = CapabilityMaskWordCount();
+    if (masks.empty())
+    {
+        return wordCount;
+    }
+
+    assert(masks.size() == wordCount);
+    std::ranges::fill(masks, uint64_t{ 0u });
+    for (uint32_t capability = 0u; capability < capabilityNames.size(); ++capability)
+    {
+        if (supports(user, CapabilityName(capability)))
+        {
+            masks[capability / k_AxisMaskWordBits] |= uint64_t{ 1u } << (capability % k_AxisMaskWordBits);
+        }
+    }
+    return wordCount;
+}
+
 ShaderSourceProvider::ShaderSourceProvider(EnvironmentView _view,
                                            uint64_t _generation) noexcept
     : view{ _view },

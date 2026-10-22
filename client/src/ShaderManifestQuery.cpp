@@ -1,10 +1,14 @@
+#include "ShaderManifestDevice.hpp"
+#include "ShaderManifestFormat.hpp"
 #include "ShaderManifestIndex.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifest.hpp"
+#include "ShaderManifestLayout.hpp"
 #include "Suggest.hpp"
 #include "VariantKey.hpp"
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <expected>
 #include <functional>
 #include <iterator>
@@ -309,7 +313,68 @@ QueryResult<std::vector<VariantKey>> ManifestQueryBuilder::Keys() const noexcept
         return std::unexpected(errors.front().Code);
     }
 
-    return index->select(constraints);
+    manifest::DeviceFit rejection;
+    return selectFitting(allEntryPoints(), rejection);
+}
+
+ManifestQueryBuilder ManifestQueryBuilder::ForDevice(manifest::CapabilitySupportFn supports,
+                                                     void* user,
+                                                     const manifest::DeviceLimits& limits) const
+{
+    ManifestQueryBuilder result = *this;
+    if (!index->environment.HasCodeFacts())
+    {
+        result.errors.push_back(QueryError{ .Code = QueryErrorCode::DeviceFactsUnavailable });
+        return result;
+    }
+
+    const manifest::EnvironmentView& environment = index->environment;
+    std::vector<uint64_t> supported(environment.MakeDeviceCapabilities(supports, user, {}));
+    environment.MakeDeviceCapabilities(supports, user, supported);
+    result.device = DeviceState{ .Supported = std::move(supported), .Limits = limits };
+    return result;
+}
+
+std::vector<uint32_t> ManifestQueryBuilder::allEntryPoints() const
+{
+    std::vector<uint32_t> all(index->environment.Module().EntryPoints().size());
+    std::iota(all.begin(), all.end(), 0u);
+    return all;
+}
+
+std::vector<VariantKey> ManifestQueryBuilder::selectFitting(std::span<const uint32_t> entry_points,
+                                                            manifest::DeviceFit& first_rejection) const noexcept
+{
+    std::vector<VariantKey> keys = index->select(constraints);
+    if (!device.has_value())
+    {
+        return keys;
+    }
+
+    const manifest::EnvironmentView& environment = index->environment;
+    const auto doesNotFit = [&](VariantKey key)
+    {
+        const manifest::VariantView variant = environment.VariantAt(*environment.FindVariant(key));
+        for (const uint32_t entryPoint : entry_points)
+        {
+            const manifest::DeviceFit fit = variant.EntryPoint(entryPoint).Fit(device->Supported, device->Limits);
+            if (!fit.Fits())
+            {
+
+                if (first_rejection.Fits())
+                {
+                    first_rejection = fit;
+                }
+                
+                return true;
+            }
+        }
+        return false;
+    };
+
+    std::erase_if(keys, doesNotFit);
+    
+    return keys;
 }
 
 QueryResult<std::vector<DecodedVariant>> ManifestQueryBuilder::Variants() const noexcept
@@ -346,7 +411,7 @@ std::expected<VariantKey, QueryError> ManifestQueryBuilder::Single() const noexc
 {
     const manifest::ModuleView& module = index->environment.Module();
     std::vector<uint64_t> allAxes(module.AxisMaskWordCount(), ~uint64_t{ 0u });
-    return singleOver(allAxes);
+    return singleOver(allAxes, allEntryPoints());
 }
 
 std::expected<VariantKey, QueryError> ManifestQueryBuilder::SingleFor(
@@ -357,16 +422,18 @@ std::expected<VariantKey, QueryError> ManifestQueryBuilder::SingleFor(
         return std::unexpected(errors.front());
     }
 
-    const std::expected<std::vector<uint64_t>, QueryError> relevant = joinRelevance(entry_point_names);
+    std::vector<uint32_t> entryPoints;
+    const std::expected<std::vector<uint64_t>, QueryError> relevant = joinRelevance(entry_point_names, entryPoints);
     if (!relevant)
     {
         return std::unexpected(relevant.error());
     }
-    return singleOver(*relevant);
+    return singleOver(*relevant, entryPoints);
 }
 
 std::expected<std::vector<uint64_t>, QueryError> ManifestQueryBuilder::joinRelevance(
-    std::span<const std::string_view> entry_point_names) const
+    std::span<const std::string_view> entry_point_names,
+    std::vector<uint32_t>& entry_points) const
 {
     if (entry_point_names.empty())
     {
@@ -399,6 +466,7 @@ std::expected<std::vector<uint64_t>, QueryError> ManifestQueryBuilder::joinRelev
         }
 
         
+        entry_points.push_back(*found);
         const std::span<const uint64_t> mask = environment.AxisRelevance(*found);
         for (size_t word = 0u; word < relevant.size(); ++word)
         {
@@ -412,7 +480,8 @@ std::expected<std::vector<uint64_t>, QueryError> ManifestQueryBuilder::joinRelev
 std::expected<std::vector<QueryNote>, QueryError> ManifestQueryBuilder::NotesFor(
     std::span<const std::string_view> entry_point_names) const
 {
-    const std::expected<std::vector<uint64_t>, QueryError> relevant = joinRelevance(entry_point_names);
+    std::vector<uint32_t> entryPoints;
+    const std::expected<std::vector<uint64_t>, QueryError> relevant = joinRelevance(entry_point_names, entryPoints);
     if (!relevant)
     {
         return std::unexpected(relevant.error());
@@ -450,7 +519,8 @@ void ManifestQueryBuilder::noteDuplicateValues(std::string_view axis_name,
     }
 }
 
-std::expected<VariantKey, QueryError> ManifestQueryBuilder::singleOver(std::span<const uint64_t> relevant_axes) const noexcept
+std::expected<VariantKey, QueryError> ManifestQueryBuilder::singleOver(std::span<const uint64_t> relevant_axes,
+                                 std::span<const uint32_t> entry_points) const noexcept
 {
     if (!errors.empty())
     {
@@ -458,9 +528,20 @@ std::expected<VariantKey, QueryError> ManifestQueryBuilder::singleOver(std::span
         return std::unexpected(errors.front());
     }
 
-    const std::vector<VariantKey> keys = index->select(constraints);
+    manifest::DeviceFit rejection;
+    const std::vector<VariantKey> keys = selectFitting(entry_points, rejection);
     if (keys.empty())
     {
+        if (!rejection.Fits())
+        {
+            const std::string_view capability =
+                rejection.Reason == manifest::DeviceMismatch::MissingCapability
+                    ? index->environment.CapabilityName(rejection.Detail)
+                    : std::string_view{};
+            return std::unexpected(QueryError{ .Code = QueryErrorCode::NoVariantFitsDevice,
+                                               .AxisName = std::string(capability),
+                                               .Detail = static_cast<uint32_t>(rejection.Reason) });
+        }
         return std::unexpected(QueryError{ .Code = QueryErrorCode::NoVariantForConstraints });
     }
     else if (keys.size() == 1u)

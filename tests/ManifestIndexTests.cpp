@@ -546,6 +546,192 @@ lodestone::CookedModule BuildChainModule(const PermutationSpace& space)
     return module;
 }
 
+// Two boolean axes and two entry points. GenerateCS has four sources: the wave variants need `GroupNonUniform`, and the
+// big variants use 32768 bytes of workgroup memory, a 1024 invocation workgroup, and a 144 byte push constant block
+// when they are also wave variants. BlurCS has one small source that no axis changes.
+PermutationSpace MakeDeviceSpace()
+{
+    std::vector<PermutationAxis> axes;
+    axes.emplace_back("WAVE", BoolValues(), AxisKind::Capability, EarliestBindingTime::Cook, AxisValueDomain::Boolean);
+    axes.emplace_back("BIG", BoolValues(), AxisKind::Tuning, EarliestBindingTime::Cook, AxisValueDomain::Boolean);
+    return PermutationSpace{ std::move(axes) };
+}
+
+lodestone::CookedModule BuildDeviceModule(const PermutationSpace& space)
+{
+    lodestone::CookedModule module;
+    module.Name = "DeviceModule";
+    module.Space = &space;
+    module.EntryPoints.push_back(
+        lodestone::LibraryEntryPoint{ .Name = "GenerateCS", .Stage = lodestone::ShaderStageKind::Compute });
+    module.EntryPoints.push_back(
+        lodestone::LibraryEntryPoint{ .Name = "BlurCS", .Stage = lodestone::ShaderStageKind::Compute });
+    const auto wave = [](uint32_t bytes)
+    { return lodestone::SourceCodeFacts{ .CapabilityNames = { "GroupNonUniform" }, .WorkgroupMemoryBytes = bytes }; };
+    const auto scalar = [](uint32_t bytes)
+    { return lodestone::SourceCodeFacts{ .CapabilityNames = {}, .WorkgroupMemoryBytes = bytes }; };
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// scalar small"), scalar(1024u));
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// wave small"), wave(1024u));
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// scalar big"), scalar(32768u));
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// wave big"), wave(32768u));
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// blur"), scalar(512u));
+    module.ObservedCapabilities = { "GroupNonUniform" };
+    module.ResourceLists.emplace_back();
+    module.FootprintLists.emplace_back();
+    module.VisibilityLists.emplace_back();
+    lodestone::tests::AddDefaultInstanceTables(module);
+    module.EntryPointConstantsTable.push_back(lodestone::EntryPointConstants{
+        .Delivery = lodestone::EntryPointConstantsDelivery::PushConstant, .ByteSize = 144u });
+
+    uint32_t index = 0u;
+    for (const bool waveOn : { false, true })
+    {
+        for (const bool big : { false, true })
+        {
+            lodestone::tests::FixtureInstance generate =
+                lodestone::tests::ComputeInstance((big ? 2u : 0u) + (waveOn ? 1u : 0u), 0u);
+            if (big)
+            {
+                generate.Workgroup = lodestone::WorkgroupSize{ .X = 1024u, .Y = 1u, .Z = 1u };
+                generate.Constants = waveOn ? 1u : 0u;
+            }
+
+            const std::array instances{ generate, lodestone::tests::ComputeInstance(4u, 0u) };
+            lodestone::LibraryVariant variant = lodestone::tests::MakeFixtureVariant(
+                space,
+                index++,
+                lodestone::PermutationAssignment{
+                    lodestone::PermutationBinding{ .Axis = &space.Axes()[0], .Value = PermutationValue{ waveOn } },
+                    lodestone::PermutationBinding{ .Axis = &space.Axes()[1], .Value = PermutationValue{ big } } },
+                instances);
+            module.VariantKeys.push_back(space.ComputeVariantKey(variant.Canonical));
+            module.Variants.push_back(std::move(variant));
+        }
+    }
+
+    module.SpaceSize = 4u;
+    return module;
+}
+
+struct TestDevice
+{
+    bool Subgroups{ false };
+};
+
+bool TestDeviceSupports(void* user, std::string_view capability_name)
+{
+    return capability_name == "GroupNonUniform" && static_cast<const TestDevice*>(user)->Subgroups;
+}
+
+void CheckDeviceFilter(lodestone::tests::TestRunner& runner)
+{
+    runner.BeginSection("a device keeps only the entry point instances it can run");
+    using lodestone::manifest::DeviceLimits;
+    using lodestone::manifest::DeviceMismatch;
+
+    const PermutationSpace space = MakeDeviceSpace();
+    lodestone::CookedLibrary library;
+    library.ModuleNames = { "DeviceModule" };
+    lodestone::CookedProfile profile = MakeProfile("wgsl");
+    profile.CodeFactsRead = true;
+    library.Profiles = { profile };
+    library.Environments.emplace_back(BuildDeviceModule(space));
+    const std::vector<std::byte> bytes = EmitBytes(library);
+    const ManifestResult<EnvironmentView> opened = OpenEnvironment(bytes, 0u, 0u);
+    runner.Check(opened.has_value() && opened->HasCodeFacts(), "the module opens, and the profile read its facts");
+    if (!opened.has_value())
+    {
+        return;
+    }
+
+    const ManifestIndex index{ opened.value() };
+    const DeviceLimits roomy{ .MaxWorkgroupMemoryBytes = 65536u,
+                              .MaxInvocationsPerWorkgroup = 1024u,
+                              .MaxWorkgroupSizeX = 1024u,
+                              .MaxWorkgroupSizeY = 1024u,
+                              .MaxWorkgroupSizeZ = 64u,
+                              .MaxPushConstantBytes = 256u };
+    TestDevice plain{ .Subgroups = false };
+    TestDevice waves{ .Subgroups = true };
+
+    runner.Check(index.Query().Keys()->size() == 4u, "with no device, the module has four variants");
+    runner.Check(index.Query().ForDevice(&TestDeviceSupports, &waves, roomy).Keys()->size() == 4u,
+                 "a device that runs everything removes nothing");
+    runner.Check(index.Query().ForDevice(&TestDeviceSupports, &plain, roomy).Keys()->size() == 2u,
+                 "a device without subgroups loses the wave variants");
+
+    const std::array<std::string_view, 1u> generate{ "GenerateCS" };
+    const std::array<std::string_view, 1u> blur{ "BlurCS" };
+    const ManifestQueryBuilder smallOnly = index.Query().Where("BIG", false);
+    runner.Check(!smallOnly.SingleFor(generate).has_value() &&
+                     smallOnly.SingleFor(generate).error().Code == lodestone::QueryErrorCode::AmbiguousVariant,
+                 "without a device, GenerateCS is ambiguous on WAVE");
+    const std::expected<VariantKey, lodestone::QueryError> scalarOnly =
+        smallOnly.ForDevice(&TestDeviceSupports, &plain, roomy).SingleFor(generate);
+    runner.Check(scalarOnly.has_value() && index.Decode(*scalarOnly)[0].IntegralValue == 0u,
+                 "a device without subgroups gets the scalar instance of GenerateCS");
+    runner.Check(index.Query().ForDevice(&TestDeviceSupports, &plain, roomy).SingleFor(blur).has_value(),
+                 "the same device still gets BlurCS, which no axis changes");
+
+    const std::expected<VariantKey, lodestone::QueryError> noWave =
+        index.Query().Where("WAVE", true).Where("BIG", false).ForDevice(&TestDeviceSupports, &plain, roomy).SingleFor(generate);
+    runner.Check(!noWave.has_value() && noWave.error().Code == lodestone::QueryErrorCode::NoVariantFitsDevice &&
+                     noWave.error().Detail == static_cast<uint32_t>(DeviceMismatch::MissingCapability) &&
+                     noWave.error().AxisName == "GroupNonUniform",
+                 "a query that only wave instances match names the missing capability");
+
+    DeviceLimits small = roomy;
+    small.MaxWorkgroupMemoryBytes = 16384u;
+    const ManifestQueryBuilder bigOnly = index.Query().Where("BIG", true).Where("WAVE", false);
+    const std::expected<VariantKey, lodestone::QueryError> tooMuchMemory =
+        bigOnly.ForDevice(&TestDeviceSupports, &waves, small).SingleFor(generate);
+    runner.Check(!tooMuchMemory.has_value() && tooMuchMemory.error().Code == lodestone::QueryErrorCode::NoVariantFitsDevice &&
+                     tooMuchMemory.error().Detail == static_cast<uint32_t>(DeviceMismatch::WorkgroupMemory),
+                 "a device below the workgroup memory loses the big instances");
+
+    DeviceLimits fewInvocations = roomy;
+    fewInvocations.MaxInvocationsPerWorkgroup = 256u;
+    const std::expected<VariantKey, lodestone::QueryError> tooManyInvocations =
+        bigOnly.ForDevice(&TestDeviceSupports, &waves, fewInvocations).SingleFor(generate);
+    runner.Check(!tooManyInvocations.has_value() &&
+                     tooManyInvocations.error().Detail == static_cast<uint32_t>(DeviceMismatch::Invocations),
+                 "a device below the invocation limit loses the 1024 invocation workgroup");
+
+    DeviceLimits narrow = roomy;
+    narrow.MaxWorkgroupSizeX = 32u;
+    const std::expected<VariantKey, lodestone::QueryError> tooWide =
+        smallOnly.ForDevice(&TestDeviceSupports, &waves, narrow).SingleFor(generate);
+    runner.Check(!tooWide.has_value() && tooWide.error().Detail == static_cast<uint32_t>(DeviceMismatch::WorkgroupSize),
+                 "a device below the size limit on one side loses the instance");
+
+    DeviceLimits noPush = roomy;
+    noPush.MaxPushConstantBytes = 128u;
+    const std::expected<VariantKey, lodestone::QueryError> tooManyPushBytes =
+        index.Query().Where("WAVE", true).Where("BIG", true).ForDevice(&TestDeviceSupports, &waves, noPush).SingleFor(generate);
+    runner.Check(!tooManyPushBytes.has_value() &&
+                     tooManyPushBytes.error().Detail == static_cast<uint32_t>(DeviceMismatch::PushConstants),
+                 "a device below the push constant bytes loses the instance with a 144 byte block");
+
+    runner.Check(index.Query().ForDevice(&TestDeviceSupports, &waves, DeviceLimits{}).Keys()->empty(),
+                 "limits left at 0 reject every instance with a size, and the query stays valid");
+
+    runner.BeginSection("a profile that read no facts cannot be filtered");
+    lodestone::CookedLibrary unread = library;
+    unread.Profiles[0].CodeFactsRead = false;
+    const std::vector<std::byte> unreadBytes = EmitBytes(unread);
+    const ManifestResult<EnvironmentView> unreadOpened = OpenEnvironment(unreadBytes, 0u, 0u);
+    runner.Check(unreadOpened.has_value() && !unreadOpened->HasCodeFacts(), "the flag is clear when no reader ran");
+    if (unreadOpened.has_value())
+    {
+        const ManifestIndex unreadIndex{ unreadOpened.value() };
+        const ManifestQueryBuilder unreadQuery = unreadIndex.Query().ForDevice(&TestDeviceSupports, &waves, roomy);
+        runner.Check(!unreadQuery.IsValid() && !unreadQuery.Keys().has_value() &&
+                         unreadQuery.Keys().error() == lodestone::QueryErrorCode::DeviceFactsUnavailable &&
+                         unreadQuery.Single().error().Code == lodestone::QueryErrorCode::DeviceFactsUnavailable,
+                     "a device query on such a profile fails by name, and passes nothing");
+    }
+}
+
 void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
 {
     runner.BeginSection("the axis relevance validator reads the written manifest");
@@ -1110,6 +1296,7 @@ int main()
     CheckAxisRelevance(runner);
 
     CheckAxisRelevanceValidator(runner);
+    CheckDeviceFilter(runner);
 
     return runner.Report();
 }

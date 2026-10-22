@@ -154,6 +154,13 @@ public:
     [[nodiscard]] std::span<const SamplerTexturePair> SamplerPairList(uint32_t list_index) const noexcept;
     /** @brief True when the cook read the pairs of this profile's code. */
     [[nodiscard]] bool HasSamplerTexturePairs() const noexcept;
+    /** @brief True when the cook read the capability names and workgroup memory of this profile's code. */
+    [[nodiscard]] bool HasCodeFacts() const noexcept;
+    /** @brief The device's support as a mask over `CapabilityNames()`: bit k is set when `supports` accepts name k.
+     * Names are in the terms of the profile's target. Call it twice, as in Vulkan: with an empty `masks` it returns the
+     * word count and writes nothing, then with a span of exactly that many words it fills them and returns the same
+     * count. It never allocates. */
+    uint32_t MakeDeviceCapabilities(CapabilitySupportFn supports, void* user, std::span<uint64_t> masks) const noexcept;
 
 private:
     ModuleView module;

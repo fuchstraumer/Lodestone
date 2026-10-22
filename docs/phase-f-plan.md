@@ -163,8 +163,8 @@ matches which device value. The renderer knows, and it already has the tool: a q
 |---|---|---|
 | F3.1 | The Vulkan table and its generator. The capability names of each entry point instance, from each target's reader. The workgroup memory bytes, from each target's reader. Format 14: the name table, the masks, and the byte count. | `ShaderManifestRejectTest` reads them back, and rejects a mask bit past the name table. `SpvValidatorTest` and `WgslValidatorTest` read the names and the bytes of fixed code. |
 | F3.2 | Drop the names that the profile guarantees. | The `spirv` cook of KitchenSink stores no `Shader`. |
-| F3.3 | Validators: the workgroup memory bytes and the portable capabilities (16-bit floats, subgroups) agree across the profiles of one variant. | A cook test of a probe module with `float3` and struct workgroup arrays, on both targets. |
-| F3.4 | The device filter. | `ManifestIndexTest` rows: a device without subgroups gets no wave instance of `GenerateCS`, and still gets `BlurCS`. A device below the workgroup memory or invocation limit loses only the instances above it. |
+| F3.3 | **Done 2026-10-22.** Validators: the workgroup memory bytes and the portable capabilities (16-bit floats, subgroups) agree across the profiles of one variant. | `WorkgroupMemoryCookTest` cooks a probe module with `float3`, struct, `float`, and `half4` workgroup arrays on both targets (144 bytes each). `ShaderManifestRejectTest` rows for each mismatch. |
+| F3.4 | **a to c done 2026-10-22, d deferred (O10).** The device filter. | `ManifestIndexTest` rows: a device without subgroups gets no wave instance of `GenerateCS`, and still gets `BlurCS`. A device below the workgroup memory or invocation limit loses only the instances above it. |
 | F3.5 | Cross-check each axis of kind `capability` against the measured names. A variant with the axis off must not need a capability that the axis turns on. | A must-fail row: an "off" path that still calls a wave operation. |
 
 Measured on 2026-10-21, DiamondDogs OceanFft, `spirv`, 62 unique modules:
@@ -384,7 +384,7 @@ commit.
   - Next, when phase F resumes: F2, with the rendergraph lessons applied.
 - 2026-10-21. **F3 resumes with the rendergraph tasks L5 and L6.** F3 rewritten (section 3): names in the target's
   terms, a generated Vulkan table, workgroup memory in F3, L6 closed. O6 decided. OceanFft measured. Next: F3.1.
-- 2026-10-21. **F3.1 and F3.2 done**, not committed. Format 14. 30 of 30 tests, 60 of 60 known-good dumps (8 Cooked
+- 2026-10-21. **F3.1 and F3.2 done** (committed as 900881e). Format 14. 30 of 30 tests, 60 of 60 known-good dumps (8 Cooked
   dumps gained `workgroupMemoryBytes` and `capabilities` on each source, additions only).
   - The facts belong to the source, not the variant: the code alone decides them. `SourceRef::WorkgroupMemoryBytes`,
     `EnvironmentHeader::CapabilityNames` and `SourceCapabilityTableOffset`. Reserved: `Profile::CapabilityFloor`,
@@ -401,3 +401,50 @@ commit.
     `StorageInputOutput16`, KsPost `DrawParameters` (SPIR-V only). So the F3.3 cross-check compares a portable subset
     through a map, not the whole name list.
   - Next: F3.3 (cross-profile validators), then F3.4 (the device filter).
+- 2026-10-22. **F3.3 done**, not committed. `VerifySourceFactsAcrossProfiles` (`model/CookedLibrary.cpp`, error
+  `SourceFactsTargetMismatch` = 53) beside `VerifySamplerPairsAcrossProfiles`. Both now use `VisitSharedVariants`, which
+  walks the variants that the first reading profile and a later one both cooked. The portable map is `f16` with
+  `Float16`, and `subgroups` with any `GroupNonUniform*`. `CookedProfile::CodeFactsRead` marks a profile whose reader
+  ran, because a profile with no reader stores empty facts. 31 of 31 tests. KitchenSink agrees on both targets (256 bytes
+  in KsVolume, `f16` in KsGeometry, `subgroups` in KsVolume).
+  - Found: nothing in the manifest says that a profile read its facts. F3.4 must close that, or a profile with no reader
+    would read as "needs nothing" and pass every device filter.
+  - **F3.4 proposal decided the same day** (below, O8 to O11). Next: F3.4a to c, done below.
+
+#### F3.4 proposal (2026-10-22)
+
+The consumers are DiamondDogs OceanFft (Vulkan) and VeloxRhi (WebGPU). Both give the client a device description once,
+then query. The shape:
+
+1. **The facts flag (format 15).** `ProfileFlags::CodeFactsRead`, set from `profile.Validator != nullptr`.
+   `EnvironmentView::HasCodeFacts()`. A device query on an environment without it fails with `DeviceFactsUnavailable`.
+   Nothing silent.
+2. **The fit of one instance.** `EntryPointInstanceView::Fit(const DeviceLimits&, device mask)` returns a `DeviceFit`:
+   fits, or the first reason (missing capability name, workgroup memory, invocations, size on one side, push constant
+   bytes, storage buffers per stage, bind groups). The reasons use the stored facts and the layout.
+3. **The device in the builder.** `ManifestQueryBuilder::ForDevice(predicate, limits)`. The predicate takes a capability
+   name and returns whether the device supports it. The builder builds the mask from its own environment at once, so a
+   mask for the wrong environment cannot exist. `DeviceLimits` is an aggregate with no default values: a limit left at 0
+   rejects everything, which is loud.
+4. **Grain.** `SingleFor(entry_points)` keeps a variant when every named instance fits. `Keys`, `Variants`, and `Single`
+   keep a variant when every entry point of the module fits.
+5. **The answer to "why empty".** `Notes()` gains a `DeviceRemovedVariants` note with the count and the first reason for
+   each reason. `Single` with no match returns `NoVariantFitsDevice` with the nearest reason.
+
+Slices: F3.4a (the flag, format 15), F3.4b (`Fit` for capabilities and the instance limits), F3.4c (the builder and the
+notes), F3.4d (the layout limits: bindings of each kind per stage, and bind groups).
+
+| ID | Question | Recommendation |
+|---|---|---|
+| O8 | Does `Keys` with a device mean every entry point of the module, or must the caller name them? | **Decided 2026-10-22: as recommended.** Every entry point for `Keys`, `Variants`, and `Single`. `SingleFor` names them. A caller that wants fewer uses `SingleFor`. |
+| O9 | Is a new flag worth a format bump (15)? | **Decided 2026-10-22: yes**, and bump often, since DiamondDogs builds manifests for its tests. Yes. The alternative is a device filter that cannot tell a profile with no reader from a shader that needs nothing. |
+| O10 | Do the layout limits go in F3.4, or wait for a consumer? | **Decided 2026-10-22: wait.** DiamondDogs could name limits at any time, but bound samplers will not reach them at the current scope. F3.4d waits until VeloxRhi names the limits it checks. WebGPU rejects a pipeline layout above `maxStorageBuffersPerShaderStage`, so it will. The instance-level counts are enough: each instance is one stage. |
+| O11 | Does the client give a Vulkan helper that tests the alternatives of `VulkanCapabilityTable.hpp` against a renderer predicate? | **Decided 2026-10-22: no helper, and the name predicate is a C function pointer** with a user pointer, because a lambda or a template across the library boundary is brittle. No. `ExtensionWrangler` already resolves features and extensions. The renderer writes the name predicate. Revisit if a second Vulkan consumer appears. |
+- 2026-10-22. **F3.4a to c done**, not committed. Format 15: `ProfileFlags::CodeFactsRead`, `EnvironmentView::HasCodeFacts`.
+  `ShaderManifestDevice.hpp` (`CapabilitySupportFn`, `DeviceLimits`, `DeviceMismatch`, `DeviceFit`),
+  `EntryPointInstanceView::Fit`, `EnvironmentView::MakeDeviceCapabilities`, `ManifestQueryBuilder::ForDevice`, and the query
+  errors `DeviceFactsUnavailable` and `NoVariantFitsDevice`. Proof: `CheckDeviceFilter` in `ManifestIndexTest`, and the
+  flag rows in `ShaderManifestRejectTest`. 31 of 31 tests.
+  - Not built, on purpose: a `DeviceRemovedVariants` note with counts (no consumer yet; the first rejection reason is in
+    `NoVariantFitsDevice`), and F3.4d.
+  - Next: F3.5 (the capability-axis check), or F3.4d when VeloxRhi names the limits it checks.

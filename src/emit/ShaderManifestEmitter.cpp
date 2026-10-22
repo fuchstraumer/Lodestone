@@ -1,13 +1,14 @@
 #include "emit/ShaderManifestEmitter.hpp"
+#include "ShaderManifestFormat.hpp"
 #include "VariantKey.hpp"
 #include "model/AxisInfluence.hpp"
 #include "model/CookedLibrary.hpp"
 #include "CookerErrors.hpp"
+#include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
-#include "ShaderManifest.hpp"
 #include "permute/PermutationValue.hpp"
 #include "TransparentHash.hpp"
 
@@ -20,6 +21,7 @@
 #include <expected>
 #include <format>
 #include <functional>
+#include <iterator>
 #include <numeric>
 #include <optional>
 #include <print>
@@ -271,9 +273,10 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
     profiles.reserve(profileCount);
     for (const CookedProfile& profile : library.Profiles)
     {
-        const uint16_t flags = profile.SamplerTexturePairsRecorded
-                                   ? std::to_underlying(manifest::ProfileFlags::SamplerTexturePairsRecorded)
-                                   : uint16_t{ 0u };
+        const uint16_t flags =
+            (profile.SamplerTexturePairsRecorded ? std::to_underlying(manifest::ProfileFlags::SamplerTexturePairsRecorded)
+                                                 : uint16_t{ 0u }) |
+            (profile.CodeFactsRead ? std::to_underlying(manifest::ProfileFlags::CodeFactsRead) : uint16_t{ 0u });
         profiles.push_back(manifest::Profile{ .TargetNameString = strings.Add(profile.TargetName),
                                               .AccessModel = profile.AccessModel,
                                               .CodeFormat = profile.CodeFormat,

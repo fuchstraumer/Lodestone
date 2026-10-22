@@ -336,19 +336,23 @@ void WriteSlot(lodestone::JsonWriter& writer,
     writer.KeyUInt("y", workgroup.Y);
     writer.KeyUInt("z", workgroup.Z);
     writer.EndObject();
-    writer.KeyUInt("workgroupMemoryBytes", instance.WorkgroupMemoryBytes());
 
-    // what a device must support to run this instance, by name
-    writer.Key("capabilities");
-    writer.BeginArray();
-    for (uint32_t capabilityIndex = 0u; capabilityIndex < view.CapabilityNames().size(); capabilityIndex++)
+    // what a device must support to run this instance, by name. Written only when the cook read the facts, so a
+    // missing key and an empty array are different facts
+    if (view.HasCodeFacts())
     {
-        if (instance.RequiresCapability(capabilityIndex))
+        writer.KeyUInt("workgroupMemoryBytes", instance.WorkgroupMemoryBytes());
+        writer.Key("capabilities");
+        writer.BeginArray();
+        for (uint32_t capabilityIndex = 0u; capabilityIndex < view.CapabilityNames().size(); capabilityIndex++)
         {
-            writer.String(view.CapabilityName(capabilityIndex));
+            if (instance.RequiresCapability(capabilityIndex))
+            {
+                writer.String(view.CapabilityName(capabilityIndex));
+            }
         }
+        writer.EndArray();
     }
-    writer.EndArray();
 
     // Resolved the way a consumer resolves it, through the layout range.
     writer.Key("layout");

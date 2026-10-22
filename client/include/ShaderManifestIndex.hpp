@@ -3,20 +3,20 @@
 #define LODESTONE_CLIENT_SHADER_MANIFEST_INDEX_HPP
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifest.hpp"
+#include "ShaderManifestDevice.hpp"
 #include "VariantKey.hpp"
 #include <cstdint>
-#include <cstddef>
 #include <expected>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
-#include <optional>
 #include <unordered_map>
 #include <vector>
 
+
 namespace lodestone
 {
-
 
 /** @brief One value of a permutation axis. */
 struct QueryAxisValue
@@ -36,7 +36,8 @@ struct QueryAxisValue
         }
         else
         {
-            return Type == AxisValueDomain::Integral ? IntegralValue == other.IntegralValue : Name == other.Name;
+            return Type == AxisValueDomain::Integral ? IntegralValue == other.IntegralValue
+                                                     : Name == other.Name;
         }
     }
 };
@@ -64,29 +65,32 @@ enum class QueryErrorCode : uint8_t
     Success = 0,
     UnknownAxis,
     ValueNotInAxis,
-    IncorrectValueDomain, // e.g, tried to use a uint with a bool axis
-    EmptyConstraintSet, // you can't provide an empty value set to a constraint function
+    IncorrectValueDomain,    // e.g, tried to use a uint with a bool axis
+    EmptyConstraintSet,      // you can't provide an empty value set to a constraint function
     NoVariantForConstraints, // Single() matched no variant
-    AmbiguousVariant, // Single() matched more than one variant. AxisName lists the axes that still vary
-    UnknownEntryPoint, // SingleFor() got an entry point name the module does not declare. AxisName holds the name
+    AmbiguousVariant,   // Single() matched more than one variant. AxisName lists the axes that still vary
+    UnknownEntryPoint,  // SingleFor() got an entry point name the module does not declare. AxisName holds the name
     EmptyEntryPointSet, // SingleFor() got no entry point names
+    DeviceFactsUnavailable, // ForDevice() on a profile whose cook did not read the capabilities and workgroup  memory
+    NoVariantFitsDevice,    // The constraints match variants, and the device runs none of them. Detail is a
+                         // DeviceMismatch and AxisName is the capability name for MissingCapability
     Count
 };
 
 struct QueryError
 {
     QueryErrorCode Code{ QueryErrorCode::Success };
-    std::string AxisName; // can name user input, so can't be a string_view
-    uint32_t Detail{}; // additional context-specific detail about the error
+    std::string AxisName;        // can name user input, so can't be a string_view
+    uint32_t Detail{};           // additional context-specific detail about the error
     std::string_view Suggestion; // read from manifest blob, can be a view
 };
 
 /** @brief A constraint that had no effect. Notes never fail a terminal. */
 enum class QueryNoteCode : uint8_t
 {
-    PinAxisNotDeclared, // a preset pinned an axis that this module does not declare, and Apply skipped the pin
-    PinAxisIrrelevant, // the query constrains an axis that cannot change any entry point given to NotesFor
-    DuplicateValue, // a constraint names a value that the constraints on its axis already name
+    PinAxisNotDeclared, // a preset pinned an axis that this module doesn't declare, and Apply skipped the pin
+    PinAxisIrrelevant,  // the query constrains an axis that cannot change any entry point given to NotesFor
+    DuplicateValue,     // a constraint names a value that the constraints on its axis already name
 };
 
 struct QueryNote
@@ -105,14 +109,18 @@ struct QueryPresetPin
     PinMode Mode{ PinMode::Required };
 };
 
-/** @brief Axis pins applied to the query of any module through `ManifestQueryBuilder::Apply`. A pin on an axis the
-  * module does not declare is skipped with a `QueryNote`. A pin on a declared axis is checked as `Where` checks it. */
+/** @brief Axis pins applied to the query of any module through `ManifestQueryBuilder::Apply`. A pin on an
+ * axis the module does not declare is skipped with a `QueryNote`. A pin on a declared axis is checked as
+ * `Where` checks it. */
 class QueryPreset
 {
 public:
     void Pin(std::string_view axis_name, bool value, PinMode mode);
     void Pin(std::string_view axis_name, uint32_t value, PinMode mode);
-    void Pin(std::string_view axis_name, AxisValueDomain domain, std::string_view type_or_enum_name, PinMode mode);
+    void Pin(std::string_view axis_name,
+             AxisValueDomain domain,
+             std::string_view type_or_enum_name,
+             PinMode mode);
     void PinAnyOf(std::string_view axis_name, std::span<const uint32_t> values, PinMode mode);
     void PinAnyOf(std::string_view axis_name,
                   AxisValueDomain domain,
@@ -120,6 +128,7 @@ public:
                   PinMode mode);
 
     [[nodiscard]] std::span<const QueryPresetPin> Pins() const noexcept;
+
 private:
     std::vector<QueryPresetPin> pins;
 };
@@ -137,7 +146,7 @@ struct DecodedVariant
 struct ManifestQueryBuilder
 {
     ManifestQueryBuilder(const class ManifestIndex& index) noexcept;
-    
+
     /** @brief Each call returns a new builder, so that one query can branch into several. */
     [[nodiscard]] ManifestQueryBuilder Where(std::string_view axis_name, bool value) const noexcept;
     [[nodiscard]] ManifestQueryBuilder Where(std::string_view axis_name, uint32_t value) const noexcept;
@@ -148,23 +157,33 @@ struct ManifestQueryBuilder
 
     /** @brief `Where` with `PinMode::WhenActive`. */
     [[nodiscard]] ManifestQueryBuilder WhereWhenActive(std::string_view axis_name, bool value) const noexcept;
-    [[nodiscard]] ManifestQueryBuilder WhereWhenActive(std::string_view axis_name, uint32_t value) const noexcept;
+    [[nodiscard]] ManifestQueryBuilder WhereWhenActive(std::string_view axis_name,
+                                                       uint32_t value) const noexcept;
     [[nodiscard]] ManifestQueryBuilder WhereWhenActive(std::string_view axis_name,
                                                        AxisValueDomain domain,
                                                        std::string_view type_or_enum_name) const noexcept;
 
-    /** @brief Applies each pin of `preset`, in order. Keep the preset alive while the builder is in use: the builder
-      * keeps views into its strings. */
+    /** @brief Applies each pin of `preset`, in order. Keep the preset alive while the builder is in use: the
+     * builder keeps views into its strings. */
     [[nodiscard]] ManifestQueryBuilder Apply(const QueryPreset& preset) const;
 
+    /** @brief Keeps only the variants whose entry point instances the device can run. `Keys`, `Variants`, and
+     * `Single` test every entry point of the module, and `SingleFor` tests the named ones. The mask is built
+     * from this builder's own environment at once, and `user` is only passed to `supports`. */
+    [[nodiscard]] ManifestQueryBuilder ForDevice(manifest::CapabilitySupportFn supports,
+                                                 void* user,
+                                                 const manifest::DeviceLimits& limits) const;
+
     [[nodiscard]] ManifestQueryBuilder WhereAnyOfBoolean(std::string_view axis_name) const;
-    [[nodiscard]] ManifestQueryBuilder WhereAnyOf(std::string_view axis_name, std::span<const uint32_t> values) const;
+    [[nodiscard]] ManifestQueryBuilder WhereAnyOf(std::string_view axis_name,
+                                                  std::span<const uint32_t> values) const;
     [[nodiscard]] ManifestQueryBuilder WhereAnyOf(std::string_view axis_name,
                                                   AxisValueDomain domain,
                                                   std::span<const std::string_view> values) const;
 
     [[nodiscard]] ManifestQueryBuilder WhereNoneOf(std::string_view axis_name, bool value) const noexcept;
-    [[nodiscard]] ManifestQueryBuilder WhereNoneOf(std::string_view axis_name, std::span<const uint32_t> values) const noexcept;
+    [[nodiscard]] ManifestQueryBuilder WhereNoneOf(std::string_view axis_name,
+                                                   std::span<const uint32_t> values) const noexcept;
     [[nodiscard]] ManifestQueryBuilder WhereNoneOf(std::string_view axis_name,
                                                    AxisValueDomain domain,
                                                    std::span<const std::string_view> values) const noexcept;
@@ -172,22 +191,24 @@ struct ManifestQueryBuilder
     [[nodiscard]] QueryResult<std::vector<VariantKey>> Keys() const noexcept;
     [[nodiscard]] QueryResult<std::vector<DecodedVariant>> Variants() const noexcept;
     /** @brief A cheaper `Variants()` when `Keys()` already ran. */
-    [[nodiscard]] std::vector<DecodedVariant> VariantsFromKeys(const std::vector<VariantKey>& keys) const noexcept;
+    [[nodiscard]] std::vector<DecodedVariant> VariantsFromKeys(
+        const std::vector<VariantKey>& keys) const noexcept;
     /** @brief Returns the key when exactly one variant matches. `AmbiguousVariant` lists the varying axes in
-      * `AxisName` and the match count in `Detail`. */
+     * `AxisName` and the match count in `Detail`. */
     [[nodiscard]] std::expected<VariantKey, QueryError> Single() const noexcept;
     /** @brief `Single` for a pipeline of the named entry points. Axes that cannot change any of them
-      * (`EnvironmentView::IsAxisRelevant`) do not count, and the smallest of the matching keys is returned. */
+     * (`EnvironmentView::IsAxisRelevant`) do not count, and the smallest of the matching keys is returned. */
     [[nodiscard]] std::expected<VariantKey, QueryError> SingleFor(
         std::span<const std::string_view> entry_point_names) const noexcept;
 
     [[nodiscard]] bool IsValid() const noexcept;
     [[nodiscard]] std::span<const QueryError> Errors() const noexcept;
     [[nodiscard]] std::span<const QueryNote> Notes() const noexcept;
-    /** @brief `Notes()` plus a `PinAxisIrrelevant` note for each constrained axis that cannot change any of the named
-      * entry points. */
+    /** @brief `Notes()` plus a `PinAxisIrrelevant` note for each constrained axis that cannot change any of
+     * the named entry points. */
     [[nodiscard]] std::expected<std::vector<QueryNote>, QueryError> NotesFor(
         std::span<const std::string_view> entry_point_names) const;
+
 private:
     [[nodiscard]] std::optional<uint32_t> resolveAndValidate(ManifestQueryBuilder& result,
                                                              std::string_view axis_name,
@@ -198,9 +219,16 @@ private:
                           std::vector<QueryAxisValue> allowed,
                           PinMode mode);
 
-    [[nodiscard]] std::expected<VariantKey, QueryError> singleOver(std::span<const uint64_t> relevant_axes) const noexcept;
+    [[nodiscard]] std::expected<VariantKey, QueryError> singleOver(
+        std::span<const uint64_t> relevant_axes, std::span<const uint32_t> entry_points) const noexcept;
+    /** @brief Fills `entry_points` with the index of each name. */
     [[nodiscard]] std::expected<std::vector<uint64_t>, QueryError> joinRelevance(
-        std::span<const std::string_view> entry_point_names) const;
+        std::span<const std::string_view> entry_point_names, std::vector<uint32_t>& entry_points) const;
+    [[nodiscard]] std::vector<uint32_t> allEntryPoints() const;
+    /** @brief `select`, minus the variants where one of `entry_points` does not fit the device.
+     * `first_rejection` is the reason for the first variant removed. */
+    [[nodiscard]] std::vector<VariantKey> selectFitting(std::span<const uint32_t> entry_points,
+                                                        manifest::DeviceFit& first_rejection) const noexcept;
     // WhereNoneOf builds a complement, so it does not call this
     void noteDuplicateValues(std::string_view axis_name,
                              uint32_t axis_index,
@@ -214,14 +242,22 @@ private:
     std::vector<QueryNote> notes;
     // insertion order. Select sorts the scan constraints by axis index
     std::vector<QueryAxisRange> constraints;
+
+    struct DeviceState
+    {
+        std::vector<uint64_t> Supported;
+        manifest::DeviceLimits Limits;
+    };
+    std::optional<DeviceState> device;
 };
 
-/** @brief Returns the candidate closest to a mistyped name, or an empty view. The edit budget is one edit per three
-  * characters of `input`. Public so that renderers give the same "did you mean" as the query errors. */
-[[nodiscard]] std::string_view NearestName(std::string_view input, std::span<const std::string_view> candidates) noexcept;
+/** @brief Returns the candidate closest to a mistyped name, or an empty view. The edit budget is one edit per
+ * three characters of `input`. Public so that renderers give the same "did you mean" as the query errors. */
+[[nodiscard]] std::string_view NearestName(std::string_view input,
+                                           std::span<const std::string_view> candidates) noexcept;
 
-/** @brief The query index of one environment: one module, cooked for one profile. Variant keys are per module, and
-  * each profile can cook a different subset. */
+/** @brief The query index of one environment: one module, cooked for one profile. Variant keys are per
+ * module, and each profile can cook a different subset. */
 class ManifestIndex
 {
 public:
@@ -241,7 +277,6 @@ public:
     [[nodiscard]] QueryResult<QueryAxisValue> AxisDefault(std::string_view axis_name) const;
 
 private:
-
     friend struct ManifestQueryBuilder;
 
     struct ScanConstraint
@@ -250,16 +285,20 @@ private:
         std::vector<uint32_t> AllowedValueIndices;
         PinMode Mode;
     };
-    
-    [[nodiscard]] std::vector<ScanConstraint> convertToScanConstraints(std::span<const QueryAxisRange> query) const;
+
+    [[nodiscard]] std::vector<ScanConstraint> convertToScanConstraints(
+        std::span<const QueryAxisRange> query) const;
     /** @brief Axes without a constraint take their canonical value. */
     [[nodiscard]] std::vector<VariantKey> select(std::span<const QueryAxisRange> constraints) const;
     [[nodiscard]] QueryAxisValue decodeAxis(uint32_t axis_index, uint32_t value_index) const noexcept;
-    [[nodiscard]] std::vector<uint32_t> integralValueIndices(const uint32_t axis_index, const QueryAxisRange& range) const;
-    [[nodiscard]] std::vector<uint32_t> stringValueIndices(const uint32_t axis_index, const QueryAxisRange& range) const;
+    [[nodiscard]] std::vector<uint32_t> integralValueIndices(const uint32_t axis_index,
+                                                             const QueryAxisRange& range) const;
+    [[nodiscard]] std::vector<uint32_t> stringValueIndices(const uint32_t axis_index,
+                                                           const QueryAxisRange& range) const;
     /** @brief Returns the bounded run of keys that can match `constraints`. */
     [[nodiscard]] std::span<const VariantKey> filterKeys(std::span<const ScanConstraint> constraints) const;
-    /** @brief Tests the axis-active mask as well as the digit: an inactive axis stores its canonical digit. */
+    /** @brief Tests the axis-active mask as well as the digit: an inactive axis stores its canonical digit.
+     */
     [[nodiscard]] bool matches(uint32_t variant_index,
                                VariantKey key,
                                std::span<const ScanConstraint> constraints) const noexcept;
@@ -271,7 +310,8 @@ private:
 
     [[nodiscard]] std::vector<std::string_view> stringTableForAxis(uint32_t axis_index) const;
     manifest::EnvironmentView environment;
-    /** @brief The values of each module axis, in digit order, selected from the root axis through its mask. */
+    /** @brief The values of each module axis, in digit order, selected from the root axis through its mask.
+     */
     std::vector<std::vector<AxisValueType>> axisValues;
     std::vector<uint32_t> radices;
     std::vector<uint64_t> placeValues;
@@ -279,6 +319,6 @@ private:
     std::unordered_map<std::string_view, uint32_t> axisNameToIndex;
 };
 
-}
+} // namespace lodestone
 
 #endif // !LODESTONE_CLIENT_SHADER_MANIFEST_INDEX_HPP

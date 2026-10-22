@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -30,6 +31,7 @@ namespace lodestone::manifest
 #endif
 
 using detail::BoundPlacementKey;
+using detail::k_AxisMaskWordBits;
 using detail::RunOf;
 
 namespace
@@ -412,6 +414,52 @@ uint32_t EntryPointInstanceView::WorkgroupMemoryBytes() const noexcept
 std::span<const uint64_t> EntryPointInstanceView::RequiredCapabilities() const noexcept
 {
     return environment->SourceCapabilities(entryPointInstance->Source);
+}
+
+DeviceFit EntryPointInstanceView::Fit(std::span<const uint64_t> supported, const DeviceLimits& limits) const noexcept
+{
+    const std::span<const uint64_t> required = RequiredCapabilities();
+    assert(supported.size() == required.size());
+    for (size_t word = 0u; word < required.size(); ++word)
+    {
+        const uint64_t missing = required[word] & ~supported[word];
+        if (missing != 0u)
+        {
+            const uint32_t bit = static_cast<uint32_t>(std::countr_zero(missing));
+            return DeviceFit{ .Reason = DeviceMismatch::MissingCapability,
+                              .Detail = static_cast<uint32_t>(word * k_AxisMaskWordBits) + bit };
+        }
+    }
+
+    if (WorkgroupMemoryBytes() > limits.MaxWorkgroupMemoryBytes)
+    {
+        return DeviceFit{ .Reason = DeviceMismatch::WorkgroupMemory, .Detail = WorkgroupMemoryBytes() };
+    }
+
+    if (Stage() == ShaderStageKind::Compute)
+    {
+        const WorkgroupSize size = Workgroup();
+        const uint64_t invocations = uint64_t{ size.X } * size.Y * size.Z;
+        if (invocations > limits.MaxInvocationsPerWorkgroup)
+        {
+            return DeviceFit{ .Reason = DeviceMismatch::Invocations,
+                              .Detail = static_cast<uint32_t>(std::min<uint64_t>(invocations, UINT32_MAX)) };
+        }
+
+        if (size.X > limits.MaxWorkgroupSizeX || size.Y > limits.MaxWorkgroupSizeY || size.Z > limits.MaxWorkgroupSizeZ)
+        {
+            const uint32_t side = size.X > limits.MaxWorkgroupSizeX ? size.X : (size.Y > limits.MaxWorkgroupSizeY ? size.Y : size.Z);
+            return DeviceFit{ .Reason = DeviceMismatch::WorkgroupSize, .Detail = side };
+        }
+    }
+
+    const EntryPointConstantsView constants = Constants();
+    if (constants.Delivery() == EntryPointConstantsDelivery::PushConstant && constants.ByteSize() > limits.MaxPushConstantBytes)
+    {
+        return DeviceFit{ .Reason = DeviceMismatch::PushConstants, .Detail = constants.ByteSize() };
+    }
+
+    return DeviceFit{};
 }
 
 bool EntryPointInstanceView::RequiresCapability(uint32_t capability_index) const noexcept

@@ -12,16 +12,17 @@ fixed, remove it; when a task is done, add one line to section 7 and remove its 
 
 ---
 
-## 1. State on 2026-10-21
+## 1. State on 2026-10-22
 
-- RelWithDebInfo, `ninja-msvc`: build green, 30 of 30 tests, 60 of 60 known-good dumps.
+- RelWithDebInfo, `ninja-msvc`: build green, 31 of 31 tests (after F3.4a to c). Known-good dumps: not rerun after F3.3. The change adds a check and moves no cook output.
 - Debug: do not run it unattended (section 2, item 2).
-- Manifest format version 14. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
+- Manifest format version 15. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
 - Phases D and E are complete. Phase F is paused after F1 (two Bound targets, `wgsl` and `spirv`).
 - **The current work is the VeloxRhi rendergraph tasks**: `docs/rendergraph-integration-tasks.md`. R1 and R2 are
   done, and L16, L17, and L18 of R3. L6 is closed (presets cover it). L5 is phase F slice F3: F3.1 and F3.2 are done
-  (format 14). **Next: F3.3** (cross-profile validators for workgroup bytes and the portable capabilities), then F3.4
-  (the device filter), then F3.5. `docs/phase-f-plan.md` F3 has the design. Also open: L11 (optional dispatch extent)
+  (format 14, committed), and F3.3 and F3.4a to c are done (not committed, format 15). **Next: F3.5** (the
+  capability-axis check). F3.4d (bindings per stage and bind groups) waits for a consumer to name its limits.
+  `docs/phase-f-plan.md` F3 has the design. Also open: L11 (optional dispatch extent)
   and a JSON writer for the resource report.
 - **Comments are compressed** (2026-10-21). Write one-line comments by default. Technique explanations go to
   `docs/code-notes.md`, which links to the code. Code never links to `docs/`.
@@ -40,9 +41,11 @@ Ordered by what can write wrong output first.
    the Debug tests one at a time, with a timeout, and skip `KitchenSinkCookTest`. The Debug trees in
    `build/ninja-msvc` and `build/ninja-msvc-nowgsl` were built from an old Slang: rebuild them before any Debug
    run, or their cooks poison the shared module cache.
-3. **No client filters by capability yet.** Since format 14 each source states its capability names and workgroup
-   memory (F3.1, F3.2). Slang warning 41012 is off, so the device filter (F3.4) and the cross-checks (F3.3, F3.5)
-   are what make a missing device capability fail before a pipeline does. Do not let them slip.
+3. **The device filter exists (F3.4a to c), and the capability-axis check does not (F3.5).** Since format 14 each source states its capability names and workgroup
+   memory (F3.1, F3.2), and since F3.3 the two profiles of a variant must agree on the portable part. Slang warning
+   41012 is off, so the device filter (F3.4) and the capability-axis check (F3.5) are what make a missing device
+   capability fail before a pipeline does. Do not let them slip. Since format 15 the manifest says whether a profile read
+   its facts (`HasCodeFacts`), and `ForDevice` fails with `DeviceFactsUnavailable` when it did not.
 4. **Specialization constants are reserved, not cooked.** The table is always empty. Push constants are cooked
    since format 11.
 5. **The thread count is not tuned.** Each worker loads its own core module: KitchenSink commits 1.62 GB with 16
@@ -185,5 +188,9 @@ One line for each step. Git history holds the full text.
   the storage texture format.
 - **2026-10-21 (late).** F3.1 and F3.2 (format 14): capability names and workgroup memory for each source, the
   generated `VulkanCapabilityTable.hpp`, L6 closed without a device-bound axis.
+- **2026-10-22.** F3.3: `VerifySourceFactsAcrossProfiles` (`SourceFactsTargetMismatch` = 53), `VisitSharedVariants` shared with
+  the sampler pair check, `CookedProfile::CodeFactsRead`, `WorkgroupMemoryCookTest` (31st test target). F3.4 proposed.
+- **2026-10-22 (later).** F3.4a to c, format 15: `CodeFactsRead`, `EntryPointInstanceView::Fit`, `ManifestQueryBuilder::ForDevice`
+  (C function pointer predicate), `NoVariantFitsDevice`. F3.4d deferred.
 - **2026-10-21 (later).** L16 resource report (format 13, `ResourceReportTest`): footprint axis masks, `DescribeCreation`,
   `ShaderLibrary.resources.txt`, validator `VerifyFootprintAxes`.

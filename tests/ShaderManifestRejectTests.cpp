@@ -275,6 +275,15 @@ void TestSourceFacts(lodestone::tests::TestRunner& runner)
     {
         return;
     }
+    runner.Check(!environment->HasCodeFacts(), "a profile whose reader did not run reads as not having facts");
+    CookedLibrary readLibrary = library;
+    readLibrary.Profiles[0].CodeFactsRead = true;
+    const lodestone::CookResult<std::vector<std::byte>> readManifest = EmitShaderManifest(readLibrary);
+    const ManifestResult<BundleView> readBundle = BundleView::Open(readManifest.value());
+    const ManifestResult<EnvironmentView> readEnvironment =
+        readBundle.has_value() ? readBundle->OpenEnvironment(0u, 0u) : ManifestResult<EnvironmentView>{ std::unexpected(readBundle.error()) };
+    runner.Check(readEnvironment.has_value() && readEnvironment->HasCodeFacts(),
+                 "a profile whose reader ran reads as having facts");
     runner.Check(environment->CapabilityNames().size() == 2u && environment->CapabilityName(0u) == "Float16" &&
                      environment->CapabilityName(1u) == "GroupNonUniform",
                  "the environment holds the name table, sorted");

@@ -3,6 +3,7 @@
 #define LODESTONE_SHADER_MANIFEST_LAYOUT_HPP
 #include "ShaderManifestFormat.hpp"
 #include "ResourceFlags.hpp"
+#include "ShaderManifestDevice.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "VariantKey.hpp"
 #include <array>
@@ -329,6 +330,8 @@ public:
     /** @brief The capabilities the code needs, over `EnvironmentView::CapabilityNames()`. */
     [[nodiscard]] std::span<const uint64_t> RequiredCapabilities() const noexcept;
     [[nodiscard]] bool RequiresCapability(uint32_t capability_index) const noexcept;
+    /** @brief Whether a device can run this instance. `supported` is `EnvironmentView::MakeDeviceCapabilities`. */
+    [[nodiscard]] DeviceFit Fit(std::span<const uint64_t> supported, const DeviceLimits& limits) const noexcept;
     [[nodiscard]] LayoutRange Layout() const noexcept;
     /** @brief Sorted pairs of positions in `Layout()`. Empty when the profile did not record pairs. */
     [[nodiscard]] std::span<const SamplerTexturePair> SamplerTexturePairs() const noexcept;

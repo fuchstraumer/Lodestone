@@ -204,6 +204,13 @@ both targets. Both readers give 144 bytes for the same four variables (`SpvValid
 `UniformAndStorageBuffer16BitAccess`. `vk.xml` uses the primary name, so the reader stores
 `vulkan::PrimaryCapabilityName`. Extension names start with `SPV_`, so they never collide with capability names.
 
+**Cross-profile facts** (`VerifySourceFactsAcrossProfiles`). Only a portable subset of the capability names can agree:
+`f16` with `Float16`, and `subgroups` with every `GroupNonUniform*` name (Slang emits `GroupNonUniform` for any wave
+operation, plus one name for each operation class). Names with no spelling in the other target, such as
+`StorageInputOutput16` or `DrawParameters`, are not compared. The workgroup bytes compare as equal numbers, which holds
+because both readers use the Tint rule. A profile whose reader did not run (`CookedProfile::CodeFactsRead` false) is
+skipped.
+
 ## 8. The Vulkan capability table
 
 Files: [generate-vulkan-capability-table.py](../scripts/generate-vulkan-capability-table.py),
@@ -259,6 +266,12 @@ because an inactive axis stores its canonical digit 0. `matches` tests the axis-
 
 **`SingleFor`.** Matches that differ only in axes that cannot change any named entry point give the same instances, so
 they are one answer, and the smallest key keeps the answer stable between calls.
+
+**The device filter** (`ForDevice`, `EntryPointInstanceView::Fit`). The mask is built from the builder's own environment,
+because a capability index only means something in one environment's name table. The test order is capability, workgroup
+memory, invocations, size on each side, push constants, and the first failure is the reason. Workgroup size checks run for
+compute stages only: other stages carry the default 1x1x1. A rejected variant is removed for the whole query, so a pipeline
+of two entry points that share a variant needs both to fit, and `SingleFor` is the way to ask about one.
 
 ## 11. Compilation, threads, and the module cache
 
