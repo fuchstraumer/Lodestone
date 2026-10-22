@@ -13,8 +13,6 @@
 #include <type_traits>
 #include <utility>
 
-/** Private to the client library: the helpers that both the views and the `Open` validators use to read records
- * out of manifest bytes. Clients never see this header. */
 namespace lodestone::manifest::detail
 {
 
@@ -25,16 +23,13 @@ namespace lodestone::manifest::detail
 
     inline constexpr ErrorState k_ManifestOk{ .Code = ErrorCode::Success };
 
-    /** One integer that orders Bound placements: the group in the high half, the binding in the low half.
-     * It orders as the cooker's `PlacementLess` does for two Bound placements. */
+    /** Group in the high half, binding in the low half: the order of the cooker's `PlacementLess`. */
     inline constexpr uint64_t BoundPlacementKey(const PlacementPayload& placement) noexcept
     {
         return (static_cast<uint64_t>(placement.Word0) << 32u) | static_cast<uint64_t>(placement.Word1);
     }
 
-    /**The reader reinterprets manifest bytes as records, so a record must be a bag of bytes.
-    * This static assert ensures that types with objects, pointers, etc cannot make it into
-    * the manifest data.*/
+    // the reader reinterprets bytes as records, so a record must be a bag of bytes
     template<typename RecordType>
     inline constexpr bool k_IsManifestRecord =
         std::is_trivially_copyable_v<RecordType> && alignof(RecordType) <= 8u;
@@ -83,9 +78,6 @@ namespace lodestone::manifest::detail
     }
 // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
 
-    /**@brief In multiple locations, we store ranges of data in "runs". Each run specifies a contiguous block
-     * of payloads, which could be themselves simple indices or POD structs. This is just a more succinct
-     * accessor for those cases  */
     template<typename PayloadType, typename RunIndexType>
     inline std::span<const PayloadType> RunOf(std::span<const Run> runs,
                                        std::span<const PayloadType> payloads,
@@ -95,7 +87,6 @@ namespace lodestone::manifest::detail
         return payloads.subspan(run.First, run.Count);
     }
 
-    /** The bit position of the set bit of rank `rank` in `mask`, counted from the least significant bit. */
     inline uint32_t SelectSetBit(uint32_t mask, uint32_t rank) noexcept
     {
         for (int32_t cleared = 0u; std::cmp_less(cleared, rank); ++cleared)

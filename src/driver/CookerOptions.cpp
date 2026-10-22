@@ -50,8 +50,7 @@ namespace
     constexpr std::string_view k_StageDumpPrefix = "--dump-stage=";
     constexpr std::string_view k_AllStageDumpsName = "all";
 
-    /** The one table that decides both what `--dump-stage` accepts and what a dump artifact is
-     * called. A separate spelling for either job would let the flag and the file name drift. */
+    /** One table for both the flag spelling and the artifact name, so the two cannot drift. */
     struct StageDumpName
     {
         StageDumpKind Kind;
@@ -83,8 +82,7 @@ namespace
         return StageDumpBit(kind);
     }
 
-// ignore -Wunsafe-buffer-usage because from_chars with string_view is safe, and the warning is a little
-// paranoid (as it should be)
+// from_chars with string_view is safe, and the warning is a little paranoid (as it should be)
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
@@ -110,15 +108,12 @@ namespace
 #pragma clang diagnostic pop
 #endif
 
-    /** A flag that takes no argument. The table keeps the parser flat: one row for each switch, and
-     * the loop below stays a lookup rather than a chain of comparisons. */
     struct SwitchFlag
     {
         std::string_view Name;
         void (*Apply)(CookerOptions& options) noexcept;
     };
 
-    // moved these toggles out of lambdas, because the lambdas were ugly as sin
     void DisableDedupe(CookerOptions& options) noexcept
     {
         options.DedupeEnabled = false;
@@ -178,12 +173,7 @@ namespace
         return nullptr;
     }
 
-    /** A flag written as one argument with its value attached, such as `--target=wgsl` or `--O2`.
-     *
-     * These three had the same shape as three separate branches of `ParseCommandLine`, and adding
-     * `--target` put that function over the complexity threshold. One table instead, the way
-     * `k_SwitchFlags` already does for switches, so a fourth value flag costs a row rather than a
-     * branch. `Apply` gets only the tail, so no handler repeats the prefix length. */
+    /** A flag with its value attached, such as `--target=wgsl`. A new value flag costs a row, not a branch. */
     struct ValueFlag
     {
         std::string_view Prefix;
@@ -236,8 +226,7 @@ namespace
 
     const std::array<ValueFlag, 3u> k_ValueFlags{
         ValueFlag{ .Prefix = k_StageDumpPrefix, .Apply = &ApplyDumpStageArgument },
-        // Rejected here rather than in the driver. A name that reaches CookerOptions is a name
-        // FindTargetProfile accepts, so no later stage has to ask again.
+        // rejected here, so every name in CookerOptions is one FindTargetProfile accepts
         ValueFlag{ .Prefix = k_TargetPrefix, .Apply = &ApplyTargetOption },
         ValueFlag{ .Prefix = k_OptimizationPrefix, .Apply = &ApplyDesiredOptimizationLevel }
     };
@@ -262,8 +251,7 @@ namespace
         Yes = 1
     };
 
-    /** A flag that consumes the next argument. It cannot join either table, because it moves the
-     * loop index. */
+    /** Not in a table, because it moves the loop index. */
     CookResult<std::filesystem::path> ReadPathArgument(std::span<const std::string_view> arguments,
                                                        size_t& index,
                                                        CreateDirectory create_dir)
@@ -273,7 +261,6 @@ namespace
             return std::unexpected(CookError::MalformedArgument);
         }
 
-        // increment index, because the actual path/filename is the next argument
         ++index;
 
         std::filesystem::path result{ arguments[index] };
@@ -305,7 +292,6 @@ namespace
         ++index;
         std::filesystem::path result{ arguments[index] };
 
-        // since this is explicitly a filename - not a directory - we should make sure it exists
         if (result.has_filename() && !std::filesystem::exists(result))
         {
             return std::unexpected(CookError::FileNotFound);
@@ -377,8 +363,6 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
 {
     CookerOptions options;
     options.ModuleCacheDirectory = DefaultModuleCacheDirectory();
-    // good ol if/else config parsing, because the command line is at least simple for now
-    // quick future upgrade would be a declarative lambda table, along with limits for safety
     for (size_t i = 0; i < arguments.size(); ++i)
     {
         const std::string_view argument = arguments[i];
@@ -406,7 +390,6 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
             CookResult<std::filesystem::path> policyFile = ReadFileArgument(arguments, i);
             if (!policyFile)
             {
-                // no policy file is fine, just continue without setting it
                 options.PolicyFile = std::nullopt;
                 continue;
             }
@@ -445,7 +428,6 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
         return std::unexpected(CookError::NoModulesSpecified);
     }
 
-    // A cook with no target cooks nothing, so a target is required like the output path.
     if (options.TargetNames.empty())
     {
         return std::unexpected(CookError::NoTargetSpecified);

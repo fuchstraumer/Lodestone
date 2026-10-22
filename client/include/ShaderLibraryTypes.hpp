@@ -5,12 +5,7 @@
 #include <cstdint>
 #include <string_view>
 
-/**
- * @brief The vocabulary the shader cooker writes and clients read. This header is the contract between
- * Lodestone and clients that want to use the data the cooker produces. Texture formats and view dimensions
- * come from ResourceFlags.hpp. One definition serves both the resource layer and the cooker, so the two
- * cannot disagree.
- */
+/** @brief The vocabulary the cooker writes and clients read: the contract between Lodestone and its clients. */
 namespace lodestone
 {
 
@@ -30,8 +25,7 @@ enum class PlacementKind : uint8_t
     Pointer,
 };
 
-/** @brief The form of a profile's code. `Wgsl` is text. `Spirv` is 32-bit words, so each SPIR-V source
- * starts on a 4-byte boundary and its length is a multiple of 4. */
+/** @brief The code form of a profile. Each SPIR-V source is whole 32-bit words, aligned to 4 bytes. */
 enum class ShaderCodeFormat : uint8_t
 {
     None = 0,
@@ -39,8 +33,7 @@ enum class ShaderCodeFormat : uint8_t
     Spirv,
 };
 
-/** @brief Type of a memory footprint field: `None` means unspecified in the shader,
- *  so users are expected to handle it. */
+/** @brief `None` means the shader declares no size, and the caller supplies it. */
 enum class FootprintKind : uint8_t
 {
     None = 0,
@@ -48,7 +41,6 @@ enum class FootprintKind : uint8_t
     Texture,
 };
 
-/** @brief The Graphics API binding type that one shader resource needs. */
 enum class BindingKind : uint8_t
 {
     Invalid = 0,
@@ -63,14 +55,12 @@ enum class BindingKind : uint8_t
     InlineUniform,
     RayTracingAccelerationStructure,
     StorageTexture,
-    /** Reserved: no reflection produces this yet. Its members use the uniform member table. */
+    /** Reserved: no reflection produces this yet. */
     PushConstant
 };
 
-/** @brief How a target delivers the `uniform` parameters of ordinary data to an entry point: the entry point
- * constants. Slang chooses the form for each target. WGSL reads them from a uniform buffer that has a
- * placement in the entry point's layout. SPIR-V reads them from a push constant block for raster and compute
- * stages, and that block has no placement. `None` means that the entry point reads no such data. */
+/** @brief How a target delivers entry point constants: a uniform buffer with a placement (WGSL), or a push constant
+ * block with none (SPIR-V). */
 enum class EntryPointConstantsDelivery : uint8_t
 {
     None = 0,
@@ -96,8 +86,7 @@ enum class ShaderStageKind : uint32_t
     Amplification = 1u << 12u,
     Dispatch = 1u << 13u,
     Node = 1u << 14u,
-    // These are so old I forgot to add them....
-    // putting at end bc they're rare nowadays (god i feel old)
+    // so old I forgot them, so they go at the end (god i feel old)
     TessellationControl = 1u << 15u,
     TessellationEvaluation = 1u << 16u,
     Geometry = 1u << 17u,
@@ -107,11 +96,7 @@ enum class ShaderStageKind : uint32_t
 
 MAKE_ENUM_CLASS_FLAGS(ShaderStageKind)
 
-/** @brief The shape of a bound resource, as the shader declares it. This should be viewed
- * as authoritative, where the CPU side only follows from this.
- * @note This is an almost exact mirror of Slang's resource shape definitions, mostly bc
- * they're better than a huge set of combined enums to represent what flags do with bitwise ops
- */
+/** @brief The declared shape of a resource, mirroring Slang's resource shape: a base shape plus flags. */
 enum class ResourceShape : uint8_t
 {
     Invalid = 0x00,
@@ -119,14 +104,11 @@ enum class ResourceShape : uint8_t
     Texture2D = 0x02,
     Texture3D = 0x03,
     TextureCube = 0x04,
-    // TextureBuffer was at 0x05, but it's not at all needed
     StructuredBuffer = 0x06,
     ByteAddressBuffer = 0x07,
-    // 0x08 was used for unknown, but that hasn't come up
     AccelerationStructure = 0x09,
     TextureSubpass = 0x0A, // added for exact slang parity, but not needed
 
-    // flags, not shapes
     BaseShapeMask = 0x0F,
     FeedbackFlag = 0x10,
     ShadowFlag = 0x20,
@@ -156,8 +138,7 @@ constexpr bool ResourceShapeIsShadow(ResourceShape shape)
     return HasAnyFlag(shape, ResourceShape::ShadowFlag);
 }
 
-/** @brief How a shader samples a texture. Users can check this against
- * the formats they create or bind for validation. */
+/** @brief How a shader samples a texture, to check against the formats a client creates. */
 enum class TextureSampleType : uint8_t
 {
     Invalid = 0,
@@ -168,7 +149,6 @@ enum class TextureSampleType : uint8_t
     UnsignedInteger,
 };
 
-/** @brief The kind of accessmodel a shader uses with a resource */
 enum class ResourceAccess : uint8_t // increased to 16 for alignment
 {
     Invalid = 0,
@@ -181,9 +161,7 @@ enum class ResourceAccess : uint8_t // increased to 16 for alignment
     Feedback
 };
 
-/** @brief The scalar type of one vertex attribute or one color target.
- *  @note Widened to uint32_t so struct holding it is 16 bytes even vs 13
-*/
+/** @brief Widened to 32 bits, so that the records holding it are 16 bytes. */
 enum class VertexScalarType : uint32_t
 {
     Invalid = 0,
@@ -193,8 +171,6 @@ enum class VertexScalarType : uint32_t
     UnsignedInteger32,
 };
 
-/** @brief The kind of a permutation axis: stored in both Lodestone runtime 
- * and reflected in the shader manifest. */
 enum class AxisKind : uint8_t
 {
     None,
@@ -204,8 +180,7 @@ enum class AxisKind : uint8_t
     Technique, // Which technique or algorithm is used: uniform branching
 };
 
-/** @brief When a permutation axis value is made concrete and discretely bound
-  * to an actual value, i.e. the granularity at which it is bound. */
+/** @brief The earliest time an axis value can be bound. */
 enum class EarliestBindingTime : uint8_t
 {
     None = 0,
@@ -215,9 +190,7 @@ enum class EarliestBindingTime : uint8_t
     Execution, // Value is set during shader execution (per-thread, divergent)
 };
 
-/** @brief The fundamental type/domain of a permutation axis' values, and how they
-  * should be interpreted or reflected. "Type" is for interface axes, but reflects
-  * as the name of that type to keep things succinct. */
+/** @brief The domain of an axis's values. `Type` is an interface axis, stored as the implementation name. */
 enum class AxisValueDomain : uint8_t
 {
     None,
@@ -227,16 +200,10 @@ enum class AxisValueDomain : uint8_t
     Type
 };
 
-/** @brief The type used to represent values of a permutation axis, particularly when stored or reflected.
-  * @note Declared as a using alias in case we need to widen or otherwise change this in the future, as has
-  * happened when it was mistakenly implemented as a wider signed type. */
+/** @brief An alias, because this was once a wider signed type by mistake. */
 using AxisValueType = uint32_t;
 
-/** @brief One vertex shader input.
- *
- * WGSL keeps only `@location`. The semantic name and index live in the Slang source and in no part of
- * the emitted text, so the semantic information would be lost: we store it in cooked layout/reflection
- * data packed alongside source. */
+/** @brief One vertex input. WGSL keeps only `@location`, so the semantic exists only in this record. */
 struct VertexAttributeInfo
 {
     std::string_view SemanticName;
@@ -246,11 +213,7 @@ struct VertexAttributeInfo
     uint32_t ComponentCount{ 0u };
 };
 
-/** @brief One fragment shader color target.
- *
- * The format is absent, and it cannot be derived. `float4 : SV_Target0` could be Rgba8Unorm or
- * Rgba16Float. Shader reflection gives what it can, but the rest is up to the caller configuring
- * pipelines and renderpasses. */
+/** @brief One color target. The format cannot be derived: `float4 : SV_Target0` could be Rgba8Unorm or Rgba16Float. */
 struct ColorTargetInfo
 {
     uint32_t Location{ 0u };
@@ -258,8 +221,6 @@ struct ColorTargetInfo
     uint32_t ComponentCount{ 0u };
 };
 
-/** @brief Compute workgroup thread dimensions. The shader declares these, so they are always reflectable.
- * Clients may use these along with known input data sizes to calculate workgroup sizes exactly. */
 struct WorkgroupSize
 {
     uint32_t X{ 1u };

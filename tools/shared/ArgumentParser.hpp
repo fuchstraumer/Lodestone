@@ -8,10 +8,6 @@
 namespace lodestone
 {
 
-// Simple but robust command line argument parser, for our various tools
-// and tests to share and reuse. Init with argc + argv or a string.
-// Splits on whitespace, but first checks for quoted strings or 
-// `-`/`--` to pair with an value.
 class ArgumentParser
 {
 public:
@@ -20,9 +16,7 @@ public:
     std::vector<std::string_view> GetArgs() const noexcept { return arguments; }
 private:
     void tokenizeArguments();
-    // takes an owning copy of the argument string, but returns
-    // string_views into it since most apps will declare this in
-    // the same scope as main()
+    // owns the text, and returns views into it
     std::string argumentString;
     std::vector<std::string_view> arguments;
 };

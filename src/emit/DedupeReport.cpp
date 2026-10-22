@@ -33,8 +33,6 @@ namespace lodestone
 namespace
 {
 
-     /**@brief `SourceIndex` gives the unique index of a source string, and `MappedCount` tells how many
-       * times something mapped to that index instead of duplicating into another source blob string */
     struct SourceCollapse
     {
         uint32_t SourceIndex{ 0u };
@@ -42,11 +40,9 @@ namespace
         std::string_view FirstDescription;
     };
 
-    /**@brief Printed marker specifying what influence an axis had (if any) in the influence table we print. */
     char InfluenceMarker(AxisInfluence influence) noexcept;
     std::string EmitInfluenceTable(const CookedModule& module, const ModuleInfluence& influence);
-    /** Makes one pass over the variants. The previous version searched the whole variant list again for
-     * each distinct source, which was quadratic and returned the same result. */
+    /** One pass: the previous version searched every variant again for each source, which was quadratic. */
     std::vector<SourceCollapse> CollectSourceCollapses(const CookedModule& module, size_t entry_point_index);
     std::string EmitProvenance(const CookedModule& module);
 
@@ -62,22 +58,19 @@ CookError EnforceModulePolicy(const CookedModule& module,
     }
 
     const StringMap<std::vector<std::string>>& expectedInfluence = policy.InertAxesForEntryPoints;
-    // pull out the keys: we only want to iterate over the entry points we actually have policy data on
     auto inertEntryPoints = expectedInfluence |
                             std::views::keys |
                             std::views::transform([](const auto& key) { return std::string_view{ key }; }) |
                             std::ranges::to<std::vector<std::string_view>>();
     std::ranges::sort(inertEntryPoints);
 
-    // preconstruct a map of axis names to axis indices for quick lookup
     std::unordered_map<std::string_view, std::ptrdiff_t> axisNameToIndex;
     for (auto&& [idx, axis] : std::views::enumerate(module.Space->Axes()))
     {
         axisNameToIndex[axis.Name] = idx;
     }
     
-    // get the influence information for every entry point in the module
-    // todo-ship: simplify ComputeActualInfluence's work by using inertEntrryPoints as a filter there as well
+    // todo-ship: let ComputeActualInfluence filter by the inert entry points too
     const CookResult<ModuleInfluence> actualInfluence = ComputeActualInfluence(module);
     if (!actualInfluence)
     {
@@ -94,7 +87,6 @@ CookError EnforceModulePolicy(const CookedModule& module,
     for (const EntryPointInfluence& entryPointInfluence : relevantEntryPoints)
     {
         const std::vector<std::string>& expectedInertAxes = expectedInfluence.at(entryPointInfluence.EntryPointName);
-        // extract axes that should be inert but aren't
         auto filterFailingAxis = [&axisNameToIndex, &entryPointInfluence](const std::string_view& axis_name)
         {
             const std::ptrdiff_t axisIndex = axisNameToIndex.at(axis_name);
@@ -131,7 +123,6 @@ std::string GenerateDedupeReport(const CookedLibrary& library)
     report += "Note: The dedupe ratio indicates how many artifacts were seen for each unique entry. A higher "
               "ratio means more effective deduplication.\n\n";
 
-    // One section for each cooked environment, in the manifest's order: by profile, then by module.
     const size_t moduleCount = library.ModuleNames.size();
     for (size_t environmentIndex = 0u; environmentIndex < library.Environments.size(); ++environmentIndex)
     {
@@ -154,8 +145,7 @@ std::string GenerateDedupeReport(const CookedLibrary& library)
         report += EmitProvenance(module);
         report += "\n";
 
-        // One line for each table. Placement, footprint, and visibility collapse at different rates,
-        // and one number for all three would hide which one grows.
+        // the tables collapse at different rates, so one number would hide which grows
         const std::array<std::pair<std::string_view, const TableStatistics*>, 7u> tables{
             std::pair{ std::string_view{ "sources" }, &module.SourceTable },
             std::pair{ std::string_view{ "resources" }, &module.ResourceTable },
@@ -187,8 +177,6 @@ std::string GenerateDedupeReport(const CookedLibrary& library)
         report += std::format("  hash collisions resolved by byte compare: {}\n", collisions);
         report += std::format("  byte comparisons forced by a hash hit: {}\n", comparisons);
         report += "  normalization passes active: (none)\n";
-        // What the target's validator read from the emitted code. A device needs all of these to run every variant
-        // (which is not thbe expected case of course, but can set the "ultra" spec or something similar based on hardware support)
         std::string capabilities;
         for (const std::string& capability : module.ObservedCapabilities)
         {

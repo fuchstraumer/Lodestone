@@ -12,12 +12,7 @@
 #include <string_view>
 #include <vector>
 
-// The cooker evaluates a lodestone attribute expression itself, because Slang folds an attribute's
-// integer argument at compile time and the permutation constants only fold at link time. A size
-// expression such as `[ls_element_count("IFFT_SIZE * 4")]` and an axis constraint such as
-// `[vx_axis_active_when("IFFT_USE_WAVE_OPS != 0")]` both pass through this one evaluator. It is the
-// one place where a shader's declared size, or the guard on a variant, can drift from what the graph
-// creates, so it is worth more test surface than its size suggests.
+// One evaluator serves size expressions and axis constraints, so it gets more test surface than its size suggests.
 
 using lodestone::CookError;
 using lodestone::DiagnosticSink;

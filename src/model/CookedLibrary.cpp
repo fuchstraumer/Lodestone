@@ -37,12 +37,10 @@ namespace lodestone
 namespace
 {
 
-    /** One pair, named by the scope and name of each resource: texture scope, texture name, sampler scope,
-     * sampler name. */
+    /** Texture scope, texture name, sampler scope, sampler name. */
     using NamedPair = std::array<std::string_view, 4u>;
 
-    /** The pairs of one entry point instance by name, sorted. Empty with `has_combined` set when the entry point
-     * uses a combined texture sampler. */
+    /** Empty with `has_combined` set for a combined texture sampler. */
     CookResult<std::vector<NamedPair>> NamePairs(const CookedModule& module,
                                                  const LibraryVariant& variant,
                                                  size_t entry_point_index,
@@ -76,7 +74,6 @@ ContentHashValue HashVisibilityList(const std::vector<uint32_t>& visibility) noe
 
 void AppendFootprintHash(StreamingHash& hasher, const ResourceFootprint& footprint) noexcept
 {
-    // at most 4 scalar values per footprint
     std::array<uint64_t, 4> footprintScalars{ 0u, 0u, 0u, 0u };
     if (const BufferFootprint* buffer = std::get_if<BufferFootprint>(&footprint))
     {
@@ -102,7 +99,6 @@ void AppendFootprintHash(StreamingHash& hasher, const ResourceFootprint& footpri
 
 ContentHashValue HashSamplerPairList(const SamplerPairList& pairs) noexcept
 {
-    // two uint32_t fields and no padding, so the bytes are the content
     static_assert(sizeof(SamplerTexturePair) == 2u * sizeof(uint32_t));
     return HashBytes(std::as_bytes(std::span<const SamplerTexturePair>{ pairs.data(), pairs.size() }));
 }
@@ -121,8 +117,7 @@ ContentHashValue HashFootprintList(const std::vector<ResourceFootprint>& footpri
 
 void DisableDedupe(InternedModule& module) noexcept
 {
-    // todo: This is brittle and vulnerable to being missed whenever we add or change interners.
-    // Can we do something smarter? (that's rhetorical. but think about it maybe)
+    // todo: brittle when interners change. Can we do something smarter?
     module.SourceInterner.Disable();
     module.ResourceInterner.Disable();
     module.ResourceListInterner.Disable();
@@ -152,8 +147,6 @@ CookError AppendVariantToModule(InternedModule& module,
                                           .VariantDescription = variant.VariantDescription,
                                           .VariantIndex = variant.VariantIndex };
 
-    // Resources are per-variant (since that's the granularity we will build resources and bind
-    // models at, not entrypoints: this is one of the advantages of our system)
     ResourceList resources;
     resources.reserve(variant.Bindings.size());
     for (const ReflectedBinding& binding : variant.Bindings)
@@ -175,10 +168,6 @@ CookError AppendVariantToModule(InternedModule& module,
     record.Workgroups.reserve(variant.EntryPoints.size());
     record.SamplerPairIndices.reserve(variant.EntryPoints.size());
     record.ConstantsIndices.reserve(variant.EntryPoints.size());
-    // we could probably make this more efficient in the future, it'll be moving a good bit of data
-    // around as variant size grows
-    // todo-ship: once we have a better logger with levels, it'd be interesting to see how uniqueness count
-    // changes and grows per variant
     for (size_t entryPointIndex = 0u; entryPointIndex < variant.EntryPoints.size(); ++entryPointIndex)
     {
         const CompiledEntryPoint& entryPoint = variant.EntryPoints[entryPointIndex];
@@ -188,6 +177,18 @@ CookError AppendVariantToModule(InternedModule& module,
 
         const InternResult source = module.SourceInterner.Intern(entryPoint.Code, origin);
         record.SourceIndices.push_back(source.Index);
+        if (source.WasNew)
+        {
+            module.SourceFacts.push_back(entryPoint.CodeFacts);
+            for (const std::string& name : entryPoint.CodeFacts.CapabilityNames)
+            {
+                const auto position = std::ranges::lower_bound(module.ObservedCapabilities, name);
+                if (position == module.ObservedCapabilities.end() || *position != name)
+                {
+                    module.ObservedCapabilities.insert(position, name);
+                }
+            }
+        }
 
         const InternResult visibility =
             module.VisibilityInterner.Intern(entryPoint.Reflection.UsedBindingIndices, origin);
@@ -241,6 +242,7 @@ CookedModule FreezeModuleTables(InternedModule&& interned)
     module.RasterStates = interned.RasterInterner.ConsumeTable();
     module.SamplerPairLists = interned.SamplerPairInterner.ConsumeTable();
     module.EntryPointConstantsTable = interned.ConstantsInterner.ConsumeTable();
+    module.SourceFacts = std::move(interned.SourceFacts);
     module.ObservedCapabilities = std::move(interned.ObservedCapabilities);
     module.FootprintDeclarations = std::move(interned.FootprintDeclarations);
 
@@ -278,8 +280,6 @@ CookResult<ShaderLayout> ResolveLayout(const CookedModule& module,
                                        const LibraryVariant& variant,
                                        size_t entry_point_index)
 {
-    // remember that visiblity indices is per-EP in this data, so if
-    // input index is bigger than that list, it's not in range
     if (entry_point_index >= variant.VisibilityIndices.size() ||
         variant.ResourceListIndex >= module.ResourceLists.size() ||
         variant.FootprintListIndex >= module.FootprintLists.size())
@@ -287,8 +287,6 @@ CookResult<ShaderLayout> ResolveLayout(const CookedModule& module,
         return std::unexpected(CookError::ManifestShaderLayoutVariantIndicesInvalid);
     }
 
-    // another indirection: visiblity lists are stored separately. EP idx just keys to that.
-    // (remember, resource list size can change considerably between EPs)
     const uint32_t visibilityIndex = variant.VisibilityIndices[entry_point_index];
     if (visibilityIndex >= module.VisibilityLists.size())
     {
@@ -300,7 +298,6 @@ CookResult<ShaderLayout> ResolveLayout(const CookedModule& module,
 
     ShaderLayout layout;
     layout.reserve(module.VisibilityLists[visibilityIndex].size());
-    // localRsrcIndex == binding of the resource in *this* entry point
     for (const uint32_t localRsrcIndex : module.VisibilityLists[visibilityIndex])
     {
         if (localRsrcIndex >= resources.size() || resources[localRsrcIndex] >= module.Resources.size())
@@ -355,11 +352,9 @@ CookResult<ShaderLayoutView> ResolveLayoutView(const CookedModule& module,
 
 CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library)
 {
-    // todo-ship: maybe this one is worth making an optional validation or check, at this point
     const size_t moduleCount = library.ModuleNames.size();
     for (size_t moduleIndex = 0u; moduleIndex < moduleCount; ++moduleIndex)
     {
-        // every recorded profile is compared against the first recorded profile that cooked the module
         const CookedModule* baseline = nullptr;
         size_t baselineProfile = 0u;
         std::unordered_map<VariantKey, size_t> baselineVariants;
@@ -385,7 +380,7 @@ CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library)
                 continue;
             }
 
-            // each profile applies its own policy, so only the variants both profiles cooked are compared
+            // each profile has its own policy, so compare the variants both cooked
             for (size_t variantIndex = 0u; variantIndex < environment->VariantKeys.size(); ++variantIndex)
             {
 

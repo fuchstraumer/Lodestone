@@ -30,14 +30,11 @@ namespace lodestone
 namespace
 {
 
-    // Builds a parse error that points at a node. toml++ records a source region for every node, so a
-    // wrong type reports the line and the column of the offending value.
     PolicyParseError ErrorAt(const toml::node& node, std::string message);
     PolicyDocResult<StringMap<std::vector<std::string>>> ReadInertAxes(const toml::table& module_table);
     PolicyDocResult<AxisCookValues> ReadAxisCookValues(std::string_view axis_name,
                                                        const toml::node& values_node);
     PolicyDocResult<TargetCookPolicy> ReadTargetPolicy(const toml::table& target_table);
-    // Reads the optional targets table of one module. Each key is a target profile name.
     PolicyDocResult<StringMap<TargetCookPolicy>> ReadTargets(const toml::table& module_table);
     PolicyParseError MakeParseError(const toml::parse_result& result);
     PolicyDocResult<StringMap<ModulePolicyEntry>> BuildModules(const toml::table& root);
@@ -144,26 +141,20 @@ CookError PolicyDocument::ValidateAgainstSpace(std::string_view module_name,
     const ModulePolicyEntry* entry = FindModule(module_name);
     if (entry == nullptr)
     { 
-        // the file names no policy for this module, so nothing to check
         return CookError::Success;
     }
 
-    // collate all of the inert axes for the current module
     auto inertAxesStrs = entry->InertAxesForEntryPoints | std::views::values | std::views::join;
-    // use views so we don't copy a bunch
     std::vector<std::string_view> inertAxesNames(inertAxesStrs.begin(), inertAxesStrs.end());
-    // now filter out to only uniques
     std::ranges::sort(inertAxesNames);
     auto [firstToErase, lastToErase] = std::ranges::unique(inertAxesNames);
     inertAxesNames.erase(firstToErase, lastToErase);
 
-    // now extract names from axes
     auto allAxesStrs = space.Axes() |
                        std::views::transform(&PermutationAxis::Name) |
                        std::ranges::to<std::vector<std::string_view>>();
     std::ranges::sort(allAxesStrs);
 
-    // find if there are any names in inertAxesNames that are not present in allAxesStrs
     std::vector<std::string_view> missingAxes;
     std::ranges::set_difference(inertAxesNames, allAxesStrs, std::back_inserter(missingAxes));
     if (!missingAxes.empty())
@@ -213,15 +204,12 @@ TargetPolicyCoverage PolicyDocument::FindTargetCoverage(std::string_view module_
 CookError PolicyDocument::ValidateTargetNames(std::span<const std::string_view> target_names,
                                               DiagnosticSink& sink) const
 {
-    // validate that target names *in the policy* match the provided list of target names
-    // as in, reject unknown names since those could be misspellings 
     for (const auto& [module_name, module_entry] : modules)
     {
         for (const auto& targetName: std::views::keys(module_entry.Targets))
         {
             if (!std::ranges::contains(target_names, targetName))
             {
-                // Use suggest module to provide closest matching valid target name, if available
                 return ReportError(sink,
                                    CookError::PolicyUnknownTargetName,
                                    std::format("Unknown target name '{}'", targetName));
@@ -234,8 +222,7 @@ CookError PolicyDocument::ValidateTargetNames(std::span<const std::string_view> 
 
 namespace
 {
-    // Builds a parse error that points at a node. toml++ records a source region for every node, so a
-    // wrong type reports the line and the column of the offending value.
+    // toml++ records a source region per node, so errors give the line and column
     PolicyParseError ErrorAt(const toml::node& node, std::string message)
     {
         const toml::source_region& region = node.source();
@@ -302,10 +289,7 @@ namespace
             else if (element.is_integer())
             {
                 const int64_t val = *element.value<int64_t>();
-                // TOML doesn't let us distinguish between signed or unsigned: we're going
-                // to assume unsigned
-                // todo-ship: We need to figure out how to handle this better. Either PermutationValue
-                // loses it's signed support, or we make this handle signed somehow (also maybe widen?)
+                // todo-ship: TOML has no unsigned integers, so this assumes unsigned. Drop signed values or handle them
                 cookValues.Values.emplace_back(static_cast<uint32_t>(val));
             }
             else

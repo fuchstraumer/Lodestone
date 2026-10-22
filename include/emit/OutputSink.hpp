@@ -9,8 +9,7 @@
 #include <string_view>
 #include <span>
 
-/** Where cooked output goes. Kept behind an interface so a future watch-and-serve process can hand
- * sources to a running engine without going through the filesystem. */
+/** Where cooked output goes: an interface, so a live cooker can hand sources to an engine without the filesystem. */
 namespace lodestone
 {
 
@@ -24,14 +23,11 @@ public:
     OutputSink(OutputSink&&) noexcept = default;
     OutputSink& operator=(OutputSink&&) noexcept = default;
 
-    /** Writes an artifact to the output sink: this never outputs just one item, it outputs
-     * multiple named artifacts. */
     [[nodiscard]] virtual CookError WriteArtifact(std::string_view artifact_name,
                                     std::string_view content) = 0;
     [[nodiscard]] virtual CookError WriteArtifact(std::string_view artifact_name,
                                     std::span<const std::byte> content) = 0;
-    /** Clean up artifacts earlier cooks potentially wrote, so that failed cooks do not leave stale artifacts
-      * that can cascade into further failures (especially in CI/testing/agentic workflows) */
+    /** Removes an earlier cook's artifact, so that a failed cook leaves no stale output. */
     [[nodiscard]] virtual CookError RemoveArtifact(std::string_view artifact_name) = 0;
     [[nodiscard]] std::string_view Describe() const noexcept;
 protected:
@@ -64,7 +60,6 @@ public:
     [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::string_view content) override;
     [[nodiscard]] CookError WriteArtifact(std::string_view artifact_name, std::span<const std::byte> content) override;
     [[nodiscard]] CookError RemoveArtifact(std::string_view artifact_name) override;
-    /** Every companion artifact, keyed by name. The determinism check compares two cooks with it. */
     [[nodiscard]] const std::map<std::string, std::string>& GetArtifacts() const noexcept;
 
 private:

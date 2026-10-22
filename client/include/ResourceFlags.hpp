@@ -7,43 +7,26 @@
 #include <string_view>
 #include <utility>
 
-/**
- * @brief Velox's own vocabulary for resource creation parameters, deliberately independent of any
- * WebGPU header. This header is included by a lot of code, and would yank WebGPU and Dawn's headers
- * into every related TU. The conversion table is in ResourceFlagConversions.hpp, which is included
- * only by source files that actually manipulate resources.
- */
+/** @brief Resource creation vocabulary, independent of any WebGPU header so that it stays cheap to include. */
 namespace lodestone
 {
 
-/** @brief How a buffer may be used over its lifetime, declared at creation. Distinct from BufferBinding
- * in ResourceUsage.hpp, which describes what one subpass does with an already-created buffer - this is
- * the wider capability the resource is built with, and Compile() checks the latter against the former.
- */
+/** @brief The usages a buffer is created with, which bound every usage a pass may ask of it. */
 enum class BufferUsageFlags : uint16_t
 {
     Invalid = 0,
-    /** @brief Buffer may be mapped for CPU reads. Readback buffers only. Implies slow CPU-visible shared RAM */
+    /** @brief Readback buffers only: slow CPU-visible memory. */
     MapRead = 1 << 0,
-    /** @brief Buffer may be mapped for CPU writes. */
     MapWrite = 1 << 1,
-    /** @brief Buffer may be the source of a copy *command* (used to copy buffers on GPU timeline) */
     CopySource = 1 << 2,
-    /** @brief Buffer may be the destination of a copy or a queue write (on GPU timeline) */
     CopyDestination = 1 << 3,
-    /** @brief Buffer may be bound as index data for indexed draws. */
     Index = 1 << 4,
-    /** @brief Buffer may be bound as vertex data. */
     Vertex = 1 << 5,
-    /** @brief Buffer may be bound as a uniform block. This flag is often exclusive. */
     Uniform = 1 << 6,
-    /** @brief Buffer may be bound as a storage buffer */
     Storage = 1 << 7,
-    /** @brief Buffer may supply indirect draw or dispatch parameters. */
     Indirect = 1 << 8,
-    /** @brief Buffer may receive resolved query set results. */
     QueryResolve = 1 << 9,
-    // AllCpuAccess and AllGpuTransfer are distinct because WebGPU clearly separates these concepts
+    // WebGPU separates these two
     AllCpuAccess = MapRead | MapWrite,
     AllGpuTransfer = CopySource | CopyDestination,
     AllGeometry = Index | Vertex,
@@ -52,22 +35,15 @@ enum class BufferUsageFlags : uint16_t
 
 MAKE_ENUM_CLASS_FLAGS(BufferUsageFlags);
 
-/**@brief How a texture may be used over its lifetime, declared at creation.
- * @note Sampled and Storage are named for what the shader does rather than for the binding type
- */
+/** @brief The usages a texture is created with. Sampled and Storage name what the shader does. */
 enum class TextureUsageFlags : uint16_t
 {
     Invalid = 0,
-    /** @brief Texture may be the source of a copy command. */
     CopySource = 1 << 0,
-    /** @brief Texture may be the destination of a copy or a queue write. */
     CopyDestination = 1 << 1,
-    /** @brief Texture may be sampled, with filtering, through a sampler. */
     Sampled = 1 << 2,
-    /** @brief Texture may be bound as a storage texture for direct loads and stores.
-     * @note This has a restricted format list and is just raw load/store */
+    /** @brief Raw loads and stores, with a restricted format list. */
     Storage = 1 << 3,
-    /** @brief Texture may be bound as a color, depth, or stencil attachment. */
     RenderAttachment = 1 << 4,
 
     AllTransfer = CopySource | CopyDestination,
@@ -76,10 +52,8 @@ enum class TextureUsageFlags : uint16_t
 
 MAKE_ENUM_CLASS_FLAGS(TextureUsageFlags);
 
-/** @brief How a buffer is used outside of its shader bindings, as the shader author declares it with
- * `[ls_resource_role("...")]`. A binding already shows the uniform and storage usages, and the graph knows the copies
- * and the attachments, so a role states only a usage that neither of them shows. The cooker checks each role against
- * the binding kind and the element stride. */
+/** @brief Usages of a buffer outside of its shader bindings, from `[ls_resource_role("...")]`. The cooker checks each
+ * role against the binding kind and the element stride. */
 enum class ResourceRoleFlags : uint16_t
 {
     None = 0,
@@ -89,16 +63,14 @@ enum class ResourceRoleFlags : uint16_t
     IndirectDraw = 1u << 1u,
     /** @brief Arguments of an indirect indexed draw: five 4-byte values, 20 bytes. */
     IndirectDrawIndexed = 1u << 2u,
-    /** @brief Index data of an indexed draw, as 32-bit indices. */
+    /** @brief 32-bit indices. */
     IndexData = 1u << 3u,
-    /** @brief Vertex data of a draw. */
     VertexData = 1u << 4u,
     All = IndirectDispatch | IndirectDraw | IndirectDrawIndexed | IndexData | VertexData,
 };
 
 MAKE_ENUM_CLASS_FLAGS(ResourceRoleFlags);
 
-/** @brief The name of each role, as the shader writes it in `[ls_resource_role("...")]`. */
 inline constexpr std::array<std::pair<std::string_view, ResourceRoleFlags>, 5u> k_ResourceRoleNames{ {
     { "IndirectDispatch", ResourceRoleFlags::IndirectDispatch },
     { "IndirectDraw", ResourceRoleFlags::IndirectDraw },
@@ -107,7 +79,6 @@ inline constexpr std::array<std::pair<std::string_view, ResourceRoleFlags>, 5u> 
     { "VertexData", ResourceRoleFlags::VertexData },
 } };
 
-/** @brief The buffer usage that the roles add to a buffer's binding usage. */
 [[nodiscard]] constexpr BufferUsageFlags BufferUsageOfRoles(ResourceRoleFlags roles) noexcept
 {
     constexpr static ResourceRoleFlags k_IndirectRoles = ResourceRoleFlags::IndirectDispatch |
@@ -129,7 +100,7 @@ inline constexpr std::array<std::pair<std::string_view, ResourceRoleFlags>, 5u> 
     return usage;
 }
 
-/** @brief Velox specifically excludes many edge case formats: grow this list as needed. */
+/** @brief A curated format list: grow it as needed. */
 enum class TextureFormat : uint8_t
 {
     Invalid = 0,
@@ -162,8 +133,7 @@ enum class TextureFormat : uint8_t
     Depth32Float
 };
 
-/** @brief The dimensionality a texture is *allocated* with. Array textures, for example 
- *  are allocated as 2D textures with multiple array layers, not as 3D textures. */
+/** @brief The allocated dimension: an array texture is 2D with layers. */
 enum class TextureDimension : uint8_t
 {
     Invalid = 0,
@@ -172,8 +142,7 @@ enum class TextureDimension : uint8_t
     Texture3D
 };
 
-/**@brief How a texture is interpreted by a shader binding. Reflected from the shader, as the CPU
- * should not care about the view dimension. */
+/** @brief How a binding views a texture, reflected from the shader. */
 enum class TextureViewDimension : uint8_t
 {
     Invalid = 0,

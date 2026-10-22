@@ -13,17 +13,14 @@
 #include <span>
 #include <string_view>
 
-/**
- * @brief The views over one variant and its entry points: resources, layouts, and merged pipeline layouts. Each
- * view points at its `EnvironmentView`, which `ShaderManifest.hpp` declares. Include that header.
- */
+/** @brief Views over one variant, its entry points, and merged pipeline layouts. */
 namespace lodestone::manifest
 {
 
 class ModuleView;
 class EnvironmentView;
 
-/** One member of a uniform block. Use it to check that a CPU struct matches the shader layout. */
+/** One member of a uniform block, to check a CPU struct against the shader layout. */
 class UniformMemberView
 {
 public:
@@ -42,7 +39,6 @@ private:
     const UniformMember* record{ nullptr };
 };
 
-/** The members of one uniform block, in declaration order. Empty for every other binding kind. */
 class UniformMemberRange
 {
 public:
@@ -110,9 +106,7 @@ private:
     std::span<const UniformMember> members;
 };
 
-/** A resource as seen by one entry point: its binding record and its footprint.
- * @note Views point into their `EnvironmentView`, so keep that environment alive and do not move it
- * while a view exists. */
+/** A binding record and its footprint, as one entry point sees them. Keep the `EnvironmentView` alive and unmoved. */
 class ResolvedResource
 {
 public:
@@ -124,38 +118,28 @@ public:
     [[nodiscard]] ResourceShape Shape() const noexcept;
     [[nodiscard]] ResourceAccess Access() const noexcept;
     [[nodiscard]] TextureFormat StorageFormat() const noexcept;
-    /** @brief How a shader reads a sampled texture. Invalid for every other resource. */
     [[nodiscard]] TextureSampleType SampleType() const noexcept;
     [[nodiscard]] bool IsComparisonSampler() const noexcept;
-    /** @brief The size of one structured buffer element, in bytes. Zero for a texture or a sampler. */
     [[nodiscard]] uint32_t ElementStride() const noexcept;
     [[nodiscard]] uint32_t ArrayCount() const noexcept;
-    /** @brief The size of a uniform block, in bytes. Zero for every other binding kind. */
     [[nodiscard]] uint64_t ByteSize() const noexcept;
-    /** @brief The element count from `[ls_element_count]`, for this variant. Zero when the shader does not
-     * declare one, or when the resource has no footprint. In that case, the caller must provide the size. */
+    /** @brief `[ls_element_count]` for this variant. Zero when not declared, and the caller supplies the size. */
     [[nodiscard]] uint64_t ElementCount() const noexcept;
-    /** @brief The texture extent from `[ls_extent_1d]`, `[ls_extent_2d]`, or `[ls_extent_3d]`. Zero when the shader does not
-     * declare one, or when the resource has no footprint. In that case, the caller must provide the size. */
+    /** @brief `[ls_extent_*]` for this variant. Zero when not declared, and the caller supplies the size. */
     [[nodiscard]] uint32_t ExtentX() const noexcept;
     [[nodiscard]] uint32_t ExtentY() const noexcept;
     [[nodiscard]] uint32_t ExtentZ() const noexcept;
     [[nodiscard]] UniformMemberRange Members() const noexcept;
-    /** @brief The roles from `[ls_resource_role]`: usages of a buffer outside of its shader bindings. */
+    /** @brief `[ls_resource_role]`: usages of a buffer outside of its shader bindings. */
     [[nodiscard]] ResourceRoleFlags Roles() const noexcept;
-    /** @brief The count of tags from `[ls_resource_tags]`. */
     [[nodiscard]] uint32_t TagCount() const noexcept;
-    /** @brief One tag, in the order of the tags' text. */
     [[nodiscard]] std::string_view Tag(uint32_t position) const noexcept;
     [[nodiscard]] bool HasTag(std::string_view tag) const noexcept;
-    /** @brief The usage a buffer needs at creation for its binding kind and its roles. Copy and map usages are not
-     * included: the graph knows them. `Invalid` for a resource that is not a uniform or storage buffer. */
+    /** @brief The creation usage of the binding kind and the roles. Copies and maps belong to the graph. */
     [[nodiscard]] BufferUsageFlags RequiredBufferUsage() const noexcept;
-    /** @brief The axes that change this resource's element count or extent in its environment, in the word layout of
-     * `EnvironmentView::AxisMask`. A size that no axis changes has an empty mask. */
+    /** @brief The axes that change the element count or extent, in the word layout of `EnvironmentView::AxisMask`. */
     [[nodiscard]] std::span<const uint64_t> FootprintAxes() const noexcept;
     [[nodiscard]] bool IsFootprintAxis(uint32_t local_axis) const noexcept;
-    /** @brief The position of the binding record in `EnvironmentView::Bindings()`. */
     [[nodiscard]] uint32_t Index() const noexcept;
     [[nodiscard]] const Binding& Record() const noexcept;
     /** @brief Null when the footprint list is shorter than the resource list. */
@@ -172,44 +156,36 @@ private:
     const Footprint* footprint{ nullptr };
 };
 
-/** Where the value of one creation field comes from. */
 enum class CreationSource : uint8_t
 {
-    /** The binding kind has no such field. */
     NotApplicable = 0,
-    /** The shader fixes the value, and no axis changes it. */
+    /** Fixed by the shader for every variant. */
     Shader,
-    /** The shader fixes the value for each variant, and the axes in `ResolvedResource::FootprintAxes` change it. */
+    /** Fixed for each variant, and changed by `ResolvedResource::FootprintAxes`. */
     ShaderPerVariant,
-    /** The shader does not state the value, so the renderer must supply it. */
+    /** The renderer supplies the value. */
     Cpu,
 };
 
-/** The source of each field that a renderer needs to create the resource of one binding. A resource with no `Cpu`
- * field is complete: the manifest gives every value, and the graph needs no code for it. */
+/** Where each creation field of a resource comes from. A resource with no `Cpu` field is complete. */
 struct CreationFields
 {
-    /** A buffer's size: the byte size of a uniform block, or the element count of a storage buffer. */
     CreationSource Size{ CreationSource::NotApplicable };
     CreationSource Usage{ CreationSource::NotApplicable };
-    /** A texture's dimension (1D, 2D, 3D, or cube). */
     CreationSource Dimension{ CreationSource::NotApplicable };
     CreationSource Format{ CreationSource::NotApplicable };
     CreationSource Extent{ CreationSource::NotApplicable };
     CreationSource ArrayLayers{ CreationSource::NotApplicable };
     CreationSource MipLevels{ CreationSource::NotApplicable };
     CreationSource SampleCount{ CreationSource::NotApplicable };
-    /** A sampler's filters and address modes. Whether it compares is fixed by the shader. */
+    /** Filters and address modes. Comparison is fixed by the shader. */
     CreationSource SamplerState{ CreationSource::NotApplicable };
 
     [[nodiscard]] bool IsComplete() const noexcept;
 };
 
-/** @brief Returns the source of each creation field of one resource. It reads only what the manifest stores: the
- * binding kind and shape, the storage format, the footprint, the roles, and the footprint axes. */
 [[nodiscard]] CreationFields DescribeCreation(const ResolvedResource& resource) noexcept;
 
-/** One texture and one sampler that a pipeline samples together, and the stages that sample them. */
 struct MergedSamplerTexturePair
 {
     ResolvedResource Texture;
@@ -217,32 +193,28 @@ struct MergedSamplerTexturePair
     ShaderStageKind Stages{ ShaderStageKind::Invalid };
 };
 
-/** One resource of a merged layout, and the stages that use it. */
 struct MergedResource
 {
-    /** The view of the first stage that reads the resource, in the order given to `Merge`. */
+    /** The view of the first stage given to `Merge` that reads the resource. */
     ResolvedResource Resource;
     ShaderStageKind Stages{ ShaderStageKind::Invalid };
 };
 
-/** The resources used by one entry point of one variant, in placement order. `EnvironmentView::Open`
- * validates this order: Bound resources come first, in strictly ascending (group, binding) order. */
+/** The resources one entry point reads, in placement order, which `EnvironmentView::Open` checks. */
 class LayoutRange
 {
 public:
-    /** An empty range. This is used by `MergedLayoutView`, which stores a fixed array of ranges. */
     LayoutRange() noexcept = default;
 
     class Iterator
     {
     public:
-        // std::ranges::range needs a default constructor: end() must be semiregular.
+        // end() must be semiregular
         Iterator() noexcept = default;
         explicit Iterator(const LayoutRange* _range, uint32_t _position) noexcept
             : range(_range), position(_position) {}
 
-        // contiguous iterator is not a valid tag, because this is a 
-        // a proxy iterator that returns ResolvedResource by value, not by reference.
+        // a proxy iterator: it returns ResolvedResource by value
         using iterator_concept = std::input_iterator_tag;
         using iterator_category = std::input_iterator_tag;
         using difference_type = std::ptrdiff_t;
@@ -250,13 +222,9 @@ public:
         using pointer = value_type*;
         using reference = value_type&;
 
-        // because ResolvedResource is always returned by value, operator-> is strictly invalid
-        // and we need to make sure it's not possible to make this iterator return an address
-        // of a temporary ResolvedResource
+        // the value is a temporary, so there is no address to return
         void* operator->() const noexcept = delete;
 
-        // these are all defined in the header to aid with inlining/lto across 
-        // translation units, since they're more likely to be hot
 
         [[nodiscard]] ResolvedResource operator*() const noexcept
         {
@@ -329,17 +297,15 @@ private:
     std::span<const Footprint> footprints;
 };
 
-/** The entry point constants of one entry point instance: its `uniform` parameters of ordinary data, in the layout
- * of the environment's target. The delivery tells a renderer how to supply the data: a buffer write for
- * `UniformBuffer`, or a push constant range from offset 0 for `PushConstant`. */
+/** The entry point constants of one instance. `UniformBuffer`: write a buffer. `PushConstant`: declare a range
+ * from offset 0. */
 class EntryPointConstantsView
 {
 public:
     [[nodiscard]] EntryPointConstantsDelivery Delivery() const noexcept;
     [[nodiscard]] uint32_t ByteSize() const noexcept;
     [[nodiscard]] UniformMemberRange Members() const noexcept;
-    /** @brief The position in the instance's `Layout()` of the uniform buffer that contains the data. Only for the
-     * `UniformBuffer` delivery. */
+    /** @brief The position of the uniform buffer in `Layout()`. Only for `UniformBuffer`. */
     [[nodiscard]] uint32_t BindingPosition() const noexcept;
     [[nodiscard]] const EntryPointConstants& Record() const noexcept;
 
@@ -350,27 +316,26 @@ private:
     const EntryPointConstants* record{ nullptr };
 };
 
-/** One entry point of one variant.
- * @note Iterators point into their range, so keep the range returned by `Layout()` alive while iterating. */
+/** One entry point of one variant. Keep the range from `Layout()` alive while iterating. */
 class EntryPointInstanceView
 {
 public:
-    /** @brief The WGSL text. Only for a `Wgsl` profile. */
     [[nodiscard]] std::string_view Source() const noexcept;
-    /** @brief The SPIR-V words. Only for a `Spirv` profile. */
     [[nodiscard]] std::span<const uint32_t> SpirvWords() const noexcept;
     [[nodiscard]] ShaderStageKind Stage() const noexcept;
     [[nodiscard]] WorkgroupSize Workgroup() const noexcept;
+    /** @brief Zero for stages other than compute. */
+    [[nodiscard]] uint32_t WorkgroupMemoryBytes() const noexcept;
+    /** @brief The capabilities the code needs, over `EnvironmentView::CapabilityNames()`. */
+    [[nodiscard]] std::span<const uint64_t> RequiredCapabilities() const noexcept;
+    [[nodiscard]] bool RequiresCapability(uint32_t capability_index) const noexcept;
     [[nodiscard]] LayoutRange Layout() const noexcept;
-    /** @brief The textures and samplers this entry point samples together, sorted. Each pair stores two positions
-     * in `Layout()`. Empty when the profile did not record pairs (`EnvironmentView::HasSamplerTexturePairs`). */
+    /** @brief Sorted pairs of positions in `Layout()`. Empty when the profile did not record pairs. */
     [[nodiscard]] std::span<const SamplerTexturePair> SamplerTexturePairs() const noexcept;
-    /** @brief The `uniform` parameters of ordinary data. The delivery is `None` when the entry point reads none. */
     [[nodiscard]] EntryPointConstantsView Constants() const noexcept;
     //[[nodiscard]] RasterView Raster() const noexcept;
     [[nodiscard]] uint32_t Raster() const noexcept;
     [[nodiscard]] const EntryPointInstance& Record() const noexcept;
-    /** @brief The environment this instance belongs to. */
     [[nodiscard]] const EnvironmentView& Environment() const noexcept;
 
 private:
@@ -382,11 +347,9 @@ private:
     const EnvironmentView* environment{ nullptr };
     const EntryPointInstance* entryPointInstance{ nullptr };
     const Variant* variant{ nullptr };
-    // the position of the entry point in the module, which gives the stage
     uint32_t entryPoint{ 0u };
 };
 
-/** One variant of one environment. */
 class VariantView
 {
 public:
@@ -405,39 +368,26 @@ private:
     uint32_t index{};
 };
 
-/** The push constant block of one pipeline. Slang puts the block of each stage at offset 0, so the blocks of
- * the stages overlap, and each byte has one meaning for all stages. `Constants` is the block of the stage
- * with the largest byte size. A renderer declares one push constant range from offset 0, with that byte size
- * and with `Stages`. */
+/** The push constant block of a pipeline: the largest stage block, since every stage puts its block at offset 0.
+ * Declare one range from offset 0 with this size and `Stages`. */
 struct MergedPushConstants
 {
     EntryPointConstantsView Constants;
     ShaderStageKind Stages{ ShaderStageKind::Invalid };
 };
 
-/** @brief The merged resources of the entry point instances of one pipeline, in placement order.
- *
- * Pipeline layouts need each resource once, with every stage that reads it. `Merge` takes one instance
- * for each stage and validates every shared placement once, so that iteration afterwards runs unchecked.
- * Iteration returns one `MergedResource` for each (group, binding). Each change of group in the sequence
- * marks the start of the next bind group layout (or descriptor set layout).
- *
- * The instances can come from different variants, modules, or environments.
- * @note This view points into the environments of its instances, so keep them alive and do not move
- * them. Iterators point into the view, so keep the view alive while iterating. */
+/** @brief Each resource of one pipeline once, with the stages that read it, in placement order. A change of group
+ * starts the next bind group layout. Keep the instances' environments and this view alive and unmoved. */
 class MergedLayoutView
 {
 public:
-    // over what we'll actually need, but keeps things nicely rounded
     static constexpr uint32_t k_MaxPipelineStages = 8u;
 
     class Iterator
     {
     public:
-        // std::ranges::range needs a default constructor
         Iterator() noexcept = default;
 
-        // a proxy iterator, as LayoutRange::Iterator is: it returns MergedResource by value
         using iterator_concept = std::input_iterator_tag;
         using iterator_category = std::input_iterator_tag;
         using difference_type = std::ptrdiff_t;
@@ -458,24 +408,13 @@ public:
         Iterator(const MergedLayoutView* _layout,
                  const std::array<uint32_t, k_MaxPipelineStages>& _positions) noexcept;
         const MergedLayoutView* layout{ nullptr };
-        // one position for each stage's range; a stage at the end of its range has position == size
+        // a stage at the end of its range has position == size
         std::array<uint32_t, k_MaxPipelineStages> positions{};
     };
 
-    /** @brief Merges the layouts of one pipeline's entry point instances, one instance for each stage.
-     *
-     * Fails when:
-     * - there are more than `k_MaxPipelineStages` instances (`MergedLayoutTooManyStages`)
-     * - two instances have the same stage (`MergedLayoutDuplicateStage`)
-     * - a resource is not Bound (`MergedLayoutPlacementUnsupported`) (other binding/layout forms coming later)
-     * - two resources at one (group, binding) differ in kind, shape, access, storage format, sample type,
-     *   comparison, array count, byte size, roles, or tags (`MergedLayoutConflict`). Names are not compared.
-     * - two push constant blocks differ where they overlap (`MergedLayoutPushConstantConflict`): the members of
-     *   the shorter block must be the first members of the longer block, with the same offset, size, array
-     *   count, element stride, and matrix layout. Names are not compared.
-     *
-     * On failure, `RecordIndex` stores the index of the binding record, and `Detail` stores the position of
-     * the instance. */
+    /** @brief Merges one instance for each stage, checking each shared placement once. Fails on too many stages, a
+     * repeated stage, a placement that is not Bound, resources at one placement that differ in anything but name, or
+     * push constant blocks that differ where they overlap. `RecordIndex` is the binding, `Detail` the instance. */
     [[nodiscard]] static ManifestResult<MergedLayoutView> Merge(
         std::span<const EntryPointInstanceView> entry_points) noexcept;
 
@@ -483,10 +422,7 @@ public:
     [[nodiscard]] Iterator end() const noexcept;
     [[nodiscard]] uint32_t StageCount() const noexcept;
 
-    /** The union of the sampler and texture pairs of every stage. Each (texture, sampler) placement appears
-     * once, with every stage that samples it. This is the input of the WebGPU layout rule: a sampler paired with a
-     * texture that cannot filter must be non-filtering, and a texture paired with a filtering sampler must be
-     * filterable. A Vulkan renderer can use it to check a format's filter support before it binds. */
+    /** Each placement pair of every stage once. WebGPU needs it for the filtering rule of samplers and textures. */
     class PairIterator
     {
     public:
@@ -510,7 +446,6 @@ public:
     private:
         friend class MergedLayoutView;
         PairIterator(const MergedLayoutView* _layout, uint32_t _stage, uint32_t _pair) noexcept;
-        // moves forward to the first pair that no earlier stage has, or to the end
         void skipRepeats() noexcept;
         const MergedLayoutView* layout{ nullptr };
         uint32_t stage{ 0u };
@@ -529,13 +464,11 @@ public:
         const MergedLayoutView* layout{ nullptr };
     };
 
-    /** @brief The pairs of every stage, each placement pair once. Keep the view alive while iterating. */
     [[nodiscard]] PairRange SamplerTexturePairs() const noexcept;
-    /** @brief True when the profile of every stage recorded its pairs, so the union is complete. */
+    /** @brief True when every stage's profile recorded its pairs. */
     [[nodiscard]] bool HasSamplerTexturePairs() const noexcept;
 
-    /** @brief The push constant block of the pipeline. Empty when no stage has the `PushConstant` delivery. A
-     * `UniformBuffer` delivery is a resource in the merged layout, so it is not here. */
+    /** @brief Empty when no stage uses `PushConstant`. A uniform buffer delivery is a resource of the layout. */
     [[nodiscard]] std::optional<MergedPushConstants> PushConstants() const noexcept;
 
 private:

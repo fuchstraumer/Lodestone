@@ -14,13 +14,17 @@ fixed, remove it; when a task is done, add one line to section 7 and remove its 
 
 ## 1. State on 2026-10-21
 
-- RelWithDebInfo, `ninja-msvc`: build green, 29 of 29 tests, 60 of 60 known-good dumps.
+- RelWithDebInfo, `ninja-msvc`: build green, 30 of 30 tests, 60 of 60 known-good dumps.
 - Debug: do not run it unattended (section 2, item 2).
-- Manifest format version 12. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
+- Manifest format version 14. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
 - Phases D and E are complete. Phase F is paused after F1 (two Bound targets, `wgsl` and `spirv`).
 - **The current work is the VeloxRhi rendergraph tasks**: `docs/rendergraph-integration-tasks.md`. R1 and R2 are
-  done, and L17 and L18 of R3. Open: L5 and L6 (device features, with phase F), L16 (the resource report), L11
-  (optional dispatch extent).
+  done, and L16, L17, and L18 of R3. L6 is closed (presets cover it). L5 is phase F slice F3: F3.1 and F3.2 are done
+  (format 14). **Next: F3.3** (cross-profile validators for workgroup bytes and the portable capabilities), then F3.4
+  (the device filter), then F3.5. `docs/phase-f-plan.md` F3 has the design. Also open: L11 (optional dispatch extent)
+  and a JSON writer for the resource report.
+- **Comments are compressed** (2026-10-21). Write one-line comments by default. Technique explanations go to
+  `docs/code-notes.md`, which links to the code. Code never links to `docs/`.
 - **DiamondDogs** embeds Lodestone and sends requests in `docs/diamonddogs-requests.md`. Each row has a state.
   Do not edit the DiamondDogs tree: the author passes news to its agent.
 - **The author wants feature discipline.** A feature goes in only with a named consumer and a test that proves
@@ -36,10 +40,9 @@ Ordered by what can write wrong output first.
    the Debug tests one at a time, with a timeout, and skip `KitchenSinkCookTest`. The Debug trees in
    `build/ninja-msvc` and `build/ninja-msvc-nowgsl` were built from an old Slang: rebuild them before any Debug
    run, or their cooks poison the shared module cache.
-3. **The capability requirement is always zero.** `Profile::CapabilityFloor` and `Variant::CapabilityRequirement`
-   wait for a capability set (a bitmask over a string table of capability names; the author agreed to that
-   shape). Slang warning 41012 is off, so a variant can need a device capability and no cook states it. Phase F
-   steps F3.3 and F3.4 close this. Do not let them slip.
+3. **No client filters by capability yet.** Since format 14 each source states its capability names and workgroup
+   memory (F3.1, F3.2). Slang warning 41012 is off, so the device filter (F3.4) and the cross-checks (F3.3, F3.5)
+   are what make a missing device capability fail before a pipeline does. Do not let them slip.
 4. **Specialization constants are reserved, not cooked.** The table is always empty. Push constants are cooked
    since format 11.
 5. **The thread count is not tuned.** Each worker loads its own core module: KitchenSink commits 1.62 GB with 16
@@ -180,3 +183,7 @@ One line for each step. Git history holds the full text.
   (embedding) and C2 (`VulkanUseEntryPointName`). `ThreadPool` setup failures report and keep the thread
   (`WorkerSetupFailed`). Atomic artifact writes, and a cook removes the old manifest first. Both validators compare
   the storage texture format.
+- **2026-10-21 (late).** F3.1 and F3.2 (format 14): capability names and workgroup memory for each source, the
+  generated `VulkanCapabilityTable.hpp`, L6 closed without a device-bound axis.
+- **2026-10-21 (later).** L16 resource report (format 13, `ResourceReportTest`): footprint axis masks, `DescribeCreation`,
+  `ShaderLibrary.resources.txt`, validator `VerifyFootprintAxes`.

@@ -1,5 +1,3 @@
-/** The query builder and the query presets of `ShaderManifestIndex.hpp`. `ShaderManifestIndex.cpp` holds the index
- * that the builder scans. */
 #include "ShaderManifestIndex.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifest.hpp"
@@ -45,7 +43,7 @@ namespace
 
 std::string_view NearestName(std::string_view input, std::span<const std::string_view> candidates) noexcept
 {
-    // The distance budget follows clang and rust: one edit per three characters, and at least one.
+    // the budget clang and rust use
     const int32_t maxDistance = std::max<int32_t>(1, static_cast<int32_t>(input.size() / 3u));
     const std::vector<Suggestion> suggestions = FindSuggestions(input, candidates, maxDistance);
     return suggestions.empty() ? std::string_view{} : suggestions.front().Text;
@@ -57,8 +55,7 @@ ManifestQueryBuilder::ManifestQueryBuilder(const class ManifestIndex& _index) no
 
 ManifestQueryBuilder ManifestQueryBuilder::Where(std::string_view axis_name, bool value) const noexcept
 {
-    // A boolean axis is an integral axis with values {0, 1}, so store the boolean as its 0/1 integral
-    // and let it share the integral resolution and decode paths.
+    // a boolean axis shares the integral paths, with values {0, 1}
     QueryAxisValue newValue{ .Type = AxisValueDomain::Boolean, .IntegralValue = value ? 1u : 0u, .Name = {} };
     return whereAnyOf(axis_name, { newValue }, PinMode::Required);
 
@@ -109,7 +106,6 @@ ManifestQueryBuilder ManifestQueryBuilder::Apply(const QueryPreset& preset) cons
             continue;
         }
 
-        // the values point into the preset's strings, as the constraint's axis name does
         std::vector<QueryAxisValue> values;
         if (pin.Domain == AxisValueDomain::Type || pin.Domain == AxisValueDomain::Enum)
         {
@@ -128,7 +124,6 @@ ManifestQueryBuilder ManifestQueryBuilder::Apply(const QueryPreset& preset) cons
             }
         }
 
-        // resolve into `result` directly, so each pin does not copy the builder again
         const std::optional<uint32_t> axisIndex = resolveAndValidate(result, pin.AxisName, values);
         if (axisIndex)
         {
@@ -233,9 +228,6 @@ ManifestQueryBuilder ManifestQueryBuilder::WhereNoneOf(std::string_view axis_nam
 
 ManifestQueryBuilder ManifestQueryBuilder::WhereNoneOf(std::string_view axis_name, std::span<const uint32_t> values) const noexcept
 {
-    // All of the WhereNoneOf functions require a bit more work, as we have to first validate against
-    // the input set, then use it to construct the complement set for the WhereNoneOf constraint.
-    // this used to be worse before we added resolveAndValidate and insertConstraint helpers, though
     ManifestQueryBuilder result{ *this };
     auto buildAxisValue = [](uint32_t value) -> QueryAxisValue
     {
@@ -273,7 +265,6 @@ ManifestQueryBuilder ManifestQueryBuilder::WhereNoneOf(std::string_view axis_nam
 {
     ManifestQueryBuilder result{ *this };
     
-    // first, convert input_values to QueryAxisValue so we can validate against the inputs
     auto buildAxisValue = [domain](std::string_view value) -> QueryAxisValue
     {
         return QueryAxisValue{ .Type = domain, .IntegralValue = 0u, .Name = value };
@@ -290,7 +281,6 @@ ManifestQueryBuilder ManifestQueryBuilder::WhereNoneOf(std::string_view axis_nam
     }
 
     const uint32_t axisIndex = *axisIndexOpt;
-    // now construct the set compliment, using input_values/queryValues
     std::span<const AxisValueType> axisValues = index->axisValues[axisIndex];
     auto readStrTable = [&](const AxisValueType& axis_value) -> std::string_view
     {
@@ -300,7 +290,6 @@ ManifestQueryBuilder ManifestQueryBuilder::WhereNoneOf(std::string_view axis_nam
                                              std::views::transform(readStrTable) |
                                              std::views::transform(buildAxisValue) |
                                              std::ranges::to<std::vector>();
-    // complement is now all the possible values for this axis: remove the ones in queryValues
     auto isInQueryValues = [&](const QueryAxisValue& value) -> bool
     {
         return std::ranges::find(queryValues, value) != queryValues.end();
@@ -317,12 +306,9 @@ QueryResult<std::vector<VariantKey>> ManifestQueryBuilder::Keys() const noexcept
 {
     if (!errors.empty())
     {
-        // return the first error code, since that's probably the one that broke everything
         return std::unexpected(errors.front().Code);
     }
 
-    // the ManifestIndex Select() method takes QueryAxisRange values, and gives us
-    // back a vector of variant keys. We can just use that
     return index->select(constraints);
 }
 
@@ -335,7 +321,6 @@ QueryResult<std::vector<DecodedVariant>> ManifestQueryBuilder::Variants() const 
     }
     const std::vector<VariantKey>& keys = *keysResult;
 
-    // associate variants with their decoded representations
     std::vector<DecodedVariant> results;
     results.reserve(keys.size());
     for (const VariantKey key : keys)
@@ -359,7 +344,6 @@ std::vector<DecodedVariant> ManifestQueryBuilder::VariantsFromKeys(const std::ve
 
 std::expected<VariantKey, QueryError> ManifestQueryBuilder::Single() const noexcept
 {
-    // every axis counts, so two matches are always two answers
     const manifest::ModuleView& module = index->environment.Module();
     std::vector<uint64_t> allAxes(module.AxisMaskWordCount(), ~uint64_t{ 0u });
     return singleOver(allAxes);
@@ -393,7 +377,6 @@ std::expected<std::vector<uint64_t>, QueryError> ManifestQueryBuilder::joinRelev
     const manifest::ModuleView& module = environment.Module();
     const std::span<const manifest::EntryPoint> entryPoints = module.EntryPoints();
 
-    // a pipeline reads every axis that any of its stages reads, so the masks are joined
     std::vector<uint64_t> relevant(module.AxisMaskWordCount(), 0u);
     for (const std::string_view name : entry_point_names)
     {
@@ -471,7 +454,7 @@ std::expected<VariantKey, QueryError> ManifestQueryBuilder::singleOver(std::span
 {
     if (!errors.empty())
     {
-        // the whole first error, not only its code, so the suggestion reaches the caller
+        // the whole error, so the suggestion reaches the caller
         return std::unexpected(errors.front());
     }
 
@@ -485,7 +468,6 @@ std::expected<VariantKey, QueryError> ManifestQueryBuilder::singleOver(std::span
         return keys.front();
     }
 
-    // more than one match: name every relevant axis the caller must still pin
     const manifest::ModuleView& module = index->environment.Module();
     constexpr size_t k_WordBits = std::numeric_limits<decltype(relevant_axes)::value_type>::digits;
     std::string varyingNames;
@@ -505,9 +487,7 @@ std::expected<VariantKey, QueryError> ManifestQueryBuilder::singleOver(std::span
 
     if (varyingNames.empty())
     {
-        // the matches differ only in axes that cannot change the instances, so they are one answer. the
-        // smallest key keeps the answer the same from one call to the next
-        // (e.g, if you were retrieving a common prepass or shadow rendering pass that does not vary by these axes)
+        // the matches give the same instances. The smallest key keeps the answer stable between calls
         return std::ranges::min(keys);
     }
 
@@ -535,8 +515,6 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
                                                                  std::string_view axis_name,
                                                                  std::span<const QueryAxisValue> values) const
 {
-    // this exists mostly because there was a bunch of work duplicated between the where and wherenoneof
-    // functions, which otherwise differ enough by input contract that that we couldn't just reuse `whereAnyOf`
     auto indexIter = index->axisNameToIndex.find(axis_name);
     if (indexIter == index->axisNameToIndex.end())
     {
@@ -549,8 +527,6 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
         return std::nullopt;
     }
 
-    // check for values after at least confirming axis name is valid, since this will
-    // give user more information (and we try values.front() after this)
     if (values.empty())
     {
         result.errors.emplace_back(QueryErrorCode::EmptyConstraintSet,
@@ -560,7 +536,7 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
 
     const uint32_t axisIndex = indexIter->second;
     const manifest::Axis& axis = index->environment.Module().AxisData(axisIndex);
-    // just check front() (means one less passed function parameter, and values is homogenous by construction)
+    // values are homogeneous by construction
     if (values.front().Type != axis.Domain)
     {
         result.errors.emplace_back(QueryErrorCode::IncorrectValueDomain,
@@ -569,13 +545,10 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
         return std::nullopt;
     }
 
-    // Confirm the axis actually declares the requested value. A Boolean axis always contains both
-    // 0 and 1, so only Type and Integral/Enum axes need the lookup.
-    // we use just linear searches here bc the value vectors should, at MOST, be a dozen entries or so
+    // a boolean axis always declares 0 and 1. The value lists are short, so linear searches are fine
     if (axis.Domain == AxisValueDomain::Type || axis.Domain == AxisValueDomain::Enum)
     {
         const std::vector<std::string_view> axisValueNames = index->stringTableForAxis(axisIndex);
-        // create just a view, not vector, to avoid allocating a new container
         auto queryValueNames = values | std::views::transform(&QueryAxisValue::Name);
         for (const auto& queryValueName : queryValueNames)
         {
@@ -592,9 +565,7 @@ std::optional<uint32_t> ManifestQueryBuilder::resolveAndValidate(ManifestQueryBu
     else if (axis.Domain == AxisValueDomain::Integral)
     {
         std::span<const AxisValueType> axisValues = index->axisValues[axisIndex];
-        // same as above, extract a view of all values
         auto queryIntegralValues = values | std::views::transform(&QueryAxisValue::IntegralValue);
-        // make sure all values are in the axis values. both containers are sorted, use set_intersection logic
         for (const auto& queryValue : queryIntegralValues)
         {
             if (std::ranges::find(axisValues, queryValue) == axisValues.end())
@@ -619,15 +590,12 @@ void ManifestQueryBuilder::insertConstraint(std::string_view axis_name,
                                                    axis_index,
                                                    std::less<uint32_t>{},
                                                    &QueryAxisRange::AxisIndex);
-    // only quirk for lower_bound: it will give location where AxisIndex *could* be inserted
     if (constraintIter != constraints.end() &&
         constraintIter->AxisIndex == axis_index)
     {
         QueryAxisRange& constraint = *constraintIter;
-        // a duplicate value is harmless here. the callers that take user values note it first
         constraint.Values.append_range(allowed);
-        // (active and A) or (inactive or B) is (inactive or A or B): the union of a required and a
-        // when-active constraint is when-active over both value sets
+        // (active and A) or (inactive or B) is (inactive or A or B)
         if (mode == PinMode::WhenActive)
         {
             constraint.Mode = PinMode::WhenActive;
@@ -635,7 +603,6 @@ void ManifestQueryBuilder::insertConstraint(std::string_view axis_name,
     }
     else
     {
-        // insert a new constraint at the position indicated by lower_bound, which keeps it sorted
         constraints.insert(constraintIter,
             QueryAxisRange{ axis_name, std::move(allowed), axis_index, mode });
     }
@@ -646,7 +613,6 @@ ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name
                                                      PinMode mode) const noexcept
 {
     ManifestQueryBuilder result{ *this };
-    // this adds errors to result, but otherwise doesn't modify constraints
     std::optional<uint32_t> axisIndexOpt = resolveAndValidate(result, axis_name, values);
     if (!axisIndexOpt)
     {

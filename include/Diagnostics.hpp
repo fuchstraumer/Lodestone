@@ -8,23 +8,12 @@
 #include <string_view>
 #include <vector>
 
-/** A diagnostic is a record, and a sink decides what becomes of it. 
- *
- * So the boundary parses, and everything after the boundary reports. **A stage must never format a
- * diagnostic string.** It fills a record and hands the record to a sink.
- *
- * The record takes its shape from the Language Server Protocol `Diagnostic` type: a range, a
- * severity, a code, a message, and related information. Editors already read that shape, so a future
- * language server needs a translation and not a redesign.
- *
- * `SlangDiagnosticParser.hpp` is where the compiler's own format is understood, and it understands it as
- * text. */
+/** Diagnostics are records shaped like the LSP `Diagnostic`, and a sink decides what becomes of them. Stages never
+ * format a diagnostic string. */
 namespace lodestone
 {
 
-/**@brief The translated severity from Slang -> LSP.
- * @note `Fatal` has no direct LSP equivalent, but indicates a full compiler loss or crash
- */
+/** @brief Slang severity mapped to LSP. `Fatal` has no LSP equivalent. */
 enum class DiagnosticSeverity : uint8_t
 {
     Invalid = 0,
@@ -36,14 +25,9 @@ enum class DiagnosticSeverity : uint8_t
 
 std::string_view ToString(DiagnosticSeverity severity) noexcept;
 
-/**@brief True for a severity that must fail the cook. */
 bool IsFailure(DiagnosticSeverity severity) noexcept;
 
-/**@brief A half-open range of source, one based in both axes, as the compiler reports it.
- *
- * Zero in every field means the message names no location. That is a real answer and not a missing
- * one: "compilation ceased" belongs to no line. LSP has no way to say it, so a translation to LSP
- * has to invent a location, and this type keeps the truth until then. */
+/** @brief A half-open source range, one-based. All zeros means no location, such as "compilation ceased". */
 struct SourceRange
 {
     int32_t StartLine{ 0 };
@@ -54,14 +38,9 @@ struct SourceRange
     friend bool operator==(const SourceRange&, const SourceRange&) = default;
 };
 
-/** True when the range names a place in a file. */
 bool HasLocation(const SourceRange& range) noexcept;
 
-/** One extra place the compiler wants the reader to look. LSP calls this `relatedInformation`.
- *
- * Slang attaches these to a primary message: the span that carries the detailed wording, another
- * span that points at a conflicting declaration, and a note that explains a substitution. They are
- * not diagnostics of their own, and counting them as such would report one error several times. */
+/** LSP `relatedInformation`. Not a diagnostic of its own, so one error is not counted several times. */
 struct DiagnosticNote
 {
     std::string File;
@@ -72,19 +51,16 @@ struct DiagnosticNote
 struct Diagnostic
 {
     DiagnosticSeverity Severity{ DiagnosticSeverity::Invalid };
-    /** The compiler's own identifier, such as `E30015` */
+    /** Such as `E30015`. */
     std::string Code;
     std::string File;
     SourceRange Range;
     std::string Message;
-    /** `Context` is which part of our code produced this report. */
+    /** The part of our code that produced this report. */
     std::string Context;
     std::vector<DiagnosticNote> Related;
 };
 
-/**@brief Where a diagnostic output goes. Only one method on purpose,
- * as this is intended to be nothing but a data-forwarding class.
- */
 class DiagnosticSink
 {
 public:
@@ -99,24 +75,20 @@ public:
     virtual void Report(Diagnostic&& diagnostic) = 0;
 };
 
-/**@brief Writes each record to `stderr`.
- * @note Currently no suppression switch - `--quiet` turns off internal per-variant reflection reports,
- * not this. A message from Slang is not our message to withhold.
- */
+/** @brief `--quiet` does not silence this: a message from Slang is not ours to withhold. */
 class StderrDiagnosticSink final : public DiagnosticSink
 {
 public:
     void Report(const Diagnostic& diagnostic) override;
     void Report(Diagnostic&& diagnostic) override;
 
-    /**@brief Cumulative failure count over the whole cook */
     [[nodiscard]] int32_t FailureCount() const noexcept;
 
 private:
     int32_t failureCount{ 0 };
 };
 
-/**@brief Same as `stderr`: not filtering or withholding. Used by tests to capture and persist diagnostics. */
+/** @brief For tests. */
 class RecordingDiagnosticSink final : public DiagnosticSink
 {
 public:

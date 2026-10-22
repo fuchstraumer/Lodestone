@@ -49,7 +49,7 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input) cons
     result.Options = std::move(input);
     result.Diagnostics = std::make_unique<StderrDiagnosticSink>();
 
-    // gonna reuse this for a few steps, whenever we touch the filesystem (the third rail)
+    // reused whenever we touch the filesystem (the third rail)
     std::error_code filesystemError;
 
     if (result.Options.ModuleCacheDirectory.empty())
@@ -79,7 +79,6 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input) cons
                                      std::unexpected(CookError::DirectoryDoesNotExist);
         }
 
-        // convert to a string because TOML++ takes a string path rather than a std::filesystem::path
         std::string policyFilePathStr = policyFilePath.string();
         PolicyDocResult<PolicyDocument> policyDocResult = PolicyDocument::Load(policyFilePathStr);
         if (!policyDocResult)
@@ -103,10 +102,8 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input) cons
             result.Diagnostics->Report(std::move(policyDiag));
             return std::unexpected(CookError::PolicyDocumentLoadFailed);
         }
-        // remember, to move properly from expected, dereference the result
         result.Policy = std::move(*policyDocResult);
 
-        // validate policy target names against input (from options) target names
         std::span<const std::string_view> targetProfileNames = GetTargetProfileNames();
         CookError validateTargetsError = result.Policy.ValidateTargetNames(targetProfileNames, *result.Diagnostics);
         if (!validateTargetsError)
@@ -115,7 +112,6 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input) cons
         }
     }
 
-    // sanity check: do all the module paths exist?
     for (const std::filesystem::path& modulePath : result.Options.ModulePaths)
     {
         if (!std::filesystem::exists(modulePath, filesystemError))
@@ -129,7 +125,6 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input) cons
         }
     }
 
-    // now get target profiles for all targets in this cook
     for (const std::string& targetName : result.Options.TargetNames)
     {
         CookResult<TargetProfile> targetResult = FindTargetProfile(targetName);

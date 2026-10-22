@@ -18,14 +18,7 @@
 #include <string_view>
 #include <vector>
 
-// The SPIR-V twin of WgslValidatorTest. The cross-check compares reflection against what the emitted SPIR-V
-// declares. The emitted module decides the set and the binding. Reflection decides the kind, the shape, and
-// the access.
-//
-// The module is text: SPIR-V assembly, assembled in the test with the SPIRV-Tools assembler. It is Slang's
-// own output for `ShadeCS` in tests/assets/EntryPointParams.slang (spirv-dis, 2026-09-28), with the function
-// body kept, so spirv-val accepts it. Each row edits one word of the text or one field of the reflection, so
-// each row changes one fact against a known match.
+// Slang's own output for `ShadeCS` in EntryPointParams.slang, as assembly. Each row changes one fact.
 
 using lodestone::BindingComparison;
 using lodestone::BindingKind;
@@ -270,7 +263,46 @@ constexpr std::string_view k_StorageImageCs = R"(
                OpFunctionEnd
 )";
 
-/** What Slang's reflection says about `ShadeCS`. The scope is `entryPointParams` on the two parameters. */
+// workgroup variables that pad differently: 64 + 32 + 16 + 32 = 144, as in WgslValidatorTest
+constexpr std::string_view k_WorkgroupCs = R"(
+               OpCapability Shader
+               OpCapability Float16
+               OpCapability StorageUniform16
+               OpExtension "SPV_KHR_16bit_storage"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %MainCS "MainCS" %g_vec3 %g_struct %g_floats %g_half
+               OpExecutionMode %MainCS LocalSize 64 1 1
+               OpName %g_vec3 "g_vec3"
+               OpName %g_struct "g_struct"
+               OpName %g_floats "g_floats"
+               OpName %g_half "g_half"
+       %void = OpTypeVoid
+     %fnVoid = OpTypeFunction %void
+      %float = OpTypeFloat 32
+       %half = OpTypeFloat 16
+       %uint = OpTypeInt 32 0
+     %uint_3 = OpConstant %uint 3
+     %uint_4 = OpConstant %uint 4
+    %v3float = OpTypeVector %float 3
+     %v4half = OpTypeVector %half 4
+    %arrVec3 = OpTypeArray %v3float %uint_4
+    %structS = OpTypeStruct %float %v3float
+   %arrFloat = OpTypeArray %float %uint_3
+   %arrHalf4 = OpTypeArray %v4half %uint_3
+    %ptrVec3 = OpTypePointer Workgroup %arrVec3
+  %ptrStruct = OpTypePointer Workgroup %structS
+   %ptrFloat = OpTypePointer Workgroup %arrFloat
+    %ptrHalf = OpTypePointer Workgroup %arrHalf4
+     %g_vec3 = OpVariable %ptrVec3 Workgroup
+   %g_struct = OpVariable %ptrStruct Workgroup
+   %g_floats = OpVariable %ptrFloat Workgroup
+     %g_half = OpVariable %ptrHalf Workgroup
+     %MainCS = OpFunction %void None %fnVoid
+      %entry = OpLabel
+               OpReturn
+               OpFunctionEnd
+)";
+
 std::vector<ReflectedBinding> MakeAgreeingReflection()
 {
     std::vector<ReflectedBinding> reflected;
@@ -326,7 +358,7 @@ int main()
     runner.Check(match.has_value(), "valid SPIR-V and agreeing reflection produce a result, not an error");
     runner.Check(match.has_value() && match->Matches, "reflection that agrees with the module passes");
     runner.Check(match.has_value() && match->Report.empty(), "a passing comparison reports nothing");
-    runner.Check(match.has_value() && std::ranges::contains(match->Capabilities, std::string{ "Shader" }),
+    runner.Check(match.has_value() && std::ranges::contains(match->Emitted.CapabilityNames, std::string{ "Shader" }),
                  "the capabilities of the module read back");
 
     // The pairs are cook output. `ShadeCS` loads the texture and the sampler, combines them with
@@ -451,9 +483,7 @@ int main()
     runner.Check(extentOf(Replace(large, "%EntryPointParams_std430 2 Offset 128", "%EntryPointParams_std430 2 Offset 200")) ==
                      216u,
                  "the extent reads the member offsets, so a gap before the last member counts");
-    // a matrix of 2 columns of float4 is 4 rows of 2 floats. RowMajor puts a row at each stride: 3 * 16 + 2 * 4 = 56.
-    // ColMajor puts a column at each stride: 1 * 16 + 4 * 4 = 32. The read path skips spirv-val, so the function body
-    // need not agree with the narrower type
+    // 2 columns of float4: RowMajor 3 * 16 + 2 * 4 = 56, ColMajor 1 * 16 + 4 * 4 = 32
     const std::string twoColumns = Replace(Replace(large, "%mat4v4float = OpTypeMatrix %v4float 4", "%mat4v4float = OpTypeMatrix %v4float 2"),
                                            "%EntryPointParams_std430 2 Offset 128",
                                            "%EntryPointParams_std430 2 Offset 0");
@@ -461,6 +491,20 @@ int main()
     runner.Check(extentOf(Replace(twoColumns, "%EntryPointParams_std430 1 RowMajor", "%EntryPointParams_std430 1 ColMajor")) ==
                      64u + 32u,
                  "a ColMajor matrix strides its columns");
+
+    runner.BeginSection("the capability names and the workgroup memory come from the module");
+    const std::vector<std::byte> workgroupCs = Assemble(k_WorkgroupCs);
+    runner.Check(!workgroupCs.empty(), "the workgroup fixture assembles");
+    const CookResult<EmittedCodeFacts> workgroupFacts = validator.ReadEmittedCodeFacts(workgroupCs, sink);
+    runner.Check(workgroupFacts.has_value(), "the read path reads the workgroup fixture");
+    runner.Check(workgroupFacts.has_value() &&
+                     workgroupFacts->CapabilityNames ==
+                         std::vector<std::string>{ "Float16", "SPV_KHR_16bit_storage", "Shader", "UniformAndStorageBuffer16BitAccess" },
+                 "each OpCapability and OpExtension reads back as a name, sorted, an alias by its primary name");
+    runner.Check(workgroupFacts.has_value() && workgroupFacts->WorkgroupMemoryBytes == 144u,
+                 "each workgroup variable counts RoundUp(16, std430 size): 64 + 32 + 16 + 32 bytes");
+    runner.Check(noPush.has_value() && noPush->WorkgroupMemoryBytes == 0u,
+                 "a module with no workgroup variable uses no workgroup memory");
 
     return runner.Report();
 }

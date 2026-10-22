@@ -57,7 +57,6 @@ CookError SlangCompiler::Initialize(SlangCompilerCreateInfo create_info, Diagnos
         return initResult;
     }
 
-    // bootstrap completed, retrieve serialized modules and initialize the thread pool with them
     std::vector<SerializedModule> serializedModules = bootstrapContext->SerializeModules();
     initResult = compilePool->Initialize(std::move(create_info), std::move(serializedModules));
     if (initResult != CookError::Success)
@@ -65,14 +64,11 @@ CookError SlangCompiler::Initialize(SlangCompilerCreateInfo create_info, Diagnos
         return initResult;
     }
 
-    // one writer, from the bootstrap blobs. the workers used to write the cache too, each one writing the same
-    // files at once while other sessions read the cache folder as a search path. we write after the workers
-    // start, so that the write overlaps their session setup instead of delaying it. a failure is only a
-    // warning, because the cache is an optimization, and WriteModuleCache reports it
+    // one writer, after the workers start, so the write overlaps their setup. The workers used to write the cache
+    // too, all at once, while other sessions read it
     static_cast<void>(WriteModuleCache(compilePool->SerializedModules(), sink));
 
-    // todo-ship: With multi-module builds, we'll absolutely want to have a way to "inherit" or share
-    // symbol tables with multiple compilers. can probably pass this as optional createInfo member
+    // todo-ship: share symbol tables between the compilers of a multi-module build
     const std::string_view moduleName = bootstrapContext->ModuleName();
     const std::vector<std::string>& sourcePaths = bootstrapContext->ModuleSourcePaths();
     for (const auto&& [sourceIndex, sourceStr] : std::views::enumerate(bootstrapContext->ModuleSourceStrings()))
@@ -102,8 +98,7 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
     module.EntryPointNames = bootstrapContext->EntryPointNames();
     module.ExternDefaults = std::move(defaults.value());
 
-    // hybrid read: the symbol table supplies each expression, and reflection decides which names are module
-    // scope, so that a function-local `static const` is never mistaken for a derived constant
+    // the symbol table gives the expressions, and reflection says which names are module scope
     const std::vector<std::string> moduleScopeNames = bootstrapContext->BuildModuleScopeVariableNames();
     for (const DerivedConstantDeclaration& declaration : symbolTable.DerivedConstantsForModule(ModuleName()))
     {

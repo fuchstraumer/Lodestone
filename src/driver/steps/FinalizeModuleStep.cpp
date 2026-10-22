@@ -25,14 +25,11 @@ namespace lodestone
 
 namespace
 {
-    // Uses lower_bound to find the variant as an address, in the dense variant array
     const CompiledVariant* FindCompiledVariant(std::span<const CompiledVariant> compiled,
                                                uint64_t variant_index) noexcept;
-    // Verifies library variants round trip against the compiled variants (source code, mostly)
     CookError VerifyLibraryRoundTrip(const CookedModule& module,
                                      std::span<const CompiledVariant> compiled,
                                      DiagnosticSink& diagnostics);
-    // Replays the layout of each LibraryVariant to make sure it matches CompiledVariant
     CookError VerifyLayoutRoundTrip(const CookedModule& module,
                                     std::span<const CompiledVariant> compiled,
                                     DiagnosticSink& diagnostics);
@@ -56,7 +53,6 @@ CookResult<FinalizedModule> FinalizeModuleStep::operator()(const SharedCookState
         return std::unexpected(layoutResult);
     }
 
-    // the measured footprint axes against the axes the size attributes name: two readers of one fact
     const CookError footprintError = VerifyFootprintAxes(cookedModule, *shared_state.Diagnostics);
     if (footprintError != CookError::Success)
     {
@@ -68,7 +64,6 @@ CookResult<FinalizedModule> FinalizeModuleStep::operator()(const SharedCookState
                                                     cookedModule.Name,
                                                     cookedModule.Variants.size());
     ReportInfo(*shared_state.Diagnostics, roundTripStr);
-    // only check module policy if there are inert axes specified for entry points
 
     const ModulePolicyEntry* modulePolicy = shared_state.Policy.FindModule(cookedModule.Name);
 
@@ -95,12 +90,10 @@ namespace
     const CompiledVariant* FindCompiledVariant(std::span<const CompiledVariant> compiled,
                                                uint64_t variant_index) noexcept
     {
-        // `compiled` is sorted in ascending order already: we can use lower_bound
         auto candidateIter = std::ranges::lower_bound(compiled,
                                                       variant_index,
                                                       std::less<uint64_t>{},
                                                       &CompiledVariant::VariantIndex);
-        // iterator has to be valid, but the index also needs to match!
         if (candidateIter != compiled.end() &&
             candidateIter->VariantIndex == variant_index)
         {

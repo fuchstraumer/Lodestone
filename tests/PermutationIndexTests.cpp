@@ -12,18 +12,7 @@
 #include <cstdint>
 #include <vector>
 
-// The dense index is the key that the manifest, the generated C++, and the renderer all resolve a
-// variant with. Two properties make it safe, and this file proves both without a compiler and without
-// an asset.
-//
-// First, canonicalization can never change shader output. `Active` drives the Slang linker, and
-// `Canonical` drives the index alone.
-//
-// Second, a caller can name only the axes it cares about. Canonicalization fills in the rest, so a
-// partial assignment still resolves to one variant.
-//
-// The space below has the shape of the OceanFft space: two independent axes, and one axis that only
-// contributes values when its parent takes the enabling value.
+// the space has the shape of OceanFft's: two independent axes, and one gated on its parent
 
 using lodestone::AxisKind;
 using lodestone::AxisValueDomain;

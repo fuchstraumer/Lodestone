@@ -50,9 +50,7 @@ namespace
         return result;
     }
 
-    /** Returns `<Slang build tag>-<build configuration>`, the name of this build's module cache folder. Every
-     * character that is not a letter, a digit, `.`, or `-` is replaced with `_`, so that a tag cannot add a
-     * path separator. */
+    /** Returns `<Slang build tag>-<configuration>`, with path-unsafe characters replaced. */
     std::string BuildCacheFolderName(std::string_view slang_build_tag)
     {
         std::string name = std::format("{}-{}", slang_build_tag, LODESTONE_BUILD_CONFIG);
@@ -70,12 +68,10 @@ namespace
         return name;
     }
 
-    /** Writes `bytes` to `path` through a temporary file in the same folder, then renames it into place. Two
-     * cooks can write the same module at once, and Slang reads the cache folder as a search path, so a reader
-     * must see the old file or the new one and never a partial write. The rename replaces an existing file. */
+    /** Writes through a temporary file and a rename: Slang reads the cache folder as a search path, so readers must
+     * never see a partial file. */
     CookError WriteFileAtomically(const std::filesystem::path& path, std::span<const std::byte> bytes)
     {
-        // the suffix is random so that two processes never share a temporary file
         std::random_device random;
         std::filesystem::path temporaryPath = path;
         temporaryPath += std::format(".{:08x}{:08x}.tmp", random(), random());
@@ -94,8 +90,7 @@ namespace
         std::filesystem::rename(temporaryPath, path, renameError);
         if (renameError)
         {
-            // a reader that holds the old file open blocks the replace on Windows. the old file stays whole,
-            // so this costs one cache miss and nothing else
+            // on Windows an open reader blocks the replace, which costs one cache miss
             std::error_code ignored;
             std::filesystem::remove(temporaryPath, ignored);
             return CookError::FileWriteFailed;
@@ -151,14 +146,9 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
 
     const std::filesystem::path canonicalModulePath = std::filesystem::canonical(create_info.ModulePath);
     const std::string sourceDirectory = canonicalModulePath.parent_path().string();
-    // shared modules imported by a shader are one level above the per-stage directory, so the asset root
-    // resolves without a command-line switch. the builtin search path is not a directory on disk: the
-    // embedded file system serves it from memory
+    // shared modules sit one level above the per-stage directory
     const std::string sharedDirectory = canonicalModulePath.parent_path().parent_path().string();
-    // module files from another Slang build, or from another configuration of this one, share a module
-    // name with ours, and Slang rejects a file of another IR version (E00131) or worse. so each build and
-    // configuration gets its own folder. the tag is read from the Slang library that is loaded, not from
-    // our configure step
+    // one folder per Slang build and configuration: Slang rejects another IR version (E00131) or worse
     const std::filesystem::path cachePath =
         create_info.ModuleCacheDirectory / BuildCacheFolderName(globalSession->getBuildTagString());
     std::error_code cacheError;
@@ -180,7 +170,6 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
         EmbeddedFileSystem::k_BuiltinSearchPath.data(),
     };
 
-    // One session compiles for one target, so every later call uses target index 0.
     slang::TargetDesc target{};
     target.format = ToSlangCompileTarget(create_info.Language);
     if (!create_info.SlangProfileName.empty())
@@ -194,7 +183,6 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
                                std::format("Slang has no profile named '{}'", create_info.SlangProfileName));
         }
     }
-    // each job will create their own session: but, global session will be shared
     slang::SessionDesc sessionDesc{};
     sessionDesc.targets = &target;
     sessionDesc.targetCount = 1;
@@ -247,8 +235,7 @@ CookError SlangModuleContext::RunBootstrap()
 namespace
 {
     // NOLINTBEGIN(misc-no-recursion)
-    // only fragment nodes are walked into: those are `__include`d files, whose declarations are still at module
-    // scope. structs, functions, generics, and namespaces are skipped, because their variables are not
+    // only `__include` fragments are walked into: their declarations are still at module scope
     void CollectModuleScopeVariableNames(slang::DeclReflection* reflection, std::vector<std::string>& names)
     {
         const unsigned int childCount = reflection->getChildrenCount();

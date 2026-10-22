@@ -21,10 +21,6 @@
 #include <string_view>
 #include <vector>
 
-// The resource roles and tags (task L17), from the shader source to the manifest, for both targets.
-// `ResourceRoles.slang` puts each role on a buffer that fits it, and tags on three buffers. The test reads the roles,
-// the tags, and the creation usage back through the client views. Each other asset breaks one rule, and its cook must
-// fail with the error of that rule.
 
 namespace
 {

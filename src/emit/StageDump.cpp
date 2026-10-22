@@ -71,8 +71,7 @@ namespace
     {
         writer.BeginObject();
         writer.KeyString("name", axis.Name);
-        // adding these keys now before we complete later tasks, to preserve parity of byte comparisons
-        // todo: remove these as soon as we are actually able to write values for this
+        // todo: remove these placeholder keys once they have real values
         writer.KeyString("kind", magic_enum::enum_name(axis.Kind));
         writer.KeyString("earliestBindingTime", magic_enum::enum_name(axis.BindingTime));
         writer.KeyString("valueDomain", magic_enum::enum_name(axis.ValueDomain));
@@ -87,10 +86,7 @@ namespace
         writer.Key("default");
         WriteAxisValue(writer, PermutationBinding{ &axis, axis.GetDeclaredDefault() });
 
-        // enum axes store the integer tag of each case, in declaration order. the values array above
-        // contains the case names, like a Type axis, so this parallel array is the only place a dump
-        // records the enum tags read from reflection. the known-good baseline pins it, which gives us
-        // the end-to-end check that the EnumTagDecode unit test cannot provide on its own
+            // the only record of the enum tags reflection read, so the known-good dumps check EnumTagDecode end to end
         if (axis.ValueDomain == AxisValueDomain::Enum)
         {
             writer.Key("enumCaseValues");
@@ -255,6 +251,14 @@ namespace
             writer.KeyUInt("index", i);
             writer.KeyUInt("byteLength", module.Sources[i].size());
             writer.KeyUInt("contentHash", HashSourceCode(module.Sources[i]));
+            writer.KeyUInt("workgroupMemoryBytes", module.SourceFacts[i].WorkgroupMemoryBytes);
+            writer.Key("capabilities");
+            writer.BeginArray();
+            for (const std::string& name : module.SourceFacts[i].CapabilityNames)
+            {
+                writer.String(name);
+            }
+            writer.EndArray();
             writer.EndObject();
         }
         writer.EndArray();
@@ -315,8 +319,6 @@ namespace
         WriteUniformMembers(writer, "members", constants.Members);
     }
 
-    /** The axes that each resource's size attributes name, by axis name. The validator compares them with the
-     * measured footprint axes. */
     void WriteFootprintDeclarations(JsonWriter& writer, const CookedModule& module)
     {
         writer.Key("footprintDeclarations");
@@ -628,8 +630,7 @@ namespace
         writer.EndArray();
     }
 
-    // the source file is written as a file name only: a full path would make the dump depend on where the
-    // repository is checked out, and the known-good dumps must not
+    // file names only, so that the dumps do not depend on the checkout path
     void WriteDerivedConstants(JsonWriter& writer, const RawModule& module)
     {
         writer.Key("derivedConstants");
@@ -837,12 +838,7 @@ std::string DumpResolvedModule(std::string_view module_name, std::span<const Com
 namespace
 {
 
-    /** Every artifact that mapped onto one unique entry, for one table.
-     *
-     * This is the only thing the `interned` dump shows that `cooked` cannot. The interner records who
-     * mapped where, `FreezeModuleTables` copies out the unique entries and leaves the provenance
-     * behind, so after the freeze the answer is gone. A collapse that surprises you is findable here
-     * and nowhere else. */
+    /** Who mapped where, which the freeze discards: the only place a surprising collapse can be traced. */
     template<typename PayloadType>
     void WriteProvenance(JsonWriter& writer,
                          std::string_view key,
@@ -1002,7 +998,6 @@ static std::vector<NameValuePair> ParseVariantDescription(std::string_view descr
     size_t start = 0;
     while (start < description.size())
     {
-        // split between NAME=VALUE first, then use comma as where to close the pair
         size_t equalPos = description.find('=', start);
         if (equalPos == std::string_view::npos)
         {
@@ -1035,8 +1030,6 @@ CookError DumpShaderSources(const CookedModule& module,
                             ShaderCodeFormat code_format,
                             OutputSink& sink)
 {
-    // The sink creates the subdirectory. A memory sink has no directory, so this function must not
-    // create one: under --verify-deterministic that left `<output>_first` and `<output>_second` on disk.
 
     std::unordered_map<uint32_t, std::string> sourceIdxToFilename;
 
@@ -1049,7 +1042,6 @@ CookError DumpShaderSources(const CookedModule& module,
             std::format("{}_{:016X}.{}", module.Name, hashedSource, isSpirv ? "spv" : "wgsl");
         sourceIdxToFilename[sourceIdx] = filename;
         std::string outputName = std::format("{}/{}", subdir, filename);
-        // we used to write a header, but we have a source table that does that cleaner now
         CookError writeResult = sink.WriteArtifact(outputName, source);
         if (!writeResult)
         {
@@ -1057,8 +1049,6 @@ CookError DumpShaderSources(const CookedModule& module,
         }
     }
 
-    // use JSON to create a table mapping the hashed filenames to all the variants
-    // (including meta-information) that used that info
     lodestone::JsonWriter tableWriter(true);
     tableWriter.BeginObject();
     tableWriter.KeyString("module", module.Name);
@@ -1066,11 +1056,9 @@ CookError DumpShaderSources(const CookedModule& module,
     tableWriter.Key("variants");
     tableWriter.BeginArray();
 
-    // Replicate the variant structure to map human-readable descriptions to the hashed files
     for (const auto& variant : module.Variants)
     {
         tableWriter.BeginObject();
-        // Assuming variant has an Index or you can track it via a loop counter
         tableWriter.KeyString("suffix", variant.Suffix);
         tableWriter.KeyString("description", variant.Description);
         

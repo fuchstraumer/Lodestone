@@ -43,15 +43,13 @@ namespace
     CookError CheckVariantKeyDecode(const manifest::EnvironmentView& view,
                                     const LibraryVariant& variant,
                                     VariantKey key);
-    /** The axis relevance validator. It reads the written environment only, through the client views, and
-     * derives relevance a second time */
+    /** Derives the relevance again from the written environment alone, through the client views. */
     CookError VerifyAxisRelevance(const manifest::EnvironmentView& view);
     CookError CheckFootprintAxes(const CookedModule& module, const manifest::EnvironmentView& view);
+    CookError CheckSourceFacts(const CookedModule& module, const manifest::EnvironmentView& view);
     CookError CheckVariantAxisMask(const CookedModule& module,
                                    const LibraryVariant& variant,
                                    manifest::VariantView read_variant);
-    /** True when the value stored at `digit` of one module axis is `value` of `axis`. Both the key check and
-     * the default check read values this way, which is the same way a client reads them. */
     bool StoredAxisValueMatches(const manifest::EnvironmentView& view,
                                 uint32_t axis_index,
                                 uint32_t digit,
@@ -85,7 +83,6 @@ namespace
                                   const manifest::EnvironmentView& view,
                                   const LibraryVariant& variant,
                                   size_t entry_point_index);
-    /** Checks every field the manifest stores for one entry point of one variant. */
     CookError CheckManifestSlot(const CookedModule& module,
                                 const manifest::EnvironmentView& view,
                                 const manifest::ShaderSourceProvider& provider,
@@ -128,7 +125,6 @@ CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::vecto
 
             if (!environment.has_value())
             {
-                // an environment the cook skipped must read back as absent, and not as some other extent
                 if (view.has_value() || view.error().Code != manifest::ErrorCode::EnvironmentNotCooked)
                 {
                     std::println(stderr,
@@ -246,6 +242,12 @@ namespace
             return footprintAxesError;
         }
 
+        const CookError sourceFactsError = CheckSourceFacts(module, view);
+        if (sourceFactsError != CookError::Success)
+        {
+            return sourceFactsError;
+        }
+
         const manifest::ShaderSourceProvider provider{ view, 0u };
         for (const LibraryVariant& variant : module.Variants)
         {
@@ -289,8 +291,7 @@ namespace
                                     const LibraryVariant& variant,
                                     VariantKey key)
     {
-        // A second opinion on the key: decode it the way a client does, through the module axes and the
-        // root values, and compare each value against the canonical assignment the cook keyed.
+        // decode the key as a client does, and compare with the canonical assignment
         const manifest::ModuleView& moduleView = view.Module();
         const uint32_t axisCount = moduleView.AxisCount();
         if (variant.Canonical.size() != axisCount)
@@ -368,7 +369,6 @@ namespace
             return CookError::Success;
         }
 
-        // read each default back through the module digit and the root value table, as a client does
         const std::span<const PermutationAxis> axes = module.Space->Axes();
         for (uint32_t axisIndex = 0u; axisIndex < axes.size(); ++axisIndex)
         {
@@ -389,7 +389,6 @@ namespace
         return CookError::Success;
     }
 
-    /** Returns the bytes of one source in the profile's code format. */
     std::span<const std::byte> SourceBytes(const manifest::EnvironmentView& view, uint32_t source_index)
     {
         if (view.CodeFormat() == ShaderCodeFormat::Spirv)
@@ -402,13 +401,11 @@ namespace
     template<typename RecordType>
     bool RecordsEqual(std::span<const RecordType> lhs, std::span<const RecordType> rhs) noexcept
     {
-        // manifest records are trivially copyable bags of bytes with zeroed reserved fields, and every string
-        // they name is an index into a deduplicated string table, so equal bytes are equal content
+        // records are bags of bytes with zeroed reserved fields, and strings are deduplicated indices
         return lhs.size() == rhs.size() && std::memcmp(lhs.data(), rhs.data(), lhs.size_bytes()) == 0;
     }
 
-    /** Compares one resource of two layouts by content. `FirstUniformMember` is an index that `--no-dedupe`
-     * makes unique, so the members are compared instead. */
+    /** `--no-dedupe` makes member indices unique, so the members themselves are compared. */
     bool ResourcesEqual(const manifest::EnvironmentView& view,
                         const manifest::ResolvedResource& lhs,
                         const manifest::ResolvedResource& rhs) noexcept
@@ -419,7 +416,6 @@ namespace
         rhsBinding.FirstUniformMember = 0u;
         lhsBinding.FirstTag = 0u;
         rhsBinding.FirstTag = 0u;
-        // one string table for the bundle, so equal tag text has one string index
         if (std::memcmp(&lhsBinding, &rhsBinding, sizeof(manifest::Binding)) != 0 ||
             !RecordsEqual(view.UniformMembers(lhs.Record()), view.UniformMembers(rhs.Record())) ||
             !RecordsEqual(view.ResourceTags(lhs.Record()), view.ResourceTags(rhs.Record())))
@@ -437,8 +433,7 @@ namespace
         return std::memcmp(lhsFootprint, rhsFootprint, sizeof(manifest::Footprint)) == 0;
     }
 
-    /** Compares the instance of one entry point in two variants by content: source, layout, raster state, sampler
-     * and texture pairs, entry point constants, and workgroup size. Equal record indices are a shortcut only: unequal indices still compare content. */
+    /** By content. Equal record indices are only a shortcut. */
     bool InstancesEqual(const manifest::EnvironmentView& view, uint32_t lhs_variant, uint32_t rhs_variant, uint32_t entry_point)
     {
         const manifest::EntryPointInstanceView lhs = view.VariantAt(lhs_variant).EntryPoint(entry_point);
@@ -494,8 +489,6 @@ namespace
                std::ranges::equal(SourceBytes(view, lhsRecord.Source), SourceBytes(view, rhsRecord.Source));
     }
 
-    /** Groups the variants into classes that agree on every axis whose bit is set in `kept_axes`, and returns
-     * each class as a run of variant indices, in `order`. */
     std::vector<std::span<const uint32_t>> GroupVariants(std::span<const std::vector<uint32_t>> digits,
                                                          std::span<const uint8_t> kept_axes,
                                                          std::vector<uint32_t>& order)
@@ -533,8 +526,36 @@ namespace
         return classes;
     }
 
-    /** Compares the footprint axis mask of each binding record with the mask the model measures. The binding
-     * records are written in the order of `CookedModule::Resources`. */
+    /** Compares names by text, so a wrong bit and a wrong name table both fail. */
+    CookError CheckSourceFacts(const CookedModule& module, const manifest::EnvironmentView& view)
+    {
+        for (uint32_t sourceIndex = 0u; sourceIndex < module.SourceFacts.size(); ++sourceIndex)
+        {
+            const SourceCodeFacts& expected = module.SourceFacts[sourceIndex];
+            std::vector<std::string_view> read;
+            for (uint32_t capabilityIndex = 0u; capabilityIndex < view.CapabilityNames().size(); ++capabilityIndex)
+            {
+                if (view.SourceNeedsCapability(sourceIndex, capabilityIndex))
+                {
+                    read.push_back(view.CapabilityName(capabilityIndex));
+                }
+            }
+
+            if (!std::ranges::equal(read, expected.CapabilityNames) ||
+                view.SourceWorkgroupMemoryBytes(sourceIndex) != expected.WorkgroupMemoryBytes)
+            {
+                std::println(stderr,
+                             "[lodestone] manifest round trip: module {} source {} reads back capabilities or "
+                             "workgroup memory that differ from the code",
+                             module.Name,
+                             sourceIndex);
+                return CookError::ManifestSourceFactsMismatch;
+            }
+        }
+
+        return CookError::Success;
+    }
+
     CookError CheckFootprintAxes(const CookedModule& module, const manifest::EnvironmentView& view)
     {
         const size_t wordCount = view.Module().AxisMaskWordCount();
@@ -583,8 +604,6 @@ namespace
             return view.String(module.EntryPoints()[entry_point].NameString);
         };
 
-        // first pass: an axis is relevant when two variants that differ only in it hold different instances, or
-        // when no two variants differ only in it (one cooked value is undetermined)
         std::vector<std::vector<uint8_t>> derived(entryPointCount, std::vector<uint8_t>(axisCount, uint8_t{ 0u }));
         std::vector<uint32_t> order;
         std::vector<uint8_t> allButOne(axisCount, uint8_t{ 1u });
@@ -607,8 +626,6 @@ namespace
             }
         }
 
-        // closing pass: in each class of variants that agree on the relevant axes and hold more than one instance,
-        // mark every axis that varies within the class, until no class holds more than one instance
         for (uint32_t entryPoint = 0u; entryPoint < entryPointCount; ++entryPoint)
         {
             std::vector<uint8_t>& relevant = derived[entryPoint];
@@ -702,7 +719,6 @@ namespace
                                   const LibraryVariant& variant,
                                   size_t entry_point_index)
     {
-        // Read back through the accessor a consumer of this format uses, and compare bytes.
         const std::span<const std::byte> expectedSource = ResolveSource(module, variant, entry_point_index);
         const VariantKey variantKey = module.VariantKeys[variant.Index];
         const uint32_t entryPoint = static_cast<uint32_t>(entry_point_index);
@@ -746,8 +762,7 @@ namespace
 
     bool RecordMatchesFootprint(const manifest::Footprint& record, const ResourceFootprint& footprint) noexcept
     {
-        // compared field by field against the model, with no call into the writer, so a fault in the writer's
-        // encoding cannot hide here. A field the footprint kind does not use must read back as zero
+        // field by field against the model, never through the writer. Unused fields must read zero
         if (const BufferFootprint* buffer = std::get_if<BufferFootprint>(&footprint))
         {
             return record.Kind == static_cast<uint32_t>(FootprintKind::Buffer) &&
@@ -893,8 +908,6 @@ namespace
             ++position;
         }
 
-        // the pairs are positions in the visibility list, which the walk above proved equal, so the positions
-        // compare directly
         const SamplerPairList& expectedPairs =
             module.SamplerPairLists[variant.SamplerPairIndices[entry_point_index]];
         const std::span<const manifest::SamplerTexturePair> readPairs =
@@ -914,7 +927,6 @@ namespace
             return CookError::ManifestSamplerPairMismatch;
         }
 
-        // the binding position is local to the visibility list, which the walk above proved equal
         const EntryPointConstants& expectedConstants =
             module.EntryPointConstantsTable[variant.ConstantsIndices[entry_point_index]];
         const manifest::EntryPointConstantsView readConstants =

@@ -11,9 +11,7 @@ namespace lodestone
 
 namespace
 {
-    // A module-name- and path-safe token for one axis value. For enum values, we can't 
-    // use the qualified name as :: is not legal in module names. Instead, join with _
-    // to keep module names unique and as a parent-child set of the typename
+    // `::` is not legal in module names, so enum values join with `_`
     std::string ValueNameToken(const PermutationAxis& axis, const PermutationValue& value)
     {
         if (value.GetType() == PermutationValue::Type::Enum)
@@ -73,7 +71,6 @@ std::string_view PermutationValue::AsEnumCase(const PermutationAxis& axis) const
 
 std::string PermutationValue::AsQualifiedEnum(const PermutationAxis& axis) const noexcept
 {
-    // returns scoped name, since slang requires all enums to be scoped by default
     return std::format("{}::{}", axis.EnumTypeName(), axis.EnumCaseName(uintValue));
 }
 
@@ -165,8 +162,7 @@ std::string MakeExportedConstantSource(const PermutationAxis& axis, const Permut
 {
     if (value.GetType() == PermutationValue::Type::Type)
     {
-        // since the synthetic module loads as it's own independent "TU", it must import the module
-        // that declares the concrete type and the interface it implements
+        // the synthetic module is its own TU, so it imports the declaring module
         const RawInterfaceImpl& impl = axis.InterfaceImpl(value.AsUInt());
         return std::format("import {};\nexport struct {} : {} = {};\n",
                            impl.Module,
@@ -176,9 +172,6 @@ std::string MakeExportedConstantSource(const PermutationAxis& axis, const Permut
     }
     else if (value.GetType() == PermutationValue::Type::Enum)
     {
-        // Same as the interface case: the synthetic module is its own TU, so it must import the module
-        // that declares the enum. The constant is typed as the enum itself (not the `enum` keyword),
-        // and the value is the qualified case, e.g. `QualityLevel::Low`.
         return std::format("import {};\nexport static const {} {} = {};\n",
                            axis.Module(),
                            axis.EnumTypeName(),

@@ -21,14 +21,6 @@
 #include <vector>
 
 
-// Stage 4 is a pure function of a `RawVariant` and a symbol table. This test is the proof of that
-// claim: it links against no Slang type, it reads no asset, and it runs in milliseconds. This test could
-// not be written before stage 3 and stage 4 were separated, because the arithmetic used to live inside
-// the file that talks to the compiler.
-//
-// Every buffer size the engine allocates comes out of this arithmetic, so a wrong answer here is a
-// wrong allocation with no other symptom. That is why the rejections get as much surface as the
-// successes.
 
 using lodestone::BindingKind;
 using lodestone::BoundPlacement;

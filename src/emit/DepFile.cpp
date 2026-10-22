@@ -8,8 +8,7 @@ namespace lodestone
 
 namespace
 {
-    // Make reads a space as a separator and `#` as a comment, so both take a backslash. `$` is a variable
-    // reference in Make and in Ninja, and each spells a literal one as `$$`.
+    // Make reads spaces as separators and `#` as comments. Make and Ninja spell a literal `$` as `$$`
     void AppendEscapedPath(std::string& out, std::string_view path)
     {
         for (const char character : path)
@@ -34,7 +33,6 @@ std::string GenerateDepfile(std::string_view target, std::span<const std::string
     result += ':';
     for (const std::string& prerequisite : prerequisites)
     {
-        // a backslash before the newline continues the rule on the next line
         result += " \\\n  ";
         AppendEscapedPath(result, prerequisite);
     }

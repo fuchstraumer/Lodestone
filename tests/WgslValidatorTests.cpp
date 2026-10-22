@@ -13,18 +13,7 @@
 #include <tuple>
 #include <vector>
 
-// The cross-check compares what reflection reports against what the emitted WGSL actually declares.
-// It is the check that stops a wrong shader from reaching a pipeline. `WgslValidator` parses the
-// text with Tint, reads the used bindings from Tint's inspector, and compares them against the
-// reflected bindings this file writes by hand.
-//
-// The asymmetry matters: the emitted artifact decides the group and the binding number, and
-// reflection decides the kind, the shape, and the access. A test that fed the same source to both
-// sides would prove nothing, so the WGSL text here is fixed and the reflection records are separate.
-//
-// Tint reports only the bindings an entry point uses, so `MainCS` references every resource. A
-// resource the entry point never reads leaves the used set, and then an agreeing reflection record
-// reads as a binding the WGSL never declared.
+// `MainCS` uses every resource: Tint reports only used bindings.
 
 using lodestone::BindingComparison;
 using lodestone::BindingKind;
@@ -124,8 +113,31 @@ ResourceShape MakeBufferShape(bool is_structured)
     return is_structured ? ResourceShape::StructuredBuffer : ResourceShape::ByteAddressBuffer;
 }
 
-// The reflection that agrees with `k_Wgsl` on every used binding. Samplers have no shape or
-// access, so it takes `Invalid` for both; the validator reads neither for a sampler.
+// the workgroup variables of SpvValidatorTest's k_WorkgroupCs, also 144 bytes
+constexpr std::string_view k_WgslWorkgroup = R"(
+enable f16;
+
+struct S
+{
+    a : f32,
+    b : vec3<f32>,
+}
+
+var<workgroup> g_vec3 : array<vec3<f32>, 4>;
+var<workgroup> g_struct : S;
+var<workgroup> g_floats : array<f32, 3>;
+var<workgroup> g_half : array<vec4<f16>, 3>;
+
+@compute @workgroup_size(64)
+fn MainCS(@builtin(local_invocation_index) index : u32)
+{
+    g_vec3[index % 4u] = vec3<f32>(1.0);
+    g_struct.a = 1.0;
+    g_floats[index % 3u] = 1.0;
+    g_half[index % 3u] = vec4<f16>(1.0h);
+}
+)";
+
 std::vector<ReflectedBinding> MakeAgreeingReflection()
 {
     std::vector<ReflectedBinding> reflected;
@@ -158,9 +170,6 @@ std::vector<ReflectedBinding> MakeAgreeingReflection()
     return reflected;
 }
 
-// The validator takes a span of pointers, so each caller keeps its records in a named vector and
-// hands out pointers into it. The span is copied before it is sorted, so one vector serves many
-// calls.
 std::vector<const ReflectedBinding*> PointersTo(const std::vector<ReflectedBinding>& reflected)
 {
     std::vector<const ReflectedBinding*> pointers;
@@ -190,9 +199,6 @@ int main()
     runner.Check(match.has_value() && match->Matches, "reflection that agrees with the emitted text passes");
     runner.Check(match.has_value() && match->Report.empty(), "a passing comparison reports nothing");
 
-    // The pairs are cook output, read from Tint's inspector. `MainCS` samples the height texture with the
-    // linear sampler, and the depth texture with the comparison sampler, so Tint names two pairs. The read path
-    // that `--no-validate` uses must give the same pairs as the validate path.
     runner.BeginSection("the sampler and texture pairs come from Tint");
     const std::vector<SamplerTexturePlacement> expectedPairs
     {
@@ -212,6 +218,19 @@ int main()
         validator.ReadEmittedCodeFacts(std::as_bytes(std::span{ k_Wgsl }), sink);
     runner.Check(readFacts.has_value() && sortedPairs(readFacts->SamplerTexturePairs) == expectedPairs,
                  "the read path gives the same pairs, and compares nothing");
+
+    runner.BeginSection("the capability names and the workgroup memory come from Tint");
+    runner.Check(readFacts.has_value() && readFacts->CapabilityNames.empty() && readFacts->WorkgroupMemoryBytes == 0u,
+                 "WGSL with no enable directive and no workgroup variable needs nothing");
+    runner.Check(match.has_value() && match->Emitted.CapabilityNames.empty(),
+                 "the validate path reads the same names as the read path");
+    const CookResult<EmittedCodeFacts> workgroupFacts =
+        validator.ReadEmittedCodeFacts(std::as_bytes(std::span{ k_WgslWorkgroup }), sink);
+    runner.Check(workgroupFacts.has_value(), "the read path reads the workgroup WGSL");
+    runner.Check(workgroupFacts.has_value() && workgroupFacts->CapabilityNames == std::vector<std::string>{ "f16" },
+                 "each enable directive reads back as a name");
+    runner.Check(workgroupFacts.has_value() && workgroupFacts->WorkgroupMemoryBytes == 144u,
+                 "the workgroup memory is Dawn's sum, and equals the SPIR-V reader's sum for the same variables");
 
     runner.BeginSection("a kind mismatch fails the cross-check");
     // A uniform block that reflection calls a storage buffer still emits valid WGSL. WebGPU rejects
@@ -249,9 +268,7 @@ int main()
                  "a depth texture reflected without the shadow flag fails");
 
     runner.BeginSection("storage-buffer shape is orthogonal to the wgsl kind");
-    // WGSL has no structured/raw distinction: a storage buffer's Tint kind follows from the access
-    // alone. So flipping the reflected shape from raw to structured leaves the cross-check passing.
-    // This answers whether a `float4` buffer must be "structured" to validate: it need not be.
+    // WGSL has no structured/raw distinction, so the shape does not change the kind
     std::vector<ReflectedBinding> structured = MakeAgreeingReflection();
     structured[1].Shape = MakeBufferShape(true);
     std::vector<const ReflectedBinding*> structuredPointers = PointersTo(structured);
@@ -316,9 +333,6 @@ int main()
     runner.Check(!broken.has_value() && broken.error() == lodestone::CookError::TargetValidationEntryPointParseFailed,
                  "the error names the parse failure");
 
-    // The seam must not change the answer: `FindTargetProfile` has to hand back a real `WgslValidator`,
-    // and reaching the validator through the profile pointer gives the same result as calling one
-    // built here directly. If these disagree, the profile wired up something with a different opinion.
     runner.BeginSection("the target profile supplies a working validator");
     const CookResult<TargetProfile> wgslProfile = lodestone::FindTargetProfile("wgsl");
     runner.Check(wgslProfile.has_value(), "the build has a wgsl profile");

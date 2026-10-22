@@ -28,25 +28,8 @@ using RequireReadyMap = std::unordered_map<std::ptrdiff_t, std::vector<std::stri
 using AxisValueOverrideMap = std::unordered_map<std::ptrdiff_t, std::vector<PermutationValue>>;
 
 
-/**
- * One variant's identity.
- *
- * `Active`: Contains only the axes this variant actually uses. The linker uses this to export the final
- * values (i.e., what shows up in source)
- *
- * `Canonical`: A complete list of EVERY axis in the permutation space, in declaration order. This is
- * *not* what the shader will actually use.
- *
- * If an axis is disabled, it will not appear in Active but it will appear in Canonical. This happens with
- * an axis (or axes) whose parent does not match the value required to enable it. The permutation evaluator
- * will fill in the first value of that axis as the value in Canonical.
- *
- * Why? Because this then provides a truly stable index for the variant, which several properties/values we
- * associate with a variant are computed. This also makes it simpler for further retrieval: we don't need to
- * know the fully evaluated "correct" value of each axis to retrieve it, we can just use our unique values
- * and the canonicalized values to retrieve the variant. Think how trivial that is: if you know just the
- * set of values you want to use, you can get your variant.
- */
+/** One variant's identity. `Active` holds the axes the variant uses, and drives the linker. `Canonical` holds every
+ * axis, with the first value for disabled ones, and drives the stable key only. */
 struct VariantDescriptor
 {
     PermutationAssignment Active;
@@ -55,9 +38,7 @@ struct VariantDescriptor
     uint64_t Index{ 0 };
 };
 
-/** Everything one permutation space expands to. `SpaceSize` counts the dense index range, holes
- * included: a disabled dependent axis leaves gaps, and the plan accepts them rather than pay for a
- * lookup structure. */
+/** A space expanded. `SpaceSize` includes the holes that disabled axes leave. */
 struct VariantSet
 {
     std::vector<VariantDescriptor> Variants;
@@ -71,9 +52,7 @@ public:
                      std::vector<std::string> require_expressions = {}) noexcept;
     ~PermutationSpace() noexcept = default;
 
-    /** The space owns its axes, and `PermutationBinding` points into them. A copy would leave every
-     * binding of the original aimed at a different object, so a space is moved and never copied. A
-     * move keeps the vector's buffer, so the axis addresses survive it. */
+    /** Bindings point into the owned axes, so a copy would aim them at another object. A move keeps the buffer. */
     PermutationSpace(const PermutationSpace&) = delete;
     PermutationSpace& operator=(const PermutationSpace&) = delete;
     PermutationSpace(PermutationSpace&&) noexcept = default;
@@ -90,9 +69,7 @@ public:
     [[nodiscard]] VariantKey ComputeVariantKey(const CanonicalAssignment& canonical) const;
     [[nodiscard]] uint64_t ComputeVariantSpaceSize() const noexcept;
     [[nodiscard]] CookError ValidateConstraints(DiagnosticSink& sink) const;
-    /**The other direction: an `extern` constant that no axis drives keeps its default in every variant.
-     * This is what our resource sizing annotations rely on, in the Slang compiler machinery (though they
-     * don't actually affect source code: they just carry through to the data we extract still) */
+    /** Reports `extern` constants that no axis drives: they keep their default in every variant. */
     void ReportUndrivenExternConstants(std::string_view module_name,
                                        const SymbolTable& symbol_table,
                                        DiagnosticSink& sink) const;

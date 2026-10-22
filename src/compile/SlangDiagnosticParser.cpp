@@ -19,9 +19,7 @@ namespace lodestone
 namespace
 {
 
-    /**@brief Slang emits this in front of the message that ended the compile. The record after it repeats
-     * the fatal message already reported, so the reader sees the problem twice. That seems on purpose,
-     * to avoid having a recognizer be able to miss an abort message? */
+    // Slang prefixes the message that ended the compile, then repeats it as a record
     constexpr std::string_view k_AbortPrefix = "abort compilation: ";
 
     constexpr int32_t k_FieldCount = 8;
@@ -32,8 +30,7 @@ namespace
     constexpr int32_t k_MessageField = 7;
     using FieldStrArray = std::array<std::string_view, k_FieldCount>;
 
-    /** Splits into exactly `k_FieldCount` fields, so a tab inside the message cannot shift the
-     * columns. Gives nothing when the line has too few. */
+    /** Splits into exactly `k_FieldCount` fields, so tabs in the message cannot shift columns. */
     std::optional<FieldStrArray> SplitFields(std::string_view line)
     {
         FieldStrArray fields;
@@ -57,9 +54,7 @@ namespace
     int32_t ParseInt(std::string_view text) noexcept
     {
         int32_t value = 0;
-        // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): the check looks for a `data()`
-        // that reaches a callee with no length. `from_chars` takes the end pointer, so the length is
-        // right there. Requiring the whole field to be consumed is what rejects a partial number.
+        // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): from_chars takes the end pointer
         const char* const end = text.data() + text.size();
         const std::from_chars_result result = std::from_chars(text.data(), end, value);
         // C++26 will finally let us boolean convert from_chars_result directly.... please....
@@ -74,8 +69,7 @@ namespace
                             .EndColumn = ParseInt(fields[k_StartLineField + 3]) };
     }
 
-    /** `getSeverityName` in `slang-diagnostic-sink.h` writes these. `ignored` never reaches the
-     * output, because a disabled diagnostic returns before it renders. */
+    /** The names of `getSeverityName` in `slang-diagnostic-sink.h`. */
     DiagnosticSeverity ToSeverity(std::string_view name) noexcept
     {
         if (name == "note")
@@ -96,7 +90,6 @@ namespace
         }
         else [[unlikely]]
         {
-            // if slang adds any new severity names, we'll return this to raise it clearly
             std::println(stderr, "Unknown Slang Error name {} in SlangDiagnosticParser::ToSeverity", name);
             return DiagnosticSeverity::Error;
         }
@@ -117,8 +110,7 @@ namespace
         return line;
     }
 
-    /** Slang writes `E` followed by the padded number, and a bare `E` when the diagnostic has no
-     * code. A bare `E` becomes an empty code, because `E` alone identifies nothing. */
+    /** A bare `E` means no code, and becomes empty. */
     std::string ParseCode(std::string_view field)
     {
         return field.size() > 1u && field.front() == 'E' ? std::string{ field } : std::string{};
@@ -154,7 +146,6 @@ namespace
                                .Message = std::string{ fields[k_MessageField] } };
     }
 
-    /** Collects the records of one text, so the caller reports each one once and in order. */
     class RecordBuilder final
     {
     public:
@@ -172,8 +163,7 @@ namespace
                 return;
             }
 
-            // An attachment with nothing above it has nothing to attach to, so it becomes a record of
-            // its own rather than disappearing.
+            // an attachment with nothing to attach to becomes its own record
             if (IsAttachment((*fields)[k_SeverityField]) && !records.empty())
             {
                 Diagnostic& prevDiag = records.back();

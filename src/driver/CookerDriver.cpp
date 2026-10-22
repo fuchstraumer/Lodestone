@@ -50,12 +50,9 @@ namespace
         return std::format("{}_{}_{}.json", module_name, target_name, magic_enum::enum_name(kind));
     }
 
-    /** An empty grid of (profile, module) environments, in the order the targets were named. */
     CookedLibrary MakeEmptyLibrary(const SharedCookState& cook_state);
-    /** Stage 8: the bundle, its round trip, and the dedup report, all from the one frozen library. */
     CookError EmitLibraryArtifacts(const CookedLibrary& library, OutputSink& sink);
 
-    // A depfile needs to have normalized absolute paths, so that change detection works correctly.
     std::string NormalizeDependencyPath(const std::filesystem::path& path)
     {
         std::error_code error;
@@ -70,7 +67,6 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
 {
     const std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
     CookStatistics cookStatistics;
-    // note that none of these actually hold state, it just makes calling them as functors easier
     //NOLINTBEGIN(readability-identifier-naming)
     const static PrepareCookStep PrepareCook;
     const static PrepareModuleStep PrepareModule;
@@ -90,20 +86,15 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
 
     CookedLibrary library = MakeEmptyLibrary(cookState);
     const size_t moduleCount = library.ModuleNames.size();
-    // For now, cooked modules point into their own permutation spcae, and the libraries have to outlive
-    // this loop. So, we keep the space in unique_ptrs (for now) so all axes stored in outputs remain valid.
+    // cooked modules point into their spaces, which must outlive the loop
     std::vector<std::unique_ptr<PermutationSpace>> permutationSpaces;
     permutationSpaces.reserve(library.Environments.size());
-    // input source paths for the depfile. each target reads the same files, so this has duplicates until
-    // the sort below
     std::vector<std::string> dependencyPaths;
 
     for (auto&& [moduleIdx, modulePath] : std::views::enumerate(cookState.Options.ModulePaths))
     {
         for (auto&& [targetIdx, targetName] : std::views::enumerate(cookState.Options.TargetNames))
         {
-            // Each module's preparation involves a slang bootstrap compile, which creates the compiler
-            // we'll use later and walks the root (no specializations) source code of the module.
             CookResult<PreparedCompiler> preparedModuleResult = PrepareModule(cookState,
                                                                               modulePath,
                                                                               targetName);
@@ -121,14 +112,9 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                     dependencyPaths.push_back(NormalizeDependencyPath(dependencyPath));
                 }
             }
-            // The preparation step allows us to do exactly this part - figure out what axes exist in the module's source code.
             std::vector<RawAxisDeclaration> rawAxes = preparedModule.Compiler->BuildAxisDeclarations();
             const std::string_view moduleName = cookState.AllModuleNames[static_cast<size_t>(moduleIdx)];
             const SymbolTable& symbolTable = preparedModule.Compiler->GetSymbolTable();
-            // The permutation space needs the symbol table for the active module + the raw axes to build itself
-            // With that, it can fully validate and get set up to generate all the possible permutations
-            // (Which are returned in the variants table out of this - not actually containing source code,
-            //  but just keys based on whatever axes and permutations exist in the module's source code)
             CookResult<PreparedPermutationSpace> spaceResult = PreparePermutationSpace(cookState,
                                                                                        moduleName,
                                                                                        targetName,
@@ -162,10 +148,7 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                 }
             }
 
-            // This is the actual meat of the operation: this will use a thread pool to build all the permutations of the 
-            // current module+target pairing concurrently. This step also runs interning, which deduplicates identical
-            // data across permutations. This could probably be pulled out to this level, and ideally at some point I'll
-            // do just that (we could fuse it across the *whole* library instead of per-module), but not yet.
+            // todo: intern across the whole library, not per module
             permutationSpaces.emplace_back(std::make_unique<PermutationSpace>(std::move(preparedSpace.Space)));
             CookResult<BuiltModule> buildResult = BuildModule(cookState,
                                                               moduleName,
@@ -210,14 +193,8 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                 }
             }
             
-            // operator+= uses atomic_ref to safely update the statistics in a potentially multithreaded context
-            // we can improve this in the future, but for now that works just fine
             cookStatistics += builtModule.Statistics;
 
-            // Last step: resolve everything into it's final form. This mostly just "consumes" the memory of the interner,
-            // moving most of it's members into itself: but it also performs some final validation of the source code
-            // and reflection data to make sure that interning/deduplication has been correctly applied.
-            // The key "extra data" from this is just information on the efficiency of dedupe per field type.
             CookResult<FinalizedModule> finalizeResult = FinalizeModule(cookState,
                                                                         std::move(builtModule.Module),
                                                                         builtModule.CompiledVariants);
@@ -237,8 +214,7 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                 }
             }
 
-            // Independent of --dump-stage. This block was once inside the Cooked dump branch, so
-            // --dump-sources alone wrote nothing.
+            // independent of --dump-stage: it was once inside the Cooked dump branch, and wrote nothing alone
             if (cookState.Options.DumpSources)
             {
                 const std::string outputDir = std::format("{}_{}_sources", moduleName, targetName);
@@ -251,7 +227,6 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                 }
             }
 
-            // write into slot: when we thread this, that should just work since the vector is never resized after initial allocation
             const size_t environmentIndex =
                 (static_cast<size_t>(targetIdx) * moduleCount) + static_cast<size_t>(moduleIdx);
             library.Environments[environmentIndex] = std::move(finalizeResult->Module);
@@ -267,7 +242,6 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
         return std::unexpected(ReportError(diagnostics, CookError::ReflectionMismatch, errStr));
     }
 
-    // a validator over every profile at once, so it runs after the last module and before the emit
     const CookError pairsError = VerifySamplerPairsAcrossProfiles(library);
     if (pairsError != CookError::Success)
     {
@@ -284,7 +258,6 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
 
     if (cookState.Options.WriteDepfile)
     {
-        // the policy file decides which variants get cooked, so editing it must trigger a re-cook too
         if (cookState.Options.PolicyFile.has_value())
         {
             dependencyPaths.push_back(NormalizeDependencyPath(cookState.Options.PolicyFile.value()));
@@ -310,10 +283,7 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
 namespace
 {
 
-    /** Cooks twice into memory and compares every artifact. Enumeration order is sorted and the
-     * interner numbers entries in first-encounter order, so two cooks of one input must agree byte
-     * for byte. A difference means an unordered container's iteration order reached the output, which
-     * otherwise shows up months later as a rebuild that changes nothing. */
+    /** A difference means an unordered container's order reached the output. */
     CookResult<CookStatistics> RunCookTwiceAndCompare(const CookerOptions& options,
                                                       OutputSink& sink,
                                                       DiagnosticSink& diagnostics)
@@ -424,7 +394,6 @@ namespace
             return manifestWriteError;
         }
 
-        // read from the written bytes through the client views, so the report states what a renderer reads
         const CookResult<ResourceReport> resourceReport = BuildResourceReport(*manifest);
         if (!resourceReport)
         {
@@ -444,7 +413,6 @@ namespace
 
 CookResult<CookStatistics> RunCook(CookerOptions options, OutputSink& sink)
 {
-    // create one diag sink for the *whole* cook
     StderrDiagnosticSink diagnostics;
     const std::string_view artifactNames[4]
     {
@@ -454,7 +422,7 @@ CookResult<CookStatistics> RunCook(CookerOptions options, OutputSink& sink)
         k_DepfileName
     };
 
-    // a failed cook must leave no manifest of an earlier cook, or a reader takes the old file for this cook's output
+    // a failed cook must leave no stale manifest for a reader to take as its output
     for (const std::string_view artifactName : artifactNames)
     {
         if (sink.RemoveArtifact(artifactName) != CookError::Success)

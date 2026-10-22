@@ -30,7 +30,6 @@ ThreadPool::ThreadPool() noexcept = default;
 
 ThreadPool::~ThreadPool()
 {
-    // stop and join the workers before the serialized modules and the condition variable are destroyed
     workers.clear();
 }
 
@@ -39,19 +38,17 @@ CookError ThreadPool::Initialize(SlangCompilerCreateInfo create_info, std::vecto
     createInfo = std::move(create_info);
     serializedModules = std::move(serialized_modules);
 
-    // hardware_concurrency returns 0 when the count is unknown, and zero workers would compile nothing
+    // hardware_concurrency can return 0
     numThreads = createInfo.MultithreadVariantBuild ? std::max(std::thread::hardware_concurrency(), 1u) : 1u;
     if (numThreads > 1u)
     {
-        // take off one thread for the main thread, since it works as a helper after dispatching
+        // the calling thread helps after dispatch
         --numThreads;
     }
 
     workers.reserve(numThreads);
     for (size_t i = 0; i < numThreads; ++i)
     {
-        // need to inject stop_token since jthread invocable check doesn't work
-        // with member functions taking stop_token? i think
         auto workerLambda = [this, i](std::stop_token token)
         {
             workerFunction(token, i);
@@ -94,7 +91,6 @@ void ThreadPool::runJobs(SlangModuleContext& module_context, CompileBatch& batch
 {
     while (true)
     {
-        // all we need is a unique index, not a strictly ordered one
         const int32_t jobIndex = batch.NextJobIndex.fetch_add(1, std::memory_order_relaxed);
         if (jobIndex >= std::ssize(batch.Variants))
         {
@@ -103,7 +99,6 @@ void ThreadPool::runJobs(SlangModuleContext& module_context, CompileBatch& batch
 
         const auto jobIndexU = static_cast<size_t>(jobIndex);
         SlangVariantCompiler variantCompiler;
-        // todo: standardize how these two take diagnostic sinks, instead of one being pointer and one being reference
         CookResult<LinkedVariant> variantBuildResult =
             variantCompiler.CompileVariant(module_context, batch.Variants[jobIndexU], batch.DiagnosticSinks[jobIndexU]);
         SlangReflector variantReflector(module_context.EntryPointNames(),
@@ -119,11 +114,9 @@ void ThreadPool::runJobs(SlangModuleContext& module_context, CompileBatch& batch
 SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDescriptor>& variants,
                                                      DiagnosticSink& diagnostic_sink)
 {
-    // we create recording diagnostic sinks for each variant to capture their diagnostics separately,
-    // and we'll merge them into the main sink (no matter it's type) after the work completes.
     std::vector<RecordingDiagnosticSink> diagnosticSinks;
     diagnosticSinks.resize(variants.size());
-    // one sink for each worker, and the last one for the calling thread
+    // the last sink is the calling thread's
     std::vector<RecordingDiagnosticSink> threadSinks;
     threadSinks.resize(workers.size() + 1u);
 
@@ -151,7 +144,6 @@ SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDe
     // after waking everyone, do our solemn best to help out
     if (createInfo.MultithreadVariantBuild)
     {
-        // only enter here if multithreading already enabled: if not, let the singular worker toil away
         SlangModuleContext moduleContext;
         if (prepareContext(moduleContext, currBatch, threadSinks.back()) == CookError::Success)
         {
@@ -162,12 +154,12 @@ SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDe
     done.wait();
 
     {
-        // the batch lives on this stack frame. clear the pointer so that no later reader can follow it
+        // the batch lives on this stack frame
         const std::scoped_lock<std::mutex> jobsMutex(mutex);
         activeBatch = nullptr;
     }
 
-    // a job that no thread took is left only when every thread failed its setup. it gets the setup error
+    // a job is left only when every thread failed its setup
     if (currBatch.SetupError.load() != CookError::Success)
     {
         for (CookResult<RawVariant>& result : results)
@@ -179,7 +171,7 @@ SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDe
         }
     }
 
-    // thread setup first, so that the cause of a failure prints before its effects
+    // setup errors first, so the cause prints before its effects
     for (auto&& sink : threadSinks)
     {
         for (auto&& record : sink.Records())
@@ -225,7 +217,7 @@ void ThreadPool::workerFunction(const std::stop_token& stop_token,
             batch = activeBatch;
         }
 
-        // a failed setup skips this batch only. the thread must stay, because the latch of each later batch counts it
+        // the thread must stay: each later batch's latch counts it
         SlangModuleContext moduleContext;
         if (prepareContext(moduleContext, *batch, batch->ThreadSinks[thread_idx]) == CookError::Success)
         {

@@ -34,15 +34,12 @@ using detail::RunOf;
 
 namespace
 {
-    /** True when pair `lhs` of `lhs_layout` and pair `rhs` of `rhs_layout` name the same texture placement and
-     * the same sampler placement. `Merge` checked that every resource is Bound. */
     bool SamePairPlacement(const LayoutRange& lhs_layout,
                            const SamplerTexturePair& lhs,
                            const LayoutRange& rhs_layout,
                            const SamplerTexturePair& rhs) noexcept;
     // compare by text, because the two resources can come from two environments
     bool TagsEqual(const ResolvedResource& lhs, const ResolvedResource& rhs) noexcept;
-    /** The source of a value that a size attribute states: per variant when an axis changes the footprint. */
     CreationSource SourceOfFootprint(const ResolvedResource& resource, bool stated) noexcept;
     void DescribeTexture(const ResolvedResource& resource, CreationFields& fields) noexcept;
 } // namespace
@@ -269,7 +266,6 @@ CreationFields DescribeCreation(const ResolvedResource& resource) noexcept
         break;
     case BindingKind::Texture:
         DescribeTexture(resource, fields);
-        // the sample type limits the format, and the renderer chooses one
         fields.Format = CreationSource::Cpu;
         break;
     case BindingKind::CombinedTextureSampler:
@@ -281,7 +277,6 @@ CreationFields DescribeCreation(const ResolvedResource& resource) noexcept
         fields.SamplerState = CreationSource::Cpu;
         break;
     default:
-        // the remaining kinds have no reflection that states their creation fields yet
         break;
     }
     return fields;
@@ -312,7 +307,6 @@ BufferUsageFlags ResolvedResource::RequiredBufferUsage() const noexcept
 
 uint32_t ResolvedResource::Index() const noexcept
 {
-    // the record points into the binding table, so its distance from the table start is its index
 
     return static_cast<uint32_t>(record - environment->Bindings().data());
 }
@@ -369,10 +363,8 @@ bool LayoutRange::Empty() const noexcept
 
 ResolvedResource LayoutRange::operator[](uint32_t position) const noexcept
 {
-    // visibility entries are positions in the variant's resource list, and the footprint list has the
-    // same order. this is the only place that resolves that chain
+    // the only place that resolves visibility -> resource list -> footprint
     const uint32_t local = visible[position];
-    // recall that footprints can be null, this is expected behavior - some resources may not have compile-time sizing info
     const Footprint* footprint = local < footprints.size() ? &footprints[local] : nullptr;
     return ResolvedResource{ environment, &environment->BindingRecord(resources[local]), footprint };
 }
@@ -410,6 +402,21 @@ WorkgroupSize EntryPointInstanceView::Workgroup() const noexcept
         .X = entryPointInstance->WorkgroupX,
         .Y = entryPointInstance->WorkgroupY,
         .Z = entryPointInstance->WorkgroupZ };
+}
+
+uint32_t EntryPointInstanceView::WorkgroupMemoryBytes() const noexcept
+{
+    return environment->SourceWorkgroupMemoryBytes(entryPointInstance->Source);
+}
+
+std::span<const uint64_t> EntryPointInstanceView::RequiredCapabilities() const noexcept
+{
+    return environment->SourceCapabilities(entryPointInstance->Source);
+}
+
+bool EntryPointInstanceView::RequiresCapability(uint32_t capability_index) const noexcept
+{
+    return environment->SourceNeedsCapability(entryPointInstance->Source, capability_index);
 }
 
 LayoutRange EntryPointInstanceView::Layout() const noexcept
@@ -523,12 +530,9 @@ const Variant& VariantView::Record() const noexcept
 
 namespace
 {
-    // no Bound key reaches this value: a group of 0xFFFFFFFF with a binding of 0xFFFFFFFF
     constexpr uint64_t k_NoPlacement = std::numeric_limits<uint64_t>::max();
 
-    /**The smallest placement under any cursor, where the cursor is the position within each entry 
-     * entry point's layout range. All the ranges are in strictly ascending order already, so this
-     * is the next key of a N-way merge - where N is the number of stages being merged. */
+    /** The next key of the N-way merge over the stages' sorted layout ranges. */
     uint64_t NextPlacement(std::span<const LayoutRange> ranges,
                            std::span<const uint32_t> stage_layout_positions) noexcept
     {
@@ -547,9 +551,7 @@ namespace
         return next;
     }
 
-    /** Writes the index of each stage whose layout position index sits on `key` into `out_stages`,
-      * and returns how many stages matched that key. This tells us how many entry points / stages
-      * are "sharing" a resource placement. */
+    /** Writes the stages whose current position is at `key` into `out_stages`, and returns their count. */
     uint32_t StagesAtPlacement(std::span<const LayoutRange> ranges,
                                std::span<const uint32_t> stage_layout_positions,
                                uint64_t key,
@@ -564,12 +566,8 @@ namespace
             }
 
             const ResolvedResource& resource = range[stage_layout_positions[i]];
-            // PlacementValue is just a generic container of data per placement binding model...
             if (BoundPlacementKey(resource.PlacementValue()) == key)
             {
-                // if the current key matches the current entry points resource at it's active
-                // position, we record this stage as one that uses the given placement key.
-                // this is the culmination of the merge at this step, effectively giving us the result we are after
                 out_stages[count] = static_cast<uint32_t>(i);
                 ++count;
             }
@@ -579,21 +577,17 @@ namespace
         return count;
     }
 
-    /** True when two resources at one placement can share one layout entry. Compares the fields read by a
-     * bind group layout entry or a descriptor set layout binding. Names are not compared. */
+    /** Compares the fields of a layout entry. Names are not compared. */
     bool SameLayoutBinding(const ResolvedResource& lhs, const ResolvedResource& rhs) noexcept
     {
-        // one binding record: the same environment and the same resource, so we can shortcut
         if (&lhs.Record() == &rhs.Record())
         {
             return true;
         }
-        // otherwise we have to compare the fields
         return lhs == rhs;
     }
 
-    // The blocks overlap from offset 0, so the bytes of the shorter block must have the same meaning in the
-    // longer block. The members are in declaration order, so the shorter list must be a prefix of the longer list.
+    // the blocks overlap from offset 0, so the shorter member list must be a prefix of the longer one
     bool SharePushConstantPrefix(const EntryPointConstantsView& lhs, const EntryPointConstantsView& rhs) noexcept
     {
         const UniformMemberRange lhsMembers = lhs.Members();
@@ -628,7 +622,6 @@ ManifestResult<MergedLayoutView> MergedLayoutView::Merge(std::span<const EntryPo
     MergedLayoutView view;
     view.stageCount = static_cast<uint32_t>(entry_points.size());
 
-    // don't allow duplicate stages
     ShaderStageKind seenStages = ShaderStageKind::Invalid;
     for (int32_t i = 0u; std::cmp_less(i, view.stageCount); ++i)
     {
@@ -674,15 +667,10 @@ ManifestResult<MergedLayoutView> MergedLayoutView::Merge(std::span<const EntryPo
             }
         }
 
-        // will need to validate/verify layouts as bound/pointer/bindless etc here as appropriate, too
     }
 
-    // The conflict pass is the same N-way walk the iterator does, with no output. after this,
-    // iteration can't fail and can just run unchecked with no concern for the layouts
+    // the iterator's walk with no output, so that iteration afterwards cannot fail
     const std::span<const LayoutRange> ranges = std::span{ view.layoutRanges }.first(view.stageCount);
-    // stageLayoutPositions is the index (per entry point) in that entry point's layout range, 
-    // telling us where in our walk through the layout ranges each stage currently is.
-    // we need that so we can correctly merge the layout ranges across stages.
     std::array<uint32_t, k_MaxPipelineStages> stageLayoutPositionsArray;
     stageLayoutPositionsArray.fill(0u);
     const std::span<uint32_t> stageLayoutPositions = std::span{ stageLayoutPositionsArray }.first(view.stageCount);
@@ -757,7 +745,6 @@ MergedResource MergedLayoutView::Iterator::operator*() const noexcept
     const std::span<const LayoutRange> ranges = std::span{ layout->layoutRanges }.first(layout->stageCount);
     const std::span<const uint32_t> activePositions = std::span{ positions }.first(layout->stageCount);
     const uint64_t key = NextPlacement(ranges, activePositions);
-    // a dereference of end() is undefined, as it is for every iterator: begin() != end() means a key exists
     assert(key != k_NoPlacement);
 
     std::array<uint32_t, k_MaxPipelineStages> stagesAtKey{};
@@ -780,7 +767,6 @@ MergedLayoutView::Iterator& MergedLayoutView::Iterator::operator++() noexcept
     const std::span<uint32_t> activePositions = std::span{ positions }.first(layout->stageCount);
     const uint64_t key = NextPlacement(ranges, activePositions);
 
-    // every stage that reads this placement moves past it together
     std::array<uint32_t, k_MaxPipelineStages> stagesAtKey{};
     const uint32_t matchCount = StagesAtPlacement(ranges, activePositions, key, stagesAtKey);
     for (uint32_t match = 0u; match < matchCount; ++match)
@@ -839,8 +825,7 @@ MergedLayoutView::PairIterator::PairIterator(const MergedLayoutView* _layout, ui
 
 void MergedLayoutView::PairIterator::skipRepeats() noexcept
 {
-    // a pipeline has a few stages and each stage a few pairs, so a scan of the earlier stages is cheap and
-    // needs no storage. the pairs of one stage are unique already
+    // few stages with few pairs each, so scanning the earlier stages is cheap
     while (stage < layout->stageCount)
     {
         const std::span<const SamplerTexturePair> pairs = layout->pairLists[stage];
@@ -960,7 +945,6 @@ namespace
         fields.Usage = CreationSource::Shader;
         fields.Dimension = CreationSource::Shader;
         fields.Extent = SourceOfFootprint(resource, resource.ExtentX() != 0u);
-        // a cube has six layers, and every other shape that is not an array has one
         fields.ArrayLayers = ResourceShapeIsArray(shape) ? CreationSource::Cpu : CreationSource::Shader;
         fields.MipLevels = CreationSource::Cpu;
         fields.SampleCount = ResourceShapeIsMultisample(shape) ? CreationSource::Cpu : CreationSource::Shader;

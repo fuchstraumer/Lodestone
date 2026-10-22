@@ -29,10 +29,7 @@
 #include <utility>
 #include <vector>
 
-// The resource report (task L16), with no Slang. A hand-built module has two boolean axes: SIZE changes the element
-// count of one buffer, and DEBUG changes nothing. The test measures the footprint axes from the model, compares them
-// with the declared axes (the validator), reads them back through the manifest, and reads the creation fields that
-// `DescribeCreation` and the report give.
+// SIZE changes one buffer's element count, and DEBUG changes nothing
 
 namespace
 {
@@ -79,7 +76,7 @@ CookedModule BuildModule(const PermutationSpace& space, std::span<const VariantC
     module.Name = "ReportModule";
     module.Space = &space;
     module.EntryPoints.push_back(LibraryEntryPoint{ .Name = "CountCS", .Stage = ShaderStageKind::Compute });
-    module.Sources.emplace_back(tests::BytesOf("// one source for every variant"));
+    lodestone::tests::AddFixtureSource(module, tests::BytesOf("// one source for every variant"), lodestone::SourceCodeFacts{});
 
     ReflectedBinding counts = MakeBinding("Counts", 0u, BindingKind::StorageBuffer, ResourceShape::StructuredBuffer);
     counts.ElementStride = 4u;

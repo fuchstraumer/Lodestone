@@ -8,17 +8,8 @@
 #include <string_view>
 #include <vector>
 
-/**Evaluates the expression carried by a lodestone attribute declared in Slang source code.
- * The expression travels as a string because integral attribute expressions fold at compile time,
- * but all of our attribute expressions are intended to be evaluated at link-time. Leaving it as a
- * string allows it to pass through untouched, so that we can evaluate it and substitute values
- * ourselves as part of cook.
- * 
- * This used to be `SizeExpression.hpp`, as we only used this for sizing resources. Now it also
- * evaluates expressions for permutation and constraint axes, so it's more general-use.
- *
- * Nothing here knows about Slang or about the permutation types. It takes a string and a symbol
- * table, and it is therefore testable on its own. */
+/** Evaluates `[ls_*]` attribute expressions and axis constraints. They travel as strings, because Slang folds
+ * attribute integers at compile time and our constants bind at link time. */
 namespace lodestone
 {
 
@@ -39,11 +30,10 @@ struct AttrExprSymbol
  *     unary      := ('!' | '-') unary | primary
  *     primary    := integer | identifier | '(' logical ')'
  *
- * Integers are decimal or `0x` hexadecimal, with an optional `u` or `U` suffix so an expression can
- * be copied out of Slang source unchanged. */
+ * Integers are decimal or `0x` hex, with an optional `u` suffix, as in Slang source. */
 CookResult<int64_t> EvaluateExpression(std::string_view expression, std::span<const AttrExprSymbol> symbols, DiagnosticSink& sink);
 
-/** @brief Collects all named identifiers from the given expression, used to determine which axes an expression names before full evaluation. */
+/** @brief Returns the identifiers an expression names, without evaluating it. */
 CookResult<std::vector<std::string>> CollectExpressionIdentifiers(std::string_view expression, DiagnosticSink& sink);
 
 

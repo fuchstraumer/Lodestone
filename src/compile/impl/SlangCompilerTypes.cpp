@@ -49,9 +49,7 @@ std::vector<std::byte> BlobToBytes(slang::IBlob* blob)
 
 std::string BlobToString(slang::IBlob* blob)
 {
-    // Slang leaves the blob null when a call has nothing to say, and a clean codegen is the common
-    // case. `GenerateOneEntryPoint` reads its diagnostic blob without asking, so the check is here
-    // and not only in `ReportDiagnostics`.
+    // Slang leaves the blob null when it has nothing to say
     if (blob == nullptr)
     {
         return {};
@@ -62,9 +60,6 @@ std::string BlobToString(slang::IBlob* blob)
 
 void ReportDiagnostics(DiagnosticSink& sink, std::string_view context, slang::IBlob* blob)
 {
-    // this check is the point of this function: only report diagnostics if blob has content,
-    // but otherwise make it trivial to call inline in case we want to report diagnositcs from
-    // slang calls
     if (blob == nullptr || blob->getBufferSize() == 0u)
     {
         return;

@@ -8,14 +8,21 @@
 
 #include <cstdint>
 #include <span>
+#include <vector>
 #include <utility>
 
-/** Builders for the `CookedModule` values that tests write by hand and pass to the emitter. A `LibraryVariant`
- * keeps several vectors with one entry for each entry point, and each new field of that kind used to break every
- * hand-built fixture at once (first the canonical assignment, then the sampler pair index). These
- * builders set every such field, so a new field changes this file and no fixture. */
+/** Builders for hand-built `CookedModule` values. They set every per-entry-point field, so a new field changes this
+ * file and no fixture. */
 namespace lodestone::tests
 {
+
+/** Appends one source and its facts. `CookedModule::SourceFacts` runs parallel to `CookedModule::Sources`, so a
+ * fixture adds both together. */
+inline void AddFixtureSource(CookedModule& module, std::vector<std::byte> code, SourceCodeFacts facts)
+{
+    module.Sources.push_back(std::move(code));
+    module.SourceFacts.push_back(std::move(facts));
+}
 
 /** One entry point of a hand-built variant: the index into each per-entry-point table of the module. */
 struct FixtureInstance
@@ -40,9 +47,7 @@ inline FixtureInstance ComputeInstance(uint32_t source, uint32_t visibility)
                             .Workgroup = WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u } };
 }
 
-/** Returns a variant of `space` with the assignment `active`, its canonical assignment, and one entry in every
- * per-entry-point vector for each of `instances`. The resource list and the footprint list are 0; a test that
- * needs others sets them on the result. */
+/** The resource and footprint lists are 0: set others on the result. */
 inline LibraryVariant MakeFixtureVariant(const PermutationSpace& space,
                                          uint64_t index,
                                          PermutationAssignment active,

@@ -19,7 +19,6 @@ CookResult<PreparedCompiler> PrepareModuleStep::operator()(const SharedCookState
                                                            std::filesystem::path module_path,
                                                            std::string_view target_name) const
 {
-    // first step: initialize the compiler and have it begin building this particular module
     SlangCompilerCreateInfo createInfo;
     createInfo.ModulePath = std::move(module_path);
     createInfo.ModuleCacheDirectory = shared_state.Options.ModuleCacheDirectory;

@@ -169,9 +169,6 @@ void TestValidationAgainstSpace(TestRunner& runner)
 
 } // namespace
 
-// The policy is opt-in. Modules with no entry, or with an entry that has no targets
-// table, apply no policy. Only modules that declare a policy for some other target, but not for the cooked
-// one, are suspicious.
 void TestTargetCoverage(TestRunner& runner)
 {
     runner.BeginSection("target coverage");

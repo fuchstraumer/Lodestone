@@ -29,7 +29,6 @@ namespace lodestone::manifest::detail
 namespace
 {
 
-    /** One table to bounds-check: `Count` records of `RecordSize` bytes, starting at `Offset`. */
     struct Section64
     {
         ShaderManifestTable Table{ ShaderManifestTable::Invalid };
@@ -47,11 +46,9 @@ namespace
     using BundleValidator = ErrorState (*)(const Header&, std::span<const std::byte>) noexcept;
     using EnvironmentValidator = ErrorState (*)(const EnvironmentContext&) noexcept;
 
-    /** True when a table of `count` records of `record_size` bytes starts at `offset` and stays inside a
-     * region of `region_size` bytes. An empty table at any offset is in bounds. */
+    /** An empty table is in bounds at any offset. */
     bool TableIsInBounds(TableRef loc, size_t record_size, uint64_t region_size) noexcept;
     bool TableIsInBounds(TableRef64 loc, size_t record_size, uint64_t region_size) noexcept;
-    /** True when a grid of `rows * columns` records fits a region, checked without an overflow. */
     bool GridFitsRegion(uint64_t rows, uint64_t columns, size_t record_size, uint64_t region_size) noexcept;
     ErrorState ValidateSections(std::span<const Section> sections, uint64_t region_size) noexcept;
     ErrorState ValidateSections(std::span<const Section64> sections, uint64_t region_size) noexcept;
@@ -78,29 +75,28 @@ namespace
     ErrorState ValidateAxisMasks(const EnvironmentContext& context) noexcept;
     ErrorState ValidateAxisRelevance(const EnvironmentContext& context) noexcept;
     ErrorState ValidateFootprintAxes(const EnvironmentContext& context) noexcept;
+    ErrorState ValidateCapabilityNames(const EnvironmentContext& context) noexcept;
+    ErrorState ValidateSourceCapabilities(const EnvironmentContext& context) noexcept;
     ErrorState ValidateRasterStates(const EnvironmentContext& context) noexcept;
     ErrorState ValidateVertexInputs(const EnvironmentContext& context) noexcept;
     ErrorState ValidateUniformMembers(const EnvironmentContext& context) noexcept;
     ErrorState ValidateSpecializationConstants(const EnvironmentContext& context) noexcept;
 
-    // Yes, I know how branchy all of this is. But we pay it once when opening the manifest and then there's
-    // no branches during actual queries, and the error type here can hold rich information that makes
-    // debugging easier. This is mainly intended to catch errors in the manifest file itself, like corruption
-    // or truncation: a rare issue, but a huge pain to debug if no infrastructure exists for catching it.
-    // You should read this code as "I once spent a weekend debugging corrupted shader variants when trying
-    // to ship a game, and it messed me up so bad I'm willing to write this BS"
-    // The order matters: each validator may read what the validators before it proved in bounds.
+    // Yes, I know how branchy this is. We pay it once at open, and queries run with no branches. Read it as "I once spent
+    // a weekend debugging corrupted shader variants while shipping a game, and I'm willing to write this BS".
+    // Each validator may read what the validators before it proved in bounds.
     constexpr std::array<BundleValidator, 8u> k_BundleValidators{
         &ValidateBundleSections, &ValidateStrings,      &ValidateAxes,       &ValidateProfiles,
         &ValidateModuleHeaders,  &ValidateEntryPoints,  &ValidateModuleAxes, &ValidateDirectory,
     };
 
-    constexpr std::array<EnvironmentValidator, 16u> k_EnvironmentValidators{
+    constexpr std::array<EnvironmentValidator, 18u> k_EnvironmentValidators{
         &ValidateEnvironmentSections, &ValidateSources,      &ValidateBindings,
         &ValidateEntryPointConstants,
         &ValidateResourceIndices,     &ValidateRunTables,    &ValidateSlots,
         &ValidateVariantKeys,         &ValidateVariants,     &ValidateAxisMasks,
         &ValidateAxisRelevance,       &ValidateFootprintAxes, &ValidateRasterStates,
+        &ValidateCapabilityNames,     &ValidateSourceCapabilities,
         &ValidateVertexInputs,
         &ValidateUniformMembers,      &ValidateSpecializationConstants,
     };
@@ -112,7 +108,7 @@ namespace
             return true;
         }
 
-        // divide first, so a huge count cannot overflow the multiply
+        // divide first, so the multiply cannot overflow
         if (loc.Count > region_size / record_size)
         {
             return false;
@@ -129,7 +125,7 @@ namespace
             return true;
         }
 
-        // divide first, so a huge count cannot overflow the multiply
+        // divide first, so the multiply cannot overflow
         if (loc.Count > region_size / record_size)
         {
             return false;
@@ -193,7 +189,6 @@ namespace
             return { .Code = ErrorCode::SizeMismatch, .Detail = static_cast<uint32_t>(parsed.HeaderSize) };
         }
 
-        // the span can contain only the header region, or the whole file. anything past the file is invalid
         if (span_size < parsed.HeaderSize)
         {
             return { .Code = ErrorCode::TooSmall, .Detail = static_cast<uint32_t>(span_size) };
@@ -210,7 +205,7 @@ namespace
     //NOLINTBEGIN(modernize-use-designated-initializers)
     ErrorState ValidateBundleSections(const Header& parsed, [[maybe_unused]] std::span<const std::byte> bytes) noexcept
     {
-        // every whole-cook table lives inside the header region, so a reader of that region alone can trust it
+        // whole-cook tables stay inside the header region, so that region can be read alone
         const TableRef64 moduleLoc{ sizeof(Header), parsed.ModuleCount };
         const std::array<Section64, 6u> sections
         {
@@ -228,7 +223,6 @@ namespace
             return sectionsValid;
         }
 
-        // the directory is a grid, so check the product without overflowing it
         const bool gridFits = GridFitsRegion(parsed.Profiles.Count,
                                              parsed.ModuleCount,
                                              sizeof(EnvironmentDirectoryEntry),
@@ -265,8 +259,6 @@ namespace
 
     ErrorState ValidateAxes(const Header& parsed, std::span<const std::byte> bytes) noexcept
     {
-        // each axis stores a name string and a run in the axis value table. literal values reference
-        // nothing, so we only check the name, the run, and named values
         const std::span<const Axis> axisSpan = Map<Axis>(bytes, parsed.Axes);
         const std::span<const AxisValueType> allAxesValueSpan = Map<AxisValueType>(bytes, parsed.AxesValues);
         for (int32_t i = 0; i < std::ssize(axisSpan); ++i)
@@ -288,7 +280,6 @@ namespace
                          .Detail = axis.ValueCount };
             }
 
-            // both types and enums have values stored in string blob, verify integrity of the string indices
             if (axis.Domain != AxisValueDomain::Type && axis.Domain != AxisValueDomain::Enum)
             {
                 continue;
@@ -397,8 +388,7 @@ namespace
                              .Detail = entryPoint.NameString };
                 }
 
-                // a stage is one bit of ShaderStageKind. A merged layout ORs stages into one mask, so a value
-                // with two bits would read as two stages
+                // a merged layout ORs stages, so a value with two bits would read as two stages
                 if (entryPoint.Stage >= static_cast<uint32_t>(ShaderStageKind::Count) ||
                     !std::has_single_bit(entryPoint.Stage))
                 {
@@ -431,7 +421,6 @@ namespace
                              .Detail = moduleAxis.AxisIndex };
                 }
 
-                // an empty mask would give the axis a radix of zero, and a bit past the root values selects nothing
                 const uint32_t valueCount = axisSpan[moduleAxis.AxisIndex].ValueCount;
                 const bool maskPastValues = valueCount < 32u && (moduleAxis.LiveValuesMask >> valueCount) != 0u;
                 if (moduleAxis.LiveValuesMask == 0u || maskPastValues)
@@ -469,8 +458,7 @@ namespace
                 continue;
             }
 
-            // extents start past the header region, on an 8-byte boundary, and stay inside the file. we check
-            // against the file size from the header, because the span may contain only the header region
+            // the span may be the header region alone, so check against the file size in the header
             const bool valid = entry.ExtentOffset >= parsed.HeaderSize && (entry.ExtentOffset % 8u) == 0u &&
                                entry.ExtentSize >= sizeof(EnvironmentHeader) &&
                                entry.ExtentOffset <= parsed.FileSize &&
@@ -516,8 +504,13 @@ namespace
                                          static_cast<uint32_t>(context.EntryPointCount) * context.AxisMaskWordCount };
         const TableRef footprintAxesLoc{ environment.FootprintAxisTableOffset,
                                          environment.Bindings.Count * context.AxisMaskWordCount };
-        const std::array<Section, 23u> sections
+        const TableRef sourceCapabilitiesLoc{ environment.SourceCapabilityTableOffset,
+                                              environment.Sources.Count *
+                                                  MaskWordCountForAxes(environment.CapabilityNames.Count) };
+        const std::array<Section, 25u> sections
         {
+            Section{ ShaderManifestTable::CapabilityNames, environment.CapabilityNames, sizeof(uint32_t) },
+            Section{ ShaderManifestTable::SourceCapabilities, sourceCapabilitiesLoc, sizeof(uint64_t) },
             Section{ ShaderManifestTable::AxisRelevance, axisRelevanceLoc, sizeof(uint64_t) },
             Section{ ShaderManifestTable::FootprintAxes, footprintAxesLoc, sizeof(uint64_t) },
             Section{ ShaderManifestTable::VariantKeys, varKeysLoc, sizeof(VariantKey) },
@@ -551,7 +544,6 @@ namespace
     {
         const EnvironmentHeader& environment = context.Environment;
         const std::span<const SourceRef> sourceSpan = Map<SourceRef>(context.Extent, environment.Sources);
-        // SPIR-V sources are read as words, so the blob, each offset, and each length must be multiples of 4
         const bool readAsWords = context.CodeFormat == ShaderCodeFormat::Spirv;
         if (readAsWords && (environment.SourceBlob.Offset % sizeof(uint32_t)) != 0u)
         {
@@ -623,7 +615,7 @@ namespace
                          .RecordIndex = static_cast<uint32_t>(i) };
             }
 
-            // the string table holds each text once, so a repeated index is a repeated tag
+            // strings are stored once, so a repeated index is a repeated tag
             const std::span<const uint32_t> tags = tagSpan.subspan(binding.FirstTag, binding.TagCount);
             for (size_t tag = 0u; tag < tags.size(); ++tag)
             {
@@ -641,9 +633,7 @@ namespace
         return k_ManifestOk;
     }
 
-    /** Checks each entry point constants record alone: a known delivery, a member run inside the member table, no
-     * position on a push constant block, and no data for the delivery `None`. `ValidateVariants` checks the
-     * position of a uniform buffer, because a position is local to one instance. */
+    /** `ValidateVariants` checks uniform buffer positions, because a position is local to one instance. */
     ErrorState ValidateEntryPointConstants(const EnvironmentContext& context) noexcept
     {
         const EnvironmentHeader& environment = context.Environment;
@@ -728,7 +718,7 @@ namespace
             const std::span<const Run> runSpan = Map<Run>(context.Extent, runTable.Loc);
             for (int32_t i = 0; i < std::ssize(runSpan); ++i)
             {
-                // <= on the sum for the edge case: an empty trailing list starts at the payload count
+                // <=, because an empty trailing run starts at the payload count
                 const Run& run = runSpan[i];
                 if (static_cast<uint64_t>(run.First) + static_cast<uint64_t>(run.Count) > runTable.PayloadCount)
                 {
@@ -801,7 +791,6 @@ namespace
         const EnvironmentHeader& environment = context.Environment;
         const TableRef varKeysLoc{ environment.VariantKeyTableOffset, environment.VariantCount };
         const std::span<const VariantKey> variantKeySpan = Map<VariantKey>(context.Extent, varKeysLoc);
-        // adjacent_find lets us combine is_sorted and the uniqueness check
         const auto outOfOrder = std::ranges::adjacent_find(variantKeySpan, std::greater_equal<VariantKey>{});
         if (outOfOrder != variantKeySpan.end())
         {
@@ -815,9 +804,7 @@ namespace
 
     ErrorState ValidateVariants(const EnvironmentContext& context) noexcept
     {
-        // the most complex and annoying pass to handle, but the most beneficial: after this, all
-        // cross-references between variants, resource lists, and visibility lists are validated
-        // so that all accessors can run unchecked
+        // the most annoying pass, and the most useful: it validates every cross-reference, so accessors run unchecked
         const EnvironmentHeader& environment = context.Environment;
         const std::span<const std::byte> extent = context.Extent;
         const TableRef variantsLoc{ environment.VariantTableOffset, environment.VariantCount };
@@ -857,9 +844,7 @@ namespace
                          .Detail = variant.ResourceList };
             }
 
-            // further open question for footprint lists: should we change it so that the null check
-            // is no longer needed? We should have a sentinel value that indicates an empty or null
-            // footprint for a resource, since that is still a valid case
+            // todo: a sentinel for "no footprint" would remove this null check
             if (variant.FootprintList >= environment.FootprintLists.Count)
             {
                 return { .Code = ErrorCode::InvalidVariantFootprintListIndex,
@@ -876,18 +861,14 @@ namespace
             {
                 const std::span<const uint32_t> slotVisibilityIndices =
                     RunOf(visibilityLists, visibilityIndices, slot.Visibility);
-                // absolute offset of this run into the visibility index table, so errors can report the row
                 const uint32_t runOffset = static_cast<uint32_t>(slotVisibilityIndices.data() - visibilityIndices.data());
 
-                // The placement order is checked for each instance, not once for each visibility list: an
-                // entry indexes the resource list of the variant, and two variants can share one list.
+                // checked per instance, not per list: two variants can share a list with different resource lists
                 bool hasPreviousBound = false;
                 bool seenNotBound = false;
                 uint64_t previousKey = 0u;
                 for (int32_t j = 0; j < std::ssize(slotVisibilityIndices); ++j)
                 {
-                    // the entry indexes the variant's resource list, and the resource list was checked
-                    // against the binding table already
                     const uint32_t local = slotVisibilityIndices[j];
                     if (local >= variantResourceIndices.size())
                     {
@@ -918,8 +899,7 @@ namespace
                     hasPreviousBound = true;
                 }
 
-                // each pair names two positions in this instance's visibility list: a texture, then a sampler.
-                // like the placement order, this is checked for each instance, because the positions are local
+                // pair positions are local to the instance, so this is checked per instance too
                 const std::span<const SamplerTexturePair> slotPairs =
                     RunOf(samplerPairLists, samplerTexturePairs, slot.SamplerPairs);
                 const uint32_t pairRunOffset = static_cast<uint32_t>(slotPairs.data() - samplerTexturePairs.data());
@@ -947,8 +927,6 @@ namespace
                     }
                 }
 
-                // a uniform buffer of entry point constants is a position in this instance's visibility list, and
-                // that position must name a uniform buffer of the same size
                 const EntryPointConstants& constants = constantsSpan[slot.Constants];
                 if (constants.Delivery == std::to_underlying(EntryPointConstantsDelivery::UniformBuffer))
                 {
@@ -983,7 +961,6 @@ namespace
         const TableRef axisMaskLoc{ environment.AxisMaskTableOffset,
                                     environment.VariantCount * wordCount };
         const std::span<const uint64_t> maskSpan = Map<uint64_t>(context.Extent, axisMaskLoc);
-        // only the last word of each mask can hold a bit past the module's axes
         for (int32_t i = 0; std::cmp_less(i, environment.VariantCount); ++i)
         {
             const uint64_t lastWord = maskSpan[(static_cast<size_t>(i) * wordCount) + wordCount - 1u];
@@ -998,16 +975,16 @@ namespace
         return k_ManifestOk;
     }
 
-    /** Checks a table of `mask_count` axis masks, in the word layout of the axis mask table, for a bit past the
-     * module's axes. Only the last word of each mask can hold one. */
-    ErrorState ValidateAxisMaskBits(const EnvironmentContext& context,
-                                    uint32_t table_offset,
-                                    uint32_t mask_count,
-                                    ErrorCode error_code,
-                                    ShaderManifestTable table) noexcept
+    /** Only the last word of each mask can hold a bit past `bit_count`. */
+    ErrorState ValidateMaskBits(const EnvironmentContext& context,
+                                uint32_t table_offset,
+                                uint32_t mask_count,
+                                uint64_t bit_count,
+                                ErrorCode error_code,
+                                ShaderManifestTable table) noexcept
     {
-        const uint32_t wordCount = context.AxisMaskWordCount;
-        const auto usedBitsInLastWord = static_cast<uint32_t>(context.ModuleAxisCount % k_AxisMaskWordBits);
+        const uint32_t wordCount = MaskWordCountForAxes(bit_count);
+        const auto usedBitsInLastWord = static_cast<uint32_t>(bit_count % k_AxisMaskWordBits);
         if (wordCount == 0u || usedBitsInLastWord == 0u)
         {
             return k_ManifestOk;
@@ -1028,20 +1005,49 @@ namespace
 
     ErrorState ValidateAxisRelevance(const EnvironmentContext& context) noexcept
     {
-        return ValidateAxisMaskBits(context,
-                                    context.Environment.AxisRelevanceTableOffset,
-                                    static_cast<uint32_t>(context.EntryPointCount),
-                                    ErrorCode::InvalidAxisRelevance,
-                                    ShaderManifestTable::AxisRelevance);
+        return ValidateMaskBits(context,
+                                context.Environment.AxisRelevanceTableOffset,
+                                static_cast<uint32_t>(context.EntryPointCount),
+                                context.ModuleAxisCount,
+                                ErrorCode::InvalidAxisRelevance,
+                                ShaderManifestTable::AxisRelevance);
     }
 
     ErrorState ValidateFootprintAxes(const EnvironmentContext& context) noexcept
     {
-        return ValidateAxisMaskBits(context,
-                                    context.Environment.FootprintAxisTableOffset,
-                                    context.Environment.Bindings.Count,
-                                    ErrorCode::InvalidFootprintAxes,
-                                    ShaderManifestTable::FootprintAxes);
+        return ValidateMaskBits(context,
+                                context.Environment.FootprintAxisTableOffset,
+                                context.Environment.Bindings.Count,
+                                context.ModuleAxisCount,
+                                ErrorCode::InvalidFootprintAxes,
+                                ShaderManifestTable::FootprintAxes);
+    }
+
+    // the sort order is the cooker's promise: the text is not read here
+    ErrorState ValidateCapabilityNames(const EnvironmentContext& context) noexcept
+    {
+        const std::span<const uint32_t> names = Map<uint32_t>(context.Extent, context.Environment.CapabilityNames);
+        for (uint32_t i = 0u; i < names.size(); ++i)
+        {
+            if (names[i] >= context.StringCount)
+            {
+                return { .Code = ErrorCode::InvalidCapabilityNames,
+                         .Table = ShaderManifestTable::CapabilityNames,
+                         .RecordIndex = i,
+                         .Detail = names[i] };
+            }
+        }
+        return k_ManifestOk;
+    }
+
+    ErrorState ValidateSourceCapabilities(const EnvironmentContext& context) noexcept
+    {
+        return ValidateMaskBits(context,
+                                context.Environment.SourceCapabilityTableOffset,
+                                context.Environment.Sources.Count,
+                                context.Environment.CapabilityNames.Count,
+                                ErrorCode::InvalidSourceCapabilities,
+                                ShaderManifestTable::SourceCapabilities);
     }
 
     ErrorState ValidateRasterStates(const EnvironmentContext& context) noexcept
@@ -1151,7 +1157,6 @@ ErrorState OpenEnvironmentExtent(const BundleView& bundle,
                                  uint32_t module_index,
                                  std::span<const std::byte> extent_bytes) noexcept
 {
-    // The indices and the bytes come from the caller, so this is an ingestion surface and it checks them.
     if (profile_index >= bundle.Profiles().size() || module_index >= bundle.ModuleCount())
     {
         return { .Code = ErrorCode::IndexOutOfBounds,

@@ -13,10 +13,7 @@
 namespace lodestone
 {
 
-/**@brief The result of the variant compiler: a fully linked variant, but with
- * none of the reflection completed. This purely exists to invoke slang and
- * retrieve bytecode.
- */
+/** @brief A linked variant and its code, before reflection. */
 struct LinkedVariant
 {
     Slang::ComPtr<slang::IComponentType> LinkedProgram;

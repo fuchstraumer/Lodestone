@@ -10,32 +10,12 @@
 #include <utility>
 #include <vector>
 
-/**
- * Collapses equal artifacts onto one entry, and records who mapped where. The name Interner
- * comes from the compiler world, where it is used to collapse equal strings onto one copy. This
- * is just a generalized interner of sorts, a kind of "hash table with provenance".
- *
- * The provenance is important because there are many ways to get the same artifact. We
- * want to know what those inputs were, so that if we have issues with a specific instance
- * of an artifact, we can trace it back to it's source
- *
- *
- * Three rules control this class:
- *
- * 1. Hashes only find buckets. A hash does not identify the data.
- *    If hashes match, the class compares the bytes. If bytes are different,
- *    the class keeps both items and records the collision.
- *
- * 2. The class records all sources. A unique item keeps a list of its
- *    original inputs. You can always trace an output back to its inputs.
- *
- * 3. You can stop deduplication. The `Disable()` function gives every item
- *    its own index. The build output must be correct and identical in both modes.
- */
+/** A hash table with provenance: it collapses equal artifacts onto one entry and records every input that mapped
+ * there. Hashes only find buckets and bytes decide. `Disable()` gives every artifact its own entry, and the output
+ * must stay correct in both modes. */
 namespace lodestone
 {
 
-/** @brief One artifact that mapped onto a unique entry. */
 struct ProvenanceRecord
 {
     std::string EntryPointName;
@@ -43,27 +23,20 @@ struct ProvenanceRecord
     uint64_t VariantIndex{ 0u };
 };
 
-/** @brief The result - a lookup outcome - of interning */
 struct InternResult
 {
     uint32_t Index{ 0u };
     bool WasNew{ false };
 };
 
-/**@brief Useful tracking metrics to monitor interning performance, and surface changes */
 struct InternerStatistics
 {
     uint32_t ArtifactsSeen{ 0u };
     uint32_t UniqueEntries{ 0u };
-    /** Equal hash, unequal bytes. The byte comparison caught it and kept both. */
     uint32_t HashCollisions{ 0u };
-    /** Byte comparisons that a hash hit forced. A rising count means a worse hash, not a bug. */
+    /** A rising count means a worse hash, not a bug. */
     uint32_t ByteComparisons{ 0u };
 };
-/**@brief Note that this is templated on the payload type: that affects how equality and hashing can be
- * performed, and is another way we give ourselves flexibilty with output formats. This could be changed to be
- * SPIR-V, or GLSL, or DXIL, or any other format we want to support. The interner doesn't care, it just needs
- * to be able to hash and compare the payload type. */
 template<typename PayloadType>
 class ContentInterner final
 {
@@ -80,7 +53,6 @@ public:
         buckets.reserve(256);
     }
 
-    /** Turns off collapsing. Every artifact then gets its own index, and the tables stay correct. */
     void Disable() noexcept
     {
         dedupeEnabled = false;
@@ -102,7 +74,6 @@ public:
         }
 
         const ContentHashValue hash = hashFunction(payload);
-        // use [] here *because* we want to create the bucket
         std::vector<uint32_t>& bucket = buckets[hash];
 
         for (uint32_t candidate : bucket)
@@ -114,7 +85,7 @@ public:
                 return InternResult{ candidate, false };
             }
 
-            // Same bucket, different bytes. Both entries stay. Nothing here guesses.
+            // same bucket, different bytes: both entries stay
             ++statistics.HashCollisions;
         }
 
@@ -128,8 +99,7 @@ public:
         return uniqueEntries;
     }
 
-    /**@brief used during freezing step: a span is a non-owning view, which is great, but we can't move out
-     * of it. and if we're holding a vector of source strings... it's worth moving it */
+    /** @brief Moves the table out, for the freeze. */
     [[nodiscard]] std::vector<PayloadType> ConsumeTable() noexcept
     {
         return std::move(uniqueEntries);

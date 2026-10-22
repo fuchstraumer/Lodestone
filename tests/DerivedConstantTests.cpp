@@ -21,11 +21,7 @@
 #include <string_view>
 #include <vector>
 
-// Derived constants in size expressions, end to end. `DerivedConstants.slang` sizes `gLightIndices` with
-// `LIGHT_SLOTS`, a module-scope `static const` that uses another derived constant, which uses the two axes and a
-// constant from an `__include`d fragment. Nothing else checks this value: reflection cannot fold the expression,
-// and the element count is not in the emitted bindings. So this test computes each count by hand and compares it
-// with the count read back from the manifest.
+// reflection cannot fold these expressions, so each count is computed by hand
 
 namespace
 {

@@ -21,39 +21,29 @@ class PermutationSpace;
 class DiagnosticSink;
 
 
-/**@brief Specialization of unordered_map using a transparent hash to allow for string_view queries
-  * without copying the key */
 template<typename Value>
 using StringMap = std::unordered_map<std::string, Value, TransparentStringHash, std::equal_to<>>;
 
-/**@brief Values to cook for the specified axis - uses basic typing of TOML values to make sure
- * we construct PermutationValues explicitly, since that tremendously simplifies downstream code */
 struct AxisCookValues
 {
     std::string Axis;
     std::vector<PermutationValue> Values;
 };
 
-/** The cook policy for one module on one target profile. */
 struct TargetCookPolicy
 {
     uint32_t MaxVariants{ 0u };
-    /** @brief Override values for axes in a modules permutation space */
     std::vector<AxisCookValues> CookValues;
-    /**@brief Conditional expression that determines the set of axis values required for cooking.
-      * e.g, if we set this to be like WaveOpsEnabled==1, it would *only* cook and build variants
-      * where the condition specified by CookIf evaluates to true.*/
+    /** @brief Only variants where this evaluates true are cooked, such as `WaveOpsEnabled==1`. */
     std::string CookIf;
 };
 
-/**@brief Whole policy for one module: influence statements and one section for each target.*/
 struct ModulePolicyEntry
 {
     StringMap<std::vector<std::string>> InertAxesForEntryPoints;
     StringMap<TargetCookPolicy> Targets;
 };
 
-/**@brief Policy parsing error with location information to make diagnosing/fixing it less painful */
 //todo-ship: This needs to either reuse Diagnostic's range object, or have a conversion operator
 struct PolicyParseError
 {
@@ -62,9 +52,7 @@ struct PolicyParseError
     uint32_t Column{ 0u };
 };
 
-/** @brief What the policy document says about a specific (module, target) pair.
- * `OtherTargetsOnly` as a result will raise a warning, since it's error-prone for 
- * someone to constrain one target but not others. */
+/** @brief `OtherTargetsOnly` warns: constraining one target and not the others is error-prone. */
 enum class TargetPolicyCoverage : uint8_t
 {
     Invalid = 0,
@@ -77,25 +65,20 @@ enum class TargetPolicyCoverage : uint8_t
 template<typename T>
 using PolicyDocResult = std::expected<T, PolicyParseError>;
 
-/**@brief A parsed TOML policy file. This is used to specify expected axis influences, cooking policies,
-  *and per target overrides for axis values or enable/disable status. 
-  *@note All strings are stored and persisted internally, so string_view returns should not pose a problem*/
+/** @brief A parsed TOML policy file. It owns its strings. */
 class PolicyDocument
 {
 public:
     [[nodiscard]] static PolicyDocResult<PolicyDocument> Load(std::string_view path);
-    // reads TOML "file" from memory - mostly used for unit tests so they don't need to have assets
+    // from memory, for tests
     [[nodiscard]] static PolicyDocResult<PolicyDocument> Parse(std::string_view text);
-    /**@brief Finding a policy can fail, which will return `nullptr`: this is expected and find */
     [[nodiscard]] const ModulePolicyEntry* FindModule(std::string_view module_name) const noexcept;
-    /**@brief Finds the target-specific policy: if unfound, it will return an empty policy. Downstream
-      * code then just uses this to use the axes with their values in the shader source. */
+    /** @brief Returns an empty policy when none is found. */
     [[nodiscard]] const TargetCookPolicy& FindTargetPolicy(std::string_view module_name,
                                                        std::string_view target_name) const noexcept;
     [[nodiscard]] std::span<const std::string> InertAxesForEntryPoint(std::string_view module_name,
                                                                 std::string_view entry_point_name) const noexcept;
-    /**@brief Verifies that `CookValues` and `CookWhen` entries in the policy are consistent with the 
-      * permutation space, i.e. lints the policy for naming and presence of axes and their values. */
+    /** @brief Checks every axis name and value in the policy against the space. */
     [[nodiscard]] CookError ValidateAgainstSpace(std::string_view module_name,
                                                  const PermutationSpace& space,
                                                  DiagnosticSink& sink) const;

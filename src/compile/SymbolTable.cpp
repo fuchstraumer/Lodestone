@@ -58,8 +58,7 @@ namespace lodestone
             return IsIdentifierCharacter(lhs) == IsIdentifierCharacter(rhs);
         }
 
-        /**@brief Pulls out a variable identifier from 'line', by using 'end_index' - which should be the
-         * location of an `=` character. */
+        /** @brief Returns the identifier before the `=` at `end_index`. */
         constexpr std::string_view ExtractIdentifier(std::string_view line, size_t end_index) noexcept
         {
             constexpr std::string_view k_ValidIdChars =
@@ -70,32 +69,24 @@ namespace lodestone
             {
                 return {};
             }
-            // run backwards to find id_start now
             size_t idStartIdx = line.find_last_not_of(k_ValidIdChars, idEndIdx);
-            // asserting on npos because it should be nearly impossible for that to happen: we only enter
-            // this code if the line has `extern const static` etc in it, and that precedes the identifier
             assert(idStartIdx != std::string_view::npos);
-            // increment idStartIdx to point to the actual start of the identifier
             ++idStartIdx;
             return line.substr(idStartIdx, idEndIdx - idStartIdx + 1);
         }
 
-        /**@brief Pulls out a value assignment from line, by starting *after* the `=` character we find for
-         * the identifier extraction above. Much wider space of permissible characters though, so we just
-         * trim whitespace and pull out the whole chunk between `=` and `;`. */
+        /** @brief Returns the trimmed text between `=` and `;`. */
         constexpr std::string_view ExtractValueAssignment(std::string_view line, size_t assignment_index) noexcept
         {
             const size_t valueStartIdx = assignment_index + 1;
             const size_t valueEndIdx = line.find(';', valueStartIdx);
-            // if no semicolon, just take the rest of the line
             std::string_view valueStr = valueEndIdx == std::string_view::npos ?
                                         line.substr(valueStartIdx) :
                                         line.substr(valueStartIdx, valueEndIdx - valueStartIdx);
             return TrimWhitespace(valueStr);
         }
 
-        /**@brief The declaration keywords found before the `=` of one line. Using a bitmask lets us
-          *freely combine and order these, just like how C-like languages allow natively */
+        /** @brief Flags, so the keywords combine in any order, as in C. */
         enum class DeclarationKeyword : uint8_t
         {
             None = 0,
@@ -106,8 +97,7 @@ namespace lodestone
         };
         MAKE_ENUM_CLASS_FLAGS(DeclarationKeyword)
 
-        /**@brief Walks the tokens of `declaration` once and returns every declaration keyword it contains. Keywords
-         * are matched as whole tokens, so a type named `staticconst_buffer` sets no flag. */
+        /** @brief Matches whole tokens, so a type named `staticconst_buffer` sets no flag. */
         DeclarationKeyword ScanDeclarationKeywords(std::string_view declaration) noexcept
         {
             DeclarationKeyword keywords = DeclarationKeyword::None;
@@ -141,9 +131,7 @@ namespace lodestone
             return ExternConstantDeclaration{ .Name=identifier, .Value=value };
         }
 
-        /**@brief Reads `static const <Type> <Name> = <Expression>;` from a line that `keywords` classified as a
-         * non-extern static const declaration. Returns nothing when the name before `=` is not an identifier, such
-         * as an array declaration. The expression runs from `=` to `;`, so it must be on one line. */
+        /** @brief Reads `static const <Type> <Name> = <Expression>;` on one line. No value for arrays. */
         std::optional<DerivedConstantDeclaration> ExtractDerivedConstant(std::string_view line,
                                                                           size_t assignment_index,
                                                                           std::string_view source_path,
@@ -161,9 +149,7 @@ namespace lodestone
                                                .SourceLine = source_line };
         }
 
-        /**@brief Reads `extern struct <Name> : <Interface> = <Default>;` from a line that `keywords` classified as
-         * an extern struct declaration. The identifier just before `=` is the interface, not the struct, so the
-         * name is the identifier token after the `struct` keyword. */
+        /** @brief Reads `extern struct <Name> : <Interface> = <Default>;`. The name follows `struct`. */
         std::optional<ExternConstantDeclaration> ExtractExternTypeDefault(std::string_view line, size_t assignment_index)
         {
             bool sawStruct = false;
@@ -185,11 +171,7 @@ namespace lodestone
         }
     }
 
-    // Reserved words and built-in type names, so a token that can never be a user identifier does not
-    // enter the symbol table. Sorted by byte value, which is the order `string_view::operator<` uses,
-    // so `binary_search` below is correct. The list holds only genuinely reserved words and built-in
-    // type names -- never intrinsics like `dot` or `mul`, because an author may shadow an intrinsic
-    // name with a real identifier, and filtering it would drop a token that could be an axis.
+    // sorted for binary_search. Reserved words and type names only: an author may shadow an intrinsic with an axis
     static constexpr std::string_view k_ReservedKeywords[]
     {
         "AppendStructuredBuffer", "Buffer", "ByteAddressBuffer", "ConstantBuffer", "ConsumeStructuredBuffer",
@@ -226,8 +208,7 @@ namespace lodestone
                                 std::string_view source_path,
                                 std::string_view source_code) noexcept
     {
-        // Accumulate tokens for this module - one module may receive tokens from
-        // several sources, due to how slang handles `__include` directives.
+        // `__include` gives one module several sources
         TokenSet& tokens = tokenMap[module_name];
         ExternConstSet& externConsts = externConstMap[module_name];
         ExternConstSet& externTypeDefaults = externTypeDefaultMap[module_name];
@@ -247,7 +228,6 @@ namespace lodestone
             lineStart = lineEnd + 1;
             ++lineNumber;
 
-            // every declaration we read has an initializer, so only the text before `=` is classified
             const size_t assignmentIndex = line.find('=');
             const DeclarationKeyword keywords = assignmentIndex == std::string_view::npos
                                                     ? DeclarationKeyword::None
@@ -256,7 +236,7 @@ namespace lodestone
             const bool isExtern = HasAllFlags(keywords, DeclarationKeyword::Extern);
             const bool isStaticConst = HasAllFlags(keywords, DeclarationKeyword::Static | DeclarationKeyword::Const);
 
-            // no `continue` here either: the expression names axes, and those still count as tokens
+            // no `continue`: the expression names axes, which count as tokens
             if (isStaticConst && !isExtern)
             {
                 if (const std::optional<DerivedConstantDeclaration> derived =
@@ -266,7 +246,7 @@ namespace lodestone
                 }
             }
 
-            // no `continue` here: the struct name still counts as a token, the same as before we read defaults
+            // no `continue`: the struct name counts as a token
             if (isExtern && HasAllFlags(keywords, DeclarationKeyword::Struct))
             {
                 if (const std::optional<ExternConstantDeclaration> typeDefault =
@@ -282,8 +262,6 @@ namespace lodestone
                 continue;
             }
 
-            // chunk_by works great here, since this is single pass: it's just a subview,
-            // not even doing any copying (and it's lazily evaluated)
             auto chunkedLineView = line | std::views::chunk_by(ChunkSeparator);
 
             for (auto chunk : chunkedLineView)
@@ -311,7 +289,6 @@ namespace lodestone
                 auto iter = tokenMap.find(moduleName);
                 if (iter != tokenMap.end() && iter->second.contains(token))
                 {
-                    // break because finding token in any of the modules is good enough for us
                     found = true;
                     break;
                 }

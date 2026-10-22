@@ -22,15 +22,12 @@
 
 namespace
 {
-// will fix this, but for now bring everything from lodestone into scope
 using namespace lodestone;
 
-// each session has one target (SlangModuleContext::Initialize), so its index is always 0
 constexpr SlangInt k_TargetIndex = 0;
 constexpr uint32_t k_SpirvMagicNumber = 0x07230203u;
 constexpr size_t k_SpirvHeaderBytes = 5u * sizeof(uint32_t);
 
-/** The manifest reads SPIR-V as words, so a payload that is not whole words cannot reach it. */
 bool IsSpirvModule(const std::vector<std::byte>& code) noexcept
 {
     if (code.size() < k_SpirvHeaderBytes || (code.size() % sizeof(uint32_t)) != 0u)
@@ -43,8 +40,7 @@ bool IsSpirvModule(const std::vector<std::byte>& code) noexcept
     return magic == k_SpirvMagicNumber;
 }
 
-/** What one entry point's codegen produced. The diagnostic text travels with the code so that a
- * worker thread never touches a sink. coalesced after threads join */
+/** Codegen output, with its diagnostics, so that worker threads never touch a sink. */
 struct GeneratedEntryPoint
 {
     std::vector<std::byte> Code;
@@ -68,9 +64,7 @@ CookResult<std::vector<LinkedVariant::EpCode>> GenerateEntryPointCode(SlangModul
                                                                       Slang::ComPtr<slang::IComponentType> linked_program,
                                                                       DiagnosticSink& sink)
 {
-    // Slang can report an error and still return a success code with code text. Measured with a
-    // specialization constant in `numthreads` for WGSL: error E55205, a success code, and a wrong
-    // `@workgroup_size(1, 1, 1)`. So an error record fails the entry point as a failed call does.
+    // Slang can report an error with a success code (E55205 for a spec constant in numthreads on WGSL)
     const size_t entryPointCount = context.EntryPointCount();
     std::vector<LinkedVariant::EpCode> generated(entryPointCount);
     bool anyEntryPointFailed = false;

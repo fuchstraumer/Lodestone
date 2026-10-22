@@ -108,31 +108,76 @@ The Bound form works on WGSL, so this slice needs no SPIR-V. It can run beside F
 | F2.6 | A cook test asset: a material that uses buffer, texture, and sampler shims in a `ParameterBlock` and in an entry point `uniform` parameter. | The cross-check agrees. Check the binding numbers: no global may move down a set (vocabulary §9e, measurement notes). |
 | F2.7 | **Done by rendergraph task L14 (2026-10-19):** the container is the `entryPointParams` binding on WGSL and entry point constants on SPIR-V, and the mismatch row is now `EntryPointUnusedResource.slang`. Fix the cross-check for an entry point `uniform` container. Today it expects an empty name for `entryPointParams`. | F2.6 passes with F0.1 in place. `AccessModelRejectTest` uses `EntryPointResourceStruct.slang` as its mismatch row, so replace that row with another mismatch in the same step. |
 
-### F3 — The capability set
+### F3 — The capability set and the device limits
+
+Revised on 2026-10-21 with the rendergraph tasks L5 and L6. The author decided the points marked (A).
+
+**What the cook stores, for each entry point instance:**
+
+- **The capability names that the code needs, in the names of its target** (A). `spirv`: each `OpCapability` and
+  `OpExtension` name. `wgsl`: each `enable` directive (Tint `Inspector::GetUsedExtensionNames`). Each environment
+  holds a table of these names, and each entry point instance holds a bitmask over it, in the word layout of the
+  axis masks. A name that the profile guarantees is not stored: for `spirv`, a capability that a Vulkan version at
+  or below 1.2 enables alone (`Shader`). The grain is the entry point instance, not the variant: KsVolume `BlurCS`
+  needs no wave operation, also in a wave variant.
+- **The workgroup memory bytes.** Each workgroup variable counts `RoundUp(16, RoundUp(align, size))`, with the
+  std430 size and alignment, and the sum is stored. This is the rule of Tint (`core::ir::GetWorkgroupInfo`, which
+  Dawn checks against `maxComputeWorkgroupStorageSize`), and it is an upper bound for the Vulkan rule (Vulkan-Docs
+  `shaders.adoc`, `[[workgroup-padding]]`: implementation-dependent, but at most std430 in the worst order). So
+  one number serves both targets, and the two profiles of one variant must agree on it.
+- `Variant::CapabilityRequirement` is removed (A). `Profile::CapabilityFloor` is removed: the profile names its
+  floor, and the cook drops the guaranteed names.
+
+**Why names and not Vulkan feature bits.** The design note of 2026-09-25 said to store Vulkan feature names. The
+`<spirvcapabilities>` section of `vk.xml` shows that a capability needs **any one** of its `<enable>` entries: a
+feature (`struct` and `feature`), an extension, a property bit (`property`, `member`, `value`), or a version.
+`Float16` is `VkPhysicalDeviceVulkan12Features::shaderFloat16` or `VK_AMD_gpu_shader_half_float`. A bitmask of
+feature names cannot hold an "or". The SPIR-V name is also what the reader measures, so the stored value is a
+measurement and not a translation.
+
+**The Vulkan table** (A: a checked-in file and its generator script). `scripts/generate-vulkan-capability-table.py`
+reads the `<spirvcapabilities>` and `<spirvextensions>` sections of `vk.xml` and writes
+`client/include/VulkanCapabilityTable.hpp`: for each SPIR-V name, its `<enable>` alternatives as strings. It names
+no Vulkan type, so the client needs no Vulkan header. The cook reads it to drop the guaranteed names. A renderer
+reads it to test a device and to list what to enable. DiamondDogs' `ExtensionWrangler` works in extension names and
+feature structs, which are the same terms, so it resolves the dependencies and Lodestone does not. The WebGPU table
+is small and written by hand: `f16` is `shader-f16`, `subgroups` is `subgroups`.
+
+**The device filter (F3.4).** The client takes a device description in two halves:
+
+- Features. The renderer gives a predicate over the capability names of one environment, and the client builds the
+  device mask once. The Vulkan and WebGPU tables help a renderer write the predicate. The filter itself names no API.
+- Limits, each compared less-or-equal for each entry point instance: workgroup memory bytes, invocations (the
+  product of the workgroup size), the size on each side, push constant bytes. Bindings per stage and the bind group
+  count come from the merged layout of a pipeline.
+
+The query removes each (variant, entry point) instance that the device cannot run. It is the base filter, and every
+other query builds on it.
+
+**L6 is closed without an axis bound to a device property** (A). A shader author does not always know which axis
+matches which device value. The renderer knows, and it already has the tool: a query preset (L4), such as a pin of
+`IFFT_WAVE_SIZE` to the subgroup size. A required subgroup size is a pipeline creation fact
+(`VK_EXT_subgroup_size_control`), so no cook can measure it. Revisit with specialization constants.
 
 | Step | Work | Proof |
 |---|---|---|
-| F3.1 | A string table of capability names and a bitmask over it. Use the feature-bit names in vocabulary §9d, not only extension names. | `ShaderManifestRejectTest` reads the table back. |
-| F3.2 | Fill `Profile::CapabilityFloor` from the profile. | The manifest dump shows it. |
-| F3.3 | Fill the capability requirement of each entry point, and collate it for each variant. Source to be decided (O6): Slang metadata, or the SPIR-V capabilities in the binary. | Compare the two sources where both exist. KsVolume: `GroupNonUniformArithmetic` in the 216 wave variants only. |
-| F3.4 | The query takes a device capability set and removes each (variant, entry point) that needs more. It is the base preset, and every other query builds on it. | `ManifestIndexTest` rows: a device without the capability gets no wave variant of `GenerateCS`, and still gets `BlurCS`. |
-| F3.5 | Cross-check each capability-kind axis against the measured requirement. A variant with the axis off must not need the capability. | A must-fail row: an "off" path that still calls a wave op. |
+| F3.1 | The Vulkan table and its generator. The capability names of each entry point instance, from each target's reader. The workgroup memory bytes, from each target's reader. Format 14: the name table, the masks, and the byte count. | `ShaderManifestRejectTest` reads them back, and rejects a mask bit past the name table. `SpvValidatorTest` and `WgslValidatorTest` read the names and the bytes of fixed code. |
+| F3.2 | Drop the names that the profile guarantees. | The `spirv` cook of KitchenSink stores no `Shader`. |
+| F3.3 | Validators: the workgroup memory bytes and the portable capabilities (16-bit floats, subgroups) agree across the profiles of one variant. | A cook test of a probe module with `float3` and struct workgroup arrays, on both targets. |
+| F3.4 | The device filter. | `ManifestIndexTest` rows: a device without subgroups gets no wave instance of `GenerateCS`, and still gets `BlurCS`. A device below the workgroup memory or invocation limit loses only the instances above it. |
+| F3.5 | Cross-check each axis of kind `capability` against the measured names. A variant with the axis off must not need a capability that the axis turns on. | A must-fail row: an "off" path that still calls a wave operation. |
 
-Design notes for F3, agreed on 2026-09-25:
+Measured on 2026-10-21, DiamondDogs OceanFft, `spirv`, 62 unique modules:
 
-- **One device description, several readers.** The query filter (F3.4), cook-time pruning for named device
-  classes, the check of size expressions against limits (`todo.md`, `SetDeviceLimits`), and the profile
-  choice (D11) all read it.
-- **Features and limits are two halves.** A feature is a boolean, and the test is a subset. A limit is a
-  number, and the test is less-or-equal for each field. `OpCapability` gives features only. Limits come
-  from reflection (workgroup size, `groupshared` bytes). Design both halves in F3.1. Fill the features first.
-- **The manifest stores Vulkan feature names, not SPIR-V capability names.** The client holds Vulkan
-  feature structs. The map is not one to one: `GroupNonUniformArithmetic` is a bit of
-  `subgroupSupportedOperations`, and support also depends on the stage. Generate the map from the
-  `<spirvcapabilities>` section of `vk.xml`. WGSL uses the same shape with its own table: `enable`
-  directives, WebGPU features and limits.
-- **The grain is the entry point.** KsVolume `BlurCS` needs no wave operation, also in a wave variant.
-  A filter that removes whole variants removes usable pipelines.
+- `IfftRadix2CS` and `IfftRadix4CS` run `IFFT_SIZE` threads and use `16 * IFFT_SIZE` bytes of workgroup memory
+  (`half4[IFFT_SIZE]` twice). At 1024 that is 1024 invocations and 16384 bytes: the Vulkan minimum of
+  `maxComputeSharedMemorySize`, the WebGPU default of `maxComputeWorkgroupStorageSize`, and four times the WebGPU
+  default of `maxComputeInvocationsPerWorkgroup` (256). `OceanMipsCS` uses 4096 bytes.
+- Every IFFT module needs `Float16` and `UniformAndStorageBuffer16BitAccess`. The wave variants add
+  `GroupNonUniform` and `GroupNonUniformShuffle`. `IFFT_WAVE_SIZE` leaves no trace in the module.
+- The `wgsl` cook fails with E56106: `rgba16float` has no `read_write` storage access in WGSL. That is a target
+  language limit, so it is Slang's to reject.
+- KsVolume `float g_tile[64]` is 256 bytes on both targets.
 
 ### F4 — `spirv-modern`: Pointer buffers and Handle textures
 
@@ -174,7 +219,7 @@ row holds the decision and its date.
 | O3 | F1.1 | One Slang session with two targets, or one session for each profile? | **Decided 2026-09-25.** One session for each profile. Shared work needs the same access model and capability floor on two targets. That case is rare: a build seldom holds two languages. |
 | O4 | F1.5 | A module has no policy section for a requested target. | **Decided 2026-09-25, revised the same day.** The policy is opt-in. An absent section means no limits. A module with a section for another target, and none for this one, gets a warning, not a failure. Inheritance from another section is in `todo.md`. |
 | O5 | F1.2 | Which Vulkan environment does the `spirv` profile target? | **Decided 2026-09-25.** Vulkan 1.2 (SPIR-V 1.5) for now. At the end of phase F, measure the device coverage and decide the range again, from 1.0 up to 1.4. |
-| O6 | F3.3 | Where does a variant's capability requirement come from? | Decide after F3.1. Measure what Slang metadata gives first. The SPIR-V `OpCapability` list is exact for each variant (section 7, F1.2). |
+| O6 | F3.3 | Where does a variant's capability requirement come from? | **Decided 2026-10-21.** The emitted code of each target. Slang's `IMetadata` has no capability query (`isParameterLocationUsed` and `getDebugBuildIdentifier` only). |
 | O7 | F1.2 | An entry point needs a capability above the profile floor. Slang raises E41012, and our warnings-as-errors fails the module. | **Decided 2026-09-25.** E41012 is off for every target. A device capability is ours to record, not Slang's to reject. F3.3 and F3.4 must record it: until then a cook states no requirement. |
 
 ## 5. Upstream Slang issues to file
@@ -337,3 +382,22 @@ commit.
   - Measured: `KitchenSinkCookTest` crashed on 2026-10-12 from commit exhaustion on a PC with no page
     file, not from a code fault. `todo.md` holds the thread-count item.
   - Next, when phase F resumes: F2, with the rendergraph lessons applied.
+- 2026-10-21. **F3 resumes with the rendergraph tasks L5 and L6.** F3 rewritten (section 3): names in the target's
+  terms, a generated Vulkan table, workgroup memory in F3, L6 closed. O6 decided. OceanFft measured. Next: F3.1.
+- 2026-10-21. **F3.1 and F3.2 done**, not committed. Format 14. 30 of 30 tests, 60 of 60 known-good dumps (8 Cooked
+  dumps gained `workgroupMemoryBytes` and `capabilities` on each source, additions only).
+  - The facts belong to the source, not the variant: the code alone decides them. `SourceRef::WorkgroupMemoryBytes`,
+    `EnvironmentHeader::CapabilityNames` and `SourceCapabilityTableOffset`. Reserved: `Profile::CapabilityFloor`,
+    `Variant::CapabilityRequirement`. Round trip `CheckSourceFacts` (`ManifestSourceFactsMismatch` = 116). `Open`
+    rejects a name past the string table (`InvalidCapabilityNames` = 60) and a mask bit past the names
+    (`InvalidSourceCapabilities` = 61).
+  - Measured: the WGSL reader (Tint `core::ir::GetWorkgroupInfo`, Dawn's own value) and the SPIR-V reader (std430,
+    written here) give 144 bytes for the same four variables: a `vec3` array, a struct of a float and a `vec3`, a
+    float array, and a `half4` array. So the padding agrees on those types, and F3.3 can compare equality.
+  - Found: SPIRV-Headers `CapabilityToString` returned the alias `StorageUniform16` for OceanFft's
+    `UniformAndStorageBuffer16BitAccess`, which `vk.xml` does not list. The generator reads the 54 aliases from
+    `spirv.core.grammar.json`, and the reader stores the primary name.
+  - KitchenSink: KsVolume `subgroups` / `GroupNonUniformArithmetic`, KsGeometry `f16` / `Float16` and
+    `StorageInputOutput16`, KsPost `DrawParameters` (SPIR-V only). So the F3.3 cross-check compares a portable subset
+    through a map, not the whole name list.
+  - Next: F3.3 (cross-profile validators), then F3.4 (the device filter).

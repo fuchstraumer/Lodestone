@@ -28,12 +28,7 @@
 #include <utility>
 #include <vector>
 
-// The query surface (`ManifestIndex` + `ManifestQueryBuilder`) is the one client object a renderer
-// drives by hand, so it must reject a bad query with an error, never a crash. This test builds a
-// manifest inline through the real emitter, so it exercises the true emit -> read -> query path with
-// no asset and no compiler. The module has one axis of each value domain: a Boolean axis, an Enum
-// axis (with explicit non-ascending case values), an Integral axis, and a Type axis. The full cross
-// product is 2 * 3 * 3 * 2 = 36 variants, and the keys pack densely to 0..35.
+// one axis of each value domain: 2 * 3 * 3 * 2 = 36 variants, keyed densely 0..35
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -129,11 +124,7 @@ PermutationSpace MakeSpace()
     return PermutationSpace{ std::move(axes) };
 }
 
-// Builds the four-axis module, keeping only the variants `keep` accepts. A subset models a cook that
-// did not emit every combination: a policy allow-list, or an ActiveWhen gate that pins a child axis when
-// its parent is off. The axis schema stays whole either way, because the space is unchanged; only the key
-// set shrinks. `active` tells which axes each kept variant uses, and that fills the axis-active mask.
-// The module points into `space`, so the space must outlive the emit.
+// `keep` models a cook that did not emit every combination. The module points into `space`
 template<typename Keep, typename Active>
 lodestone::CookedModule BuildModule(const PermutationSpace& space, Keep keep, Active active)
 {
@@ -143,7 +134,7 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space, Keep keep, Ac
 
     module.EntryPoints.push_back(
         lodestone::LibraryEntryPoint{ .Name = "MainCS", .Stage = lodestone::ShaderStageKind::Compute });
-    module.Sources.emplace_back(lodestone::tests::BytesOf("// wgsl for the test module"));
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// wgsl for the test module"), lodestone::SourceCodeFacts{});
 
     lodestone::ReflectedBinding binding;
     binding.Name = "Data";
@@ -295,7 +286,7 @@ lodestone::CookedModule BuildTileModule(std::string name, const PermutationSpace
     module.Space = &space;
     module.EntryPoints.push_back(
         lodestone::LibraryEntryPoint{ .Name = "MainCS", .Stage = lodestone::ShaderStageKind::Compute });
-    module.Sources.emplace_back(lodestone::tests::BytesOf("// wgsl for a tile module"));
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// wgsl for a tile module"), lodestone::SourceCodeFacts{});
     module.ResourceLists.emplace_back();
     module.FootprintLists.emplace_back();
     module.VisibilityLists.emplace_back();
@@ -318,9 +309,7 @@ lodestone::CookedModule BuildTileModule(std::string name, const PermutationSpace
     return module;
 }
 
-// Two boolean axes and two entry points. `FogCS` has one source for each value of FOG, and `PlainCS` has one
-// source for every variant. DEBUG changes nothing. So FOG is relevant to FogCS only, and DEBUG is relevant to
-// nothing. `keep_debug_on` false cooks only DEBUG = false, which leaves DEBUG with one cooked value.
+// FOG is relevant to FogCS only, and DEBUG to nothing. Without `keep_debug_on`, DEBUG has one cooked value
 PermutationSpace MakeRelevanceSpace()
 {
     std::vector<PermutationAxis> axes;
@@ -338,9 +327,9 @@ lodestone::CookedModule BuildRelevanceModule(const PermutationSpace& space, bool
         lodestone::LibraryEntryPoint{ .Name = "FogCS", .Stage = lodestone::ShaderStageKind::Compute });
     module.EntryPoints.push_back(
         lodestone::LibraryEntryPoint{ .Name = "PlainCS", .Stage = lodestone::ShaderStageKind::Compute });
-    module.Sources.emplace_back(lodestone::tests::BytesOf("// fog off"));
-    module.Sources.emplace_back(lodestone::tests::BytesOf("// fog on"));
-    module.Sources.emplace_back(lodestone::tests::BytesOf("// plain"));
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// fog off"), lodestone::SourceCodeFacts{});
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// fog on"), lodestone::SourceCodeFacts{});
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// plain"), lodestone::SourceCodeFacts{});
     module.ResourceLists.emplace_back();
     module.FootprintLists.emplace_back();
     module.VisibilityLists.emplace_back();
@@ -488,11 +477,7 @@ void CheckAxisRelevance(lodestone::tests::TestRunner& runner)
     }
 }
 
-// Three boolean axes, and a sparse set of cooked variants: (0,0,0), (1,1,0), (0,0,1), (1,0,1), (0,1,1). Only
-// (1,1,0) has different code. A and B each have a pair that differs in that axis alone, (x,x,1), and that pair
-// shares one instance. C has one such pair, (0,0,0) and (0,0,1), and it shares one instance too. So the per-axis
-// pass finds every axis Inert. But (0,0,0) and (1,1,0) differ in their code, and no cooked variant links them.
-// This is what a sparse cook policy can leave, and what the closing pass of `model/AxisInfluence` exists for.
+// a sparse cook where every one-axis pair shares an instance, yet (0,0,0) and (1,1,0) differ: the closing pass case
 PermutationSpace MakeChainSpace()
 {
     std::vector<PermutationAxis> axes;
@@ -511,8 +496,8 @@ lodestone::CookedModule BuildChainModule(const PermutationSpace& space)
     module.Space = &space;
     module.EntryPoints.push_back(
         lodestone::LibraryEntryPoint{ .Name = "MainCS", .Stage = lodestone::ShaderStageKind::Compute });
-    module.Sources.emplace_back(lodestone::tests::BytesOf("// common"));
-    module.Sources.emplace_back(lodestone::tests::BytesOf("// only A and B together"));
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// common"), lodestone::SourceCodeFacts{});
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// only A and B together"), lodestone::SourceCodeFacts{});
     module.ResourceLists.emplace_back();
     module.FootprintLists.emplace_back();
     module.VisibilityLists.emplace_back();
@@ -931,11 +916,7 @@ int main()
                      "Single reports the empty result as NoVariantForConstraints");
     }
 
-    // An ActiveWhen gate appears at the query layer as a structured hole, not as a schema field: the
-    // query layer has no ActiveWhen concept. Here SHADE is gated on DITHER: when DITHER is false, SHADE
-    // is pinned to its first value (Lambert), so no variant has DITHER false and SHADE Phong.
-    // an ActiveWhen gate is a policy-level selection filter, so it's a structured hole in the manifest
-    // the manifest still declares all axis values, but some combinations are absent from the cooked variants
+    // SHADE is gated on DITHER, so no variant has DITHER false and SHADE Phong
     runner.BeginSection("an ActiveWhen-gated axis is a hole in the key set, not a schema change");
     const std::vector<std::byte> gatedBytes =
         BuildManifest([](const std::array<uint32_t, 4>& digits)
@@ -986,9 +967,7 @@ int main()
         runner.Check(enumerateAgrees, "Enumerate marks SHADE active exactly where DITHER is on");
     }
 
-    // L4: a WhenActive pin constrains a gated axis only where the axis is active, so it keeps the gated-off
-    // variants. A preset applies one set of pins to any module, and skips a pin on an axis the module does not
-    // declare. The gated manifest holds 27 variants: 9 with DITHER off (SHADE inactive), and 18 with DITHER on.
+    // the gated manifest has 27 variants: 9 with DITHER off (SHADE inactive), 18 with DITHER on
     runner.BeginSection("a WhenActive pin keeps the gated-off variants, and a preset skips an undeclared axis");
     if (gatedOpened.has_value())
     {

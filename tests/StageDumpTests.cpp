@@ -436,9 +436,7 @@ void CheckInternedDump(lodestone::tests::TestRunner& runner)
     runner.Check(Contains(dump, std::format(R"("hashName": "{}")", k_HashName)),
                  "the dump names the hash, because the name reaches the output");
 
-    // The reason this dump exists. `FreezeModuleTables` copies the unique entries out and leaves the
-    // provenance behind, so after the freeze nothing can say which variants collapsed onto which
-    // entry. Only this stage can answer it.
+    // the freeze discards provenance, so only this stage can show what collapsed
     runner.Check(Contains(dump, R"("provenance")"), "the dump carries what the freeze discards");
     runner.Check(Contains(dump, R"("mappedFrom")"), "each unique entry lists the artifacts that reached it");
     runner.Check(Contains(dump, R"("variantIndex": 1)"),

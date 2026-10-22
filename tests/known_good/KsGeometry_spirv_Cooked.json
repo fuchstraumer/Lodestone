@@ -25,42 +25,70 @@
         {
             "index": 0,
             "byteLength": 1976,
-            "contentHash": 242550958211057306
+            "contentHash": 242550958211057306,
+            "workgroupMemoryBytes": 0,
+            "capabilities": [
+                "Float16",
+                "StorageInputOutput16"
+            ]
         },
         {
             "index": 1,
             "byteLength": 2468,
-            "contentHash": 13204632837496855875
+            "contentHash": 13204632837496855875,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 2,
             "byteLength": 2036,
-            "contentHash": 4362587059020138876
+            "contentHash": 4362587059020138876,
+            "workgroupMemoryBytes": 0,
+            "capabilities": [
+                "Float16",
+                "StorageInputOutput16"
+            ]
         },
         {
             "index": 3,
             "byteLength": 2008,
-            "contentHash": 13181849766142888545
+            "contentHash": 13181849766142888545,
+            "workgroupMemoryBytes": 0,
+            "capabilities": [
+                "Float16",
+                "StorageInputOutput16"
+            ]
         },
         {
             "index": 4,
             "byteLength": 2052,
-            "contentHash": 17290625990141186944
+            "contentHash": 17290625990141186944,
+            "workgroupMemoryBytes": 0,
+            "capabilities": [
+                "Float16",
+                "StorageInputOutput16"
+            ]
         },
         {
             "index": 5,
             "byteLength": 2532,
-            "contentHash": 13502973341681498838
+            "contentHash": 13502973341681498838,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 6,
             "byteLength": 2504,
-            "contentHash": 1680865840537810721
+            "contentHash": 1680865840537810721,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 7,
             "byteLength": 2492,
-            "contentHash": 570009243031309271
+            "contentHash": 570009243031309271,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         }
     ],
     "resources": [

@@ -25,727 +25,1017 @@
         {
             "index": 0,
             "byteLength": 3924,
-            "contentHash": 15833065449927775352
+            "contentHash": 15833065449927775352,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 1,
             "byteLength": 1244,
-            "contentHash": 14215401488317301553
+            "contentHash": 14215401488317301553,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 2,
             "byteLength": 3908,
-            "contentHash": 1978714112945036646
+            "contentHash": 1978714112945036646,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 3,
             "byteLength": 3980,
-            "contentHash": 11733646691862298264
+            "contentHash": 11733646691862298264,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 4,
             "byteLength": 4036,
-            "contentHash": 16787200830257203346
+            "contentHash": 16787200830257203346,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 5,
             "byteLength": 4020,
-            "contentHash": 6866176204412429310
+            "contentHash": 6866176204412429310,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 6,
             "byteLength": 4092,
-            "contentHash": 10191179141348705837
+            "contentHash": 10191179141348705837,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 7,
             "byteLength": 4036,
-            "contentHash": 6746309415456638766
+            "contentHash": 6746309415456638766,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 8,
             "byteLength": 4020,
-            "contentHash": 2220431431821215069
+            "contentHash": 2220431431821215069,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 9,
             "byteLength": 4092,
-            "contentHash": 8006633686259269571
+            "contentHash": 8006633686259269571,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 10,
             "byteLength": 4036,
-            "contentHash": 8290498931590269797
+            "contentHash": 8290498931590269797,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 11,
             "byteLength": 4020,
-            "contentHash": 10751182075668870377
+            "contentHash": 10751182075668870377,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 12,
             "byteLength": 4092,
-            "contentHash": 1876932071740527693
+            "contentHash": 1876932071740527693,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 13,
             "byteLength": 4296,
-            "contentHash": 7592421094398089182
+            "contentHash": 7592421094398089182,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 14,
             "byteLength": 4280,
-            "contentHash": 11521290858665167721
+            "contentHash": 11521290858665167721,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 15,
             "byteLength": 4336,
-            "contentHash": 9965503766365140580
+            "contentHash": 9965503766365140580,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 16,
             "byteLength": 4408,
-            "contentHash": 9416988597978531798
+            "contentHash": 9416988597978531798,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 17,
             "byteLength": 4392,
-            "contentHash": 17767315901561812680
+            "contentHash": 17767315901561812680,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 18,
             "byteLength": 4448,
-            "contentHash": 4380123473075189168
+            "contentHash": 4380123473075189168,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 19,
             "byteLength": 4408,
-            "contentHash": 15664596098484387175
+            "contentHash": 15664596098484387175,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 20,
             "byteLength": 4392,
-            "contentHash": 10847891139807829567
+            "contentHash": 10847891139807829567,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 21,
             "byteLength": 4448,
-            "contentHash": 2741954623645520023
+            "contentHash": 2741954623645520023,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 22,
             "byteLength": 4408,
-            "contentHash": 16300207862941658
+            "contentHash": 16300207862941658,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 23,
             "byteLength": 4392,
-            "contentHash": 14500812881456361895
+            "contentHash": 14500812881456361895,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 24,
             "byteLength": 4448,
-            "contentHash": 1342655934305857942
+            "contentHash": 1342655934305857942,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 25,
             "byteLength": 4324,
-            "contentHash": 18030112161636735014
+            "contentHash": 18030112161636735014,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 26,
             "byteLength": 4308,
-            "contentHash": 7252353866600660662
+            "contentHash": 7252353866600660662,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 27,
             "byteLength": 4380,
-            "contentHash": 6690089839688355126
+            "contentHash": 6690089839688355126,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 28,
             "byteLength": 4436,
-            "contentHash": 1332395299151327268
+            "contentHash": 1332395299151327268,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 29,
             "byteLength": 4420,
-            "contentHash": 9887358252425030110
+            "contentHash": 9887358252425030110,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 30,
             "byteLength": 4492,
-            "contentHash": 337209191076401609
+            "contentHash": 337209191076401609,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 31,
             "byteLength": 4436,
-            "contentHash": 7023779036681066522
+            "contentHash": 7023779036681066522,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 32,
             "byteLength": 4420,
-            "contentHash": 9933766064059152117
+            "contentHash": 9933766064059152117,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 33,
             "byteLength": 4492,
-            "contentHash": 14565585679381928882
+            "contentHash": 14565585679381928882,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 34,
             "byteLength": 4436,
-            "contentHash": 14186415148119852455
+            "contentHash": 14186415148119852455,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 35,
             "byteLength": 4420,
-            "contentHash": 1310787642210626995
+            "contentHash": 1310787642210626995,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 36,
             "byteLength": 4492,
-            "contentHash": 11977462482131664023
+            "contentHash": 11977462482131664023,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 37,
             "byteLength": 4696,
-            "contentHash": 9261356837591881644
+            "contentHash": 9261356837591881644,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 38,
             "byteLength": 4680,
-            "contentHash": 8141487407237450821
+            "contentHash": 8141487407237450821,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 39,
             "byteLength": 4736,
-            "contentHash": 3137195948333908752
+            "contentHash": 3137195948333908752,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 40,
             "byteLength": 4808,
-            "contentHash": 5636834831733370221
+            "contentHash": 5636834831733370221,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 41,
             "byteLength": 4792,
-            "contentHash": 7274855398072442215
+            "contentHash": 7274855398072442215,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 42,
             "byteLength": 4848,
-            "contentHash": 2502847992215221502
+            "contentHash": 2502847992215221502,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 43,
             "byteLength": 4808,
-            "contentHash": 13015780431385283842
+            "contentHash": 13015780431385283842,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 44,
             "byteLength": 4792,
-            "contentHash": 1706044196249716926
+            "contentHash": 1706044196249716926,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 45,
             "byteLength": 4848,
-            "contentHash": 3662498183274655690
+            "contentHash": 3662498183274655690,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 46,
             "byteLength": 4808,
-            "contentHash": 17748081808309620610
+            "contentHash": 17748081808309620610,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 47,
             "byteLength": 4792,
-            "contentHash": 10766552275912519296
+            "contentHash": 10766552275912519296,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 48,
             "byteLength": 4848,
-            "contentHash": 2131356311564817105
+            "contentHash": 2131356311564817105,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 49,
             "byteLength": 4716,
-            "contentHash": 16303019931987829588
+            "contentHash": 16303019931987829588,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 50,
             "byteLength": 4700,
-            "contentHash": 790052768194073363
+            "contentHash": 790052768194073363,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 51,
             "byteLength": 4772,
-            "contentHash": 17805547832707919816
+            "contentHash": 17805547832707919816,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 52,
             "byteLength": 4812,
-            "contentHash": 12909449172285102103
+            "contentHash": 12909449172285102103,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 53,
             "byteLength": 4796,
-            "contentHash": 11224685436356712579
+            "contentHash": 11224685436356712579,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 54,
             "byteLength": 4868,
-            "contentHash": 4346994832562417278
+            "contentHash": 4346994832562417278,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 55,
             "byteLength": 4828,
-            "contentHash": 4061349366021438451
+            "contentHash": 4061349366021438451,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 56,
             "byteLength": 4812,
-            "contentHash": 13137428786634685302
+            "contentHash": 13137428786634685302,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 57,
             "byteLength": 4884,
-            "contentHash": 7547536041461580166
+            "contentHash": 7547536041461580166,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 58,
             "byteLength": 4828,
-            "contentHash": 2981550721151087797
+            "contentHash": 2981550721151087797,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 59,
             "byteLength": 4812,
-            "contentHash": 992857744538765129
+            "contentHash": 992857744538765129,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 60,
             "byteLength": 4884,
-            "contentHash": 9703649215422420173
+            "contentHash": 9703649215422420173,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 61,
             "byteLength": 5088,
-            "contentHash": 14531011673051380032
+            "contentHash": 14531011673051380032,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 62,
             "byteLength": 5072,
-            "contentHash": 5914615496450618422
+            "contentHash": 5914615496450618422,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 63,
             "byteLength": 5128,
-            "contentHash": 8872060665044034521
+            "contentHash": 8872060665044034521,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 64,
             "byteLength": 5184,
-            "contentHash": 15142466835046205200
+            "contentHash": 15142466835046205200,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 65,
             "byteLength": 5168,
-            "contentHash": 1176061323573603727
+            "contentHash": 1176061323573603727,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 66,
             "byteLength": 5224,
-            "contentHash": 12964459291126322807
+            "contentHash": 12964459291126322807,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 67,
             "byteLength": 5200,
-            "contentHash": 6609132385753257779
+            "contentHash": 6609132385753257779,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 68,
             "byteLength": 5184,
-            "contentHash": 3957471042170059143
+            "contentHash": 3957471042170059143,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 69,
             "byteLength": 5240,
-            "contentHash": 16371664945934484750
+            "contentHash": 16371664945934484750,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 70,
             "byteLength": 5200,
-            "contentHash": 17284796718167859804
+            "contentHash": 17284796718167859804,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 71,
             "byteLength": 5184,
-            "contentHash": 8617522286694683755
+            "contentHash": 8617522286694683755,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 72,
             "byteLength": 5240,
-            "contentHash": 13916432770239923324
+            "contentHash": 13916432770239923324,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 73,
             "byteLength": 3924,
-            "contentHash": 9381231917300606859
+            "contentHash": 9381231917300606859,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 74,
             "byteLength": 3908,
-            "contentHash": 812082989610698897
+            "contentHash": 812082989610698897,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 75,
             "byteLength": 3980,
-            "contentHash": 9238740768403734814
+            "contentHash": 9238740768403734814,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 76,
             "byteLength": 4036,
-            "contentHash": 2437323397319768344
+            "contentHash": 2437323397319768344,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 77,
             "byteLength": 4020,
-            "contentHash": 3318740411509244800
+            "contentHash": 3318740411509244800,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 78,
             "byteLength": 4092,
-            "contentHash": 2059572225743347412
+            "contentHash": 2059572225743347412,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 79,
             "byteLength": 4036,
-            "contentHash": 16186931842583426110
+            "contentHash": 16186931842583426110,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 80,
             "byteLength": 4020,
-            "contentHash": 8662837536814004442
+            "contentHash": 8662837536814004442,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 81,
             "byteLength": 4092,
-            "contentHash": 16960609178062148153
+            "contentHash": 16960609178062148153,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 82,
             "byteLength": 4036,
-            "contentHash": 7732285809281490699
+            "contentHash": 7732285809281490699,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 83,
             "byteLength": 4020,
-            "contentHash": 1328342920017611871
+            "contentHash": 1328342920017611871,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 84,
             "byteLength": 4092,
-            "contentHash": 15732760085110457411
+            "contentHash": 15732760085110457411,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 85,
             "byteLength": 4296,
-            "contentHash": 14467201488164893758
+            "contentHash": 14467201488164893758,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 86,
             "byteLength": 4280,
-            "contentHash": 175668622802284239
+            "contentHash": 175668622802284239,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 87,
             "byteLength": 4336,
-            "contentHash": 8704741000507652125
+            "contentHash": 8704741000507652125,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 88,
             "byteLength": 4408,
-            "contentHash": 2700838776917499290
+            "contentHash": 2700838776917499290,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 89,
             "byteLength": 4392,
-            "contentHash": 9689781098763815730
+            "contentHash": 9689781098763815730,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 90,
             "byteLength": 4448,
-            "contentHash": 9845294084959323998
+            "contentHash": 9845294084959323998,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 91,
             "byteLength": 4408,
-            "contentHash": 6186386927671597075
+            "contentHash": 6186386927671597075,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 92,
             "byteLength": 4392,
-            "contentHash": 7357695973983334410
+            "contentHash": 7357695973983334410,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 93,
             "byteLength": 4448,
-            "contentHash": 11364818627646623536
+            "contentHash": 11364818627646623536,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 94,
             "byteLength": 4408,
-            "contentHash": 6679395360222550151
+            "contentHash": 6679395360222550151,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 95,
             "byteLength": 4392,
-            "contentHash": 6077964063750175783
+            "contentHash": 6077964063750175783,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 96,
             "byteLength": 4448,
-            "contentHash": 15701741766043119948
+            "contentHash": 15701741766043119948,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 97,
             "byteLength": 4324,
-            "contentHash": 12900924249080132405
+            "contentHash": 12900924249080132405,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 98,
             "byteLength": 4308,
-            "contentHash": 11937805794794136679
+            "contentHash": 11937805794794136679,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 99,
             "byteLength": 4380,
-            "contentHash": 11021653753209514933
+            "contentHash": 11021653753209514933,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 100,
             "byteLength": 4436,
-            "contentHash": 16945921780410357266
+            "contentHash": 16945921780410357266,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 101,
             "byteLength": 4420,
-            "contentHash": 17030684719142979130
+            "contentHash": 17030684719142979130,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 102,
             "byteLength": 4492,
-            "contentHash": 1371689194945098532
+            "contentHash": 1371689194945098532,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 103,
             "byteLength": 4436,
-            "contentHash": 6672939336721711614
+            "contentHash": 6672939336721711614,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 104,
             "byteLength": 4420,
-            "contentHash": 13072832994129760535
+            "contentHash": 13072832994129760535,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 105,
             "byteLength": 4492,
-            "contentHash": 11524424739935986611
+            "contentHash": 11524424739935986611,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 106,
             "byteLength": 4436,
-            "contentHash": 13314525139879507808
+            "contentHash": 13314525139879507808,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 107,
             "byteLength": 4420,
-            "contentHash": 6469629228177495040
+            "contentHash": 6469629228177495040,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 108,
             "byteLength": 4492,
-            "contentHash": 15038137254942971432
+            "contentHash": 15038137254942971432,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 109,
             "byteLength": 4696,
-            "contentHash": 5126153380882937081
+            "contentHash": 5126153380882937081,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 110,
             "byteLength": 4680,
-            "contentHash": 7687036072896797624
+            "contentHash": 7687036072896797624,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 111,
             "byteLength": 4736,
-            "contentHash": 10660109267789880658
+            "contentHash": 10660109267789880658,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 112,
             "byteLength": 4808,
-            "contentHash": 15256530195592733693
+            "contentHash": 15256530195592733693,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 113,
             "byteLength": 4792,
-            "contentHash": 9955023554691334433
+            "contentHash": 9955023554691334433,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 114,
             "byteLength": 4848,
-            "contentHash": 4784052144314176192
+            "contentHash": 4784052144314176192,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 115,
             "byteLength": 4808,
-            "contentHash": 10412077448575642869
+            "contentHash": 10412077448575642869,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 116,
             "byteLength": 4792,
-            "contentHash": 429020633326318273
+            "contentHash": 429020633326318273,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 117,
             "byteLength": 4848,
-            "contentHash": 2022341873402746301
+            "contentHash": 2022341873402746301,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 118,
             "byteLength": 4808,
-            "contentHash": 17048938783935194437
+            "contentHash": 17048938783935194437,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 119,
             "byteLength": 4792,
-            "contentHash": 4862523602776939336
+            "contentHash": 4862523602776939336,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 120,
             "byteLength": 4848,
-            "contentHash": 16596167671772287378
+            "contentHash": 16596167671772287378,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 121,
             "byteLength": 4716,
-            "contentHash": 18164957708654645409
+            "contentHash": 18164957708654645409,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 122,
             "byteLength": 4700,
-            "contentHash": 2360012902949206578
+            "contentHash": 2360012902949206578,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 123,
             "byteLength": 4772,
-            "contentHash": 12814722778238044690
+            "contentHash": 12814722778238044690,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 124,
             "byteLength": 4812,
-            "contentHash": 3048580717691625175
+            "contentHash": 3048580717691625175,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 125,
             "byteLength": 4796,
-            "contentHash": 7375918426828401559
+            "contentHash": 7375918426828401559,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 126,
             "byteLength": 4868,
-            "contentHash": 9287551894020654959
+            "contentHash": 9287551894020654959,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 127,
             "byteLength": 4828,
-            "contentHash": 17541043811245842512
+            "contentHash": 17541043811245842512,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 128,
             "byteLength": 4812,
-            "contentHash": 7365630553135928479
+            "contentHash": 7365630553135928479,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 129,
             "byteLength": 4884,
-            "contentHash": 1251194483988524283
+            "contentHash": 1251194483988524283,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 130,
             "byteLength": 4828,
-            "contentHash": 9048506628077030789
+            "contentHash": 9048506628077030789,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 131,
             "byteLength": 4812,
-            "contentHash": 8142572672058621969
+            "contentHash": 8142572672058621969,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 132,
             "byteLength": 4884,
-            "contentHash": 16411513636810606851
+            "contentHash": 16411513636810606851,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 133,
             "byteLength": 5088,
-            "contentHash": 12234391577399942780
+            "contentHash": 12234391577399942780,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 134,
             "byteLength": 5072,
-            "contentHash": 15516833568269076241
+            "contentHash": 15516833568269076241,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 135,
             "byteLength": 5128,
-            "contentHash": 5748634155748548174
+            "contentHash": 5748634155748548174,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 136,
             "byteLength": 5184,
-            "contentHash": 7576076562109031150
+            "contentHash": 7576076562109031150,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 137,
             "byteLength": 5168,
-            "contentHash": 11756340933390356017
+            "contentHash": 11756340933390356017,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 138,
             "byteLength": 5224,
-            "contentHash": 6221366307772813609
+            "contentHash": 6221366307772813609,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 139,
             "byteLength": 5200,
-            "contentHash": 6636439749890708407
+            "contentHash": 6636439749890708407,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 140,
             "byteLength": 5184,
-            "contentHash": 5302813302070602841
+            "contentHash": 5302813302070602841,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 141,
             "byteLength": 5240,
-            "contentHash": 17837461884383091455
+            "contentHash": 17837461884383091455,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 142,
             "byteLength": 5200,
-            "contentHash": 6377241950003114731
+            "contentHash": 6377241950003114731,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 143,
             "byteLength": 5184,
-            "contentHash": 9633932297853569490
+            "contentHash": 9633932297853569490,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 144,
             "byteLength": 5240,
-            "contentHash": 13406975394917320656
+            "contentHash": 13406975394917320656,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         }
     ],
     "resources": [

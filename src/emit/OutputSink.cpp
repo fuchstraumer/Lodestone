@@ -28,8 +28,7 @@ FileOutputSink::FileOutputSink(std::filesystem::path _path) noexcept :
     OutputSink{ _path.string() },
     path{ std::move(_path) }
 {
-    // the throwing overload would end the process here, because the constructor is noexcept. a folder that cannot
-    // be made fails the first write instead, with OutputFileOpenFailed
+    // the constructor is noexcept, so a folder that cannot be made fails the first write instead
     std::error_code ignored;
     if (!path.empty())
     {
@@ -42,13 +41,11 @@ FileOutputSink::~FileOutputSink() = default;
 CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::string_view content)
 {
     const std::filesystem::path artifactPath = path / std::filesystem::path{ artifact_name };
-    // check for length of path
     if (std::wcslen(artifactPath.c_str()) > 255)
     {
         return CookError::OutputPathTooLong;
     }
 
-    // An artifact name can hold a subdirectory, such as the `--dump-sources` folder.
     std::error_code directoryError;
     std::filesystem::create_directories(artifactPath.parent_path(), directoryError);
     if (directoryError)
@@ -56,8 +53,7 @@ CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::str
         return CookError::OutputFileOpenFailed;
     }
 
-    // write to a temporary file in the same folder, then rename it into place. a reader sees the old file or the
-    // new one, and never a partial write. the suffix is random so that two cooks never share a temporary file
+    // a temporary file and a rename, so readers never see a partial write
     std::random_device random;
     std::filesystem::path temporaryPath = artifactPath;
     temporaryPath += std::format(".{:08x}{:08x}.tmp", random(), random());
@@ -69,7 +65,7 @@ CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::str
         }
 
         stream.write(content.data(), static_cast<std::streamsize>(content.size()));
-        // close before the check, because the flush on close can fail too
+        // the flush on close can fail too
         stream.close();
         if (!stream)
         {
@@ -88,7 +84,7 @@ CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::str
         return CookError::OutputWriteFailed;
     }
 
-    // read the size back from the file system, so that a write that the stream accepted and the disk lost fails
+    // catches writes the stream accepted and the disk lost
     const std::uintmax_t writtenSize = std::filesystem::file_size(artifactPath, fileError);
     if (fileError || writtenSize != content.size())
     {
@@ -100,7 +96,7 @@ CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::str
 
 CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::span<const std::byte> content)
 {
-    // be evil: just cast the span of bytes to a string view and call the other overload
+    // be evil: just cast the bytes to a string view and call the other overload
     const std::string_view contentAsStringView{ reinterpret_cast<const char*>(content.data()), content.size() };
     return WriteArtifact(artifact_name, contentAsStringView);
 }

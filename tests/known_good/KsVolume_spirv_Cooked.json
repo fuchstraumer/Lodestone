@@ -25,737 +25,1247 @@
         {
             "index": 0,
             "byteLength": 1236,
-            "contentHash": 7935041597257864925
+            "contentHash": 7935041597257864925,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 1,
             "byteLength": 1252,
-            "contentHash": 11924543649323730372
+            "contentHash": 11924543649323730372,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 2,
             "byteLength": 1328,
-            "contentHash": 5622443767548442670
+            "contentHash": 5622443767548442670,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 3,
             "byteLength": 1336,
-            "contentHash": 12137439898520416523
+            "contentHash": 12137439898520416523,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 4,
             "byteLength": 1576,
-            "contentHash": 14472325434191465227
+            "contentHash": 14472325434191465227,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 5,
             "byteLength": 1668,
-            "contentHash": 14708202949561161269
+            "contentHash": 14708202949561161269,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 6,
             "byteLength": 1676,
-            "contentHash": 7981562063613908714
+            "contentHash": 7981562063613908714,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 7,
             "byteLength": 1356,
-            "contentHash": 17771999990063547495
+            "contentHash": 17771999990063547495,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 8,
             "byteLength": 1448,
-            "contentHash": 15939814897232257434
+            "contentHash": 15939814897232257434,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 9,
             "byteLength": 1456,
-            "contentHash": 12323541287565596156
+            "contentHash": 12323541287565596156,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 10,
             "byteLength": 1696,
-            "contentHash": 460656828092853655
+            "contentHash": 460656828092853655,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 11,
             "byteLength": 1788,
-            "contentHash": 15211363841204055201
+            "contentHash": 15211363841204055201,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 12,
             "byteLength": 1796,
-            "contentHash": 18163240081606218549
+            "contentHash": 18163240081606218549,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 13,
             "byteLength": 1340,
-            "contentHash": 5665272027613512831
+            "contentHash": 5665272027613512831,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 14,
             "byteLength": 1432,
-            "contentHash": 8818630594198687562
+            "contentHash": 8818630594198687562,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 15,
             "byteLength": 1440,
-            "contentHash": 4703307383788513774
+            "contentHash": 4703307383788513774,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 16,
             "byteLength": 1680,
-            "contentHash": 12240279818241701988
+            "contentHash": 12240279818241701988,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 17,
             "byteLength": 1772,
-            "contentHash": 11461762360596883431
+            "contentHash": 11461762360596883431,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 18,
             "byteLength": 1780,
-            "contentHash": 16171726498879931705
+            "contentHash": 16171726498879931705,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 19,
             "byteLength": 1356,
-            "contentHash": 16907630188233564088
+            "contentHash": 16907630188233564088,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 20,
             "byteLength": 1448,
-            "contentHash": 1124532432474034706
+            "contentHash": 1124532432474034706,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 21,
             "byteLength": 1456,
-            "contentHash": 18290291392347783068
+            "contentHash": 18290291392347783068,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 22,
             "byteLength": 1696,
-            "contentHash": 6545507745699726238
+            "contentHash": 6545507745699726238,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 23,
             "byteLength": 1788,
-            "contentHash": 4806818109887291186
+            "contentHash": 4806818109887291186,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 24,
             "byteLength": 1796,
-            "contentHash": 11753393881416301644
+            "contentHash": 11753393881416301644,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 25,
             "byteLength": 1236,
-            "contentHash": 3183129473488622016
+            "contentHash": 3183129473488622016,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 26,
             "byteLength": 1252,
-            "contentHash": 3181411168327979704
+            "contentHash": 3181411168327979704,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 27,
             "byteLength": 1328,
-            "contentHash": 13744936951135555971
+            "contentHash": 13744936951135555971,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 28,
             "byteLength": 1336,
-            "contentHash": 2808598707094626180
+            "contentHash": 2808598707094626180,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 29,
             "byteLength": 1576,
-            "contentHash": 15985537977471391443
+            "contentHash": 15985537977471391443,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 30,
             "byteLength": 1668,
-            "contentHash": 3729554084402325795
+            "contentHash": 3729554084402325795,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 31,
             "byteLength": 1676,
-            "contentHash": 5564694342696279021
+            "contentHash": 5564694342696279021,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 32,
             "byteLength": 1356,
-            "contentHash": 6171441629272945423
+            "contentHash": 6171441629272945423,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 33,
             "byteLength": 1448,
-            "contentHash": 13512021620642640606
+            "contentHash": 13512021620642640606,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 34,
             "byteLength": 1456,
-            "contentHash": 18255839431681836780
+            "contentHash": 18255839431681836780,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 35,
             "byteLength": 1696,
-            "contentHash": 5423228246132792065
+            "contentHash": 5423228246132792065,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 36,
             "byteLength": 1788,
-            "contentHash": 6336887951648161724
+            "contentHash": 6336887951648161724,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 37,
             "byteLength": 1796,
-            "contentHash": 7102839797892239230
+            "contentHash": 7102839797892239230,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 38,
             "byteLength": 1356,
-            "contentHash": 13988924990386822475
+            "contentHash": 13988924990386822475,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 39,
             "byteLength": 1448,
-            "contentHash": 4900251884688447863
+            "contentHash": 4900251884688447863,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 40,
             "byteLength": 1456,
-            "contentHash": 5782587645275630137
+            "contentHash": 5782587645275630137,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 41,
             "byteLength": 1696,
-            "contentHash": 2609446928893703417
+            "contentHash": 2609446928893703417,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 42,
             "byteLength": 1788,
-            "contentHash": 6242309830044360882
+            "contentHash": 6242309830044360882,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 43,
             "byteLength": 1796,
-            "contentHash": 11820778556019122786
+            "contentHash": 11820778556019122786,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 44,
             "byteLength": 1340,
-            "contentHash": 1535379087840314939
+            "contentHash": 1535379087840314939,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 45,
             "byteLength": 1432,
-            "contentHash": 17590647634738161993
+            "contentHash": 17590647634738161993,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 46,
             "byteLength": 1440,
-            "contentHash": 15554291003650923893
+            "contentHash": 15554291003650923893,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 47,
             "byteLength": 1680,
-            "contentHash": 8368313943340103362
+            "contentHash": 8368313943340103362,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 48,
             "byteLength": 1772,
-            "contentHash": 4851471649139213800
+            "contentHash": 4851471649139213800,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 49,
             "byteLength": 1780,
-            "contentHash": 532004929685248253
+            "contentHash": 532004929685248253,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 50,
             "byteLength": 1236,
-            "contentHash": 12242187669987364907
+            "contentHash": 12242187669987364907,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 51,
             "byteLength": 1252,
-            "contentHash": 7435835868667206261
+            "contentHash": 7435835868667206261,
+            "workgroupMemoryBytes": 0,
+            "capabilities": []
         },
         {
             "index": 52,
             "byteLength": 1328,
-            "contentHash": 6606812470702298968
+            "contentHash": 6606812470702298968,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 53,
             "byteLength": 1336,
-            "contentHash": 13762704529746354259
+            "contentHash": 13762704529746354259,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 54,
             "byteLength": 1576,
-            "contentHash": 17038719841289490490
+            "contentHash": 17038719841289490490,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 55,
             "byteLength": 1668,
-            "contentHash": 5178559872796282946
+            "contentHash": 5178559872796282946,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 56,
             "byteLength": 1676,
-            "contentHash": 16970560343725077913
+            "contentHash": 16970560343725077913,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 57,
             "byteLength": 1356,
-            "contentHash": 3631528010521971591
+            "contentHash": 3631528010521971591,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 58,
             "byteLength": 1448,
-            "contentHash": 11184573665890528583
+            "contentHash": 11184573665890528583,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 59,
             "byteLength": 1456,
-            "contentHash": 6785650305314118004
+            "contentHash": 6785650305314118004,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 60,
             "byteLength": 1696,
-            "contentHash": 1720705016176425791
+            "contentHash": 1720705016176425791,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 61,
             "byteLength": 1788,
-            "contentHash": 5992623842037451416
+            "contentHash": 5992623842037451416,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 62,
             "byteLength": 1796,
-            "contentHash": 11121236522621922656
+            "contentHash": 11121236522621922656,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 63,
             "byteLength": 1356,
-            "contentHash": 7183604615888830756
+            "contentHash": 7183604615888830756,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 64,
             "byteLength": 1448,
-            "contentHash": 10440801686983840376
+            "contentHash": 10440801686983840376,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 65,
             "byteLength": 1456,
-            "contentHash": 11620732525367236082
+            "contentHash": 11620732525367236082,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 66,
             "byteLength": 1696,
-            "contentHash": 8821870818000590088
+            "contentHash": 8821870818000590088,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 67,
             "byteLength": 1788,
-            "contentHash": 13080693247306358333
+            "contentHash": 13080693247306358333,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 68,
             "byteLength": 1796,
-            "contentHash": 8802597866211591403
+            "contentHash": 8802597866211591403,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 69,
             "byteLength": 1356,
-            "contentHash": 13027948429623399953
+            "contentHash": 13027948429623399953,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 70,
             "byteLength": 1448,
-            "contentHash": 12228883582327773993
+            "contentHash": 12228883582327773993,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 71,
             "byteLength": 1456,
-            "contentHash": 10287558679446528830
+            "contentHash": 10287558679446528830,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 72,
             "byteLength": 1696,
-            "contentHash": 13981914477057665184
+            "contentHash": 13981914477057665184,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 73,
             "byteLength": 1788,
-            "contentHash": 320472939612857779
+            "contentHash": 320472939612857779,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 74,
             "byteLength": 1796,
-            "contentHash": 10862871252490353953
+            "contentHash": 10862871252490353953,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 75,
             "byteLength": 1272,
-            "contentHash": 15799831097847155595
+            "contentHash": 15799831097847155595,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 76,
             "byteLength": 1364,
-            "contentHash": 5831077943269151709
+            "contentHash": 5831077943269151709,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 77,
             "byteLength": 1372,
-            "contentHash": 4453112279233502378
+            "contentHash": 4453112279233502378,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 78,
             "byteLength": 1612,
-            "contentHash": 9381035813875992260
+            "contentHash": 9381035813875992260,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 79,
             "byteLength": 1704,
-            "contentHash": 1684211364740095367
+            "contentHash": 1684211364740095367,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 80,
             "byteLength": 1712,
-            "contentHash": 14769176741998456255
+            "contentHash": 14769176741998456255,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 81,
             "byteLength": 1392,
-            "contentHash": 17560626835469160327
+            "contentHash": 17560626835469160327,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 82,
             "byteLength": 1484,
-            "contentHash": 16976773459875403268
+            "contentHash": 16976773459875403268,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 83,
             "byteLength": 1492,
-            "contentHash": 6605009333815921966
+            "contentHash": 6605009333815921966,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 84,
             "byteLength": 1732,
-            "contentHash": 7792927951122518469
+            "contentHash": 7792927951122518469,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 85,
             "byteLength": 1824,
-            "contentHash": 567112861538102767
+            "contentHash": 567112861538102767,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 86,
             "byteLength": 1832,
-            "contentHash": 2374648816218592239
+            "contentHash": 2374648816218592239,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 87,
             "byteLength": 1376,
-            "contentHash": 13117947157795919527
+            "contentHash": 13117947157795919527,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 88,
             "byteLength": 1468,
-            "contentHash": 5041201725328273252
+            "contentHash": 5041201725328273252,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 89,
             "byteLength": 1476,
-            "contentHash": 15579762659941213153
+            "contentHash": 15579762659941213153,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 90,
             "byteLength": 1716,
-            "contentHash": 7278312897222969130
+            "contentHash": 7278312897222969130,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 91,
             "byteLength": 1808,
-            "contentHash": 7385668794189932001
+            "contentHash": 7385668794189932001,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 92,
             "byteLength": 1816,
-            "contentHash": 12687326493400986544
+            "contentHash": 12687326493400986544,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 93,
             "byteLength": 1392,
-            "contentHash": 9828578216373182140
+            "contentHash": 9828578216373182140,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 94,
             "byteLength": 1484,
-            "contentHash": 12748293914485107342
+            "contentHash": 12748293914485107342,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 95,
             "byteLength": 1492,
-            "contentHash": 12918159747320712627
+            "contentHash": 12918159747320712627,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 96,
             "byteLength": 1732,
-            "contentHash": 17662108703499150650
+            "contentHash": 17662108703499150650,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 97,
             "byteLength": 1824,
-            "contentHash": 3636589687317493994
+            "contentHash": 3636589687317493994,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 98,
             "byteLength": 1832,
-            "contentHash": 6879663466557116969
+            "contentHash": 6879663466557116969,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 99,
             "byteLength": 1272,
-            "contentHash": 6947703919714861567
+            "contentHash": 6947703919714861567,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 100,
             "byteLength": 1364,
-            "contentHash": 13737451441286666790
+            "contentHash": 13737451441286666790,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 101,
             "byteLength": 1372,
-            "contentHash": 11835425677540322855
+            "contentHash": 11835425677540322855,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 102,
             "byteLength": 1612,
-            "contentHash": 8169161030857972654
+            "contentHash": 8169161030857972654,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 103,
             "byteLength": 1704,
-            "contentHash": 6287495519506172871
+            "contentHash": 6287495519506172871,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 104,
             "byteLength": 1712,
-            "contentHash": 6371068707188151427
+            "contentHash": 6371068707188151427,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 105,
             "byteLength": 1392,
-            "contentHash": 11532603397924190666
+            "contentHash": 11532603397924190666,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 106,
             "byteLength": 1484,
-            "contentHash": 15070554534418347417
+            "contentHash": 15070554534418347417,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 107,
             "byteLength": 1492,
-            "contentHash": 7977517622400880816
+            "contentHash": 7977517622400880816,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 108,
             "byteLength": 1732,
-            "contentHash": 11100421735524236280
+            "contentHash": 11100421735524236280,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 109,
             "byteLength": 1824,
-            "contentHash": 7690043076910733783
+            "contentHash": 7690043076910733783,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 110,
             "byteLength": 1832,
-            "contentHash": 15780174545993061946
+            "contentHash": 15780174545993061946,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 111,
             "byteLength": 1392,
-            "contentHash": 12912654981965505821
+            "contentHash": 12912654981965505821,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 112,
             "byteLength": 1484,
-            "contentHash": 11208343220189956559
+            "contentHash": 11208343220189956559,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 113,
             "byteLength": 1492,
-            "contentHash": 18237011063921414992
+            "contentHash": 18237011063921414992,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 114,
             "byteLength": 1732,
-            "contentHash": 8512391242517565848
+            "contentHash": 8512391242517565848,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 115,
             "byteLength": 1824,
-            "contentHash": 12694516613401185488
+            "contentHash": 12694516613401185488,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 116,
             "byteLength": 1832,
-            "contentHash": 10399303006875457232
+            "contentHash": 10399303006875457232,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 117,
             "byteLength": 1376,
-            "contentHash": 4738207421545848468
+            "contentHash": 4738207421545848468,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 118,
             "byteLength": 1468,
-            "contentHash": 9984785858169404333
+            "contentHash": 9984785858169404333,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 119,
             "byteLength": 1476,
-            "contentHash": 15010056491485242888
+            "contentHash": 15010056491485242888,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 120,
             "byteLength": 1716,
-            "contentHash": 11874225207079446995
+            "contentHash": 11874225207079446995,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 121,
             "byteLength": 1808,
-            "contentHash": 7514671305533951276
+            "contentHash": 7514671305533951276,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 122,
             "byteLength": 1816,
-            "contentHash": 2711242296752292202
+            "contentHash": 2711242296752292202,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 123,
             "byteLength": 1272,
-            "contentHash": 1827542859807199803
+            "contentHash": 1827542859807199803,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 124,
             "byteLength": 1364,
-            "contentHash": 11028039303739999675
+            "contentHash": 11028039303739999675,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 125,
             "byteLength": 1372,
-            "contentHash": 6959257397975555890
+            "contentHash": 6959257397975555890,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 126,
             "byteLength": 1612,
-            "contentHash": 6283959726503059082
+            "contentHash": 6283959726503059082,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 127,
             "byteLength": 1704,
-            "contentHash": 17007288791270148396
+            "contentHash": 17007288791270148396,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 128,
             "byteLength": 1712,
-            "contentHash": 10304386267985898030
+            "contentHash": 10304386267985898030,
+            "workgroupMemoryBytes": 256,
+            "capabilities": []
         },
         {
             "index": 129,
             "byteLength": 1392,
-            "contentHash": 11522937115677976923
+            "contentHash": 11522937115677976923,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 130,
             "byteLength": 1484,
-            "contentHash": 12648481343380666023
+            "contentHash": 12648481343380666023,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 131,
             "byteLength": 1492,
-            "contentHash": 3980516424744465322
+            "contentHash": 3980516424744465322,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 132,
             "byteLength": 1732,
-            "contentHash": 9880733537241956086
+            "contentHash": 9880733537241956086,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 133,
             "byteLength": 1824,
-            "contentHash": 266044109456476087
+            "contentHash": 266044109456476087,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 134,
             "byteLength": 1832,
-            "contentHash": 5978569768932000475
+            "contentHash": 5978569768932000475,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 135,
             "byteLength": 1392,
-            "contentHash": 10974439727425314217
+            "contentHash": 10974439727425314217,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 136,
             "byteLength": 1484,
-            "contentHash": 141929627211559136
+            "contentHash": 141929627211559136,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 137,
             "byteLength": 1492,
-            "contentHash": 12731154745628021506
+            "contentHash": 12731154745628021506,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 138,
             "byteLength": 1732,
-            "contentHash": 10554809598597211922
+            "contentHash": 10554809598597211922,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 139,
             "byteLength": 1824,
-            "contentHash": 4983774796061372676
+            "contentHash": 4983774796061372676,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 140,
             "byteLength": 1832,
-            "contentHash": 5764698574274835937
+            "contentHash": 5764698574274835937,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 141,
             "byteLength": 1392,
-            "contentHash": 17077313979243810125
+            "contentHash": 17077313979243810125,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 142,
             "byteLength": 1484,
-            "contentHash": 17470581284256476595
+            "contentHash": 17470581284256476595,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 143,
             "byteLength": 1492,
-            "contentHash": 10273882547852413515
+            "contentHash": 10273882547852413515,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 144,
             "byteLength": 1732,
-            "contentHash": 14862798558967443129
+            "contentHash": 14862798558967443129,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 145,
             "byteLength": 1824,
-            "contentHash": 4114233513385673164
+            "contentHash": 4114233513385673164,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         },
         {
             "index": 146,
             "byteLength": 1832,
-            "contentHash": 3954503787860971440
+            "contentHash": 3954503787860971440,
+            "workgroupMemoryBytes": 256,
+            "capabilities": [
+                "GroupNonUniformArithmetic"
+            ]
         }
     ],
     "resources": [

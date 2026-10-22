@@ -15,7 +15,6 @@ VariantKey PackVariantKey(std::span<const uint32_t> value_indices, std::span<con
     uint64_t result{ 0u };
     for (auto&& [value, radix] : std::views::zip(value_indices, radices))
     {
-        // only cast the mul, adding different widths is fine
         result = (result * static_cast<uint64_t>(radix)) + value;
     }
     return static_cast<VariantKey>(result);

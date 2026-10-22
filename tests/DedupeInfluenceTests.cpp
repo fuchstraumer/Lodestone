@@ -19,14 +19,7 @@
 #include <utility>
 #include <vector>
 
-/** Proves that dedup changes what the tables cost and never what the cook measures.
- *
- * `--no-dedupe` is the A/B control arm, so both arms must reach the same conclusions about the
- * shader. Every measurement therefore has to read content. A measurement that reads an interner index
- * gives one answer with dedup on and the opposite answer with dedup off, and the module then fails
- * its own policy in the arm that exists to debug the other one.
- *
- * This test needs no Slang, no compiler, and no asset. */
+/** Both `--no-dedupe` arms must reach the same conclusions, so every measurement must read content. */
 using namespace lodestone;
 
 namespace
@@ -37,9 +30,7 @@ constexpr std::string_view k_InertEntryPoint = "InertCS";
 constexpr std::string_view k_ConditionalEntryPoint = "ConditionalCS";
 constexpr std::string_view k_FootprintEntryPoint = "FootprintCS";
 
-// This used to be in DedupeReport.hpp/.cpp, but it's oddly specific and isn't really often
-// a useful metric in library code (in most cases). It's a useful test case though, so it's
-// been moved here but removed from internal library headers/source
+// moved here from DedupeReport: a useful test, but rarely a useful library metric
 CookResult<bool> AllVariantsShareOneLayout(const CookedModule& module)
 {
     bool seenOne = false;
@@ -156,9 +147,7 @@ VariantDescriptor MakeAssignment(const PermutationSpace& space,
                                                   .Value = PermutationValue{ second_axis_value } } });
 }
 
-/** `ConditionalCS` reads the first axis only when the second axis is true. So the variants that have
- * the second axis false all share one source, and only the other group can find the first axis
- * Active. A measurement that reads one group and drops the next reports Inert here. */
+/** Reads the first axis only when the second is true, so only one group of variants can find the first axis Active. */
 CompiledVariant MakeConditionalVariant(uint64_t index, bool first_axis_value, bool second_axis_value)
 {
     CompiledVariant variant;
@@ -173,9 +162,7 @@ CompiledVariant MakeConditionalVariant(uint64_t index, bool first_axis_value, bo
     return variant;
 }
 
-/** `FootprintCS` has the same code in every variant. The first axis changes only the element count of its
- * buffer, the way an axis that appears only in a size attribute does. So the first axis is Active and the
- * second is Inert, and a measurement that reads the code alone reports both as Inert. */
+/** The same code everywhere: the first axis changes only an element count, so a code-only measurement misses it. */
 CompiledVariant MakeFootprintVariant(uint64_t index, bool first_axis_value, bool second_axis_value)
 {
     CompiledVariant variant;
@@ -366,9 +353,7 @@ void CheckTheTwoArmsReallyDiffer(lodestone::tests::TestRunner& runner,
     runner.Check(deduped.ResourceLists.size() == 1u, "every variant declares the same one resource");
     runner.Check(deduped.VisibilityLists.size() == 1u,
                  "both entry points read that resource, so both see the same visibility list");
-    // Four, not eight. A resource belongs to the variant, so it is interned once for each variant and
-    // not once for each entry point that reads it. The sources stay at eight, because a source does
-    // belong to an entry point.
+    // four, not eight: resources are interned per variant, and sources per entry point
     runner.Check(raw.Resources.size() == 4u,
                  "no-dedupe gives each variant its own resource entry, one for each of the four");
 }

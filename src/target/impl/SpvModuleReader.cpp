@@ -1,5 +1,6 @@
 #include "SpvModuleReader.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "VulkanCapabilityTable.hpp"
 #include "target/TargetProfile.hpp"
 #include "target/TargetUtils.hpp"
 #include "CookerErrors.hpp"
@@ -47,7 +48,7 @@ namespace
                           uint32_t id_bound,
                           uint32_t schema)
     {
-        // every id is below id_bound, so a flat table indexed by id replaces a map
+        // ids are below id_bound, so a flat table replaces a map
         ParseState* parseState = static_cast<ParseState*>(user_data);
         parseState->Ids.resize(id_bound);
         return SPV_SUCCESS;
@@ -62,7 +63,6 @@ namespace
 
     void OnOpExtension(ParseState& parse_state, std::span<const uint32_t> words)
     {
-        // The extension name is stored as a null-terminated string starting at words[1]
         const char* extensionName = reinterpret_cast<const char*>(&words[1]);
         parse_state.Extensions.emplace_back(extensionName);
     }
@@ -110,26 +110,22 @@ namespace
                         std::span<const uint32_t> words,
                         std::span<const spv_parsed_operand_t> operands)
     {
-        // execution model is in words[1]. The cook sets VulkanUseEntryPointName, so the name is the source name and
-        // not "main"
         EntryPointInfo entryPoint;
         entryPoint.Stage = StageFromExecutionModel(static_cast<spv::ExecutionModel>(words[1]));
         entryPoint.Name = reinterpret_cast<const char*>(words.data() + operands[2].offset);
 
-        // actual operands start at 3: 0-2 are exec model, function id, name string
+        // operands 0-2 are the execution model, the function id, and the name
         for (size_t i = 3u; i < operands.size(); ++i)
         {
             entryPoint.Interfaces.emplace_back(words[operands[i].offset]);
         }
 
-        // LocalSize arrives later (execution modes follow entry points), so nothing is lost here
         parse_state.EntryPoint = std::move(entryPoint);
     }
 
     void OnOpName(ParseState& parse_state,
                   std::span<const uint32_t> words)
     {
-        // strings attached to instruction words are always null-terminated
         const uint32_t* nameWords = words.data() + 2;
         parse_state.Ids[words[1]].Name = reinterpret_cast<const char*>(nameWords);
     }
@@ -143,7 +139,6 @@ namespace
         record.MemberCount = static_cast<uint32_t>(words.size() - 2u);
         for (const uint32_t memberTypeId : words.subspan(2u))
         {
-            // we'll use memberTypeId to associate these to the pending records at the end of parse
             parse_state.Members.emplace_back(memberTypeId);
         }
     }
@@ -190,8 +185,7 @@ namespace
     void OnOpMemberName(ParseState& parse_state,
                         std::span<const uint32_t> words)
     {
-        // OpMemberName is in the debug section, before OpTypeStruct gives the struct its member range.
-        // Defer it like a member decoration.
+        // OpMemberName precedes OpTypeStruct, so it is deferred like a member decoration
         const char* name = reinterpret_cast<const char*>(words.data() + 3u);
         parse_state.PendingMembers.push_back(PendingMemberDecoration{ .StructId = words[1],
                                                                       .MemberIndex = words[2],
@@ -202,8 +196,7 @@ namespace
                          std::span<const uint32_t> words,
                          uint32_t result_id)
     {
-        // words[2] is the storage class
-        // words[3] is the type ID
+        // words[2] is the storage class, words[3] the type id
         parse_state.Ids[result_id].StorageClass = words[2];
         parse_state.Ids[result_id].PointeeType = words[3];
     }
@@ -233,17 +226,14 @@ namespace
             record.Shape |= ResourceShape::TextureSubpass;
             break;
         case spv::Dim::Rect:
-            // not valid in Vulkan. The shape stays Invalid, so the comparison reports it.
             [[fallthrough]];
         case spv::Dim::Buffer:
-            // a texel buffer (BindingKind::TexelBuffer). No asset uses one yet.
             [[fallthrough]];
         default:
             break;
         }
 
-        // 0,2 indicate non depth or unknown, and unknown is quite common
-        // 1 is the only guaranteed "this is definitely a depth texture" value
+        // only 1 means depth: 0 and 2 are "not depth" and "unknown"
         if (words[4] == 1u)
         {
             record.Shape |= ResourceShape::ShadowFlag;
@@ -261,12 +251,10 @@ namespace
 
         record.SampledMode = static_cast<uint8_t>(words[7]);
         record.Format = words[8];
-        // words[9], the access qualifier, is Kernel-only. A Vulkan storage image takes its access from
-        // NonWritable / NonReadable on the variable instead.
+        // the access qualifier is Kernel-only: Vulkan storage images use NonWritable / NonReadable
     }
 
-    /** Maps the curated formats that `FromSlangImageFormat` maps, so that the two sides compare. Any other format,
-     * `Unknown` included, is Invalid on both sides. */
+    /** Maps the curated set of `FromSlangImageFormat`. Other formats, `Unknown` included, are Invalid on both sides. */
     TextureFormat TextureFormatFromSpirv(spv::ImageFormat format) noexcept
     {
         switch (format)
@@ -306,8 +294,7 @@ namespace
 
     void OnOpTypeScalar(ParseState& parse_state, std::span<const uint32_t> words, uint32_t result_id)
     {
-        // OpTypeInt: words[2] width, words[3] signedness. OpTypeFloat: words[2] width (words[3] is an
-        // optional encoding, not a sign).
+        // words[2] is the width. words[3] is signedness for OpTypeInt, and an optional encoding for OpTypeFloat
         IdRecord& record = parse_state.Ids[result_id];
         record.ScalarWidth = words[2];
         record.ScalarSigned = (record.OpCode == spv::Op::OpTypeInt) && (words[3] != 0u);
@@ -331,7 +318,6 @@ namespace
 
     void OnOpVariable(ParseState& parse_state, std::span<const uint32_t> words, uint32_t result_id)
     {
-        // the prelude already stored TypeId (the pointer type)
         parse_state.Ids[result_id].StorageClass = words[3];
     }
 
@@ -356,8 +342,7 @@ namespace
         const spv::ExecutionMode executionMode = static_cast<spv::ExecutionMode>(words[2]);
         if (executionMode == spv::ExecutionMode::LocalSizeId)
         {
-            // later pass will have to resolve the values using the IDs: this opcode comes before
-            // any of the actual spec constants
+            // the spec constants come later, so the ids are resolved after the parse
             parse_state.EntryPoint.LocalSizeFromIds = true;
             parse_state.EntryPoint.LocalSizeX = words[3];
             parse_state.EntryPoint.LocalSizeY = words[4];
@@ -367,14 +352,11 @@ namespace
 
     void OnOpMemoryModel(ParseState& parse_state, std::span<const uint32_t> words)
     {
-        // logical = bound, physicalstoragebuffer64 = pointers. The memory model (words[2]) is GLSL450 from
-        // Slang, which is normal for Vulkan: the Vulkan memory model is opt-in.
+        // Logical is bound, PhysicalStorageBuffer64 is pointers
         parse_state.AddressingModel = static_cast<spv::AddressingModel>(words[1]);
     }
 
-    /** OpConstant and OpSpecConstant: words[1] type, words[2] result, words[3..] the value. One word up to 32
-     * bits, two words (low word first) for 64 bits. The True/False forms have no words[3]: the opcode is
-     * the value. */
+    /** words[3..] is the value, low word first for 64 bits. The True/False forms have no value word. */
     void OnOpConstant(ParseState& parse_state,
                       std::span<const uint32_t> words,
                       uint32_t result_id,
@@ -415,7 +397,6 @@ namespace
         std::span<const spv_parsed_operand_t> operands{ inst->operands, inst->num_operands };
         const spv::Op opCode = static_cast<spv::Op>(inst->opcode);
         const uint32_t resultId = inst->result_id;
-        // id 0 is never valid: it means "no result"
         if (resultId != 0u)
         {
             parseState->Ids[resultId].OpCode = opCode;
@@ -490,9 +471,7 @@ namespace
             break;
         case spv::Op::OpSpecConstantOp:
         case spv::Op::OpSpecConstantComposite:
-            // an expression over other constants: no value and no SpecId. SPIRV-Tools-opt can fold these
-            // (CreateFreezeSpecConstantValuePass, CreateFoldSpecConstantOpAndCompositePass) once we need
-            // the numbers
+            // an expression over constants, with no value and no SpecId
             parseState->Ids[resultId].Constant = ConstantKind::SpecDerived;
             break;
         case spv::Op::OpLoad:
@@ -507,15 +486,12 @@ namespace
             parseState->SampledImages.push_back(SampledImageUse{ .ImageId = words[3], .SamplerId = words[4] });
             break;
         default:
-            // for unhandled opcodes, just continue parsing
             return SPV_SUCCESS;
         }
 
         return SPV_SUCCESS;
     }
 
-    /** Runs once after the parse. Each struct now has its member range, so each pending entry indexes its
-     * member directly. */
     void ApplyPendingMembers(ParseState& parse_state)
     {
         for (const PendingMemberDecoration& pending : parse_state.PendingMembers)
@@ -523,7 +499,6 @@ namespace
             const IdRecord& structRecord = parse_state.Ids[pending.StructId];
             if (pending.MemberIndex >= structRecord.MemberCount)
             {
-                // a member of a struct the parse never reached (it stops at the first function)
                 continue;
             }
 
@@ -551,9 +526,7 @@ namespace
         }
     }
 
-    /** Classifies one interface variable: variable -> pointer type -> pointee type. The storage class sits
-     * on the pointer. Only a variable with a DescriptorSet is a binding: builtins, varyings, and Workgroup
-     * variables have none. */
+    /** Classifies a variable through its pointer type. Only variables with a DescriptorSet are bindings. */
     DeclaredBinding ClassifyVariable(const ParseState& parse_state, const IdRecord& variable)
     {
         DeclaredBinding declared{ .Group = variable.Group, .Binding = variable.Binding, .Name = variable.Name };
@@ -578,7 +551,6 @@ namespace
                 declared.Kind = BindingKind::CombinedTextureSampler;
                 break;
             case spv::Op::OpTypeImage:
-                // Sampled 2 is a storage image, and its access comes from the variable's decorations
                 declared.Kind = (pointee.SampledMode == 2u) ? BindingKind::StorageTexture : BindingKind::Texture;
                 declared.Shape = pointee.Shape;
                 declared.Access = variable.Access;
@@ -593,7 +565,6 @@ namespace
             }
             break;
         case spv::StorageClass::StorageBuffer:
-            // NonWritable on the variable gives read-only (StructuredBuffer), none gives read-write
             declared.Kind = BindingKind::StorageBuffer;
             declared.Access = variable.Access;
             break;
@@ -608,9 +579,8 @@ namespace
         return declared;
     }
 
-    /** Follows `id` back through loads, access chains, and copies. Returns the id of the variable, or 0 when
-     * the chain ends at something that is not a variable. The chain is at most one step per id, so the step
-     * count bounds the walk on a malformed module. */
+    /** Returns the variable at the end of a chain of loads, access chains, and copies, or 0. One step per id bounds
+     * the walk on a malformed module. */
     uint32_t TraceToVariable(const ParseState& parse_state, uint32_t id)
     {
         for (size_t step = 0u; step < parse_state.Ids.size() && id != 0u && id < parse_state.Ids.size(); ++step)
@@ -640,7 +610,7 @@ CookError ParseModule(spv_context_t* context,
         return ReportError(sink, CookError::TargetValidationEntryPointParseFailed, errStr);
     }
 
-    // A copy, so no alignment of the source bytes is assumed. The state owns it: names point into these words
+    // a copy: names point into these words, and the source alignment is unknown
     out_state.Words.resize(source_code.size() / sizeof(uint32_t));
     std::memcpy(out_state.Words.data(), source_code.data(), source_code.size());
     const std::vector<uint32_t>& words = out_state.Words;
@@ -648,7 +618,6 @@ CookError ParseModule(spv_context_t* context,
     spv_diagnostic diagnostic = nullptr;
     if (validate)
     {
-        // Legality first: spirv-val with the Vulkan 1.2 rules. Tint gives the WGSL side this for free.
         const spv_result_t validResult = spvValidateBinary(context, words.data(), words.size(), &diagnostic);
         if (validResult != SPV_SUCCESS)
         {
@@ -732,9 +701,7 @@ std::vector<DeclaredBinding> CollectDeclaredBindings(const ParseState& parse_sta
 namespace
 {
     // NOLINTBEGIN(misc-no-recursion)
-    /** The bytes one value of `type_id` covers, with no trailing padding. A matrix member reads its stride and its
-     * major order from the member decorations. SPIR-V `ColMajor` puts a column at each stride, and `RowMajor` a
-     * row. No value for a type that this reader cannot size. */
+    /** The bytes a value covers, with no trailing padding. SPIR-V `ColMajor` puts a column at each matrix stride. */
     std::optional<uint64_t> TypeExtent(const ParseState& parse_state,
                                        uint32_t type_id,
                                        uint32_t matrix_stride,
@@ -753,7 +720,6 @@ namespace
         }
         case spv::Op::OpTypeMatrix:
         {
-            // ElementType is the column vector, so its component count is the row count
             const IdRecord& column = parse_state.Ids[type.ElementType];
             const std::optional<uint64_t> scalar = TypeExtent(parse_state, column.ElementType, 0u, MatrixLayout::Invalid);
             if (!scalar || matrix_stride == 0u)
@@ -796,7 +762,101 @@ namespace
     }
     // NOLINTEND(misc-no-recursion)
 
+    struct Std430Layout
+    {
+        uint64_t Size{ 0u };
+        uint64_t Align{ 1u };
+    };
+
+    constexpr uint64_t RoundUp(uint64_t alignment, uint64_t value) noexcept
+    {
+        return (value + alignment - 1u) / alignment * alignment;
+    }
+
+    // NOLINTBEGIN(misc-no-recursion)
+    /** Std430, for undecorated variables. Matrices are column major, and booleans count as 32 bits, per Vulkan. */
+    std::optional<Std430Layout> LayOutStd430(const ParseState& parse_state, uint32_t type_id)
+    {
+        const IdRecord& type = parse_state.Ids[type_id];
+        switch (type.OpCode)
+        {
+        case spv::Op::OpTypeBool:
+            return Std430Layout{ .Size = 4u, .Align = 4u };
+        case spv::Op::OpTypeInt:
+        case spv::Op::OpTypeFloat:
+            return Std430Layout{ .Size = type.ScalarWidth / 8u, .Align = type.ScalarWidth / 8u };
+        case spv::Op::OpTypeVector:
+        {
+            const std::optional<Std430Layout> component = LayOutStd430(parse_state, type.ElementType);
+            if (!component)
+            {
+                return std::nullopt;
+            }
+            const uint64_t alignedCount = type.ComponentCount == 3u ? 4u : type.ComponentCount;
+            return Std430Layout{ .Size = component->Size * type.ComponentCount, .Align = component->Size * alignedCount };
+        }
+        case spv::Op::OpTypeMatrix:
+        case spv::Op::OpTypeArray:
+        {
+            const std::optional<Std430Layout> element = LayOutStd430(parse_state, type.ElementType);
+            const uint64_t length = type.OpCode == spv::Op::OpTypeMatrix ? type.ComponentCount
+                                                                          : parse_state.Ids[type.LengthId].ConstantBits;
+            if (!element || length == 0u)
+            {
+                return std::nullopt;
+            }
+            return Std430Layout{ .Size = length * RoundUp(element->Align, element->Size), .Align = element->Align };
+        }
+        case spv::Op::OpTypeStruct:
+        {
+            Std430Layout layout;
+            for (const MemberRecord& member : std::span{ parse_state.Members }.subspan(type.FirstMember, type.MemberCount))
+            {
+                const std::optional<Std430Layout> memberLayout = LayOutStd430(parse_state, member.TypeId);
+                if (!memberLayout)
+                {
+                    return std::nullopt;
+                }
+                layout.Size = RoundUp(memberLayout->Align, layout.Size) + memberLayout->Size;
+                layout.Align = std::max(layout.Align, memberLayout->Align);
+            }
+            layout.Size = RoundUp(layout.Align, layout.Size);
+            return layout;
+        }
+        default:
+            return std::nullopt;
+        }
+    }
+    // NOLINTEND(misc-no-recursion)
+
 } // namespace
+
+CookResult<uint32_t> ReadWorkgroupMemoryBytes(const ParseState& parse_state, DiagnosticSink& sink)
+{
+    uint64_t bytes = 0u;
+    for (const uint32_t variableId : parse_state.EntryPoint.Interfaces)
+    {
+        const IdRecord& variable = parse_state.Ids[variableId];
+        if (variable.OpCode != spv::Op::OpVariable ||
+            variable.StorageClass != static_cast<uint32_t>(spv::StorageClass::Workgroup))
+        {
+            continue;
+        }
+
+        const std::optional<Std430Layout> layout =
+            LayOutStd430(parse_state, parse_state.Ids[variable.TypeId].PointeeType);
+        if (!layout)
+        {
+            return std::unexpected(ReportError(sink,
+                                               CookError::TargetValidationEntryPointInvalid,
+                                               std::format("workgroup variable '{}' has a type that the SPIR-V reader "
+                                                           "cannot size",
+                                                           variable.Name)));
+        }
+        bytes += RoundUp(16u, RoundUp(layout->Align, layout->Size));
+    }
+    return static_cast<uint32_t>(bytes);
+}
 
 CookResult<std::optional<uint32_t>> ReadPushConstantExtent(const ParseState& parse_state, DiagnosticSink& sink)
 {
@@ -838,12 +898,32 @@ CookResult<EmittedCodeFacts> CollectEmittedCodeFacts(const ParseState& parse_sta
         return std::unexpected(pushExtent.error());
     }
 
+    CookResult<uint32_t> workgroupBytes = ReadWorkgroupMemoryBytes(parse_state, sink);
+    if (!workgroupBytes)
+    {
+        return std::unexpected(workgroupBytes.error());
+    }
+
     EmittedCodeFacts facts{ .SamplerTexturePairs = std::move(*pairs), .PushConstantExtent = *pushExtent };
     facts.EntryPointName = parse_state.EntryPoint.Name;
     for (const DeclaredBinding& binding : CollectDeclaredBindings(parse_state))
     {
         facts.DeclaredPlacements.emplace_back(binding.Group, binding.Binding);
     }
+    facts.CapabilityNames.reserve(parse_state.Capabilities.size() + parse_state.Extensions.size());
+    // store primary names, which vk.xml uses (SPIRV-Headers may give `StorageUniform16`)
+    for (const std::string_view name : parse_state.Capabilities)
+    {
+        facts.CapabilityNames.emplace_back(vulkan::PrimaryCapabilityName(name));
+    }
+    for (const std::string_view name : parse_state.Extensions)
+    {
+        facts.CapabilityNames.emplace_back(name);
+    }
+    std::ranges::sort(facts.CapabilityNames);
+    const auto repeated = std::ranges::unique(facts.CapabilityNames);
+    facts.CapabilityNames.erase(repeated.begin(), repeated.end());
+    facts.WorkgroupMemoryBytes = *workgroupBytes;
     return facts;
 }
 

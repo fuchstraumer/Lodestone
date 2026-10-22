@@ -12,6 +12,7 @@
 #include "TransparentHash.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -37,11 +38,8 @@ namespace lodestone
 namespace
 {
 
-    /** Deduplicates strings and returns the index of each one. Equal strings share one entry, so the blob
-     * stores each binding name once, no matter how many layouts use it. One builder is used for the whole
-     * cook, so names shared by several modules or profiles are also stored once. */
-    // todo-ship: There are better ways to do this, and we should absolutely explore them since strings
-    // will rapidly become a huge cost as variant count increases
+    /** One string table for the whole cook, so shared names are stored once.
+     * todo-ship: strings will become a large cost as the variant count grows */
     class StringTableBuilder
     {
     public:
@@ -58,8 +56,7 @@ namespace
         std::vector<std::byte> blob;
     };
 
-    /** One axis in the vocabulary of the manifest. Named values (types and enum cases) are already string
-     * indices here, so two modules that use the same case store the same value. */
+    /** Named values are string indices, so modules that share a case store the same value. */
     struct EncodedAxis
     {
         uint32_t NameString{};
@@ -71,18 +68,14 @@ namespace
         bool operator==(const EncodedAxis& other) const = default;
     };
 
-    /** The parts of a module that do not depend on the profile it was cooked for. */
     struct ModuleShape
     {
         std::vector<manifest::EntryPoint> EntryPoints;
         std::vector<EncodedAxis> Axes;
-        // the declared default of each axis, as a digit in the module's own value order. this is kept apart
-        // from EncodedAxis, because EncodedAxis is also the root axis record, and root axes are shared
-        // between modules that can declare different defaults
+        // apart from EncodedAxis: root axes are shared by modules that can declare different defaults
         std::vector<uint32_t> AxisDefaultDigits;
     };
 
-    /** The four cooked tables, flattened into runs over index and payload tables. */
     struct LayoutTables
     {
         std::vector<manifest::UniformMember> UniformMembers;
@@ -106,8 +99,7 @@ namespace
         std::vector<manifest::RasterState> Rasters;
     };
 
-    /** The variant keys, the variant records, and the axis masks are parallel and sorted by key. The slots
-     * are a grid with one row for each variant. */
+    /** Keys, variants, and axis masks are parallel and sorted by key. The slots are a grid of one row per variant. */
     struct VariantTables
     {
         std::vector<VariantKey> Keys;
@@ -120,20 +112,18 @@ namespace
     {
         std::vector<std::byte> Blob;
         std::vector<manifest::SourceRef> Refs;
+        std::vector<uint32_t> CapabilityNames;
+        std::vector<uint64_t> CapabilityMasks;
     };
 
     constexpr uint32_t k_MaxModuleAxisValues = 32u;
     constexpr size_t k_AxisMaskWordBits = 64u;
 
-    /** @brief Writes the actual bytes to the given `out` string. */
     void AppendBytes(std::vector<std::byte>& out, const void* data, size_t size);
 
-    /** Pads to the next 8-byte boundary. Binding records and axis values contain 64-bit fields, and the
-     * reader maps them in place, so every section must start aligned. */
+    /** The reader maps 64-bit fields in place, so every section starts aligned. */
     void AlignTo8(std::vector<std::byte>& out);
 
-    /** @brief Appends a table of records to the output string, aligned to 8 bytes. Returns the offset
-     *  of the first record in the output string where the new records are now located */
     template<typename RecordType>
     manifest::TableRef AppendTable(std::vector<std::byte>& out, const std::vector<RecordType>& records)
     {
@@ -174,7 +164,6 @@ namespace
             currentOffset += currentListSize;
         }
 
-        // trying something a little new, esp. since we have that input lambda
         auto flattenedRecords = lists | std::views::join | std::views::transform(make_record);
         out_payloads.insert(out_payloads.end(),
                             std::make_move_iterator(flattenedRecords.begin()),
@@ -196,13 +185,11 @@ namespace
     manifest::VertexInput MakeVertexInputRecord(const ReflectedVertexInput& input, StringTableBuilder& strings);
     manifest::ColorTarget MakeColorTargetRecord(const ReflectedColorTarget& target) noexcept;
 
-    /** The module's axes and entry points, as written to the manifest. Every profile of one module must
-     * produce the same shape, because variant keys are packed against the module's axes. */
+    /** Every profile of a module must give the same shape, since keys pack against its axes. */
     ModuleShape EncodeModuleShape(const CookedModule& module, StringTableBuilder& strings);
     bool SameModuleShape(const ModuleShape& lhs, const ModuleShape& rhs) noexcept;
-    /** Adds a module's axis to the root axis table. A root axis with the same name, kind, domain, and binding
-     * time takes it when the module's values fit the root values in order, so digit D of the module still
-     * selects the module's D-th value. Otherwise the axis gets a root record of its own. */
+    /** Shares a matching root axis when the module's values fit its values in order, so digit D still selects the
+     * module's D-th value. */
     CookResult<manifest::ModuleAxis> MergeIntoRootAxes(std::vector<EncodedAxis>& root_axes,
                                                        const EncodedAxis& module_axis,
                                                        StringTableBuilder& strings);
@@ -216,11 +203,9 @@ namespace
     LayoutTables BuildLayoutTables(const CookedModule& module, StringTableBuilder& strings);
     RasterTables BuildRasterTables(const CookedModule& module, StringTableBuilder& strings);
     CookResult<VariantTables> BuildVariantTables(const CookedModule& module, StringTableBuilder& strings);
-    SourceTables BuildSourceTables(const CookedModule& module);
-    /** One environment extent: an `EnvironmentHeader`, then every table of one (profile, module) pair. */
+    SourceTables BuildSourceTables(const CookedModule& module, StringTableBuilder& strings);
     CookResult<std::vector<std::byte>> BuildExtent(const CookedModule& module, StringTableBuilder& strings);
 
-    /** The first profile that cooked the module, or null when no profile did. */
     const CookedModule* FirstCookedEnvironment(const CookedLibrary& library, size_t module_index) noexcept;
 
 } // namespace
@@ -230,8 +215,7 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
     const size_t moduleCount = library.ModuleNames.size();
     const size_t profileCount = library.Profiles.size();
 
-    // One string table serves the whole cook. The call order below decides every string index, and the
-    // cook must be deterministic, so the order is fixed: module names, module shapes, profiles, extents.
+    // the call order decides every string index, so it is fixed: module names, shapes, profiles, extents
     StringTableBuilder strings;
 
     std::vector<manifest::ModuleRootHeader> moduleHeaders(moduleCount);
@@ -296,8 +280,7 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
                                               .Flags = flags });
     }
 
-    // build every extent before the header region: extents add binding names and suffixes to the string
-    // table, and the string table is part of the header region
+    // extents add strings, and the string table is in the header region
     std::vector<std::vector<std::byte>> extents(library.Environments.size());
     for (size_t environmentIndex = 0u; environmentIndex < library.Environments.size(); ++environmentIndex)
     {
@@ -324,7 +307,6 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
     header.Version = manifest::k_ShaderManifestVersion;
     header.ModuleCount = moduleCount;
 
-    // The module headers sit right after the header, so the reader finds them with no offset.
     std::vector<std::byte> bytes;
     bytes.resize(sizeof(manifest::Header) + (moduleCount * sizeof(manifest::ModuleRootHeader)), std::byte{ 0 });
     header.Profiles = AppendTable64(bytes, profiles);
@@ -350,7 +332,6 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
     AlignTo8(bytes);
     header.HeaderSize = bytes.size();
 
-    // Profile first, then module: the grid order, and the order a renderer reads one profile in.
     for (size_t environmentIndex = 0u; environmentIndex < extents.size(); ++environmentIndex)
     {
         if (extents[environmentIndex].empty())
@@ -415,7 +396,7 @@ namespace
     std::string_view StringTableBuilder::Text(uint32_t string_index) const noexcept
     {
         const manifest::StringRef& reference = references[string_index];
-        // jut casts all the way down....
+        // just casts all the way down....
         std::span<const char> asChars{ reinterpret_cast<const char*>(blob.data()), blob.size() };
         return std::string_view{ asChars }.substr(reference.Offset, reference.Length);
     }
@@ -444,12 +425,10 @@ namespace
 
     void AlignTo8(std::vector<std::byte>& out)
     {
-        // use size_t{} to make sure it is for sure 64 bits on x64
         const size_t alignedSize = (out.size() + 7u) & ~size_t{ 7u };
         out.resize(alignedSize, static_cast<std::byte>(0));
     }
 
-    /** Appends one record for each member to `member_records`, and returns the index of the first. */
     uint32_t AppendMemberRecords(std::span<const ReflectedUniformMember> members,
                                  StringTableBuilder& strings,
                                  std::vector<manifest::UniformMember>& member_records)
@@ -463,7 +442,6 @@ namespace
             memberRecord.Offset = member.Data.Offset;
             memberRecord.Size = member.Data.Size;
             memberRecord.ArrayCount = member.Data.ArrayCount;
-            // widen these types to uint32_t, since this is all 8-byte aligned anyways
             memberRecord.ElementStride = static_cast<uint32_t>(member.Data.ElementStride);
             memberRecord.MatrixLayout = static_cast<uint32_t>(member.Data.MatrixLayout);
             member_records.emplace_back(memberRecord);
@@ -480,7 +458,6 @@ namespace
         record.ByteSize = binding.ByteSize;
         record.NameString = strings.Add(binding.Name);
         record.ScopeString = strings.Add(binding.ScopeName);
-        // the cooker only produces bound placements today, so the payload is a group and a binding
         record.Placement = manifest::PlacementPayload{ .Word0 = GroupOf(binding), .Word1 = BindingOf(binding) };
         record.ElementStride = binding.ElementStride;
         record.ArrayCount = binding.ArrayCount;
@@ -609,7 +586,6 @@ namespace
                     encoded.Values.push_back(value.AsUInt());
                     break;
                 case AxisValueDomain::Enum:
-                    // an enum value is stored by its case name, the same way a type value is
                     encoded.Values.push_back(strings.Add(value.AsEnumCase(axis)));
                     break;
                 case AxisValueDomain::Type:
@@ -641,8 +617,6 @@ namespace
                                                        const EncodedAxis& module_axis,
                                                        StringTableBuilder& strings)
     {
-        // The value mask is 32 bits wide, so it is the hard limit. A nudge toward fewer values belongs in
-        // the cook diagnostics, not in the format.
         if (module_axis.Values.size() > k_MaxModuleAxisValues)
         {
             std::println(stderr,
@@ -688,8 +662,7 @@ namespace
 
         appended_values.clear();
         live_values_mask = 0u;
-        // The digit order is the module's value order. Selecting set bits walks the root order. The two
-        // agree only when every value lands at a higher root position than the value before it.
+        // digits follow the module's order and set bits the root order, so each value must land higher in the root
         int64_t lastPosition = -1;
         for (const AxisValueType value : module_axis.Values)
         {
@@ -747,9 +720,7 @@ namespace
         {
             tables.Bindings.push_back(MakeBindingRecord(resource, strings, tables.UniformMembers, tables.ResourceTags));
         }
-        // todo-ship: Make this into a move, and make footprint record stop using a variant. Change values
-        // to be stored not in a variant, but in a dedicated footprint record structure that we can just copy
-        // already. Use sentinel values to derive type
+        // todo-ship: a footprint record without a variant, copied as is, with sentinels for the kind
         AppendRuns(module.ResourceLists, tables.ResourceIndices, tables.ResourceLists, &PassThroughIndex);
         AppendRuns(module.FootprintLists, tables.Footprints, tables.FootprintLists, &MakeFootprintRecord);
         AppendRuns(
@@ -797,8 +768,7 @@ namespace
 
     CookResult<VariantTables> BuildVariantTables(const CookedModule& module, StringTableBuilder& strings)
     {
-        // The reader finds a variant by a binary search over the keys, so the three parallel tables are
-        // written in key order, whatever order the cook appended the variants in.
+        // the reader binary searches the keys, so the parallel tables are written in key order
         std::vector<uint32_t> order(module.Variants.size());
         std::ranges::iota(order, 0u);
         auto keyOf = [&module](uint32_t position) -> VariantKey
@@ -835,7 +805,6 @@ namespace
                                        .ResourceList = variant.ResourceListIndex,
                                        .FootprintList = variant.FootprintListIndex });
 
-            // an active binding points into the space's axis vector, so its offset there is the axis position
             for (const PermutationBinding& binding : variant.Active)
             {
                 const size_t axisPosition = static_cast<size_t>(binding.Axis - module.Space->Axes().data());
@@ -852,22 +821,43 @@ namespace
         return tables;
     }
 
-    SourceTables BuildSourceTables(const CookedModule& module)
+    SourceTables BuildSourceTables(const CookedModule& module, StringTableBuilder& strings)
     {
         SourceTables tables;
         tables.Refs.reserve(module.Sources.size());
+        // hand-built modules must supply facts, or the zip drops sources
+        assert(module.SourceFacts.size() == module.Sources.size());
 
-        for (const std::vector<std::byte>& source : module.Sources)
+        for (const auto& [source, facts] : std::views::zip(module.Sources, module.SourceFacts))
         {
-            tables.Refs.emplace_back(static_cast<uint32_t>(tables.Blob.size()), static_cast<uint32_t>(source.size()));
+            tables.Refs.push_back(manifest::SourceRef{ .Offset = static_cast<uint32_t>(tables.Blob.size()),
+                                                       .Length = static_cast<uint32_t>(source.size()),
+                                                       .WorkgroupMemoryBytes = facts.WorkgroupMemoryBytes });
             tables.Blob.append_range(source);
+        }
+
+        // a name's sorted position is its bit
+        const std::vector<std::string>& names = module.ObservedCapabilities;
+        tables.CapabilityNames.reserve(names.size());
+        for (const std::string& name : names)
+        {
+            tables.CapabilityNames.push_back(strings.Add(name));
+        }
+        const size_t wordCount = (names.size() + k_AxisMaskWordBits - 1u) / k_AxisMaskWordBits;
+        tables.CapabilityMasks.assign(module.SourceFacts.size() * wordCount, 0u);
+        for (const auto& [sourceIndex, facts] : std::views::enumerate(module.SourceFacts))
+        {
+            for (const std::string& name : facts.CapabilityNames)
+            {
+                const auto bit = static_cast<size_t>(std::ranges::lower_bound(names, name) - names.begin());
+                tables.CapabilityMasks[(static_cast<size_t>(sourceIndex) * wordCount) + (bit / k_AxisMaskWordBits)] |=
+                    uint64_t{ 1u } << (bit % k_AxisMaskWordBits);
+            }
         }
 
         return tables;
     }
 
-    /** Returns one axis relevance mask for each entry point, in the word layout of the axis mask table. Bit k is
-     * set when `model/AxisInfluence` measures axis k as Active or Undetermined for that entry point. */
     CookResult<std::vector<uint64_t>> BuildAxisRelevanceTable(const CookedModule& module)
     {
         const size_t axisCount = module.Space != nullptr ? module.Space->AxisCount() : 0u;
@@ -921,25 +911,24 @@ namespace
             BuildFootprintAxisMasks(module, (axisCount + k_AxisMaskWordBits - 1u) / k_AxisMaskWordBits);
         const LayoutTables layouts = BuildLayoutTables(module, strings);
         const RasterTables rasters = BuildRasterTables(module, strings);
-        SourceTables sources = BuildSourceTables(module);
+        SourceTables sources = BuildSourceTables(module, strings);
 
         manifest::EnvironmentHeader environment;
         std::vector<std::byte> extent;
         extent.resize(sizeof(manifest::EnvironmentHeader), std::byte{ 0 });
 
-        // The variant count sizes these four tables, so each keeps its offset only.
+        // the tables below that keep an offset only are sized by other counts
         environment.VariantCount = static_cast<uint32_t>(variants.Variants.size());
         environment.VariantKeyTableOffset = AppendTable(extent, variants.Keys).Offset;
         environment.VariantTableOffset = AppendTable(extent, variants.Variants).Offset;
         environment.AxisMaskTableOffset = AppendTable(extent, variants.AxisMasks).Offset;
         environment.EntryPointInstanceTableOffset = AppendTable(extent, variants.Slots).Offset;
-        // the entry point count and the module's axis count size this table, so it keeps its offset only
         environment.AxisRelevanceTableOffset = AppendTable(extent, relevance.value()).Offset;
-        // the binding count and the module's axis count size this table, so it keeps its offset only
         environment.FootprintAxisTableOffset = AppendTable(extent, footprintAxes).Offset;
+        environment.SourceCapabilityTableOffset = AppendTable(extent, sources.CapabilityMasks).Offset;
+        environment.CapabilityNames = AppendTable(extent, sources.CapabilityNames);
 
         environment.Sources = AppendTable(extent, sources.Refs);
-        // The count of the blob is in bytes.
         AlignTo8(extent);
         environment.SourceBlob = manifest::TableRef{ static_cast<uint32_t>(extent.size()),
                                                      static_cast<uint32_t>(sources.Blob.size()) };
@@ -956,7 +945,6 @@ namespace
         environment.VertexInputs = AppendTable(extent, rasters.VertexInputs);
         environment.ColorTargets = AppendTable(extent, rasters.ColorTargets);
         environment.UniformMembers = AppendTable(extent, layouts.UniformMembers);
-        // Reserved. The cooker writes no specialization constant yet.
         environment.SpecConstants = AppendTable(extent, std::vector<manifest::SpecializationConstant>{});
         environment.SamplerPairLists = AppendTable(extent, layouts.SamplerPairLists);
         environment.SamplerTexturePairs = AppendTable(extent, layouts.SamplerTexturePairs);

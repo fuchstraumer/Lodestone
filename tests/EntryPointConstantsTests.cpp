@@ -21,10 +21,7 @@
 #include <string_view>
 #include <vector>
 
-// The entry point constants, from the shader source to the manifest, for both targets. `EntryPointConstants.slang`
-// declares the `uniform` parameters of ordinary data in four forms. Reflection and the emitted code each give part
-// of the answer, so this test compares the manifest with sizes and offsets computed by hand from the std140 (WGSL
-// uniform buffer) and std430 (SPIR-V push constant) rules.
+// sizes and offsets computed by hand from std140 (WGSL uniform buffer) and std430 (SPIR-V push constants)
 
 namespace
 {

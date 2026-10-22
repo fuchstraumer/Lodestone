@@ -1,21 +1,8 @@
 module LodestoneAttributes;
 
-// Annotations the shader cooker reads back through reflection. They describe sizes that only the
-// shader author knows, so the graph stops being told them a second time on the CPU side, where the
-// two statements drift apart.
-//
-// Every size travels as a string, and this is not a style choice. Slang folds an attribute's integer
-// argument at compile time, but the permutation constants are `extern static const` and only fold at
-// link time, so `[ls_element_count(IFFT_SIZE * IFFT_SIZE)]` fails to compile outright. A string
-// argument reaches reflection untouched, and the cooker evaluates it once per variant against the
-// axis values it already holds.
-//
-// User-defined attributes also have no optional parameters -- Slang requires the argument count to
-// match exactly -- so each arity needs its own name.
-//
-// todo-ship: add `vx_byte_size` for the cases where an element count is the wrong unit. When it
-// lands, the cooker must reject a byte size that is not a whole multiple of the reflected element
-// stride, and reject a declaration that carries both attributes.
+// Sizes travel as strings: Slang folds attribute integers at compile time, but our constants fold at link time.
+// Attributes have no optional parameters, so each arity has its own name.
+// todo-ship: `ls_byte_size`, rejected when not a multiple of the stride or beside `ls_element_count`
 
 /** Number of elements in a structured buffer. The cooker multiplies this by the reflected element
  * stride, so the stride is never written by hand and cannot drift. */
@@ -49,9 +36,8 @@ public struct ls_extent_3dAttribute
     public string depth;
 };
 
-/** The usages of a buffer outside of its shader bindings, separated by whitespace: IndirectDispatch,
- * IndirectDraw, IndirectDrawIndexed, IndexData, VertexData. The cooker checks each role against the
- * binding kind and the element stride. */
+/** Buffer usages outside of its bindings, separated by spaces: IndirectDispatch, IndirectDraw, IndirectDrawIndexed,
+ * IndexData, VertexData. */
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct ls_resource_roleAttribute
 {
@@ -86,9 +72,7 @@ public struct ls_axis_valuesAttribute
     public string values;
 };
 
-/** ls_axis_active_when specifies what condition, expressed as axis values from previously declared
-  * axes, that must evaluate to true for the axis this declaration is applied to be considered active (e.g,
-  * `[ls_axis_active_when("MY_AXIS == 1")]`) */
+/** The axis is active when this expression over earlier axes is true, such as `"MY_AXIS == 1"`. */
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct ls_axis_active_whenAttribute
 {

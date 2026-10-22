@@ -56,9 +56,7 @@ std::string_view ToString(BindingKind kind) noexcept
 namespace
 {
 
-/** Using constexpr, this structure allows for compile-time composition of shape names from the various
-  * flags present in the mask. To populate it, we just iterate over all possible shape values at compile time
-  * and have that populate the array. Checked in Godbolt: it really does work at compile time! */
+/** Shape names composed at compile time. Checked in Godbolt: it really does work at compile time! */
 struct ShapeName
 {
     std::array<char, 64u> Data{};
@@ -81,7 +79,6 @@ struct ShapeName
 
 constexpr std::string_view BaseShapeName(ResourceShape base_shape) noexcept
 {
-    // input is masked to extract the base shape before it gets here
     switch (base_shape)
     {
     case ResourceShape::Texture1D:
@@ -105,9 +102,7 @@ constexpr std::string_view BaseShapeName(ResourceShape base_shape) noexcept
     }
 }
 
-/** Composes the base name by working from the base shape "downards" (in bits). 
-  * Unconditionally appends as it goes, so even invalid combinations still produce
-  * a name, which can help identify invalid or unexpected combinations. */
+/** Invalid combinations still get a name, which helps to identify them. */
 constexpr ShapeName ComposeShapeName(ResourceShape shape) noexcept
 {
     ShapeName name;
@@ -131,8 +126,6 @@ constexpr ShapeName ComposeShapeName(ResourceShape shape) noexcept
     return name;
 }
 
-/** Build the names for each value in the span of a uint8_t. This one is consteval,
- *  so it absolutely runs at compile time. */
 consteval std::array<ShapeName, 256u> BuildShapeNameTable() noexcept
 {
     std::array<ShapeName, 256u> table{};
@@ -148,7 +141,6 @@ inline constexpr std::array<ShapeName, 256u> k_ShapeNames = BuildShapeNameTable(
 template<typename T> requires(std::is_trivially_copyable_v<T> && !std::is_pointer_v<T>)
 constexpr std::span<const std::byte, sizeof(T)> ObjectAsBytes(const T& object) noexcept
 {
-    // silly warning, when we have the requires ensuring this cast is actually legitimately safe
     //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     auto& byteArray = reinterpret_cast<const std::byte(&)[sizeof(T)]>(object);
     return std::span<const std::byte, sizeof(T)>{ byteArray };
@@ -461,18 +453,14 @@ std::string DescribeUniformMembers(const ReflectedBinding& binding)
     return description;
 }
 
-//todo-ship: audit and update this. we've changed the field widths quite a bit
+//todo-ship: audit this, since the field widths changed a lot
 uint64_t HashReflectedBinding(const ReflectedBinding& binding) noexcept
 {
     thread_local StreamingHash compositeHasher;
-    compositeHasher.Reset(); // always reset at opening
-    // this replaces previous crappy xor fnv-1a combine hash stuff, with proper hashing
-    // should mean much better distribution and fewer collisions than the previous approach.
+    compositeHasher.Reset();
     compositeHasher.Append(std::string_view{ binding.Name });
     compositeHasher.Append(static_cast<uint64_t>(binding.Placement.index()));
-    // gather all our integral fields into one big run of uint64_t's. xxHash3 avalanches exceedingly well,
-    // so unlike with fnv-1a where we worry about repeated low bits having little effect on the output, 
-    // that's not true here. converting once to 64 bit uints before hashing is sufficient for good distribution.
+    // xxHash3 avalanches well, so widening every field to 64 bits once is enough
     const uint64_t scalarValues[]
     {
         static_cast<uint64_t>(binding.Kind),
@@ -495,7 +483,6 @@ uint64_t HashReflectedBinding(const ReflectedBinding& binding) noexcept
         compositeHasher.Append(ObjectAsBytes(member.Data));
     }
 
-    // the count separates the last member name from the first tag
     compositeHasher.Append(static_cast<uint64_t>(binding.Tags.size()));
     for (const std::string& tag : binding.Tags)
     {
@@ -509,7 +496,6 @@ uint64_t HashReflectedRasterState(const ReflectedRasterState& rasterState) noexc
 {
     thread_local StreamingHash compositeHasher;
     compositeHasher.Reset();
-    // we could probably reinterpret most of these as byte spans
 
     for (const ReflectedVertexInput& vertexInput : rasterState.VertexInputs)
     {

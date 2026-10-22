@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <string>
 
-// File for all POD permutation types that don't need anything beyond standard includes.
-// Helps keep the include graph cleaner, especially for cross-module dependencies.
 namespace lodestone
 {
 
@@ -55,7 +53,6 @@ struct RawEnumCase
         }
         else
         {
-            // should hopefully only sort on this
             return Value < other.Value;
         }
     }

@@ -4,12 +4,7 @@
 #include <type_traits>
 #include <utility>
 
-/**
- * @file EnumClassUtils.hpp
- * @brief Utilities for working with enum class bitflags in a type-safe manner.
- * Defines a macro to generate bitwise operators for enum classes used as bitmasks, and a shim that allows
- * for safe boolean checks on the results of these operations (while preserving stored value in bitmask).
-*/
+/** @brief Bitwise operators for enum class flags, and safe boolean tests on the results. */
 
 template<typename T>
     requires(std::is_enum_v<T> and requires(T e) { enable_bitmask_operator_or(e); })
@@ -32,7 +27,6 @@ constexpr auto operator^(const T lhs, const T rhs) noexcept
     return static_cast<T>(std::to_underlying(lhs) ^ std::to_underlying(rhs));
 }
 
-// can we use this to define common patterns like |= ? 
 template<typename T>
     requires(std::is_enum_v<T> and requires(T e) { enable_bitmask_operator_or_eq(e); })
 constexpr T& operator|=(T& lhs, const T rhs) noexcept
@@ -41,7 +35,6 @@ constexpr T& operator|=(T& lhs, const T rhs) noexcept
     return lhs;
 }
 
-// add ~ mask option
 template<typename T>
     requires(std::is_enum_v<T> and requires(T e) { enable_bitmask_operator_not(e); })
 constexpr auto operator~(const T value) noexcept
@@ -49,7 +42,7 @@ constexpr auto operator~(const T value) noexcept
     return static_cast<T>(~std::to_underlying(value));
 }
 
-// pairs with ~ for the clear-a-flag idiom: usage &= ~Flags::MapWrite
+// usage &= ~Flags::MapWrite
 template<typename T>
     requires(std::is_enum_v<T> and requires(T e) { enable_bitmask_operator_and(e); })
 constexpr T& operator&=(T& lhs, const T rhs) noexcept
@@ -66,11 +59,7 @@ constexpr T& operator^=(T& lhs, const T rhs) noexcept
     return lhs;
 }
 
-/** @brief True when every bit in flags is set in value. The right test for a single-bit flag, and the
- * one that reads correctly when passed a multi-bit alias like AllTransfer.
- * @note Use this rather than `value & flag` in a condition - the operators above return the enum type,
- * which has no implicit conversion to bool.
- */
+/** @brief Use this, not `value & flag`, in a condition: the operators return the enum type. */
 template<typename T>
     requires std::is_enum_v<T>
 constexpr bool HasAllFlags(T value, T flags) noexcept
@@ -78,9 +67,7 @@ constexpr bool HasAllFlags(T value, T flags) noexcept
     return (std::to_underlying(value) & std::to_underlying(flags)) == std::to_underlying(flags);
 }
 
-/** @brief True when any bit in flags is set in value. Differs from HasAllFlags only for multi-bit
- * arguments, which is exactly where guessing wrong is silent - hence two names rather than one.
- */
+/** @brief Differs from HasAllFlags only for multi-bit flags, where a wrong guess is silent. */
 template<typename T>
     requires std::is_enum_v<T>
 constexpr bool HasAnyFlag(T value, T flags) noexcept
@@ -88,7 +75,6 @@ constexpr bool HasAnyFlag(T value, T flags) noexcept
     return (std::to_underlying(value) & std::to_underlying(flags)) != 0;
 }
 
-// now our macro is a bunch of consteval functions that return true for the operators we want to enable
 #define MAKE_ENUM_CLASS_FLAGS(EnumClass) \
     consteval bool enable_bitmask_operator_or(EnumClass) { return true; } \
     consteval bool enable_bitmask_operator_and(EnumClass) { return true; } \

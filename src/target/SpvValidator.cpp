@@ -61,18 +61,12 @@ CookResult<BindingComparison> SpvValidator::validateEntryPoint(std::span<const s
     }
 
     std::vector<DeclaredBinding> declared = CollectDeclaredBindings(state);
-    // the interface list is not sorted. `bindings` arrives sorted by (group, binding).
     std::ranges::sort(declared, {}, [](const DeclaredBinding& binding)
     {
         return std::make_tuple(binding.Group, binding.Binding);
     });
 
     BindingComparison comparison = CompareBindings(declared, bindings);
-    comparison.Capabilities.reserve(state.Capabilities.size());
-    for (const std::string_view capability : state.Capabilities)
-    {
-        comparison.Capabilities.emplace_back(capability);
-    }
 
     CookResult<EmittedCodeFacts> facts = CollectEmittedCodeFacts(state, sink);
     if (!facts)
@@ -98,9 +92,7 @@ CookResult<EmittedCodeFacts> SpvValidator::readEmittedCodeFacts(std::span<const 
 namespace
 {
 
-    /** Shape and access are only compared where both sides record them. SPIR-V only records the shape of
-     * images, and only records the access of storage buffers and storage images. Reflection writes ReadOnly
-     * on every sampled texture, and SPIR-V has no equivalent for that. */
+    /** SPIR-V states shape for images only, and access for storage buffers and images only. */
     bool ShapeIsStated(BindingKind kind) noexcept
     {
         return (kind == BindingKind::Texture) || (kind == BindingKind::StorageTexture);
@@ -111,10 +103,8 @@ namespace
         return (kind == BindingKind::StorageBuffer) || (kind == BindingKind::StorageTexture);
     }
 
-    /** SPIR-V names scoped variables with dots (`Surface.Material.Albedo`). Reflection joins scopes with
-     * underscores, as WGSL does (the scope question is open in `todo.md`). Set and binding already match
-     * when this runs, so comparing the last segment is enough to catch a wrong resource at the right
-     * location. */
+    /** SPIR-V joins scopes with dots, and reflection with underscores (todo.md has the scope question). Placement
+     * already matched, so the last segment is enough. */
     std::string_view LastNameSegment(std::string_view spirv_name) noexcept
     {
         const size_t lastDot = spirv_name.rfind('.');
@@ -175,8 +165,6 @@ namespace
         }
     }
 
-    /** Both lists are sorted by (set, binding), so one pass of two iterators compares them: O(N + M), the
-     * same walk as the WGSL validator. */
     BindingComparison CompareBindings(std::span<const DeclaredBinding> declared,
                                       std::span<const ReflectedBinding*> reflected)
     {

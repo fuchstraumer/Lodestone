@@ -21,14 +21,11 @@ struct LinkedVariant;
 class SlangReflector
 {
 public:
-    // Since we need to propagate errors/results, ctor is just defaulted
     SlangReflector(std::span<const std::string> entry_point_names,
                    DiagnosticSink* sink,
                    slang::IGlobalSession* global_session,
                    PlacementKind active_placement_kind) noexcept;
     ~SlangReflector() noexcept = default;
-    // this thing works like a local one-shot invocation of reflection, so copying
-    // shouldn't happen, but better safe than sorry
     SlangReflector(const SlangReflector&) noexcept = delete;
     SlangReflector& operator=(const SlangReflector&) noexcept = delete;
 
@@ -91,7 +88,6 @@ private:
     std::span<const std::string> entryPointNames;
     DiagnosticSink* sink{ nullptr };
     slang::IGlobalSession* globalSession;
-    // governs checks for how bindings and layouts are interpreted or lowered
     PlacementKind activePlacementKind;
 };
 

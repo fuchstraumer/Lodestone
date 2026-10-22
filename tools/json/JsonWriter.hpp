@@ -7,14 +7,7 @@
 #include <string_view>
 #include <vector>
 
-/**
- * @brief Builds one JSON document as text, one call at a time.
- *
- * The writer only emits JSON. It never parses it, so a debug tool can dump a cooked manifest without
- * pulling in a full JSON library or its exception-based error paths. Callers open a container, write its
- * members, and close it; the only checked failure is an unclosed container at the end, since that is the
- * one mistake that would silently produce invalid output.
- */
+/** @brief Writes one JSON document. The only checked failure is an unclosed container at the end. */
 namespace lodestone
 {
 

@@ -18,8 +18,7 @@
 #include <string_view>
 #include <vector>
 
-/** Owns every interaction with Slang. Nothing in this header names a Slang type, so the rest of the
- * cooker links against the data schema rather than against the compiler. */
+/** The Slang wall: this header names no Slang type. */
 namespace lodestone
 {
 
@@ -33,12 +32,9 @@ struct SlangCompilerCreateInfo
     std::filesystem::path ModuleCacheDirectory;
     uint32_t OptimizationLevel{ 0u };
     bool MultithreadVariantBuild{ true };
-    /**@brief If multithreading enabled, it's important to specify expected batch size.
-     * As session creation is expensive, using all threads for low variant counts oversubscribes and slows the build. */
+    /** @brief Sessions are expensive, so a small batch on every thread oversubscribes. */
     size_t ExpectedBatchSize{ 0u };
-    /**@brief Optional symbol table to inherit from for multi-module builds. */
     std::optional<SymbolTable> InheritedSymbolTable;
-    /** The `TargetProfile` supplies these two. One session compiles for one language. */
     TargetLanguage Language{ TargetLanguage::Invalid };
     std::string_view SlangProfileName;
     PlacementKind AccessModel;
@@ -66,8 +62,7 @@ public:
     [[nodiscard]] const std::vector<std::string>& EntryPointNames() const noexcept;
     [[nodiscard]] const std::vector<std::string>& ModuleSourceStrings() const noexcept;
     [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
-    /** Returns the file path of every input source the module read, excluding embedded builtins. We write
-     * these to the depfile so that the build step re-cooks when any input source changes. */
+    /** @brief The file paths for the depfile, excluding embedded builtins. */
     [[nodiscard]] const std::vector<std::string>& DependencyFilePaths() const noexcept;
     [[nodiscard]] std::vector<RawAxisDeclaration> BuildAxisDeclarations() const noexcept;
     [[nodiscard]] const SymbolTable& GetSymbolTable() const noexcept;

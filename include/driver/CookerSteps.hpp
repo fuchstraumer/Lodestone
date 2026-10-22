@@ -32,7 +32,6 @@ struct CookStatistics
     size_t TotalSourceBytes{ 0u };
     CookStatistics& operator+=(const CookStatistics& other)
     {
-        // input does not have to be treated as atomic, just *this
         std::atomic_ref<uint32_t> atomicModulesCooked{ ModulesCooked };
         std::atomic_ref<uint32_t> atomicVariantsCompiled{ VariantsCompiled };
         std::atomic_ref<uint32_t> atomicEntryPointsCompiled{ EntryPointsCompiled };
@@ -49,41 +48,28 @@ struct CookStatistics
     }
 };
 
-// fow now: listing steps using an enum class to spell them out, then going to build structs
-// per step
 struct SharedCookState
 {
     CookerOptions Options;
     std::unique_ptr<DiagnosticSink> Diagnostics;
     PolicyDocument Policy;
     std::vector<std::string> AllModuleNames;
-    // Resolve policies per target upfront, read later
-    // string_views are views into Options vector of strings, should be fine
+    // views into the Options strings
     std::unordered_map<std::string_view, TargetProfile> TargetProfiles;
 };
 
-// Writes SharedState, building the profile and policy document
-// used by all later steps. Does not yet populate permutation space.
 struct PreparedCook
 {
     SharedCookState SharedState;
 };
 
-// Step 1: Bootstrap compiler *per module*, then coalesce back to build the 
-// permutation space for the whole cook. After that, we can proceed to 
-// build the RawModule per-module
-// todo-ship: this also needs to be keyed/varied on target, since that can
-// change the binding model and generally affects results greatly
+// todo-ship: key this on the target too, which changes the binding model
 struct PreparedCompiler
 {
     std::unique_ptr<class SlangCompiler> Compiler;
 };
 
-// Step 2: Build the permutation space, using all of the modules (and thus
-// compiler instances) from the previous step. This also generates
-// the variant set for a single module.
-// todo-ship: Currently it's still per-module, but that doesn't break
-// anything behavior-wise. It's just a missing improvement.
+// todo-ship: build the space once for the whole cook, not per module
 struct PreparedPermutationSpace
 {
     PermutationSpace Space;
@@ -92,13 +78,7 @@ struct PreparedPermutationSpace
     std::optional<std::string> VariantDump;
 };
 
-// Stage 3: Combine the built space and the compiler to build the prepared
-// module. Previous seam used to be on RawModule, but this builds that 
-// internally and writes to RawModuleDump as the only artifact of that work
-// which exits this step
-// todo-ship: Thread this step, and use that to scale the shader compiler
-// to the right amount of threads to be about 1.25-1.5x hardware thread counts
-// any further will just choke out the OS, but mild oversubscription is fine
+// todo-ship: thread this step, at about 1.25-1.5x the hardware threads
 struct BuiltModule
 {
     InternedModule Module;

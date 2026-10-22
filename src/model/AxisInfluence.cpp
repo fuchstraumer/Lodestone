@@ -31,8 +31,7 @@ namespace lodestone
 namespace
 {
 
-    /** The content of every (variant, entry point) instance of one module, resolved once. `Layouts` points into
-     * the module's tables, so the module must outlive it. Both vectors are strided by the entry point count. */
+    /** Every instance's content, resolved once and strided by the entry point count. Points into the module. */
     struct InstanceTable
     {
         size_t EntryPointCount{ 0u };
@@ -59,7 +58,7 @@ namespace
         for (const ResolvedBindingView& binding : layout)
         {
             hasher.Append(HashReflectedBinding(*binding.Resource));
-            // a resource with no footprint and a resource with an empty one are different facts
+            // no footprint and an empty footprint are different facts
             hasher.Append(static_cast<uint32_t>(binding.Footprint != nullptr));
             if (binding.Footprint != nullptr)
             {
@@ -74,7 +73,6 @@ namespace
         hasher.Append(workgroup.Y);
         hasher.Append(workgroup.Z);
 
-        // the pairs follow from the code and the layout, and a consumer reads them, so they are part of the instance
         hasher.Append(HashSamplerPairList(module.SamplerPairLists[variant.SamplerPairIndices[entry_point_index]]));
         hasher.Append(
             HashEntryPointConstants(module.EntryPointConstantsTable[variant.ConstantsIndices[entry_point_index]]));
@@ -107,8 +105,7 @@ namespace
         return table;
     }
 
-    /** Compares the content of two instances of one entry point. A hash only picks the candidates, so this
-     * decides. */
+    /** Hashes pick candidates, and this decides. */
     bool InstancesEqual(const CookedModule& module,
                         const InstanceTable& instances,
                         uint32_t lhs_variant,
@@ -149,8 +146,6 @@ namespace
                                 std::span<const uint32_t> group,
                                 size_t entry_point_index)
     {
-        // If the hash of the first variant matches all others, we still need to check the actual content.
-        // But if we find a mismatch, we can immediately return false.
         const ContentHashValue firstHash = instances.Hashes[instances.Slot(group.front(), entry_point_index)];
         auto hashCheck = [&instances, &entry_point_index, &firstHash](uint32_t variant_index)
         {
@@ -164,8 +159,6 @@ namespace
             return false;
         }
 
-        // equal hashes prove nothing: the content decides. check the actual content, including layouts, states,
-        // and workgroup sizes - all things that can be varied by permutation values
         auto predicate = [&](uint32_t variant_index)
         {
             return InstancesEqual(module, instances, group.front(), variant_index, entry_point_index);
@@ -190,7 +183,7 @@ namespace
         return false;
     }
 
-    /** Orders the variants so that the ones that agree on every axis except `axis_index` are adjacent. */
+    /** Makes variants that agree on every axis except `axis_index` adjacent. */
     std::vector<uint32_t> OrderByOtherAxes(const CookedModule& module, const size_t axis_index)
     {
         std::vector<uint32_t> order(module.Variants.size());
@@ -205,16 +198,9 @@ namespace
         return order;
     }
 
-    /** Closes the relevance of one subject. The per-axis pass compares only variants that differ in one axis, so
-     * it proves that variants which agree on every relevant axis hold one value only along chains of cooked
-     * variants, and a sparse cook can break a chain. This groups the variants by their relevant axes, and in each
-     * group that holds more than one value it marks every axis that varies within the group, until no group holds
-     * more than one value.
-     *
-     * Every axis that varies within such a group separates two variants with different values, so the rule marks
-     * a set and picks no pair, which keeps the result independent of the variant order. A smaller set can exist,
-     * but it is not unique. Each round marks at least one axis, because two variants with different values that
-     * agree on every relevant axis differ in some other axis. */
+    /** The closing pass: groups variants by their relevant axes, and marks every axis that varies within a group of
+     * more than one value, until no group has one. It marks sets and never picks pairs, so the result does not depend
+     * on variant order. */
     template<typename SharesOneValue>
     void CloseRelevance(const CookedModule& module,
                         const SharesOneValue& shares_one_value,
@@ -231,13 +217,11 @@ namespace
 
         while (true)
         {
-            // reset marked per iteration
             std::ranges::fill(marked, 0u);
-            active_indices.clear(); // just reset using clear(), can't fill
-            inactive_indices.clear(); // just reset using clear(), can't fill
+            active_indices.clear();
+            inactive_indices.clear();
 
-            // pack the actually active (relevant) axes into active_indices
-            // means one less branch in the hot lessOnRelevant comparison
+            // one less branch in the hot comparison
             for (std::ptrdiff_t k = 0u; k < std::ssize(axes); ++k)
             {
                 if (IsAxisRelevant(axes[k]))
@@ -286,8 +270,7 @@ namespace
                 }
 
                 const CanonicalAssignment& first = module.Variants[group.front()].Canonical;
-                // inverted loop: load each variant once, then check all of it's axes for differences
-                // should hopefully be more cache-friendly than the previous approach
+                // load each variant once, then check all of its axes
                 for (uint32_t variant_index : group.subspan(1u))
                 {
                     const CanonicalAssignment& current = module.Variants[variant_index].Canonical;
@@ -317,10 +300,8 @@ namespace
         }
     }
 
-    /** The first pass over each of `subject_count` subjects. A subject is one thing that a variant gives a value
-     * for, such as one entry point instance or one resource footprint. `shares_one_value(group, subject)` returns true
-     * when every variant of `group` gives one value for the subject, and it decides by content. Returns one axis list
-     * for each subject: Active where a one-axis pair differs, and Undetermined for an axis with no such pair. */
+    /** The first pass: Active where a one-axis pair differs, Undetermined where no pair exists. A subject is anything a
+     * variant gives a value for, and `shares_one_value(group, subject)` decides by content. */
     template<typename SharesOneValue>
     std::vector<std::vector<AxisInfluence>> MeasureAxisPairs(const CookedModule& module,
                                                              size_t subject_count,
@@ -334,16 +315,13 @@ namespace
         {
             const std::vector<uint32_t> orderedIndices = OrderByOtherAxes(module, k);
             bool foundPair = false;
-            // A while, not a for: `begin` already moves to the next group, and a for header would then
-            // increment past that group's first element and drop the group.
+            // a while: `begin` already moves to the next group, and a for would skip its first element
             size_t begin = 0u;
             while (begin < orderedIndices.size())
             {
                 const PermutationAssignment& beginCanonical = module.Variants[orderedIndices[begin]].Canonical;
 
-                // The order puts variants that agree on every other axis next to each other, so a group
-                // ends at the first one that disagrees. Read `end` inside the condition: on the last
-                // group it is out of range until the range test runs.
+                // read `end` inside the condition: on the last group it is out of range until the range test
                 size_t end = begin + 1u;
                 while (end < orderedIndices.size() &&
                        !AssignmentComparatorExcludingAxis(beginCanonical,
@@ -385,10 +363,9 @@ namespace
         return subjects;
     }
 
-    /** The resources of one module by scope and name, and the footprint each variant gives each of them. */
     struct FootprintTable
     {
-        /** Sorted by scope and then by name, with no repeats. */
+        /** Sorted and unique. */
         std::vector<std::pair<std::string_view, std::string_view>> Identities;
         /** Strided by the identity count. Null where the variant does not declare the resource. */
         std::vector<const ResourceFootprint*> Footprints;
@@ -411,7 +388,6 @@ namespace
         const auto [uniqueEnd, rangeEnd] = std::ranges::unique(table.Identities);
         table.Identities.erase(uniqueEnd, rangeEnd);
 
-        // the identity of each resource record, found once, so the variant walk below searches nothing
         std::vector<uint32_t> identityOfResource;
         identityOfResource.reserve(module.Resources.size());
         for (const ReflectedBinding& resource : module.Resources)
@@ -438,7 +414,6 @@ namespace
         return table;
     }
 
-    /** Returns true when every variant of `group` that declares the resource gives it one footprint. */
     bool GroupSharesOneFootprint(const FootprintTable& table, std::span<const uint32_t> group, size_t identity_index)
     {
         const ResourceFootprint* first = nullptr;
@@ -477,8 +452,7 @@ CookResult<ModuleInfluence> ComputeActualInfluence(const CookedModule& module)
     }
 
     const size_t axisCount = module.Space->AxisCount();
-    // every pass reads one canonical value for each axis, and only CanonicalizeAssignment builds a canonical
-    // assignment, so a variant with a shorter one was built by hand and skipped it
+    // a shorter canonical assignment was built by hand, skipping CanonicalizeAssignment
     auto checkAxisCount = [&axisCount](const LibraryVariant& variant)
     {
         return variant.Canonical.size() == axisCount;
@@ -537,8 +511,7 @@ std::vector<ResourceFootprintInfluence> ComputeFootprintInfluence(const CookedMo
     for (auto&& [identityIndex, resource] : std::views::enumerate(influence))
     {
         resource.PairAxes = std::move(measured[static_cast<size_t>(identityIndex)]);
-        // the closing pass treats an Undetermined axis as relevant, which suits a pin and not a footprint: here it
-        // must mark the axes that a sparse cook left with no one-axis pair
+        // the closing pass counts Undetermined as relevant, which suits pins and not footprints
         resource.Axes = resource.PairAxes;
         std::ranges::replace(resource.Axes, AxisInfluence::Undetermined, AxisInfluence::Inert);
         CloseRelevance(module, sharesOneFootprint, static_cast<size_t>(identityIndex), resource.Axes);
@@ -558,7 +531,6 @@ std::vector<uint64_t> BuildFootprintAxisMasks(const CookedModule& module, size_t
     const std::vector<ResourceFootprintInfluence> influence = ComputeFootprintInfluence(module);
     for (auto&& [resourceIndex, resource] : std::views::enumerate(module.Resources))
     {
-        // every record has an identity in the result, because the result is built from these records
         const auto measured = std::ranges::lower_bound(influence,
                                                        std::tie(resource.ScopeName, resource.Name),
                                                        std::less{},
@@ -590,7 +562,6 @@ CookError VerifyFootprintAxes(const CookedModule& module, DiagnosticSink& sink)
     CookError result = CookError::Success;
     for (const ResourceFootprintInfluence& resource : measured)
     {
-        // both lists are sorted by scope and then by name, and a resource with no size attribute has no declaration
         const auto declaration = std::ranges::lower_bound(module.FootprintDeclarations,
                                                           std::tie(resource.ScopeName, resource.Name),
                                                           std::less{},
@@ -599,8 +570,7 @@ CookError VerifyFootprintAxes(const CookedModule& module, DiagnosticSink& sink)
         const bool declared = declaration != module.FootprintDeclarations.end() &&
                               declaration->ScopeName == resource.ScopeName && declaration->Name == resource.Name;
 
-        // only a one-axis pair proves that one axis changes the footprint. The closed set can hold an axis that a
-        // sparse cook could not separate from the one that does
+        // only one-axis pairs prove an axis; the closed set can hold axes a sparse cook could not separate
         for (auto&& [axisIndex, axisInfluence] : std::views::enumerate(resource.PairAxes))
         {
 

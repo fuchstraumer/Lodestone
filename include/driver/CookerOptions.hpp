@@ -13,11 +13,8 @@
 namespace lodestone
 {
 
-/** One point between two stages that a cook can write out as JSON.
- *
- * Dumps are diagnostics, not a shipped format. They have no version field, and nothing reads them back.
- * Every check that uses them is a byte comparison, either against a golden file or against the second
- * cook that `--verify-deterministic` runs. */
+/** A point between two stages that a cook can dump. Dumps are diagnostics with no version: only byte comparisons
+ * read them. */
 enum class StageDumpKind : uint8_t
 {
     Invalid = 0,
@@ -31,12 +28,10 @@ enum class StageDumpKind : uint8_t
 
 std::string_view ToString(StageDumpKind kind) noexcept;
 
-/** Maps one `--dump-stage` name onto a kind. Returns `Invalid` for a name the cooker does not know. */
 StageDumpKind ParseStageDumpKind(std::string_view name) noexcept;
 
 uint32_t StageDumpBit(StageDumpKind kind) noexcept;
 
-/** Every kind at once, which is what `--dump-stage=all` sets. */
 uint32_t AllStageDumpBits() noexcept;
 
 struct CookerOptions
@@ -45,25 +40,17 @@ struct CookerOptions
     std::filesystem::path ModuleCacheDirectory;
     std::vector<std::filesystem::path> ModulePaths;
     uint32_t OptimizationLevel{ 0u };
-    /** Which `TargetProfile` this cook emits for. `--target` sets it */
     std::vector<std::string> TargetNames;
-    /** Runs the target's validator, making sure that emitted data matches target binding schema and access
-     * model */
     bool ValidateAgainstEmittedText{ true };
     bool ReportReflection{ false };
     bool MultithreadEntryPointCodegen{ true };
-    /**Turns off content dedup. Output stays correct, and every artifact takes its own index */
+    /** The control arm: every artifact takes its own index. */
     bool DedupeEnabled{ true };
-    /** Cooks twice into memory and compares. Catches an unordered container's iteration order when
-     * it reaches the emitted output. */
+    /** Cooks twice into memory and compares, to catch unordered containers reaching the output. */
     bool VerifyDeterministic{ false };
-    /** One bit for each `StageDumpKind` the cook must write. `--dump-stage` sets them. */
     uint32_t DumpStageMask{ 0u };
     std::optional<std::filesystem::path> PolicyFile;
     bool DumpSources{ false };
-    /** Set by `--depfile`. When true, the cook writes `ShaderLibrary.d` next to the manifest. This is a
-     * Makefile-form depfile that lists every input source file, so that a build system can re-cook when
-     * one of them changes. */
     bool WriteDepfile{ false };
 };
 

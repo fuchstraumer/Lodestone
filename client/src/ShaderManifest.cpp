@@ -46,11 +46,7 @@ using detail::SelectSetBit;
 namespace
 {
 
-    // expanded descriptions for manifest error codes, since making these clear to users is important
-    // static_assert will break compile if new code is added without updating the descriptions array
-    // make sure ordering is respected, though
-    // std::to_array deduces the size from the list. A sized std::array would pad a short list with empty
-    // views, and the static_assert below could then never fire.
+    // to_array, so that a short list cannot pad itself and silence the static_assert below
     constexpr auto k_ErrorDescriptions = std::to_array<std::string_view>({
             "no error code was set",
             "no error",
@@ -112,6 +108,8 @@ namespace
             "a binding sets a role bit that ResourceRoleFlags does not define",
             "a binding's tag run is outside the tag table, names a string past the string table, or repeats a tag",
             "a binding's footprint axis mask sets a bit past the module's axes",
+            "a capability name is past the string table, or the names are not sorted and unique",
+            "a source's capability mask sets a bit past the capability name table",
         });
 
     static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ErrorCode::Count),
@@ -138,7 +136,6 @@ std::string DescribeShaderManifestError(const ErrorState& error)
         out += std::format(" [table {}, record {}]", magic_enum::enum_name(error.Table), error.RecordIndex);
     }
 
-    // `Detail` is only implemented for a few codes, so we only handle it for a few specific error codes
     switch (error.Code)
     {
     case ErrorCode::VersionMismatch:
@@ -281,7 +278,7 @@ const EnvironmentDirectoryEntry& BundleView::Environment(uint32_t profile_index,
 ManifestResult<EnvironmentView> BundleView::OpenEnvironment(uint32_t profile_index,
                                                             uint32_t module_index) const noexcept
 {
-    // The indices come from the caller, so this is an ingestion surface and it checks them.
+    // the caller supplies the indices, so this is an ingestion surface
     if (profile_index >= profiles.size() || module_index >= moduleHeaders.size())
     {
         return std::unexpected(ErrorState{ .Code = ErrorCode::IndexOutOfBounds,
@@ -469,6 +466,11 @@ ManifestResult<EnvironmentView> EnvironmentView::Open(const BundleView& bundle,
                                             .Count = static_cast<uint64_t>(parsed.Bindings.Count) *
                                                      context.AxisMaskWordCount };
     view.footprintAxes = Map<uint64_t>(extent_bytes, footprintAxisTableRef);
+    view.capabilityNames = Map<uint32_t>(extent_bytes, parsed.CapabilityNames);
+    const TableRef64 sourceCapabilityTableRef{ .Offset = static_cast<uint64_t>(parsed.SourceCapabilityTableOffset),
+                                               .Count = static_cast<uint64_t>(parsed.Sources.Count) *
+                                                        MaskWordCountForAxes(parsed.CapabilityNames.Count) };
+    view.sourceCapabilities = Map<uint64_t>(extent_bytes, sourceCapabilityTableRef);
     const TableRef64 entryPointInstanceTableRef{
         .Offset = static_cast<uint64_t>(parsed.EntryPointInstanceTableOffset), .Count = slotCount };
     view.entryPointInstances = Map<EntryPointInstance>(extent_bytes, entryPointInstanceTableRef);
@@ -520,7 +522,6 @@ ShaderCodeFormat EnvironmentView::CodeFormat() const noexcept
 
 std::string_view EnvironmentView::Source(uint32_t source_index) const noexcept
 {
-    // if this assert fires on source_index, caller provided invalid index
     assert(source_index < sources.size());
     assert(CodeFormat() == ShaderCodeFormat::Wgsl);
     const SourceRef& reference = sources[source_index];
@@ -548,8 +549,7 @@ std::span<const Variant> EnvironmentView::Variants() const noexcept
 
 std::optional<uint32_t> EnvironmentView::FindVariant(VariantKey key) const noexcept
 {
-    // the key table is sorted and parallel to the variant table, so the position of a key *is* the index of
-    // its variant
+    // the key table is parallel to the variant table
     const auto keyIter = std::ranges::lower_bound(variantKeys, key);
     if (keyIter == variantKeys.end() || *keyIter != key) [[unlikely]]
     {
@@ -613,6 +613,39 @@ bool EnvironmentView::IsFootprintAxis(uint32_t binding_index, uint32_t local_axi
     const std::span<const uint64_t> mask = FootprintAxes(binding_index);
     const uint64_t word = mask[local_axis / k_AxisMaskWordBits];
     return ((word >> (local_axis % k_AxisMaskWordBits)) & 1u) != 0u;
+}
+
+std::span<const uint32_t> EnvironmentView::CapabilityNames() const noexcept
+{
+    return capabilityNames;
+}
+
+std::string_view EnvironmentView::CapabilityName(uint32_t capability_index) const noexcept
+{
+    return String(capabilityNames[capability_index]);
+}
+
+uint32_t EnvironmentView::CapabilityMaskWordCount() const noexcept
+{
+    return MaskWordCountForAxes(capabilityNames.size());
+}
+
+std::span<const uint64_t> EnvironmentView::SourceCapabilities(uint32_t source_index) const noexcept
+{
+    const size_t wordCount = CapabilityMaskWordCount();
+    return sourceCapabilities.subspan(static_cast<size_t>(source_index) * wordCount, wordCount);
+}
+
+bool EnvironmentView::SourceNeedsCapability(uint32_t source_index, uint32_t capability_index) const noexcept
+{
+    const std::span<const uint64_t> mask = SourceCapabilities(source_index);
+    const uint64_t word = mask[capability_index / k_AxisMaskWordBits];
+    return ((word >> (capability_index % k_AxisMaskWordBits)) & 1u) != 0u;
+}
+
+uint32_t EnvironmentView::SourceWorkgroupMemoryBytes(uint32_t source_index) const noexcept
+{
+    return sources[source_index].WorkgroupMemoryBytes;
 }
 
 std::span<const EntryPointInstance> EnvironmentView::EntryPointInstanceTable() const noexcept

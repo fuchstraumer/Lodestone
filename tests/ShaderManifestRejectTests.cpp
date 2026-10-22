@@ -23,12 +23,7 @@
 #include <utility>
 #include <vector>
 
-// The manifest is the one artifact that leaves this repository as bytes. A reader that accepts a
-// malformed file reads whatever follows it in memory, so every rejection path matters as much as the
-// happy path.
-//
-// The valid case comes from the real emitter rather than from a hand-written header. A hand-written
-// header can agree with a hand-written reader and still not match what the cooker writes.
+// the valid case comes from the real emitter, since a hand-written header could agree with a hand-written reader
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -53,9 +48,7 @@ using lodestone::manifest::ManifestResult;
 namespace
 {
 
-// One boolean axis, so that the two variants of the small module differ in something. A module with no axis has
-// one variant, and the axis relevance validator rejects two variants that nothing tells apart. File scope,
-// because the module points into the space.
+// one axis, so the two variants differ in something the relevance validator can see
 const lodestone::PermutationSpace k_SmallSpace{ { lodestone::PermutationAxis{
     "VARIANT",
     { lodestone::PermutationValue{ false }, lodestone::PermutationValue{ true } },
@@ -73,8 +66,8 @@ CookedModule MakeSmallModule()
     module.EntryPoints.push_back(
         lodestone::LibraryEntryPoint{ .Name="MainCS", .Stage=lodestone::ShaderStageKind::Compute });
 
-    module.Sources.emplace_back(lodestone::tests::BytesOf("// wgsl for variant zero"));
-    module.Sources.emplace_back(lodestone::tests::BytesOf("// wgsl for variant one"));
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// wgsl for variant zero"), lodestone::SourceCodeFacts{});
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// wgsl for variant one"), lodestone::SourceCodeFacts{});
 
     lodestone::ReflectedBinding binding;
     binding.Name = "IfftInput";
@@ -250,6 +243,69 @@ ErrorCode EnvironmentErrorFrom(std::span<const std::byte> bytes, uint32_t profil
 }
 
 } // namespace
+
+/** The capability names and the workgroup memory of each source (format 14). Variant zero's source needs two names
+ * and 4096 bytes of workgroup memory, variant one's needs one name and none. */
+void TestSourceFacts(lodestone::tests::TestRunner& runner)
+{
+    runner.BeginSection("the capability names and the workgroup memory of each source read back");
+    CookedLibrary library = MakeSmallLibrary();
+    CookedModule& module = *library.Environments[0u];
+    module.SourceFacts = { lodestone::SourceCodeFacts{ .CapabilityNames = { "Float16", "GroupNonUniform" },
+                                                       .WorkgroupMemoryBytes = 4096u },
+                           lodestone::SourceCodeFacts{ .CapabilityNames = { "GroupNonUniform" },
+                                                       .WorkgroupMemoryBytes = 0u } };
+    module.ObservedCapabilities = { "Float16", "GroupNonUniform" };
+
+    const lodestone::CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library);
+    runner.Check(manifest.has_value(), "the emitter accepts a module with source facts");
+    if (!manifest.has_value())
+    {
+        return;
+    }
+    const std::vector<std::byte>& bytes = *manifest;
+    runner.Check(lodestone::VerifyManifestRoundTrip(library, bytes) == lodestone::CookError::Success,
+                 "the round trip reads back the facts the cook wrote");
+
+    const ManifestResult<BundleView> bundle = BundleView::Open(bytes);
+    const ManifestResult<EnvironmentView> environment =
+        bundle.has_value() ? bundle->OpenEnvironment(0u, 0u) : ManifestResult<EnvironmentView>{ std::unexpected(bundle.error()) };
+    runner.Check(environment.has_value(), "the environment with source facts opens");
+    if (!environment.has_value())
+    {
+        return;
+    }
+    runner.Check(environment->CapabilityNames().size() == 2u && environment->CapabilityName(0u) == "Float16" &&
+                     environment->CapabilityName(1u) == "GroupNonUniform",
+                 "the environment holds the name table, sorted");
+    const lodestone::manifest::EntryPointInstanceView first = environment->VariantAt(0u).EntryPoint(0u);
+    const lodestone::manifest::EntryPointInstanceView second = environment->VariantAt(1u).EntryPoint(0u);
+    runner.Check(first.RequiresCapability(0u) && first.RequiresCapability(1u) && first.WorkgroupMemoryBytes() == 4096u,
+                 "an instance reads its source's names and workgroup memory");
+    runner.Check(!second.RequiresCapability(0u) && second.RequiresCapability(1u) && second.WorkgroupMemoryBytes() == 0u,
+                 "another source keeps its own facts");
+
+    CookedLibrary otherFacts = library;
+    otherFacts.Environments[0u]->SourceFacts[1u].WorkgroupMemoryBytes = 16u;
+    runner.Check(lodestone::VerifyManifestRoundTrip(otherFacts, bytes) == lodestone::CookError::ManifestSourceFactsMismatch,
+                 "the round trip fails on workgroup memory that differs");
+    CookedLibrary otherNames = library;
+    otherNames.Environments[0u]->SourceFacts[1u].CapabilityNames = { "Float16" };
+    runner.Check(lodestone::VerifyManifestRoundTrip(otherNames, bytes) == lodestone::CookError::ManifestSourceFactsMismatch,
+                 "the round trip fails on a capability name that differs");
+
+    const Header header = ReadRecord<Header>(bytes, 0u);
+    const EnvironmentDirectoryEntry entry = ReadRecord<EnvironmentDirectoryEntry>(bytes, header.EnvironmentDirectoryOffset);
+    const EnvironmentHeader environmentHeader = ReadRecord<EnvironmentHeader>(bytes, entry.ExtentOffset);
+    std::vector<std::byte> bitPastNames = bytes;
+    WriteValue(bitPastNames, entry.ExtentOffset + environmentHeader.SourceCapabilityTableOffset, uint64_t{ 1u } << 63u);
+    runner.Check(EnvironmentErrorFrom(bitPastNames, 0u) == ErrorCode::InvalidSourceCapabilities,
+                 "a capability bit past the name table is rejected");
+    std::vector<std::byte> namePastStrings = bytes;
+    WriteValue(namePastStrings, entry.ExtentOffset + environmentHeader.CapabilityNames.Offset, 0xFFFFFFu);
+    runner.Check(EnvironmentErrorFrom(namePastStrings, 0u) == ErrorCode::InvalidCapabilityNames,
+                 "a capability name past the string table is rejected");
+}
 
 int main()
 {
@@ -588,6 +644,8 @@ int main()
         runner.Check(EnvironmentErrorFrom(tagPastStrings, 0u) == ErrorCode::InvalidBindingTags,
                      "a tag past the string table is rejected");
     }
+
+    TestSourceFacts(runner);
 
     return runner.Report();
 }

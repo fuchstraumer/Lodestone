@@ -16,8 +16,6 @@
 #include <slang.h>
 #include <slang-com-ptr.h>
 
-/** @brief Holds types and definitions used only within this module,
- * but which are shared by multiple components within this module.*/
 namespace lodestone
 {
 
@@ -115,17 +113,13 @@ constexpr BindingKind FromSlangBindingType(slang::BindingType binding_type) noex
     }
 }
 
-/** Slang packs the base shape and the array and multisample flags into one value, so the base
-    * shape must be masked out before the comparison. */
 constexpr ResourceShape FromSlangResourceShape(SlangResourceShape shape) noexcept
 {
-    // we used to have to convert this, but now the enum values line up almost exactly
-    // (excepting two values we removed, TextureBuffer [redundant] and Unknown [not used])
+    // the values line up, minus TextureBuffer and Unknown, which we removed
     return static_cast<ResourceShape>(shape);
 }
 
-/** Maps the scalar type a texture returns onto the sample type WebGPU wants. A depth texture is
-    * not distinguishable here, so the graph decides that from the format it creates. */
+/** Depth is not visible here, so the graph decides it from the format it creates. */
 constexpr TextureSampleType FromSlangScalarType(slang::TypeReflection::ScalarType scalar_type) noexcept
 {
     switch (scalar_type)
@@ -175,8 +169,7 @@ constexpr VertexScalarType FromSlangVertexScalarType(
     }
 }
 
-/** Only the formats Velox curates. An unmapped format returns Invalid on purpose: the graph must
-    * reject a shader that asks for a format the engine does not express. */
+/** Unmapped formats return Invalid, so that the graph rejects formats the engine does not express. */
 constexpr TextureFormat FromSlangImageFormat(SlangImageFormat format) noexcept
 {
     switch (format)
@@ -236,8 +229,7 @@ constexpr bool IsResourceTypeKind(slang::TypeReflection::Kind kind) noexcept
 #pragma clang diagnostic pop
 #endif
 
-/** True for a name the hardware supplies, such as SV_Position. Those never become a vertex buffer
-    * attribute, so they must not reach the vertex input list. */
+/** True for hardware-supplied names such as SV_Position, which never become vertex attributes. */
 constexpr bool IsSystemSemantic(std::string_view semantic_name) noexcept
 {
     return semantic_name.starts_with("SV_") || semantic_name.starts_with("sv_");
@@ -249,18 +241,9 @@ constexpr bool IsDepthSemantic(std::string_view semantic_name) noexcept
             semantic_name == "SV_DepthGreaterEqual" || semantic_name == "SV_DepthLessEqual";
 }
 
-/**
- * The starting placement of one parameter scope, and the name Slang emits around the bindings inside it.
- *
- * The global scope starts at group 0 and binding 0, and adds no name. Other scopes read these values
- * from reflection. Nested scopes store the whole chain in `Name`, so the emitted name of a binding is
- * `<Name>_<binding>` at any depth.
- *
- * `Base` and `SpaceBase` are different numbers, and mixing them up breaks the cook. `Base` is the
- * placement of bindings declared directly in this scope. `SpaceBase` is the first space used by
- * parameter blocks declared in this scope. In one probe, the entry point scope reported a slot offset
- * of 0 and a sub-element space offset of 1, and its block used space 1.
- */
+/** The starting placement of one parameter scope, and the name Slang emits around its bindings. `Base` places the
+ * scope's own bindings, and `SpaceBase` is the first space of its parameter blocks: they differ, and mixing them up
+ * breaks the cook. */
 struct BindingScope
 {
     BoundPlacement Base;
@@ -268,18 +251,14 @@ struct BindingScope
     std::string Name;
 };
 
-/** One binding, plus its `[ls_*]` annotations. The annotations are kept next to the binding until the
- * order is final, because sorting the bindings alone would attach each annotation to the wrong binding. */
+/** A binding and its annotations, kept together until the order is final. */
 struct RawBindingDraft
 {
     RawBinding Binding;
     std::vector<RawSizeAttribute> Attributes;
 };
 
-/** One parameter block, as the sub-object range of its parent describes it.
- *
- * `UniformSize` is zero when the block contains only resources. Slang emits no constant buffer for those
- * blocks, so drafting one would report a binding that the shader does not have. */
+/** One parameter block. `UniformSize` is zero for a block of resources alone, which has no constant buffer. */
 struct ParameterBlockInfo
 {
     slang::TypeLayoutReflection* ElementLayout{ nullptr };
@@ -307,14 +286,12 @@ struct InterfaceAxisStub
 
 struct InterfaceAxisImplStub
 {
-    std::string InterfaceName; // name of interface this binds to
+    std::string InterfaceName;
     slang::TypeReflection* Type{ nullptr };
     RawInterfaceImpl Impl;
 };
 
-/** One compiler option as a row. A row of `Int` kind reads `IntValue`, and a row of `String`
- * kind reads `StringValue`. The unused field keeps the value Slang treats as absent, which is
- * what the entry held before this became a table. */
+/** One compiler option. The unused value field keeps the value Slang treats as absent. */
 struct CompilerOptionRow
 {
     slang::CompilerOptionName Name{ slang::CompilerOptionName::CountOf };
@@ -327,12 +304,10 @@ struct CompilerOptionRow
 };
 
 constexpr const char* k_AllWarningsAsErrors = "all";
-// 41012: "profile implicitly upgraded". Slang checks the entry point before specialization, so a
-// capability behind a capability axis fails every variant. Device capabilities are ours to record, not
-// Slang's to reject. The SPIR-V `OpCapability` list contains the exact needs of each variant.
-// nothing records them yet: the work is tracked in `todo.md`.
+// 41012 checks the entry point before specialization, so a capability axis fails every variant. Device capabilities
+// are ours to record, from the emitted code
 constexpr const char* k_DisabledWarnings = "31010,41012";
-// Order reaches Slang, and the two warning level rows must stay in this order.
+// the two warning level rows must stay in this order
 constexpr std::array<CompilerOptionRow, 9u> k_CompilerOptionRows{
     CompilerOptionRow{ .Name = slang::CompilerOptionName::WarningLevel,
                            .Kind = slang::CompilerOptionValueKind::Int,
@@ -358,8 +333,7 @@ constexpr std::array<CompilerOptionRow, 9u> k_CompilerOptionRows{
     CompilerOptionRow{ .Name = slang::CompilerOptionName::UseUpToDateBinaryModule,
                            .Kind = slang::CompilerOptionValueKind::Int,
                            .IntValue = 1 },
-    // SPIR-V keeps the source name of the entry point in OpEntryPoint, in place of "main", so the manifest's entry
-    // point name is the name a renderer gives to the pipeline. The cook compares the two.
+    // the cook compares the OpEntryPoint name with the manifest name
     CompilerOptionRow{ .Name = slang::CompilerOptionName::VulkanUseEntryPointName,
                            .Kind = slang::CompilerOptionValueKind::Int,
                            .IntValue = 1 }
@@ -384,8 +358,6 @@ constexpr SlangOptimizationLevel ToSlangOptimizationLevel(uint32_t level) noexce
 
 slang::CompilerOptionEntry ToOptionEntry(const CompilerOptionRow& row) noexcept;
 
-/** Returns every compiler option this cook sets. The optimization level comes from the caller, so it is
- * the only option that is not in the static table. */
 std::vector<slang::CompilerOptionEntry> MakeCompilerOptions(uint32_t optimization_level);
 
 std::vector<std::byte> BlobToBytes(slang::IBlob* blob);

@@ -7,21 +7,14 @@
 namespace lodestone
 {
 
-// This is defined as an enum class since it provides strong typing and prevents accidental misuse of
-// raw integers where a callsite expects a key: we'll have to cast to underlying type for packed output
-// or storage, but that's fine and clear as a boundary between strong typing and low-level representation.
 enum class VariantKey : uint64_t {};
-// set all bits to 1, since if we ever manage to hit that we're already in an invalid state
-// add operator! so functions returning variant keys can just do if (!resultKey)
 constexpr static VariantKey INVALID_VARIANT = static_cast<VariantKey>(0xFFFFFFFFFFFFFFFF);
 constexpr bool operator!(VariantKey key) noexcept
 {
     return key == INVALID_VARIANT;
 }
 
-// This uses radix indices to avoid any Slang or Permutation includes - but shares common logic for
-// packing and unpacking the VariantKey from its underlying inputs that generate it. Used to make sure
-// client and library code agree on the representation without introducing direct dependencies.
+// the codec shared by the cooker and the client
 VariantKey PackVariantKey(std::span<const uint32_t> value_indices, std::span<const uint32_t> radices) noexcept;
 void UnpackVariantKey(VariantKey key, std::span<const uint32_t> radices, std::span<uint32_t> out_value_indices) noexcept;
 

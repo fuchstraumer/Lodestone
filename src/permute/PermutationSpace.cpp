@@ -83,31 +83,23 @@ std::span<const std::string> PermutationSpace::RequireExpressions() const noexce
 CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetCookPolicy& policy, DiagnosticSink& sink) const
 {
     using AxisIndexMapType = std::unordered_map<std::string_view, std::ptrdiff_t, TransparentStringHash, std::equal_to<>>;
-    // constructing this with ranges/views so we can make it const, which couldn't
-    // happen with ye olde for loop. kinda neat.
     const AxisIndexMapType axisIndexMap = 
         axes |
         std::views::enumerate |
         std::views::transform(
             [](const auto& pair)
             {
-                // important: explicitly construct string_view, otherwise the map
-                // might construct a view pointing to a temp string copy made here
+                // an explicit string_view, or the map could view a temporary copy
                 auto [index, axis] = pair;
                 return std::pair(std::string_view{ axis.Name }, index);
             }) |
         std::ranges::to<AxisIndexMapType>();
     
-    // build require-ready-at-depth map - this helps save some legwork during the already
-    // hot recursive enumeration of permutations
     RequireReadyMap requireReadyAt;
     for (const std::string& expr : requireExpressions)
     {
         const auto exprEval = CollectExpressionIdentifiers(expr, sink);
-        // errors should've already been handled in validation step, done earlier
-        // skip error checking bc we *know* the expressions have already been validated
 
-        // find the deepest axis index referenced by this require expression, and store that
         std::ptrdiff_t deepest = 0;
         for (const std::string& identifier : *exprEval)
         {
@@ -117,7 +109,6 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetCookPolic
         requireReadyAt[deepest].push_back(expr);
     }
 
-    // policy override time
     AxisValueOverrideMap axisValueOverrides;
     for (const AxisCookValues& axisValues : policy.CookValues)
     {
@@ -139,16 +130,12 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetCookPolic
 
     VariantSet variantSet;
     variantSet.SpaceSize = ComputeVariantSpaceSize();
-    // check if the computed space size exceeds the maximum representable variant key
-    // we'll need to change this eventually, but for now we're just using a simple uncompressed
-    // key based on the canonical assignment of the axes.
     if (variantSet.SpaceSize == std::numeric_limits<std::underlying_type_t<VariantKey>>::max())
     {
         return std::unexpected(CookError::PermutationKeySpaceTooLarge);
     }
     variantSet.Variants = std::move(descriptors);
 
-    // sort variants by their calculated key
     std::ranges::sort(variantSet.Variants, std::ranges::less{}, &VariantDescriptor::Key);
 
     const CookError verifyUnique = VerifyVariantKeysAreUnique(variantSet.Variants);
@@ -156,7 +143,6 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetCookPolic
     {
         return std::unexpected(verifyUnique);
     }
-    // assign dense indices after sorting by key
     for (uint64_t i = 0; std::cmp_less(i, variantSet.Variants.size()); ++i)
     {
         variantSet.Variants[i].Index = i;
@@ -166,10 +152,7 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetCookPolic
     return variantSet;
 }
 
-// Canonicalization is another expansion: for every axis in the space, we need to find the concrete
-// value of it bound in *this* assignment. If the axis is not present in the assignment, we will
-// retrieve the canonical value (the first value) of the axis. This equalizes each assignment to the
-// same length, and allows us to compute a unique index for each assignment.
+// fills every axis the assignment lacks with its canonical value, so every assignment has one length
 CanonicalAssignment PermutationSpace::CanonicalizeAssignment(const PermutationAssignment& assignment) const
 {
     auto findBinding = [&assignment](const PermutationAxis& axis) -> PermutationBinding
@@ -214,7 +197,6 @@ uint64_t PermutationSpace::ComputeVariantSpaceSize() const noexcept
 
 CookError PermutationSpace::ValidateConstraints(DiagnosticSink& sink) const
 {
-    // since we'll want to use indices to refer to axes, this makes it easier
     const std::vector<std::string_view> axesNames = axes |
                                                     std::views::transform(&PermutationAxis::Name) |
                                                     std::ranges::to<std::vector<std::string_view>>();
@@ -247,10 +229,8 @@ void PermutationSpace::ReportUndrivenExternConstants(std::string_view module_nam
     };
 
     std::vector<ExternConstantDeclaration> externConstants = symbol_table.ExternConstantsForModule(module_name);
-    // now filter undriven extern constants based on whether they are driven by any axis
     auto undriven = externConstants | std::views::filter(filterUndriven);
 
-    // build report string
     std::string report;
     for (const ExternConstantDeclaration& decl : undriven)
     {
@@ -326,7 +306,6 @@ CookError PermutationSpace::validateActiveWhen(const std::vector<std::string_vie
         }
 
         const std::vector<std::string>& identifiers = *activeWhenResult;
-        // first error-out case: is there a discrepancy between the identifiers and the declared axes?
         for (const std::string& identifier : identifiers)
         {
             auto iter = std::ranges::find(axes_names, identifier);
@@ -349,8 +328,6 @@ CookError PermutationSpace::validateActiveWhen(const std::vector<std::string_vie
             }
 
             const PermutationAxis& referenced = axes[static_cast<size_t>(index)];
-            // check to see if the referenced axis has a non-empty ActiveWhen: explain the default
-            // substitution, that this axis may be made inactive by another axis's ActiveWhen condition.
             if (!referenced.ActiveWhen.empty())
             {
                 const std::string_view& referencedName = referenced.Name;
@@ -380,7 +357,6 @@ CookError PermutationSpace::validateRequires(const std::vector<std::string_view>
         }
 
         const std::vector<std::string>& exprIdentifiersRef = *exprIdentifiers;
-        // an empty require expression is just a constant: it shouldn't be considered valid.
         if (exprIdentifiersRef.empty())
         {
             return ReportError(sink,
@@ -423,13 +399,10 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
                                        std::vector<VariantDescriptor>& expanded,
                                        DiagnosticSink& sink) const
 {
-    // canonicalize the current partial assignment here, since it will be 
-    // used directly below, then to make symbol table for checks
     CanonicalAssignment canonical = CanonicalizeAssignment(partial);
 
     if (std::cmp_equal(depth, axes.size()))
     {
-        // check CookIf to see if this full permutation assignment should even be included
         if (!policy.CookIf.empty())
         {
             const std::vector<AttrExprSymbol> symbols = SymbolsFromCanonicalAssignment(canonical);
@@ -439,17 +412,14 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
                 return cookIfResult.error();
             }
             
-            // the CookIf expression evaluated to false, so this particular variant is being excluded from cook
             if (*cookIfResult == 0)
             {
                 return CookError::Success;
             }
         }
 
-        // completed a full permutation assignment, add it to the expanded list
         const VariantKey key = ComputeVariantKey(canonical);
-        // index is unset: it's the dense index in the *sorted* set, which can't be found until 
-        // all variants have been generated and sorted by key
+        // the dense index needs the sorted set
         expanded.emplace_back(PermutationAssignment{ partial }, std::move(canonical), key, 0u);
         if ((policy.MaxVariants > 0) && (expanded.size() >= policy.MaxVariants)) [[unlikely]]
         {
@@ -464,19 +434,14 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
     const PermutationAxis& axis = axes[static_cast<size_t>(depth)];
 
     bool active = true;
-    // both ActiveWhen and Require checks will need the symbols, get them once
     const std::vector<AttrExprSymbol> symbols = SymbolsFromCanonicalAssignment(canonical);
 
-    // if active when expression is on this axis, we need to evaluate it to see if this 
-    // axis should be considered active or not
-    // (also recall we ensured ActiveWhen only has backwards deps, so on a recursive walk
-    // like this it's valid to check now)
+    // ActiveWhen only references earlier axes, so it can be evaluated here
     if (!axis.ActiveWhen.empty())
     {
         const CookResult<bool> activeResult = EvaluateActiveWhen(axis, symbols, sink);
         if (!activeResult) [[unlikely]]
         {
-            // message about the error already logged in EvaluateActiveWhen, just pass error up
             return activeResult.error();
         }
 
@@ -485,7 +450,6 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
 
     if (!active)
     {
-        // axis skipped: will be canonicalized to default value
         const CookResult<bool> requireResult = CheckRequires(depth, symbols, require_ready_at, sink);
         if (!requireResult) [[unlikely]]
         {
@@ -494,11 +458,9 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
 
         if (!requireResult.value())
         {
-            // prune the subtree
             return CookError::Success;
         }
 
-        // continue expanding the next axis
         return expandFrom(depth + 1,
                           partial,
                           require_ready_at,
@@ -508,20 +470,16 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
                           sink);
     }
 
-    // axis is active: expand partial to include all possible values of this axis
     std::span<const PermutationValue> axisValues = axis.GetValues();
-    // check override map: if there is an override for this axis, only use the specified values
     const auto overrideIt = axis_value_overrides.find(depth);
     if (overrideIt != axis_value_overrides.end())
     {
-        // overrides are just permutation values, and also persist throughout this expansion: just swap span
         axisValues = std::span<const PermutationValue>(overrideIt->second.data(), overrideIt->second.size());
     }
 
     for (const PermutationValue& value : axisValues)
     {
         partial.emplace_back(&axis, value);
-        // need to rebuild symbol table since partial assignment has changed
         const CanonicalAssignment innerCanonical = CanonicalizeAssignment(partial);
         const std::vector<AttrExprSymbol> innerSymbols = SymbolsFromCanonicalAssignment(innerCanonical);
         const CookResult<bool> keepAxis = CheckRequires(depth, innerSymbols, require_ready_at, sink);
@@ -580,7 +538,6 @@ namespace
 
         if (firstDuplicateIter != variants.end()) [[unlikely]]
         {
-            // get variant that caused the collision
             const VariantDescriptor& duplicate = *firstDuplicateIter;
             std::println(stderr,
                          "[lodestone] two variants share key {}: [{}] collides. The mixed-radix "

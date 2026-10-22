@@ -336,6 +336,19 @@ void WriteSlot(lodestone::JsonWriter& writer,
     writer.KeyUInt("y", workgroup.Y);
     writer.KeyUInt("z", workgroup.Z);
     writer.EndObject();
+    writer.KeyUInt("workgroupMemoryBytes", instance.WorkgroupMemoryBytes());
+
+    // what a device must support to run this instance, by name
+    writer.Key("capabilities");
+    writer.BeginArray();
+    for (uint32_t capabilityIndex = 0u; capabilityIndex < view.CapabilityNames().size(); capabilityIndex++)
+    {
+        if (instance.RequiresCapability(capabilityIndex))
+        {
+            writer.String(view.CapabilityName(capabilityIndex));
+        }
+    }
+    writer.EndArray();
 
     // Resolved the way a consumer resolves it, through the layout range.
     writer.Key("layout");

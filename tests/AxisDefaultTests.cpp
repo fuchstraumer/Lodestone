@@ -19,11 +19,8 @@
 #include <string_view>
 #include <vector>
 
-// The declared default of an axis, end to end: the shader initializer is read at the cook, written to the
-// manifest, and read back by the client query layer. `AxisDefaults.slang` declares every default as a value
-// other than the first one, so a cook that confused the declared default with the canonical (first) value
-// fails here. It covers all four value domains, a literal initializer (which Slang reflection also reads, so
-// the two readers are compared), and an expression initializer (which only the source text can read).
+// Every default in `AxisDefaults.slang` is a value other than the first, so a cook that confuses the declared default
+// with the canonical value fails here.
 
 namespace
 {

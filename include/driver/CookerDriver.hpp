@@ -6,8 +6,6 @@
 #include "CookerOptions.hpp"
 #include "emit/OutputSink.hpp"
 
-/** The execution loop, separated from `main` so the cooker can also be driven in-process by a watcher
- * or by the engine itself. */
 namespace lodestone
 {
 

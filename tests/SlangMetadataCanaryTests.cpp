@@ -5,10 +5,8 @@
 
 #include <print>
 
-// A canary for shader-slang/slang#13789. It asserts that the bug still exists: Slang's metadata reports an unused
-// resource beside entry point constants as used. When this test fails, Slang fixed the issue. Then delete
-// `ApplySlangWorkaround13789` in `src/driver/steps/BuildModuleStep.cpp`, its call, `ConstantsElementBindings` in
-// `RawEntryPoint` and `EntryPointReflection`, `EmittedCodeFacts::DeclaredPlacements`, and this test.
+// Fails when Slang fixes shader-slang/slang#13789. Then delete `ApplySlangWorkaround13789` and its call,
+// `ConstantsElementBindings`, `EmittedCodeFacts::DeclaredPlacements`, and this test.
 
 namespace
 {

@@ -14,13 +14,6 @@
 #include <string>
 #include <string_view>
 
-/** Makes sure that the target-specific infrastructure for reflection, and the scanners for the completed
-  * binding data can correctly reject or flag data that isn't valid for that targets binding model 
-  * 
-  * The `RejectionCase` struct is used to better define and outline what each case is expected to prove
-  * or test. 
- *
-*/
 namespace
 {
 
@@ -61,11 +54,7 @@ constexpr std::array<RejectionCase, 4u> k_Cases
                    .Claim = "a module with no pointer still cooks" },
 };
 
-/** Cooks one module into memory and returns what the driver said.
- *
- * The sink is a `MemoryOutputSink`, so a row writes no file and two rows cannot collide. A cook that
- * must fail has no artifact worth keeping.
- */
+/** Cooks one module into a `MemoryOutputSink`, so that rows write no files and cannot collide. */
 CookError CookOneModule(const std::filesystem::path& module_path, std::string_view target_name)
 {
     CookerOptions options;

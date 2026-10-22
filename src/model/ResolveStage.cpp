@@ -50,21 +50,16 @@ namespace
                                                     std::string_view binding_name,
                                                     const ResolveContext& context,
                                                     DiagnosticSink& sink);
-    /**@brief Every annotation on one resource, evaluated. A resource with no annotation is not an error,
-     * because many resources can be sized by the caller. The annotation kind tells us if the author is
-     * describing a buffer or texture, which is the current extent of our taxonomy here */
+    /** @brief Resources with no annotation are fine: the caller sizes them. */
     CookResult<ResourceFootprint> ResolveFootprint(std::span<const RawSizeAttribute> attributes,
                                                    std::string_view binding_name,
                                                    const ResolveContext& context,
                                                    DiagnosticSink& sink);
-    // the whitespace-separated words of one attribute argument
     std::vector<std::string_view> SplitWords(std::string_view text);
     std::vector<RawSizeAttribute> AttributesOfBinding(const RawVariant& raw, size_t binding_index);
     CookResult<std::vector<std::string>> ResolveTags(const RawBinding& raw_binding, DiagnosticSink& sink);
     CookResult<ResourceRoleFlags> ResolveRoleNames(const RawBinding& raw_binding, DiagnosticSink& sink);
-    /** Checks each role of a buffer against its kind, its element stride, and its element count. A raw buffer counts
-     * as a stride of 4. An indirect role accepts the stride of its command, or a stride of 4 with an element count
-     * that is a whole number of commands. */
+    /** A raw buffer counts as stride 4. Indirect roles take their command's stride, or stride 4 with whole commands. */
     CookError CheckRoles(const ReflectedBinding& binding, const ResourceFootprint& footprint, DiagnosticSink& sink);
 
     constexpr bool IsTagCharacter(char character) noexcept
@@ -78,7 +73,6 @@ namespace
                character == '-';
     }
 
-    // the size in bytes of the command of an indirect role, or 0 for a role that is not indirect
     uint32_t IndirectCommandBytes(ResourceRoleFlags role) noexcept
     {
         switch (role)
@@ -134,8 +128,6 @@ namespace
             constants.ByteSize = rawConstants.ByteSize;
             constants.Members = rawConstants.Members;
         }
-        // stage 3 sets the container only when the metadata reports it as used, and the same query decides
-        // visibility, so the container is always in the visibility list
         if (constants.Delivery == EntryPointConstantsDelivery::UniformBuffer)
         {
             const auto container = std::ranges::find(raw_entry_point.UsedBindingIndices, *rawConstants.ContainerBinding);
@@ -146,7 +138,6 @@ namespace
         return entryPoint;
     }
 
-    /** Returns `'NAME' (file:line) = 'expression'`, the form every derived constant error uses. */
     std::string DescribeDerivedConstant(const RawDerivedConstant& constant)
     {
         return std::format("'{}' ({}:{}) = '{}'",
@@ -163,7 +154,6 @@ namespace
         Black, // finished (value is in the symbol table)
     };
 
-    /** Finds a derived constant by name with a binary search over `ByName`. */
     std::optional<uint32_t> FindDerivedConstant(const DerivedConstantTable& table, std::string_view name)
     {
         auto extractNameView = [&](uint32_t index) -> std::string_view
@@ -180,13 +170,8 @@ namespace
         return *found;
     }
 
-    /** The depth-first walk over the derived constants of one variant. Its roots are the size attribute
-     * arguments, and the edges of each constant are the identifiers in its expression. Each constant is
-     * evaluated when its visit finishes, which is post-order, so every derived constant that it uses is
-     * already in the symbol table. Reaching a gray constant means the path has looped back on itself.
-     *
-     * Each constant is visited once for each variant. The color array is the cache: a black constant is
-     * skipped, so a constant that two others use (a diamond) is evaluated once. */
+    /** Depth-first walk from the size attribute arguments through the identifiers of each expression. Constants are
+     * evaluated in post-order, and black constants are skipped, so diamonds evaluate once. A gray constant is a cycle. */
     // NOLINTBEGIN(misc-no-recursion): the recursion depth is the length of one chain of derived constants
     class DerivedConstantWalk
     {
@@ -195,8 +180,6 @@ namespace
             : table(table), context(context), sink(sink), colors(table.Constants.size(), VisitColor::White)
         {}
 
-        /** Visits every derived constant that one attribute argument uses. `root` describes the attribute, for
-         * the error messages. */
         CookError VisitRoot(std::string_view argument, std::string_view root)
         {
             rootDescription = root;
@@ -214,7 +197,6 @@ namespace
         [[nodiscard]] CookError visitIdentifiers(std::span<const std::string> identifiers);
         [[nodiscard]] CookError visit(uint32_t index);
         [[nodiscard]] std::optional<uint32_t> findByName(std::string_view name) const;
-        /** Returns the current path as `'A' (file:line) = '...' -> 'B' (file:line) = '...'`. */
         [[nodiscard]] std::string describePath(std::span<const uint32_t> nodes) const;
         [[nodiscard]] CookError reportCycle(uint32_t index) const;
         [[nodiscard]] CookError reportUnreadable(const RawDerivedConstant& constant,
@@ -224,7 +206,6 @@ namespace
         ResolveContext& context;
         DiagnosticSink& sink;
         std::vector<VisitColor> colors;
-        // the gray constants, in the order their visits started
         std::vector<uint32_t> path;
         std::string_view rootDescription;
     };
@@ -237,7 +218,7 @@ CookResult<DerivedConstantTable> MakeDerivedConstantTable(std::span<const RawDer
                                                           std::span<const ExternConstantDefault> extern_defaults,
                                                           DiagnosticSink& sink)
 {
-    // a stable sort keeps the declarations of one name in source order, so the first one is the one we keep
+    // stable, so the first declaration of a name is kept
     std::vector<uint32_t> sorted(derived_constants.size());
     std::ranges::iota(sorted, 0u);
     std::ranges::stable_sort(sorted,
@@ -276,8 +257,7 @@ CookResult<DerivedConstantTable> MakeDerivedConstantTable(std::span<const RawDer
         table.ByName.push_back(run.front());
     }
 
-    // a derived constant with the name of an axis is a shadowed declaration in the shader, and the two
-    // readers of that shader (Slang and this table) could each pick a different one
+    // shadowing an axis lets Slang and this table pick different declarations
     for (const uint32_t index : table.ByName)
     {
         const RawDerivedConstant& constant = derived_constants[index];
@@ -316,7 +296,7 @@ CookResult<ResolveContext> MakeResolveContext(const PermutationAssignment& canon
 
     for (const PermutationBinding& binding : canonical)
     {
-        // todo-ship: handle enums here (map case name to integral value)
+        // todo-ship: map enum case names to values here
         context.Symbols.push_back(
             AttrExprSymbol{ .Name = binding.Axis->Name, .Value = PermutationValueToInt64(binding.Value) });
     }
@@ -326,7 +306,6 @@ CookResult<ResolveContext> MakeResolveContext(const PermutationAssignment& canon
         return context;
     }
 
-    // every size attribute argument is a root of the walk (for now)
     DerivedConstantWalk walk{ derived_constants, context, sink };
     for (const RawSizeAttribute& attribute : raw.SizeAttributes)
     {
@@ -354,8 +333,7 @@ CookResult<std::vector<uint32_t>> CollectDeclaredFootprintAxes(const RawVariant&
                                                                DiagnosticSink& sink)
 {
     std::vector<uint32_t> axisIndices;
-    // a worklist, not a recursion: MakeDerivedConstantTable and the walk already reject a cycle, and `queued` keeps
-    // a constant that two expressions use (a diamond) from being read twice
+    // the table and the walk already reject cycles, and `queued` reads diamonds once
     std::vector<uint8_t> queued(derived_constants.Constants.size(), uint8_t{ 0u });
     std::vector<std::string_view> pending;
     for (const RawSizeAttribute& attribute : raw.SizeAttributes)
@@ -386,7 +364,6 @@ CookResult<std::vector<uint32_t>> CollectDeclaredFootprintAxes(const RawVariant&
                 continue;
             }
 
-            // an extern constant is a leaf with one value, so it names no axis
             const std::optional<uint32_t> constant = FindDerivedConstant(derived_constants, identifier);
             if (constant && queued[*constant] == 0u)
             {
@@ -637,7 +614,6 @@ namespace
         for (const auto word : std::views::split(text, ' '))
         {
             const std::string_view view{ word.begin(), word.end() };
-            // a tab or a newline is not a separator here, so it fails the check of the word it is in
             if (!view.empty())
             {
                 words.push_back(view);
@@ -809,8 +785,6 @@ namespace
     {
         for (const std::string& identifier : identifiers)
         {
-            // axes, extern constants, and unknown names are leaves. EvaluateExpression reports an
-            // unknown name later, with the expression it was found in
             const std::optional<uint32_t> index = findByName(identifier);
             if (!index)
             {
@@ -856,7 +830,6 @@ namespace
             return dependencies;
         }
 
-        // post-order: every derived constant this expression uses is black, so its value is in the table
         const CookResult<int64_t> value = EvaluateExpression(constant.Expression,
                                                              context.Symbols,
                                                              sink);
@@ -889,7 +862,6 @@ namespace
 
     CookError DerivedConstantWalk::reportCycle(uint32_t index) const
     {
-        // the cycle is the part of the path from the first visit of `index` to its end, and back to `index`
         const auto cycleStart = std::ranges::find(path, index);
         std::vector<uint32_t> cycle(cycleStart, path.end());
         cycle.push_back(index);

@@ -29,7 +29,6 @@ namespace
     using manifest::CreationFields;
     using manifest::CreationSource;
 
-    /** The rank of a source by what it asks of the renderer. */
     uint32_t Demand(CreationSource source) noexcept
     {
         switch (source)
@@ -67,8 +66,7 @@ namespace
         JoinSource(joined.SamplerState, fields.SamplerState);
     }
 
-    /** A resource of one environment while the report reads it. `Values` holds every footprint seen, so a count or an
-     * extent prints only when all of them agree. */
+    /** Counts and extents print only when every footprint seen agrees. */
     struct PendingEntry
     {
         ResourceReportEntry Entry;
@@ -108,7 +106,6 @@ namespace
         environment.ModuleName = std::string{ module.Name() };
         environment.TargetName = std::string{ bundle.String(bundle.Profiles()[profile_index].TargetNameString) };
 
-        // sorted by scope and name, so each record finds its resource with a binary search
         std::vector<PendingEntry> pending;
         for (uint32_t variantIndex = 0u; variantIndex < view.Variants().size(); ++variantIndex)
         {
@@ -209,7 +206,6 @@ namespace
         return joined;
     }
 
-    /** One field as `name: source`, with the value or the axes where the shader states them. */
     std::string DescribeField(std::string_view name, CreationSource source, const ResourceReportEntry& entry, bool sized)
     {
         std::string text = std::format("{}: {}", name, SourceName(source));
@@ -285,7 +281,7 @@ std::string FormatResourceReport(const ResourceReport& report)
 
     for (const ResourceReportEnvironment& environment : report.Environments)
     {
-        // no shader states a texture's mip count, so a texture is never complete, and counting it only adds noise
+        // no shader states mip counts, so textures are never complete
         const auto isBuffer = [](const ResourceReportEntry& entry)
         { return entry.Kind == BindingKind::UniformBuffer || entry.Kind == BindingKind::StorageBuffer; };
         const auto bufferCount = std::ranges::count_if(environment.Resources, isBuffer);

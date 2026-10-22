@@ -72,9 +72,9 @@ no allocation.
 
 | # | Task | Why the graph needs it | Note |
 |---|---|---|---|
-| L5 | Device features and limits, with a WGSL table: `enable` directives (`f16`, `subgroups`), workgroup size and invocation product, `groupshared` bytes, bindings per stage, bind group count. | The device filter. Ocean FFT uses `half`, so it needs `shader-f16` today, and no cook states it. | This is phase F slice F3. Section 5. |
-| L6 | An axis bound to a device property. `IFFT_WAVE_SIZE` must equal the subgroup size. | The device filter picks the wave size, and the "prefer on" order for a boolean capability. | Design first, with L5. |
-| L16 | A resource report beside the dedupe report: for each binding, which creation fields the shader fixes, and which the CPU must give. Measure the axis set of each footprint, do not parse it, and compare the two (a validator). Put the measured set in the manifest. | A shader edit prints the CPU work it causes. A resource that is complete needs no graph code. | Source note §8.2. Build the report from the written manifest through the client views. |
+| L5 | **In progress 2026-10-21, as phase F slice F3.** Device features and limits, with a WGSL table: `enable` directives (`f16`, `subgroups`), workgroup size and invocation product, `groupshared` bytes, bindings per stage, bind group count. | The device filter. Ocean FFT uses `half`, so it needs `shader-f16` today, and no cook states it. | This is phase F slice F3. Section 5. |
+| L6 | **Closed 2026-10-21, no axis bound to a device property.** A renderer pins `IFFT_WAVE_SIZE` to the subgroup size with a query preset (L4), and the device filter (F3.4) removes what the device cannot run. Revisit with specialization constants. An axis bound to a device property. `IFFT_WAVE_SIZE` must equal the subgroup size. | The device filter picks the wave size, and the "prefer on" order for a boolean capability. | `docs/phase-f-plan.md` F3. |
+| L16 | **Done 2026-10-21** (format 13, `ResourceReportTest`). Footprint axis mask for each binding record, `DescribeCreation` in the client, `ShaderLibrary.resources.txt` from the written manifest, validator `VerifyFootprintAxes`. A JSON writer over `ResourceReport` is open. A resource report beside the dedupe report: for each binding, which creation fields the shader fixes, and which the CPU must give. Measure the axis set of each footprint, do not parse it, and compare the two (a validator). Put the measured set in the manifest. | A shader edit prints the CPU work it causes. A resource that is complete needs no graph code. | Source note §8.2. Build the report from the written manifest through the client views. |
 | L17 | **Done 2026-10-20** (format 12, `ResourceRoleTest`). Roles `IndirectDispatch`, `IndirectDraw`, `IndirectDrawIndexed`, `IndexData`, `VertexData`, checked against the kind and the stride (stride 4 needs an element count of whole commands); `IndirectCount` waits for capabilities. Free tags (`[ls_resource_tags]`) added beside the roles, stored and not interpreted. `ResolvedResource::RequiredBufferUsage` gives the creation usage. A role annotation, for example `[ls_resource_role("IndirectArgs")]`, for the usages that no binding shows. Check the stride of an `IndirectArgs` buffer (12, 16, or 20 bytes). | Velox decision V2: derive the creation usage. | Source note §8.3. The value joins the binding interning key (rule 3). |
 | L11 | Optional: a dispatch extent attribute, resolved per variant like a footprint. | The thread count of a dispatch gets one source. | Velox decision V6: the graph-side `DispatchThreadsOver` comes first. Do this only when a case needs it. |
 
@@ -203,6 +203,21 @@ no allocation.
   `AccessModelRejectTest` became `EntryPointUnusedResource.slang`: Slang's metadata marks every slot of the
   parameters' constant buffer as used (`collectMetadataFromInst`), so an unread resource beside read data is a
   mismatch. Open: decision D-R6 (section 6), and the merged layout does not read the constants.
+- 2026-10-21, L5 in progress as phase F slice F3: F3.1 and F3.2 done (format 14). Each source states its capability
+  names and its workgroup memory. OceanFft reads `Float16` and `UniformAndStorageBuffer16BitAccess` on every IFFT
+  module, and 16384 bytes at `IFFT_SIZE` 1024. L6 closed. `docs/phase-f-plan.md` section 7 has the detail.
+- 2026-10-21, L16, format 13. Measured: the footprint axes of each resource (scope and name), with the two passes of
+  the axis relevance taken out into one generic core (`MeasureAxisPairs`, `CloseRelevance` over subjects). Before the
+  closing pass an Undetermined axis counts as Inert, so a sparse cook with no one-axis pair still gets a mask, and one
+  cooked value never sets a bit. Declared: stage 4 reads the axes that each size attribute names, through the
+  derived constants (`CollectDeclaredFootprintAxes`), once for each resource. Validator: `VerifyFootprintAxes`
+  compares only the axes a one-axis pair proves, because the closed set can hold an axis a sparse cook cannot
+  separate (`FootprintAxisUndeclared`, 170). Stored: one mask for each binding record (a parallel table, so binding
+  interning did not change). Client: `ResolvedResource::FootprintAxes`, `DescribeCreation` (`CreationFields`, one
+  source for each creation field). Report: `ShaderLibrary.resources.txt`, built from the written bytes. **Not done:**
+  the report cannot note a declared axis that was not measured, because the manifest does not hold the declared set.
+  Stride and byte size are reported as shader-fixed with no axis list (decision 1). Proof: `ResourceReportTest` (29
+  checks), `DerivedConstantTest` (two derived constants back to `GRID_X` and `GRID_Y`). 30 of 30 tests.
 
 ## 5. Phase F, paused
 

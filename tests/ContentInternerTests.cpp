@@ -7,11 +7,7 @@
 #include <span>
 #include <string>
 
-// Rule 1 of the cooker: a hash never decides that two artifacts are equal. It selects a bucket, and a
-// byte comparison decides. Every test here supplies a hash function that returns one constant, so
-// every payload lands in the same bucket and only the byte comparison can separate them. A change
-// that lets a hash short-circuit the comparison ships a wrong shader, and this file is what catches
-// it.
+// every hash here returns one constant, so only the byte comparison can separate payloads
 
 using lodestone::ContentHashValue;
 using lodestone::ContentInterner;

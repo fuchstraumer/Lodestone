@@ -14,9 +14,6 @@ using lodestone::tests::TestRunner;
 namespace
 {
 
-// A thin wrapper: MissingTokens takes mutable spans, so the caller must own the vectors. Returning the
-// result by value is safe because each token is a view into the caller's string literals, not into the
-// argument vectors.
 std::vector<std::string_view> Missing(const SymbolTable& table,
                                       std::vector<std::string> modules,
                                       std::vector<std::string_view> tokens)
@@ -35,9 +32,6 @@ bool DeclarationMatches(const std::vector<ExternConstantDeclaration>& externs,
     return iter != externs.end();
 }
 
-// A whole `extern static const` line is dropped, in any keyword order. A line that has only some of
-// the three keywords is an ordinary declaration, and its name stays a token.
-// a placeholder source path: only derived constants record it, and only their tests read it back
 constexpr std::string_view k_TestSourcePath = "test.slang";
 
 void TestExternStaticConstStripping(TestRunner& runner)
@@ -148,9 +142,6 @@ void TestAccumulationAndUnknownModule(TestRunner& runner)
                  "an unknown module holds no tokens, so the token is missing");
 }
 
-// Derived constants are non-extern `static const` declarations, kept with their expression text and source
-// location. The line scan cannot tell scopes apart, so a function-local constant is captured here too: the
-// compiler filters these by the module-scope names that reflection reports.
 void TestDerivedConstantExtraction(TestRunner& runner)
 {
     runner.BeginSection("derived constants");
@@ -210,9 +201,6 @@ void TestDeclarationKeywordTokens(TestRunner& runner)
                  "`static` and `const` inside a type name do not make a line an extern static const");
 }
 
-// Interface axes are `extern struct` declarations. The identifier just before `=` is the interface, so the
-// struct name has to come from the token after `struct`, and type defaults are kept apart from the constants
-// so that nothing evaluates a type name as an expression.
 void TestExternTypeDefaultExtraction(TestRunner& runner)
 {
     runner.BeginSection("extern struct defaults");

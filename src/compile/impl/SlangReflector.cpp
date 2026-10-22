@@ -34,26 +34,17 @@ namespace
 
 using namespace lodestone;
 
-/** The name Slang gives the scope that it moves entry point `uniform` parameters into.
- *
- * `slang-ir-entry-point-uniforms.cpp` writes this string as a name hint, and reflection never reports
- * it. Every emitted name of an entry point parameter starts with it. This is a Slang convention, so we
- * keep it behind the Slang wall. */
+/** Slang's name hint for the scope of entry point `uniform` parameters. Reflection never reports it. */
 constexpr std::string_view k_EntryPointScopeName = "entryPointParams";
 
 constexpr SlangUInt k_WorkgroupAxisCount = 3u;
 
-// the shader-side attribute names are defined on RawSizeAttributeKind, so that one table defines the
-// contract and this file reads the spelling from it. Slang drops the `Attribute` suffix from the struct name,
-// so those strings match the declarations in tests/assets/LodestoneAttributes.slang.
 constexpr std::array<RawSizeAttributeKind, 4u> k_SizeAttributeKinds{ RawSizeAttributeKind::ElementCount,
                                                                      RawSizeAttributeKind::Extent1d,
                                                                      RawSizeAttributeKind::Extent2d,
                                                                      RawSizeAttributeKind::Extent3d };
 
-/** Attribute string arguments reflect as a pointer plus a length, and a null return means the
- * argument was not a string literal after all. That is a cook error rather than a skip: the
- * annotation was written, so the author expects it to do something. */
+/** Returns an error when the argument is not a string literal: an annotation the author wrote must not be skipped. */
 CookResult<std::string> ReadStringArgument(slang::Attribute* attribute,
                                            uint32_t argument_index,
                                            std::string_view binding_name)
@@ -70,7 +61,7 @@ CookResult<std::string> ReadStringArgument(slang::Attribute* attribute,
         return std::unexpected(CookError::AttributeExpressionParseFailed);
     }
 
-    // The reflected span includes the surrounding quotes on some paths; trim them if present.
+    // some paths include the quotes
     std::string_view value{ text, length };
     if (value.size() >= 2u && value.front() == '"' && value.back() == '"')
     {
@@ -80,8 +71,7 @@ CookResult<std::string> ReadStringArgument(slang::Attribute* attribute,
     return std::string{ value };
 }
 
-/** Splits one varying (shader input/output semantic) into a scalar type and a component count. A scalar
- * counts as one component, so a caller never has to test the kind again. */
+/** Splits one varying into a scalar type and a component count. A scalar counts as one component. */
 void ReadVaryingShape(slang::TypeLayoutReflection* type_layout,
                       VertexScalarType& out_scalar_type,
                       uint32_t& out_component_count) noexcept
@@ -112,24 +102,17 @@ void ReadVaryingShape(slang::TypeLayoutReflection* type_layout,
     }
 }
 
-/** One leaf of a varying or uniform tree, as the walker found it.
- *
- * `Path` contains the var layout of every field from the root to this leaf. Callers use it to build a
- * qualified name. We do not build the name in the walker, because three of the four callers never read
- * it. */
+/** One leaf of a varying or uniform tree. `Path` lists the var layouts from the root to the leaf. */
 struct LeafVisit
 {
     slang::VariableLayoutReflection* Var{ nullptr };
     slang::TypeLayoutReflection* Type{ nullptr };
-    /** The offset of this leaf in the category the walk asked for, summed down the tree. */
+    /** Summed from the root, in the category the walk asked for. */
     uint32_t Offset{ 0u };
     std::span<slang::VariableLayoutReflection* const> Path;
 };
 
-/** Calls `visit` for each leaf of one varying or uniform tree.
- *
- * Slang reports each field's offset relative to its parent, so the walker sums the offsets down the
- * tree. `category` selects which offset is summed. Callers that do not need an offset ignore it. */
+/** Calls `visit` for each leaf of one tree. Slang offsets are relative to the parent, so the walker sums them. */
 template<typename LeafVisitor> // NOLINTNEXTLINE(misc-no-recursion)
 void VisitLeaves(slang::VariableLayoutReflection* var_layout,
                  SlangParameterCategory category,
@@ -170,7 +153,7 @@ void VisitLeaves(slang::VariableLayoutReflection* var_layout,
     path.pop_back();
 }
 
-/** Walks the tree one var layout roots. The offset of that var layout counts. */
+/** Walks the tree under one var layout, including that var layout's offset. */
 template<typename LeafVisitor>
 void WalkVaryingTree(slang::VariableLayoutReflection* var_layout,
                      SlangParameterCategory category,
@@ -180,8 +163,7 @@ void WalkVaryingTree(slang::VariableLayoutReflection* var_layout,
     VisitLeaves(var_layout, category, 0u, path, visit);
 }
 
-/** Joins the field names of one path with dots. Returns an empty string when a field on the path has no
- * name, so that callers that need a full name can reject a partial one. */
+/** Joins the field names of a path with dots. Returns an empty string when any field has no name. */
 std::string JoinFieldNames(std::span<slang::VariableLayoutReflection* const> path)
 {
     if (path.empty())
@@ -255,8 +237,7 @@ void CollectColorTargets(slang::VariableLayoutReflection* var_layout, ReflectedR
     WalkVaryingTree(var_layout, SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT, varyingVisitor);
 }
 
-/** A fragment shader can write depth through an `out` parameter rather than through its result,
- * so that tree needs a walk of its own. */
+/** Depth can also be written through an `out` parameter, so that tree gets its own walk. */
 void CollectDepthWrites(slang::VariableLayoutReflection* var_layout, ReflectedRasterState& raster)
 {
     auto varyingVisitor = [&raster](const LeafVisit& leaf)
@@ -271,11 +252,8 @@ void CollectDepthWrites(slang::VariableLayoutReflection* var_layout, ReflectedRa
                     varyingVisitor);
 }
 
-/** One reflected number, or nothing.
- *
- * Slang returns `SLANG_UNKNOWN_SIZE` when a value depends on an unresolved generic parameter or a
- * link-time constant. If we cooked that value, the binding would be placed at a location that no shader
- * uses. Every read of a placement number goes through this function. */
+/** Returns no value for `SLANG_UNKNOWN_SIZE` (an unresolved generic or link-time constant). Every placement read
+ * goes through this, so that no binding is placed where no shader uses it. */
 constexpr std::optional<uint32_t> ResolvedNumber(size_t value) noexcept
 {
     if (value == SLANG_UNKNOWN_SIZE)
@@ -292,8 +270,6 @@ std::optional<uint32_t> ReadOffset(slang::VariableLayoutReflection* var_layout,
     return var_layout != nullptr ? ResolvedNumber(var_layout->getOffset(category)) : std::nullopt;
 }
 
-/** Reports a range that contains a number reflection could not resolve. Both walks use this function, so
- * that they report the error with the same message. */
 void ReportUnresolvedLocation(std::string_view range_kind, SlangInt range_index)
 {
     std::println(stderr,
@@ -303,8 +279,7 @@ void ReportUnresolvedLocation(std::string_view range_kind, SlangInt range_index)
                  range_index);
 }
 
-/** Appends one name to a scope chain. Slang joins a scope to its contents with an underscore. An empty
- * chain becomes the name alone. */
+/** Joins a scope and a name with an underscore, as Slang does. */
 std::string JoinScopeName(std::string_view prefix, const char* name)
 {
     if (name == nullptr)
@@ -349,27 +324,13 @@ void CollectScopeNames(slang::TypeLayoutReflection* layout,
 
         const SlangInt last =
             std::min<SlangInt>(fieldBase + fieldRangeCount, static_cast<SlangInt>(out_names.size()));
-        // std::fill the tail here
         std::fill(out_names.begin() + static_cast<std::ptrdiff_t>(fieldBase),
                   out_names.begin() + static_cast<std::ptrdiff_t>(last),
                   prefix);
     }
 }
 
-/**@brief Reads one subobject range as a parameter block, or returns `std::nullopt` if it can't manage that.
- *
- * @param containing_layout The layout of the type containing the sub-object range.
- * @param sub_object_index The index of the sub-object range within the containing layout.
- * @param scope The binding scope in which the parameter block resides.
- * @return An optional `ParameterBlockInfo` describing the parameter block, or `std::nullopt` if it cannot be
- * read.
- *
- * @note Expanding on this, two numbers had to come from places one wouldn't expect. First, the *bindable*
- * contents of every block always start at binding zero because their own range offsets count from the start
- * of the space, and step over the container. A block of two resources gave bindings 0 and 1, but when we
- * added a float4 that became 1 and 2.... and now the root container was at 0, because the raw float4 isn't
- * itself a binding.
- */
+/** Reads one sub-object range as a parameter block, or returns no value when the range is not one. */
 std::optional<ParameterBlockInfo> ReadParameterBlock(slang::TypeLayoutReflection* containing_layout,
                                                      SlangInt sub_object_index,
                                                      const BindingScope& scope)
@@ -381,7 +342,6 @@ std::optional<ParameterBlockInfo> ReadParameterBlock(slang::TypeLayoutReflection
         return std::nullopt;
     }
 
-    // A sub-object range is not always a block. Keep only the two this walk understands.
     const slang::BindingType bindingType = containing_layout->getBindingRangeType(rangeIndex);
     if (bindingType != slang::BindingType::ParameterBlock &&
         bindingType != slang::BindingType::ConstantBuffer)
@@ -417,16 +377,14 @@ std::optional<ParameterBlockInfo> ReadParameterBlock(slang::TypeLayoutReflection
     block.Scope.SpaceBase = block.Scope.Base.Group;
     block.Scope.Name = JoinScopeName(scope.Name, blockName);
 
-    // An unresolved size reads as no ordinary data at all, which is the answer that drafts no
-    // container. A block whose size a link-time constant decides has no fixed container anyway.
+    // an unresolved size drafts no container, as a block sized by a link-time constant has no fixed one
     block.UniformSize =
         ResolvedNumber(block.ElementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM)).value_or(0u);
     return block;
 }
 
 
-/** Moves each draft into the binding list, and keys each annotation against the position its
- * binding takes. The caller settles the order first, because `BindingIndex` is that position. */
+/** Moves the drafts into the binding list. The caller sorts them first, because `BindingIndex` is the position. */
 void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
                          std::vector<RawBinding>& out_bindings,
                          std::vector<RawSizeAttribute>& out_attributes)
@@ -441,8 +399,6 @@ void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
     }
 
     out_bindings.insert_range(out_bindings.end(), drafts | std::views::transform(&RawBindingDraft::Binding));
-    // std::views::join will effectively expand to a push_back for each element in the joined ranges, so
-    // reserve upfront
     // todo-ship: either find a way to get cache_latest in here or just stop doing this
     // its sad but ranges just don't produce the best assembly used like this
     const size_t attributesCount = std::ranges::fold_left(drafts | std::views::transform(
@@ -457,11 +413,8 @@ void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
                                 std::views::join | std::views::as_rvalue);
 }
 
-/** Asks the metadata of one entry point which global bindings that entry point reads.
- *
- * `global_bindings` contains only the global scope. Slang generates each entry point as its own
- * artifact, so two entry points can place different resources at the same group and binding. If we
- * queried placements across all entry point rows, one entry point could claim the parameter of another. */
+/** Returns the global bindings that one entry point reads. Each entry point is its own artifact, so two can place
+ * different resources at one (group, binding), and the query must not cross entry points. */
 std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_variant,
                                                 SlangInt entry_point_index,
                                                 std::span<const RawBinding> global_bindings,
@@ -555,8 +508,6 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
     rawVariant.VariantDescription = DescribeAssignment(descriptor.Canonical);
     rawVariant.VariantIndex = descriptor.Index;
 
-    // this step extracts the global bindings, which are put into the raw variant first
-    // the global bindings are sorted by placement ordering before return from this fn
     const CookError bindingExtrResult =
         extractRawBindings(linked_variant.ProgramLayout, rawVariant.Bindings, rawVariant.SizeAttributes);
     if (bindingExtrResult != CookError::Success) [[unlikely]]
@@ -579,11 +530,9 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
 
         RawEntryPoint& rawEntryPoint = entryPointResult.value();
 
-        // set the base size here, before we append the binding drafts for this entrypoint
         const uint32_t ownedBaseSize = static_cast<uint32_t>(rawVariant.Bindings.size());
         AppendBindingDrafts(entryPointDrafts, rawVariant.Bindings, rawVariant.SizeAttributes);
 
-        // the container was a position in the drafts, and the drafts keep their order when they are appended
         if (rawEntryPoint.Constants.ContainerBinding)
         {
             *rawEntryPoint.Constants.ContainerBinding += ownedBaseSize;
@@ -594,13 +543,10 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
             binding += ownedBaseSize;
         }
 
-        // filter to create a new subspan for only this entrypoints bindings, and run the collection of used binding indices on just that
         std::span<const RawBinding> entryPointBindings = std::span{ rawVariant.Bindings }.subspan(ownedBaseSize);
         std::vector entryPointIndices = CollectUsedBindingIndices(linked_variant, i, entryPointBindings, ownedBaseSize);
         rawEntryPoint.UsedBindingIndices.append_range(std::move(entryPointIndices));
-        // we need to sort the entry point binding indices, as global bindings are sorted,
-        // and our later guarantees in the manifest about merging layout views correctly
-        // require *all bindings* used by any entry point to be in strict ascending placement order.
+        // the merged layout needs every used binding in placement order
         const std::span<const RawBinding> allBindings = rawVariant.Bindings;
         std::ranges::stable_sort(rawEntryPoint.UsedBindingIndices,
                                  PlacementLess,
@@ -612,8 +558,6 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
 
         rawEntryPoint.VariantSuffix = rawVariant.VariantSuffix;
         rawEntryPoint.TargetCode = std::move(linked_variant.EntryPointCode[static_cast<size_t>(i)]);
-        // weird quirk: dereferencing a std::expected with * directly returns an rvalue. otherwise
-        // we would have to do std::move(entryPointResult).value() lol
         rawVariant.EntryPoints.emplace_back(std::move(*entryPointResult));
     }
 
@@ -637,20 +581,16 @@ CookError SlangReflector::applyLeafTypeSamplerLayout(slang::TypeReflection* leaf
 CookError SlangReflector::applyLeafTypeTextureLayout(slang::TypeReflection* leaf_type,
                                                      RawBinding& binding) const
 {
-    // fixed: we used `getType()` here, but that just gives the texture: the scalar type of a slang
-    // texture is invalid, so to get the actual sample type we need to use `getResourceResultType()`
-    // makes sense, but an easy mistake to make
+    // fixed: `getType()` returns the texture itself. The sample type is the resource result type
     if (slang::TypeReflection* resultType = leaf_type->getResourceResultType(); resultType != nullptr)
     {
         binding.SampleType = FromSlangScalarType(resultType->getScalarType());
     }
 
-    // a depth sample as a result type will read as float at first: check to see if the resource 
-    // shape indicates this is actually sampling depth, and update the sample type accordingly
+    // a depth texture reports float until the shape says shadow
     if (binding.SampleType == TextureSampleType::Float && ResourceShapeIsShadow(binding.Shape))
     {
         binding.SampleType = TextureSampleType::Depth;
-        // if this is a combined image sampler, update the sampler type as well
         if (binding.Kind == BindingKind::CombinedTextureSampler)
         {
             binding.IsComparisonSampler = true;
@@ -663,7 +603,6 @@ CookError SlangReflector::applyLeafTypeTextureLayout(slang::TypeReflection* leaf
 CookError SlangReflector::applyLeafTypeUniformBufferLayout(slang::TypeLayoutReflection* buffer_leaf_layout,
                                                            RawBinding& binding) const
 {
-    // A uniform block's size is fully determined. The graph must never take it from the caller.
     binding.ByteSize = static_cast<uint64_t>(buffer_leaf_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
     slang::TypeLayoutReflection* elementLayout = buffer_leaf_layout->getElementTypeLayout();
 
@@ -672,19 +611,15 @@ CookError SlangReflector::applyLeafTypeUniformBufferLayout(slang::TypeLayoutRefl
         binding.ByteSize = static_cast<uint64_t>(elementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
     }
 
-    // if the *leaf* layout is a parameter block, and the byte size is still 0, there's nothing to find here
     if (buffer_leaf_layout->getKind() == slang::TypeReflection::Kind::ParameterBlock &&
         binding.ByteSize == 0u)
     {
         return CookError::Success;
     }
 
-    // If this happens, and this isn't a parameter block, something is amiss. Even if it is a parameter block,
-    // empty ones should be handled by above casing (which then walks the layout further), and for hybrids
-    // (blocks with other blocks inside + some actual data), the byte size should be non-zero
+    // a hybrid block (nested blocks plus data) has a nonzero size, so zero here is a fault
     if (binding.ByteSize == 0u)
     {
-        // log a diagnostic so it's clear where this probably came from
         const char* bufferName = buffer_leaf_layout->getName();
         std::string message = std::format("Failed to determine byte size of buffer element {}",
                                           bufferName != nullptr ? bufferName : "<unknown>");
@@ -709,8 +644,6 @@ CookError SlangReflector::applyLeafTypeStorageBufferLayout(slang::TypeLayoutRefl
         slang::TypeLayoutReflection* elementLayout = leaf_layout->getElementTypeLayout();
         if (elementLayout != nullptr)
         {
-            // if element layout exists and this is a structured buffer, we can get the same info we would
-            // get for a uniform block... member by member names and offsets, which are great to have
             binding.ElementStride = static_cast<uint32_t>(elementLayout->getSize());
             const CookError structWalkResult = collectStructMembers(elementLayout, binding.UniformMembers);
             if (!structWalkResult)
@@ -727,8 +660,7 @@ CookError SlangReflector::applyLeafTypeStorageBufferLayout(slang::TypeLayoutRefl
     }
     else
     {
-        // element stride is going to be whatever the stride is for byteaddress-style buffers
-        // could be uint32, or raw bytes. we set it to 0 so clients know it is not explicitly defined.
+        // zero tells clients the stride of a byte address buffer is not defined
         binding.ElementStride = 0u;
     }
 
@@ -740,11 +672,7 @@ CookError SlangReflector::applyLeafTypeTexelBufferLayout(slang::TypeLayoutReflec
                                                          slang::TypeReflection* leaf_type,
                                                          RawBinding& binding) const
 {
-    // texel buffers hold format-converted texels, so it pretty much holds the same info as a 
-    // texture. really, it's just about the backing memory and dimensionality when it comes to
-    // what makes it any different. 
-    // read-only forms report a sample result type
-    // storage forms (RWBuffer<T>) report a format, from the binding range instead of the element
+    // a read-only texel buffer reports a sample result type, and RWBuffer<T> a format
     if (binding.Access == ResourceAccess::ReadOnly)
     {
         if (slang::TypeReflection* resultType = leaf_type->getResourceResultType(); resultType != nullptr)
@@ -759,10 +687,7 @@ CookError SlangReflector::applyLeafTypeTexelBufferLayout(slang::TypeLayoutReflec
     return CookError::Success;
 }
 
-/** Reads the size, shape, and type facts off one binding range's leaf type layout.
- *
- * Slang wraps a resource type around its element type, so the useful facts are one level down.
- * Structured buffers report their element layout, and textures report the type they return. */
+/** Reads the size, shape, and type of one binding range from its leaf type layout, one level below the resource. */
 CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* containing_layout,
                                               SlangInt range_index,
                                               RawBinding& binding) const
@@ -776,24 +701,13 @@ CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* conta
     slang::TypeReflection* leafType = leafLayout->getType();
     if (leafType == nullptr)
     {
-        // should this not be a warning? maybe an error?
         return CookError::Success;
     }
 
-    // updated: shape needs to also include array and multisample flags, and also tells
-    // us if a buffer is structured/byte address/texture buffer
     binding.Shape = FromSlangResourceShape(leafType->getResourceShape());
-    // like above, access type can end up as an invalid value still - but that's contextual, and later
-    // validation layers will catch this based on the actual underlying type of the resource.
     binding.Access = FromSlangAccessType(leafType->getResourceAccess());
 
-    // okay, while we used to just switch on the binding kind that's frail: we need to account for 
-    // the full combination of like... "routing" (binding kind), "topology" (shape), and mutability (access type)
-    // different combinations can lead to different interpretations of the binding's properties,
-    // or suggest different items we want to extract from reflection to aid the RHI consumers
-
-    // what we do instead is use the kind as a coarse filter, and then call child functions 
-    // per kind that branch further on shape and access
+    // the kind is a coarse filter, and each child branches on shape and access
     switch (binding.Kind)
     {
     case BindingKind::Sampler:
@@ -826,8 +740,7 @@ CookError SlangReflector::applyLeafTypeLayout(slang::TypeLayoutReflection* conta
     return CookError::ReflectionUnsupportedBindingKind;
 }
 
-/** Reads one `[vx_*]` annotation into its argument strings. Stage 3 never evaluates one, so a
- * malformed argument is caught here only when it is not a string at all. */
+/** Reads one size attribute into its argument strings. Stage 4 evaluates them. */
 CookError SlangReflector::collectRawSizeAttributes(slang::VariableReflection* leaf_variable,
                                                    std::string_view binding_name,
                                                    std::vector<RawSizeAttribute>& out_attributes) const
@@ -867,8 +780,7 @@ CookError SlangReflector::collectRawSizeAttributes(slang::VariableReflection* le
     return CookError::Success;
 }
 
-/** Reads the one string argument of an attribute. `out_value` stays unchanged when the variable has no such
- * attribute. */
+/** Leaves `out_value` unchanged when the variable has no such attribute. */
 CookError SlangReflector::readSingleStringAttribute(slang::VariableReflection* leaf_variable,
                                                     const char* attribute_name,
                                                     std::string_view binding_name,
@@ -894,10 +806,7 @@ CookError SlangReflector::readSingleStringAttribute(slang::VariableReflection* l
     return CookError::Success;
 }
 
-/**@brief Flattens one uniform or structured buffer block into rows of name, offset, and size.
- * Nested fields take a dotted name to reflect the hierarchy. Offset is accumulated from the
- * root of the struct, as slang structures offsets from zero based on recursive walks of all fields.
- */
+/** Flattens one struct into members with dotted names and offsets from the root. */
 CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* struct_layout,
                                                 std::vector<ReflectedUniformMember>& members) const
 {
@@ -917,7 +826,7 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
         }
         
         uint32_t memberSize = static_cast<uint32_t>(leaf.Type->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
-        // a resource or a varying input in the struct takes no uniform bytes, and it is not a member of the block
+        // resources and varyings take no uniform bytes
         if (memberSize == 0u)
         {
             return;
@@ -942,7 +851,6 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
         MatrixLayout layout{ MatrixLayout::Invalid };
         if (isMatrix)
         {
-            // determine layout (if it was an array of matrices, that should be handled already - same with the stride)
             const SlangMatrixLayoutMode slangLayout = leaf.Type->getMatrixLayoutMode();
             switch (slangLayout)
             {
@@ -976,19 +884,16 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
     return result;
 }
 
-// clang-tidy whines about no recursion, and normally while I am indeed an anti-recursion zealot, in this
-// case recursion is by far the best way to handle this (and slang damn near requires it)
-// todo-ship: add a depth counter, just so we can break out if it gets beyond our max depth
+// I am an anti-recursion zealot, but Slang damn near requires it here
+// todo-ship: add a depth counter, so we can break out past our max depth
 // NOLINTBEGIN(misc-no-recursion)
 
-/** Walks the binding ranges of one scope, and drafts a binding for each one. */
 CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection* containing_layout,
                                                     const BindingScope& scope,
                                                     std::vector<RawBindingDraft>& out_drafts) const
 {
     if (containing_layout == nullptr)
     {
-        // reached end of the binding range chain (hopefully)
         return CookError::Success;
     }
 
@@ -1001,7 +906,7 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
     for (SlangInt rangeIndex = 0; rangeIndex < bindingRangeCount; ++rangeIndex)
     {
         const slang::BindingType bindingType = containing_layout->getBindingRangeType(rangeIndex);
-        // Skip input/output attributes, which slang considers to be part of the global params
+        // varyings are part of the global params to Slang
         if (bindingType == slang::BindingType::Unknown ||
             bindingType == slang::BindingType::VaryingInput ||
             bindingType == slang::BindingType::VaryingOutput)
@@ -1034,8 +939,7 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
         slang::TypeLayoutReflection* leafType = containing_layout->getBindingRangeLeafTypeLayout(rangeIndex);
         if (leafType->getKind() == slang::TypeReflection::Kind::ParameterBlock)
         {
-            // We cannot make a binding draft for a parameter block type: that must be handled 
-            // in subobject range walk.
+            // collectSubObjectDrafts reads blocks
             continue;
         }
 
@@ -1083,11 +987,8 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
     return collectSubObjectDrafts(containing_layout, scope, out_drafts);
 }
 
-/** The constant buffer that Slang adds to store the ordinary data of a block. Neither range list contains
- * it, and clients must create it, so we draft it as a binding with the name of the block.
- *
- * Blocks that contain only resources have no ordinary data and no such buffer, so callers only ask when
- * `UniformSize` is not zero. Otherwise we would report a binding that the shader does not have. */
+/** Drafts the constant buffer Slang adds for a block's ordinary data, named after the block. Only call it when
+ * `UniformSize` is not zero: a block of resources alone has no such buffer. */
 CookResult<RawBindingDraft> SlangReflector::readBlockContainer(const ParameterBlockInfo& block, std::string_view scope_name) const
 {
     const std::optional<uint32_t> containerBinding =
@@ -1116,12 +1017,8 @@ CookResult<RawBindingDraft> SlangReflector::readBlockContainer(const ParameterBl
     return draft;
 }
 
-/**@brief Walks the parameter blocks of one scope, and drafts the container and the contents of each.
- *
- * @note Slang describes a block to its parent scope with descriptor ranges only, so the binding range of
- * the block has a descriptor set index of -1, and the range walk skips it. The contents are in a sub-object
- * range instead, and this is the only walk that reads them. `ReadParameterBlock` reads one range, and
- * `ReadBlockContainer` reads the buffer that Slang adds to store the ordinary data. */
+/** Drafts the container and the contents of each parameter block of one scope. The range walk skips blocks, so
+ * this is the only walk that reads them. */
 CookError SlangReflector::collectSubObjectDrafts(slang::TypeLayoutReflection* containing_layout,
                                                  const BindingScope& scope,
                                                  std::vector<RawBindingDraft>& out_drafts) const
@@ -1161,14 +1058,8 @@ CookError SlangReflector::collectSubObjectDrafts(slang::TypeLayoutReflection* co
 
 // NOLINTEND(misc-no-recursion)
 
-/** The parameter scope of one entry point: its starting offset, and the name Slang emits around it.
- *
- * Slang reports an unresolved offset as `SLANG_UNKNOWN_SIZE`. That value is not a valid placement, and
- * cooking it would emit a binding at a location that no shader uses.
- *
- * When the entry point declares one parameter of a struct type, the scope name is the parameter's name.
- * Otherwise Slang collects the loose `uniform` parameters into a synthetic struct named
- * `entryPointParams`. Both names come from the same call, so neither needs special handling here. */
+/** Returns the parameter scope of one entry point: its offset, and the name Slang emits around it (the struct
+ * parameter's name, or `entryPointParams` for loose parameters). */
 CookResult<BindingScope> SlangReflector::entryPointScope(slang::EntryPointReflection* entry_point_layout,
                                                          std::string_view entry_point_name) const
 {
@@ -1212,8 +1103,7 @@ CookError SlangReflector::extractRawBindings(slang::ProgramLayout* program_layou
         return walkError;
     }
 
-    // todo-ship: do we actually need stable_sort? if placements are equal, that's an error: it means they
-    // have same group and binding, and that shouldn't be possible.
+    // todo-ship: equal placements are an error, so stable_sort may be unnecessary
     std::ranges::stable_sort(drafts,
                              PlacementLess,
                              [](const RawBindingDraft& draft) -> const RawPlacement&
@@ -1257,16 +1147,13 @@ CookResult<RawEntryPoint> SlangReflector::extractRawEntryPoint(const LinkedVaria
     rawEntryPoint.UsedBindingIndices =
         CollectUsedBindingIndices(linked_variant, entry_point_index, global_bindings, 0u);
 
-    // A `uniform` parameter on the entry point takes a placement in the space the global bindings
-    // use, and the entry point var layout says where that scope starts.
     CookResult<BindingScope> scope = entryPointScope(entryPointLayout, rawEntryPoint.Name);
     if (!scope)
     {
         return std::unexpected(scope.error());
     }
 
-    // With ordinary data among the parameters, Slang puts the parameters in a constant buffer, and their
-    // resources are in the element of that buffer. Without ordinary data, the parameters are a plain struct.
+    // with ordinary data, the parameters' resources are in the element of a constant buffer
     slang::TypeLayoutReflection* parametersLayout = entryPointLayout->getTypeLayout();
     if (parametersLayout != nullptr &&
         parametersLayout->getKind() == slang::TypeReflection::Kind::ConstantBuffer)
@@ -1290,7 +1177,6 @@ CookResult<RawEntryPoint> SlangReflector::extractRawEntryPoint(const LinkedVaria
     {
         return std::unexpected(walkError);
     }
-    // positions in the drafts here, and the caller makes them indices in the variant's bindings
     if (rawEntryPoint.Constants.Delivery != EntryPointConstantsDelivery::None)
     {
         for (auto draft = elementBegin; draft < static_cast<uint32_t>(out_drafts.size()); ++draft)
@@ -1302,15 +1188,8 @@ CookResult<RawEntryPoint> SlangReflector::extractRawEntryPoint(const LinkedVaria
     return rawEntryPoint;
 }
 
-/** Reads the ordinary data of the `uniform` parameters of one entry point into `out_entry_point.Constants`, and
- * returns the element layout that contains the resources of those parameters, for the caller to walk.
- *
- * The range type of the constant buffer tells the delivery. A `ConstantBuffer` range is a uniform buffer with a
- * placement (WGSL). We draft it as a binding with the name that the target code uses, so the cross-check and the
- * layout read it like any other binding. A `PushConstant` range has no placement (SPIR-V, for raster and compute
- * stages). Both targets remove the data when the entry point does not read it. The metadata reports that for the
- * uniform buffer only, so a push constant block is stated here and settled against the emitted code later. `ContainerBinding` is a position in `out_drafts` here, and the caller
- * makes it an index in the variant's bindings. */
+/** Reads the entry point constants into `out_entry_point.Constants`, and returns the element layout that contains
+ * the parameters' resources. */
 CookResult<slang::TypeLayoutReflection*> SlangReflector::readEntryPointConstants(
     const LinkedVariant& linked_variant,
     int64_t entry_point_index,
@@ -1343,8 +1222,7 @@ CookResult<slang::TypeLayoutReflection*> SlangReflector::readEntryPointConstants
     const slang::BindingType containerType = parametersLayout->getBindingRangeType(0);
     if (containerType == slang::BindingType::PushConstant)
     {
-        // the metadata does not track push constants (measured 2026-10-19: isParameterLocationUsed reports none),
-        // so stage 3 states the block, and the read of the emitted code removes it when Slang removed it
+        // the metadata does not track push constants, so the emitted code settles this block later
         constants.Delivery = EntryPointConstantsDelivery::PushConstant;
         return elementLayout;
     }

@@ -45,14 +45,10 @@ namespace
     static WgslValidator k_WgslValidator;
     const ResolvedLibraryValidator* const k_WgslProfileValidator = &k_WgslValidator;
 #else
-    // No Tint, so no second opinion. A wgsl cook in this build fails unless it passes --no-validate.
     const ResolvedLibraryValidator* const k_WgslProfileValidator = nullptr;
 #endif
 
-    // Slang has no WGSL profile. It ignores a profile that does not imply the target, so the old
-    // `spirv_1_4` changed nothing (measured on KitchenSink, 2026-09-25).
-    // we target Vulkan 1.2 for now (to be re-measured against device coverage), and Vulkan 1.2
-    // guarantees SPIR-V 1.5
+    // Slang has no WGSL profile, and ignores one that does not imply the target. Vulkan 1.2 guarantees SPIR-V 1.5
     const std::array<TargetProfile, 2u> k_TargetProfiles
     {
         TargetProfile{ .Name = k_WgslName,
@@ -65,7 +61,8 @@ namespace
                            .SlangProfileName = "spirv_1_5",
                            .Access = AccessModel::Bound,
                            .Validator = &k_SpvValidator,
-                           .MaxPushConstantBytes = 128u },
+                           .MaxPushConstantBytes = 128u,
+                           .VulkanApiVersion = (1u << 22u) | (2u << 12u) },
     };
 
     constexpr std::array<std::string_view, 2u> k_TargetProfileNames
@@ -80,7 +77,6 @@ CookResult<BindingComparison> ResolvedLibraryValidator::ValidateEntryPoint(std::
                                                                            std::span<const ReflectedBinding*> used,
                                                                            DiagnosticSink& sink) const
 {
-    // its just a vector of pointers, so copying is fine (this is the validation path, anyways)
     std::vector<const ReflectedBinding*> sortedUsed(used.begin(), used.end());
     std::ranges::sort(sortedUsed, BoundPlacementLess);
     return validateEntryPoint(target_code, sortedUsed, sink);
@@ -106,7 +102,6 @@ std::string_view ToString(AccessModel model) noexcept
         return "invalid";
     }
 
-    // a value outside the enum reaches here, since the switch covers every named value
     return "invalid";
 }
 

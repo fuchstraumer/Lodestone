@@ -19,10 +19,7 @@
 namespace lodestone
 {
 
-/**@brief Each worker thread creates one of these objects, encapsulating the context and Slang state
-  *needed for efficient compiliation of variants. The global session and base session types both need
-  *to be per-thread, ensuring that each thread has its own independent Slang context.
-*/
+/** @brief One thread's Slang sessions and loaded modules. */
 class SlangModuleContext
 {
 public:
@@ -34,10 +31,8 @@ public:
     [[nodiscard]] CookError Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink);
     [[nodiscard]] CookError RunBootstrap();
     [[nodiscard]] CookResult<std::vector<RawAxisDeclaration>> BuildDeclaredAxes() const;
-    /**@brief Returns the names of every variable declared at module scope in the loaded modules, sorted. This
-      * includes variables declared in `__include` fragments, and excludes struct members and function locals.
-      * The symbol table scans lines and cannot tell scopes apart, so its derived constants are filtered by
-      * this list. */
+    /** @brief Sorted module-scope variable names, including `__include` fragments. Filters the symbol table's derived
+      * constants, since a line scanner cannot tell scopes apart. */
     [[nodiscard]] std::vector<std::string> BuildModuleScopeVariableNames() const;
     [[nodiscard]] slang::IGlobalSession* GlobalSession() const noexcept;
     [[nodiscard]] slang::ISession* Session() const noexcept;
@@ -46,39 +41,29 @@ public:
     [[nodiscard]] const std::vector<std::string>& EntryPointNames() const noexcept;
     [[nodiscard]] std::string_view ModuleName() const noexcept;
     [[nodiscard]] const std::vector<std::string>& ModuleSourceStrings() const noexcept;
-    /**@brief Returns the path of each source in `ModuleSourceStrings()`, at the same position. Embedded builtins
-      * are listed by their search path, so this list is not the same as `DependencyFilePaths()`. */
+    /** @brief Parallel to `ModuleSourceStrings()`. Builtins appear by search path. */
     [[nodiscard]] const std::vector<std::string>& ModuleSourcePaths() const noexcept;
     [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
-    /**@brief The file path of every input source read by the root module. Embedded builtins are excluded.
-      *This is used to make sure the build step re-cooks when any of the input sources change. */
+    /** @brief The file paths for the depfile, excluding embedded builtins. */
     [[nodiscard]] const std::vector<std::string>& DependencyFilePaths() const noexcept;
     [[nodiscard]] PlacementKind PlacementKindForTarget() const noexcept;
     [[nodiscard]] TargetLanguage Language() const noexcept;
 
-    /**@brief Serialized every module this session loaded, in depdency order, into the returned list
-      *of serialized modules. Order must be preserved in order for this to work as a shortcut */
+    /** @brief Returns every loaded module, serialized in dependency order. */
     [[nodiscard]] std::vector<SerializedModule> SerializeModules() const;
 
-    /**@brief The main thread will call RunBootstrap, retrieve the serialized modules, and then initialize
-      * sub-contexts for each worker thread with the serialized modules. */
+    /** @brief Primes a worker's session from the bootstrap's serialized modules. */
     [[nodiscard]] CookError RunWorkerSetup(std::span<const SerializedModule> serialized_modules);
 
 private:
 
     [[nodiscard]] CookError primeSessionFromCache(std::span<const SerializedModule> serialized_modules);
-    // fixed: now for worker threads this will just resolve to the module loaded in the prev func
     [[nodiscard]] CookError loadRootModule();
     [[nodiscard]] CookError readDependencySourceStrings();
     [[nodiscard]] CookError enumerateEntryPoints();
-    // fixing prev bug: need to only add to base components in one location, or this breaks rapdily
-    // when multiple sources can invoke this code. this makes things more consistent and repeatable.
+    // fixed: base components are added in this one place only
     [[nodiscard]] CookError buildSlangComponents();
 
-    // Walks one reflection node and every node beneath it, collecting each axis-carrying variable into
-    // `axisDeclarations`. A `__include`d file declared with `implementing` reflects as an Unsupported
-    // node that contains the real declarations as its children, so the walk must descend, not stop at the
-    // module's top level.
 
     struct AxesBuildContext
     {
@@ -118,10 +103,8 @@ private:
     DiagnosticSink* diagnosticSink{ nullptr };
 };
 
-/**@brief Writes each serialized module to its cache path, so that the next cook loads it instead of compiling
- * it. Only the calling thread runs this, once for each compiler, from the blobs of the bootstrap session. The
- * worker sessions load the same modules from those blobs, so one writer covers every module that a later
- * import can find. A file that cannot be written is a warning, because the cache is an optimization. */
+/** @brief Writes the bootstrap's modules to the cache, from the calling thread only. A failure is a warning: the cache
+ * is an optimization. */
 CookError WriteModuleCache(std::span<const SerializedModule> serialized_modules, DiagnosticSink& sink);
 
 }

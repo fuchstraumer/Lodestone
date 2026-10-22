@@ -7,7 +7,8 @@ set(LODESTONE_CLIENT_HEADERS
     "${CMAKE_CURRENT_SOURCE_DIR}/include/ShaderManifestFormat.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/ShaderManifestIndex.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/ShaderManifestLayout.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/VariantKey.hpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/VariantKey.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/VulkanCapabilityTable.hpp")
 
 set(LODESTONE_CLIENT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ShaderManifest.cpp"

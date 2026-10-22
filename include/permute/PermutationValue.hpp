@@ -10,10 +10,8 @@ namespace lodestone
 
 struct PermutationAxis;
 
-// We used to use std::variant, but we know that our permutation values have a fixed set of types, so we can
-// represent them more efficiently than a variant. mostly, less templates and stdlib includes
-// todo-ship: Just make this use a variant again, since we're getting more complex types involved
-// Typename string can be a string_view at least, since it will persist in the axis itself
+// a tagged union rather than std::variant, for fewer templates and includes
+// todo-ship: use a variant again, now that the types are more complex
 struct PermutationValue
 {
     enum class Type : uint8_t
@@ -29,7 +27,7 @@ struct PermutationValue
     constexpr explicit PermutationValue(bool value) noexcept : type(Type::Bool), uintValue(value ? 1u : 0u) {}
     constexpr explicit PermutationValue(uint32_t value) noexcept : type(Type::UInt), uintValue(value) {}
 
-    // Interface types store their values as the ordinal/index within the Axis' type list
+    // the ordinal in the axis's type list
     static PermutationValue MakeType(uint32_t ordinal) noexcept;
     static PermutationValue MakeEnum(uint32_t ordinal) noexcept;
 
@@ -37,7 +35,6 @@ struct PermutationValue
     [[nodiscard]] Type GetType() const noexcept;
     [[nodiscard]] bool AsBool() const noexcept;
     [[nodiscard]] uint32_t AsUInt() const noexcept;
-    /** @brief Returns the type name of this type, as it is stored by the parent axis for this value */
     [[nodiscard]] std::string_view AsType(const PermutationAxis& axis) const noexcept;
     [[nodiscard]] std::string_view AsEnumCase(const PermutationAxis& axis) const noexcept;
     [[nodiscard]] std::string AsQualifiedEnum(const PermutationAxis& axis) const noexcept;
@@ -49,16 +46,13 @@ struct PermutationValue
 
 private:
     Type type;
-    // for enum and type values: an ordinal index within the axis' value space
-    // for enums: the literal values are stored on the axis, in a separate list
+    // enum and type values: the ordinal in the axis's value list
     uint32_t uintValue{ 0u };
 };
 
-/** Widens any axis value to the integer type the size-expression evaluator works in. A `bool` axis
- * becomes 0 or 1, which is what a shader comparing it against a constant would see. */
+/** Widens a value for the expression evaluator. A `bool` becomes 0 or 1, as the shader sees it. */
 int64_t PermutationValueToInt64(const PermutationValue& value) noexcept;
 std::string ValueToPrintableString(const PermutationValue& value) noexcept;
-// needs axis as of interface axis changes: have to get from ordinal to axis for type name
 std::string ValueToSlangLiteral(const PermutationAxis& axis, const PermutationValue& value);
 std::string ValueToSlangTypeName(const PermutationValue& value);
 std::string MakeExportedConstantSource(const PermutationAxis& axis, const PermutationValue& value);

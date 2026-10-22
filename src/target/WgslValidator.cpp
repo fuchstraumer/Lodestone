@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 #include "tint/tint.h"
+#include "src/tint/lang/core/ir/reflection.h"
 #include <magic_enum/magic_enum.hpp>
 
 namespace lodestone
@@ -24,15 +25,11 @@ namespace lodestone
 namespace
 {
 
-    /**@brief Runs the actual binding-by-binding comparison and validation, after we've extracted and sorted
-     * the bindings. Bindings *MUST* be sorted, otherwise this comparison won't work. It uses a symmetric walk
-     * through bot sets of bindings to keep complexity manageable, and this also serves to elevate binding count
-     * and placement mismatches (which are an error). */
+    /** @brief One merge walk over both lists, which must be sorted by placement. */
     BindingComparison CompareBindings(std::span<const tint::inspector::ResourceBinding> wgsl_bindings,
                                       std::span<const ReflectedBinding*> reflected_bindings) noexcept;
 
-    /**@brief Parses one entry point's WGSL with every extension allowed: trust that the compiler knew what to
-     * emit. Invalid WGSL is a parse error, not a mismatch. */
+    /** @brief Allows every extension: the compiler knew what to emit. Invalid WGSL is a parse error, not a mismatch. */
     CookResult<tint::Program> ParseWgsl(std::span<const std::byte> source_code, DiagnosticSink& sink)
     {
         using namespace tint;
@@ -47,7 +44,6 @@ namespace
             std::string tintDiagnostics; tintDiagnostics.reserve(1024);
             for (const auto& diag : entrypointProgram.Diagnostics())
             {
-                // location, then message
                 tintDiagnostics += ToString(diag.source);
                 tintDiagnostics += diag.message.Plain() + "\n";
             }
@@ -60,8 +56,45 @@ namespace
         return entrypointProgram;
     }
 
-    /**@brief The (texture, sampler) placements that one entry point samples together, from Tint's inspector.
-     * Texture uses with no sampler (textureLoad) are not pairs. */
+    /** @brief Workgroup memory comes from Tint's `GetWorkgroupInfo`, Dawn's own rule. It fails without a workgroup
+     * size, so only compute entry points read it. */
+    CookError ReadCodeFacts(const tint::Program& program,
+                            tint::inspector::Inspector& inspector,
+                            EmittedCodeFacts& facts,
+                            DiagnosticSink& sink)
+    {
+        facts.CapabilityNames = inspector.GetUsedExtensionNames();
+        std::ranges::sort(facts.CapabilityNames);
+        const auto repeated = std::ranges::unique(facts.CapabilityNames);
+        facts.CapabilityNames.erase(repeated.begin(), repeated.end());
+
+        const bool compute = std::ranges::any_of(inspector.GetEntryPoints(),
+                                                 [](const tint::inspector::EntryPoint& entry_point)
+                                                 { return entry_point.stage == tint::inspector::PipelineStage::kCompute; });
+        if (!compute)
+        {
+            return CookError::Success;
+        }
+
+        auto ir = tint::wgsl::reader::ProgramToLoweredIR(program);
+        if (ir != tint::Success)
+        {
+            return ReportError(sink,
+                               CookError::TargetValidationEntryPointInvalid,
+                               std::format("Tint cannot lower the WGSL to IR: {}", ir.Failure().reason));
+        }
+        auto workgroup = tint::core::ir::GetWorkgroupInfo(ir.Get());
+        if (workgroup != tint::Success)
+        {
+            return ReportError(sink,
+                               CookError::TargetValidationEntryPointInvalid,
+                               std::format("Tint cannot read the workgroup of the WGSL: {}", workgroup.Failure().reason));
+        }
+        facts.WorkgroupMemoryBytes = static_cast<uint32_t>(workgroup.Get().storage_size);
+        return CookError::Success;
+    }
+
+    /** @brief Texture uses with no sampler (textureLoad) are not pairs. */
     std::vector<SamplerTexturePlacement> ReadPairs(tint::inspector::Inspector& inspector, const std::string& entry_point)
     {
         std::vector<SamplerTexturePlacement> pairs;
@@ -107,9 +140,7 @@ CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::span<const 
 
         std::ranges::sort(wgslBindings, sortResourceBindings);
 
-        // now resources should be precisely sorted, we can use the comparison iterator
         BindingComparison epResult = CompareBindings(wgslBindings, bindings);
-        // the pairs are cook output, so they are read whether or not the bindings match
         epResult.Emitted.SamplerTexturePairs = ReadPairs(epInspector, entrypoint.name);
         if (!epResult.Matches)
         {
@@ -118,10 +149,14 @@ CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::span<const 
         result.Emitted.SamplerTexturePairs.append_range(std::move(epResult.Emitted.SamplerTexturePairs));
     }
 
+    const CookError read = ReadCodeFacts(*entrypointProgram, epInspector, result.Emitted, sink);
+    if (read != CookError::Success)
+    {
+        return std::unexpected(read);
+    }
     return result;
 }
 
-// WGSL has no push constants, so the facts contain the pairs only
 CookResult<EmittedCodeFacts> WgslValidator::readEmittedCodeFacts(std::span<const std::byte> source_code,
                                                                  DiagnosticSink& sink) const
 {
@@ -140,6 +175,12 @@ CookResult<EmittedCodeFacts> WgslValidator::readEmittedCodeFacts(std::span<const
         {
             facts.DeclaredPlacements.emplace_back(binding.bind_group, binding.binding);
         }
+    }
+
+    const CookError read = ReadCodeFacts(*entrypointProgram, epInspector, facts, sink);
+    if (read != CookError::Success)
+    {
+        return std::unexpected(read);
     }
     return facts;
 }
@@ -165,12 +206,9 @@ namespace
             return static_cast<tResourceType>(-1); // invalid access
         }
 
-        // a value outside the enum reaches here, since the switch covers every named value
         return static_cast<tResourceType>(-1);
     }
 
-    // our frontend pulls out the kind, shape, and access (nicely) into separate fields, so going back to a discrete binding type
-    // for most APIs means using these fields together to find the proper binding type (just look at how storage textures work)
     tint::inspector::ResourceBinding::ResourceType TintTypeForBindingKind(BindingKind kind, ResourceShape shape, ResourceAccess access)
     {
         using tResourceType = tint::inspector::ResourceBinding::ResourceType;
@@ -219,11 +257,9 @@ namespace
         case BindingKind::PushConstant:
             return static_cast<tResourceType>(-1); // none of these exist in WGSL
         case BindingKind::StorageTexture:
-            // separate function bc it's another switch (3 separate values, potentially)
             return ToTintStorageTextureType(access);
         }
 
-        // a value outside the enum reaches here, since the switch covers every named value
         return static_cast<tResourceType>(-1);
     }
 
@@ -236,8 +272,7 @@ namespace
         return reflectionTintType == tint_kind;
     }
 
-    /** Maps the curated formats that `FromSlangImageFormat` maps, so that the two sides compare. Any other format is
-     * Invalid on both sides. */
+    /** Maps the curated set of `FromSlangImageFormat`. Other formats are Invalid on both sides. */
     TextureFormat TextureFormatFromTint(tint::inspector::ResourceBinding::TexelFormat format) noexcept
     {
         using tTexelFormat = tint::inspector::ResourceBinding::TexelFormat;
@@ -319,9 +354,6 @@ namespace
         using tint::inspector::ResourceBinding;
         BindingComparison comparison;
         comparison.Matches = true;
-        // recently overhauled: now we can use a simple iterator walk to make this O(N+M)
-        // instead of O(N*M) or even O(Nlog(M)). because both spans are sorted, they should
-        // just match and we don't need to spend time doing nested searches
         auto iterSource = wgsl_bindings.begin();
         auto iterReflected = reflected_bindings.begin();
 
@@ -329,9 +361,7 @@ namespace
         {
             const ResourceBinding& declaredBinding = *iterSource;
             const ReflectedBinding* reflectedBinding = *iterReflected;
-            // std::tie to create tuple of references we can directly compare
             const auto declaredTuple = std::tie(declaredBinding.bind_group, declaredBinding.binding);
-            // GroupOf/BindingOf return lvalues so we need to make a tuple of copies to compare with the declared tuple
             const auto reflectedTuple = std::make_tuple(GroupOf(*reflectedBinding), BindingOf(*reflectedBinding));
 
             if (declaredTuple == reflectedTuple)
@@ -370,7 +400,6 @@ namespace
                 }
                 else if (reflectedBinding->Kind == BindingKind::StorageTexture)
                 {
-                    // WGSL spells the format of every storage texture, so the parse states it for each one
                     const TextureFormat declaredFormat = TextureFormatFromTint(declaredBinding.image_format);
                     if (declaredFormat != reflectedBinding->StorageFormat)
                     {
@@ -390,7 +419,6 @@ namespace
             }
             else if (declaredTuple < reflectedTuple)
             {
-                // Declared binding is missing in reflection
                 comparison.Matches = false;
                 comparison.Report += std::format("  wgsl declares @group({}) @binding({}) {} : reflection has "
                                                 "no binding at that location\n",
@@ -402,12 +430,10 @@ namespace
             else
             {
                 comparison.Matches = false;
-                // declare what is here in the wgsl first, to match format of previous message
                 comparison.Report += std::format("  wgsl declares @group({}) @binding({}) {}",
                                                 declaredBinding.bind_group,
                                                 declaredBinding.binding,
                                                 StripSlangNameMangling(declaredBinding.variable_name));
-                // now add what is in the reflection
                 comparison.Report += std::format(" : reflection has @group({}) @binding({}) {}\n",
                                                 std::get<0>(reflectedTuple),
                                                 std::get<1>(reflectedTuple),
@@ -416,7 +442,6 @@ namespace
             }
         }
 
-        // Drain and report any remaining bindings that weren't matched
 
         while (iterSource != wgsl_bindings.end())
         {

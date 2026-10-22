@@ -15,11 +15,10 @@
 #include <vector>
 
 #ifdef __clang__
-// The warning about RVO failures are for std::unexpected value returns, which are fine
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wnrvo"
 #pragma clang diagnostic ignored "-Wunsafe-buffer-usage" // offsets from string pointers
-// without this we get warnings about recursion... in a recursive descent parser. silenced.
+// warnings about recursion... in a recursive descent parser. silenced.
 // NOLINTBEGIN(misc-no-recursion)
 #endif
 
@@ -39,8 +38,7 @@ namespace
         return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_';
     }
 
-    /** @brief We use parser mode primarily to enable the "CollectOnly" mode, which traverses the input
-     * without actually evaluating it - to gather identifiers ahead of time before evaluation. */
+    /** @brief `CollectOnly` walks the input and gathers identifiers without evaluating. */
     enum class ParserMode : uint8_t
     {
         None,
@@ -48,17 +46,8 @@ namespace
         CollectOnly
     };
 
-    /** Recursive descent over a fixed grammar. Every failure returns an error rather than a default,
-     * because a size that silently evaluates to zero allocates a zero-byte buffer and fails much
-     * later, somewhere unrelated. A constraint that silently evaluates to zero is a false that the
-     * author did not write, which prunes a variant that should have cooked.
-     *
-     * A comparison and a logical operator yield 0 or 1, and every other level treats a nonzero
-     * value as true. This matches C and Slang, so `(IFFT_SIZE > 256) * 4` reads the way the author
-     * expects. `&&` and `||` do NOT short circuit: this parser evaluates as it descends, so it has no
-     * unevaluated right operand to skip. The only effect is that a divide by zero or an out-of-range
-     * shift on the right of a false `&&` still fails, where C would not reach it. A constraint that
-     * relies on that guard is rare, and the failure is loud rather than silent. */
+    /** Recursive descent. Every failure is an error, never a default: a silent zero allocates an empty buffer or prunes
+     * a variant. Comparisons and logic yield 0 or 1, as in C and Slang. `&&` and `||` do not short circuit. */
     class ExpressionParser
     {
     public:
@@ -160,10 +149,7 @@ namespace
 
             while (true)
             {
-                // A two-character operator must be tested before its one-character prefix, or `<=`
-                // reads as `<` and leaves a stray `=`. A `<<` or `>>` cannot reach this point,
-                // because `parseShift` consumes every shift before it returns, so a `<` or `>` here
-                // is always a comparison.
+                // test `<=` before `<`. parseShift already consumed every `<<` and `>>`
                 Comparison comparison = Comparison::None;
                 if (consumeOperator("=="))
                 {
@@ -230,7 +216,6 @@ namespace
 
                 if (parserMode == ParserMode::CollectOnly)
                 {
-                    // walk finished, exit
                     continue;
                 }
 
@@ -306,7 +291,6 @@ namespace
 
                 if (parserMode == ParserMode::CollectOnly)
                 {
-                    // structure walked, leave loop
                     continue;
                 }
 
@@ -338,8 +322,7 @@ namespace
         CookResult<int64_t> parseUnary()
         {
             skipWhitespace();
-            // `!` is tested before the operand. It never reads the `!` of a `!=`, because `!=` is a
-            // comparison operator and `parseComparison` consumes it before an operand begins.
+            // never a `!=`: parseComparison consumed it
             if (consumeOperator("!"))
             {
                 const CookResult<int64_t> operand = parseUnary();
@@ -428,7 +411,6 @@ namespace
                 ++digitsEnd;
             }
 
-            // A trailing `u` or `U` lets an expression be pasted out of Slang source unchanged.
             size_t valueEnd = digitsEnd;
             if (valueEnd > digitsBegin && base == 10 &&
                 (text[valueEnd - 1u] == 'u' || text[valueEnd - 1u] == 'U'))
@@ -467,7 +449,7 @@ namespace
             if (parserMode == ParserMode::CollectOnly)
             {
                 identifiers.emplace_back(name);
-                result = int64_t{ 1  }; // not going to actaully evaluate, just return 1!
+                result = int64_t{ 1  }; // not evaluated, just return 1!
             }
             else if (parserMode == ParserMode::Default)
             {
@@ -488,9 +470,7 @@ namespace
             return result;
         }
 
-        /** `<` and `>` alone are comparisons now, so a shift needs both characters to tell it from a
-         * comparison. This two-character peek is what lets the comparison level trust that no shift
-         * is left when it reads a single `<` or `>`. */
+        /** A shift needs both characters, which lets the comparison level trust a single `<` or `>`. */
         bool peekIsShift() noexcept
         {
             skipWhitespace();

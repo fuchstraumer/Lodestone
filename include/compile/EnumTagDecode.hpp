@@ -4,18 +4,10 @@
 #include <cstddef>
 #include <cstdint>
 
-// The integer read of a Slang enum case tag, factored out from behind the Slang wall.
-//
-// Slang reflection gives each enum case a raw value blob and a scalar type. The scalar type names
-// the width and the signedness of the enum's underlying integer. `SlangModuleContext` maps that
-// Slang scalar type to an `EnumTagKind` at the wall, and this function does the read. The function
-// names no Slang type, so a unit test can prove the widen-and-sign logic with no compiler present.
+// Decodes Slang enum case tags with no Slang type, so that the widen-and-sign logic tests without a compiler.
 namespace lodestone
 {
 
-/** The underlying integer type of a Slang enum, as a Slang-free kind.
- *
- * Each value names one fixed-width integer type. `DecodeEnumTag` reads a blob of that width. */
 enum class EnumTagKind : uint8_t
 {
     Int8,
@@ -28,16 +20,10 @@ enum class EnumTagKind : uint8_t
     UInt64,
 };
 
-/** Read one enum case tag from its raw bytes, and widen it to `int64_t`.
- *
- * `bytes` must point at a buffer of at least the width that `kind` names. The read is in host byte
- * order. A signed `kind` sign-extends to `int64_t`, and an unsigned `kind` zero-extends. A `UInt64`
- * tag at or above 2^63 wraps to a negative `int64_t`. The caller accepts this wrap, because a size
- * expression evaluates an enum tag as a signed 64-bit value. */
+/** Reads a tag in host byte order and widens it to `int64_t`. A `UInt64` tag at or above 2^63 wraps negative, which
+ * size expressions accept: they evaluate as signed 64-bit. */
 int64_t DecodeEnumTag(EnumTagKind kind, const void* bytes) noexcept;
 
-/** Returns the width in bytes of the integer type that `kind` names. Callers use this to check that a blob
- * from Slang is wide enough before `DecodeEnumTag` reads it. */
 size_t EnumTagByteWidth(EnumTagKind kind) noexcept;
 
 } // namespace lodestone

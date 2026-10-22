@@ -6,15 +6,7 @@
 #include <cstdint>
 #include <string_view>
 
-// The reflection schema is the contract between the compiler and the CPU. This file proves the
-// parts of it that are pure data: the `ResourceShape` flag enum, the `ToString` tables an emitter
-// and a dump reader print, and the equality that dedup rests on. None of it needs Slang, so a
-// change to a field or an enumerator fails here, on the commit that made it, not in a later cook.
-//
-// The `ResourceShape` flag layout is the load-bearing decision: the base shape sits in the low
-// nibble and array, multisample, shadow, and feedback are flags above it. A reader must take the
-// base with `GetBaseShape`, never an `==` against a base value, because `Texture2D | ArrayFlag` is
-// not `Texture2D`. These tests are what keep that discipline honest.
+// read shapes with `GetBaseShape`, never `==`: `Texture2D | ArrayFlag` is not `Texture2D`
 
 using lodestone::BindingKind;
 using lodestone::CookError;
@@ -122,9 +114,7 @@ int main()
                  "the highest error has a name");
 
     runner.BeginSection("a uniform member's layout and stride take part in equality");
-    // A CPU packer that transposes a matrix or misindexes an array produces wrong pixels, not a
-    // crash. The guard is that two members which differ only in layout or stride are not equal, so
-    // dedup keeps them apart and the field survives to the packer.
+    // members differing only in layout or stride must not be equal, or dedup merges them
     ReflectedUniformMember base;
     base.Name = "world";
     base.Data.Offset = 0u;

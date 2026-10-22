@@ -59,7 +59,6 @@ CookResult<PreparedPermutationSpace> PreparePermutationSpaceStep::operator()(con
                                                                              const SymbolTable& symbol_table,
                                                                              std::vector<RawAxisDeclaration> raw_axes) const
 {
-    // Fairly simple control flow: build the space, then validate it's constraints and cross-check it against the policy
     CookResult<PermutationSpace> result = BuildPermutationSpace(symbol_table,
                                                                 shared_state.AllModuleNames,
                                                                 module_name,
@@ -84,7 +83,6 @@ CookResult<PreparedPermutationSpace> PreparePermutationSpaceStep::operator()(con
         return std::unexpected(constraintResult);
     }
 
-    // finally, validate space against policy document
     const PolicyDocument& policy = shared_state.Policy;
     const CookError policyValidationResult = policy.ValidateAgainstSpace(module_name,
                                                                          space,
@@ -136,7 +134,6 @@ namespace
         }
         else
         {
-            // make sure to use case-insensitive, otherwise "tuning" would not match AxisKind::Tuning
             std::optional<AxisKind> kind = magic_enum::enum_cast<AxisKind>(str, magic_enum::case_insensitive);
             if (kind.has_value())
             {
@@ -160,8 +157,7 @@ namespace
         for (auto chunk : csvView)
         {
             std::string_view valueStr = std::string_view(std::ranges::data(chunk), std::ranges::size(chunk));
-            // we have to trim leading and trailing whitespace, if it's present, as from_chars will fail 
-            // if we don't make sure to trim it out
+            // from_chars fails on surrounding whitespace
             const size_t firstNonSpace = valueStr.find_first_not_of(" \t\r\n");
             if (firstNonSpace == std::string_view::npos)
             {
@@ -188,15 +184,13 @@ namespace
         return values;
     }
 
-    /** Returns the last segment of a qualified name, so that `QualityLevel::Low` and `QualityLevel.Low` both
-     * read as `Low`. */
+    /** `QualityLevel::Low` and `QualityLevel.Low` both give `Low`. */
     std::string_view LastNameSegment(std::string_view name) noexcept
     {
         const size_t separator = name.find_last_of(":.");
         return separator == std::string_view::npos ? name : name.substr(separator + 1u);
     }
 
-    /** Returns a readable form of one axis value, for a diagnostic. */
     std::string DescribeValue(const PermutationAxis& axis, const PermutationValue& value)
     {
         switch (axis.ValueDomain)
@@ -215,8 +209,7 @@ namespace
         return "<none>";
     }
 
-    /** Returns the initializer text of one axis, as written in the module's sources. Interface axes are
-     * `extern struct` declarations, so their initializers are kept in a separate table from the constants. */
+    /** Interface axes are `extern struct`, so their initializers come from a separate table. */
     CookResult<std::string_view> FindDefaultText(const RawAxisDeclaration& raw_axis,
                                                  const SymbolTable& symbol_table,
                                                  std::string_view module_name,
@@ -260,8 +253,7 @@ namespace
         return found.value();
     }
 
-    /** Evaluates the initializer of a boolean or integral axis. `true` and `false` are not expression
-     * keywords, so they are read directly, the same way the undriven extern constants are. */
+    /** `true` and `false` are not expression keywords, so they are read directly. */
     CookResult<int64_t> EvaluateDefaultText(std::string_view default_text, DiagnosticSink& sink)
     {
         if (default_text == "true" || default_text == "false")
@@ -271,7 +263,7 @@ namespace
         return EvaluateExpression(default_text, std::span<const AttrExprSymbol>{}, sink);
     }
 
-    /** Returns the index of the axis value at `predicate`, or nothing when no value or several values match. */
+    /** No value when none or several values match. */
     template<typename Predicate>
     std::optional<uint32_t> FindSingleValueIndex(uint32_t value_count, Predicate predicate)
     {
@@ -374,7 +366,6 @@ namespace
                                                              std::string_view default_text,
                                                              DiagnosticSink& sink)
     {
-        // implementation names are namespace-qualified, and the initializer may or may not be
         const std::string_view typeName = LastNameSegment(default_text);
 
         auto matchesImpl = [&](uint32_t idx)
@@ -411,7 +402,6 @@ namespace
         {
             return std::unexpected(defaultText.error());
         }
-        // the value we compare against the reflected default, in the units reflection reports
         int64_t comparableValue = 0;
         CookResult<uint32_t> index = std::unexpected(CookError::Success);
         switch (axis.ValueDomain)
@@ -449,7 +439,7 @@ namespace
             return std::unexpected(index.error());
         }
 
-        // two independent readers: the source text decides, and reflection checks it where it can read a value
+        // the source text decides, and reflection checks it where it can
         if (raw_axis.ReflectedDefault.has_value() && raw_axis.ReflectedDefault.value() != comparableValue)
         {
             const std::string message =
@@ -486,7 +476,6 @@ namespace
                 defaultCooked = defaultCooked || binding->Value == axis.GetDeclaredDefault();
             }
 
-            // an axis that no cooked variant uses never gets filled, so its default does not matter here
             if (axisActiveSomewhere && !defaultCooked)
             {
                 ReportWarning(sink,
@@ -506,7 +495,7 @@ namespace
                                                        std::vector<RawAxisDeclaration> raw_axes,
                                                        DiagnosticSink& sink)
     {
-        // First step: prune axes in raw axes that aren't actually used
+        // prune the axes no source uses
         auto extractNameStrView = [](const RawAxisDeclaration& raw_axis)
         {
             return std::string_view{ raw_axis.Name };
@@ -516,8 +505,6 @@ namespace
                                                      std::ranges::to<std::vector<std::string_view>>();
         std::vector<std::string_view> missingAxisNames = symbol_table.MissingTokens(module_names, axisNamesVec);
 
-        // build the condensed span - use views and filter to remove the axes from raw_axes that aren't
-        // used in any of the source code for the given modules.
         auto filterUnusedAxis = [&missingAxisNames](const RawAxisDeclaration& raw_axis)
         {
             return std::ranges::find(missingAxisNames, raw_axis.Name) == missingAxisNames.end();
@@ -527,7 +514,6 @@ namespace
                                                        std::views::filter(filterUnusedAxis) |
                                                        std::ranges::to<std::vector<RawAxisDeclaration>>();
         
-        // Just for info sake (and because we can filter this), if missingAxisNames is not empty, we can log which axes were missing.
         if (!missingAxisNames.empty())
         {
             auto foldStrNames = [](std::span<std::string_view> names)
@@ -548,12 +534,10 @@ namespace
             ReportInfo(sink, std::move(messageStr));
         }
 
-        // Second step: build the axes, using the filtered list of only the axes that are actually used
         std::vector<PermutationAxis> axes;
         for (RawAxisDeclaration& rawAxis : filteredAxes)
         {
             const AxisKind kind = AxisKindFromString(rawAxis.Kind);
-            // values extraction - fork on boolean, if not boolean it's just a comma split
             std::vector<PermutationValue> values;
             if (rawAxis.IsBooleanAxis)
             { 
@@ -566,8 +550,7 @@ namespace
             }
             else if (rawAxis.IsInterfaceAxis)
             {
-                // build the expanded list of permutation values for the interface axis.
-                // each value is just the index of that interface implementation in the list of all implementations
+                // each value is the index of the implementation
                 for (uint32_t i = 0; std::cmp_less(i, rawAxis.InterfaceImpls.size()); ++i)
                 {
                     values.emplace_back(PermutationValue::MakeType(i));

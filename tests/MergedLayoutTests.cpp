@@ -20,11 +20,7 @@
 #include <utility>
 #include <vector>
 
-// The merged layout of one pipeline: each resource once, with every stage that reads it. This test builds a
-// manifest inline through the real emitter, so it exercises emit -> open -> merge with no asset and no
-// compiler. It also proves that Open rejects a visibility list that is not in placement order, because the
-// merge rests on that order.
-//
+// three entry points and one integral axis CASE:
 // The module has three entry points (MainVS, MainFS, MainCS) and one integral axis CASE with three values,
 // so three variants:
 //   CASE 0: VS reads Scene(0,0) and Bones(0,1). FS reads Scene(0,0), Albedo(1,0), and Sampler(1,1).
@@ -117,7 +113,7 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space,
     module.EntryPoints.push_back(lodestone::LibraryEntryPoint{ .Name = "MainVS", .Stage = ShaderStageKind::Vertex });
     module.EntryPoints.push_back(lodestone::LibraryEntryPoint{ .Name = "MainFS", .Stage = ShaderStageKind::Fragment });
     module.EntryPoints.push_back(lodestone::LibraryEntryPoint{ .Name = "MainCS", .Stage = ShaderStageKind::Compute });
-    module.Sources.emplace_back(lodestone::tests::BytesOf("// wgsl for the merge test module"));
+    lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// wgsl for the merge test module"), lodestone::SourceCodeFacts{});
 
     ReflectedBinding bones = MakeBinding("Bones", 0u, 1u, BindingKind::StorageBuffer);
     bones.Shape = ResourceShape::StructuredBuffer;

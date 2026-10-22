@@ -18,15 +18,7 @@
 #include <vector>
 
 
-/** The frozen model every emitter reads.
- *
- * Each cook builds this once. The manifest emitter and the dedup report read the same object, so that
- * two artifacts of one cook cannot describe different shaders.
- *
- * Variants store an index into the module's source table, not the source text. With dedup, equal sources
- * share one entry. With `--no-dedupe`, every artifact gets its own entry. The emitters read through the
- * index either way.
- */
+/** The frozen model every emitter reads, so that two artifacts of one cook cannot describe different shaders. */
 namespace lodestone
 {
 
@@ -36,10 +28,7 @@ struct LibraryEntryPoint
     ShaderStageKind Stage{ ShaderStageKind::Invalid };
 };
 
-/**@brief One (module, permutation) pair.
- * `ResourceListIndex` and `FootprintListIndex` are per variant, and say what resources
- * the variant uses and the derived sizes/dims (footprints) of each. VisibilityIndices is
- * the binding locations for each entrypoint - which can vary for the same pointed-to resources */
+/** @brief One variant: indices into the module's tables, per variant and per entry point. */
 struct LibraryVariant
 {
     uint64_t Index{ 0u };
@@ -53,31 +42,24 @@ struct LibraryVariant
     std::vector<uint32_t> VisibilityIndices;
     std::vector<uint32_t> RasterIndices;
     std::vector<WorkgroupSize> Workgroups;
-    /** One index into `CookedModule::SamplerPairLists` for each entry point. */
     std::vector<uint32_t> SamplerPairIndices;
-    /** One index into `CookedModule::EntryPointConstantsTable` for each entry point. */
     std::vector<uint32_t> ConstantsIndices;
 };
 
-/**@brief The axes that the size attributes of one resource name, directly or through derived constants. */
+/** @brief The axes that a resource's size attributes name, directly or through derived constants. */
 struct FootprintAxisDeclaration
 {
     std::string ScopeName;
     std::string Name;
-    /** Indices into the module's permutation space, sorted and unique. */
+    /** Sorted and unique. */
     std::vector<uint32_t> Axes;
 };
 
-/**@brief Indices into `CookedModule::Resources`: the resources one variant declares. */
 using ResourceList = std::vector<uint32_t>;
-/**@brief Indices into a variant's own resource list: the resources one entry point reads. Local, so the
- * list stays valid when the resource table changes, and small enough to collapse well. */
+/** @brief Positions in the variant's resource list, so the list survives table changes and collapses well. */
 using VisibilityList = std::vector<uint32_t>;
-/**@brief The sampler and texture pairs of one entry point, as positions in its visibility list. */
 using SamplerPairList = std::vector<SamplerTexturePair>;
-/**@brief One footprint for each entry of a variant's resource list. */
 using FootprintList = std::vector<ResourceFootprint>;
-/**@brief What a caller gets for one entry point: the resources it reads, joined with their footprints. */
 using ShaderLayout = std::vector<ResolvedBinding>;
 using ShaderLayoutView = std::vector<ResolvedBindingView>;
 
@@ -89,8 +71,6 @@ ContentHashValue HashFootprintList(const FootprintList& footprints) noexcept;
 ContentHashValue HashSamplerPairList(const SamplerPairList& pairs) noexcept;
 void AppendFootprintHash(StreamingHash& hasher, const ResourceFootprint& footprint) noexcept;
 
-/**@brief The hash that generated a table, whether or not it used dedupe logic,
- *  and the results of the process (regardless of if it ran dedupe or not) */
 struct TableStatistics
 {
     std::string_view HashName;
@@ -98,14 +78,7 @@ struct TableStatistics
     InternerStatistics Interning;
 };
 
-/**@brief An interned module is procedurally built by adding variants as they arrive, and represents
- *  the deduplicated (if enabled) contents of a Slang module bundled together for the final cooking
- *  stage to process as it sees fit. This object actually *does* the interning piece by piece, as
- *  compared to `CookedModule` which holds the completed results from this processing.
- *
- * @note As of now, there is no `InternedLibrary`: interning is a per-module operation for now.
- * In the future, we could intern libraries - but those would be most efficient running on interned
- * modules, anyways. */
+/** @brief The stage 6 builder: interns each variant as it arrives. `FreezeModuleTables` consumes it. */
 struct InternedModule
 {
     std::string Name;
@@ -114,9 +87,6 @@ struct InternedModule
     std::vector<LibraryEntryPoint> EntryPoints;
     std::vector<VariantKey> VariantKeys;
     std::vector<LibraryVariant> Variants;
-    // Every interner takes the name from `k_HashName`, because the name reaches the output and a new
-    // hash needs a new name. A literal here is a second place to change, and the two spellings drifted
-    // apart once already.
     ContentInterner<std::vector<std::byte>> SourceInterner{ &HashSourceCode, k_HashName };
     ContentInterner<ReflectedBinding> ResourceInterner{ &HashReflectedBinding, k_HashName };
     ContentInterner<ResourceList> ResourceListInterner{ &HashResourceList, k_HashName };
@@ -125,11 +95,11 @@ struct InternedModule
     ContentInterner<ReflectedRasterState> RasterInterner{ &HashReflectedRasterState, k_HashName };
     ContentInterner<SamplerPairList> SamplerPairInterner{ &HashSamplerPairList, k_HashName };
     ContentInterner<EntryPointConstants> ConstantsInterner{ &HashEntryPointConstants, k_HashName };
-    // Required capabilities read back from the target's validator in any variant, stored as names since those
-    // are easiest to associate with renderer runtime caps (e.g., Vulkan device features/extensions)
+    /** Parallel to the source table. The code decides the facts, so the first variant with a source gives them. */
+    std::vector<SourceCodeFacts> SourceFacts;
+    /** Sorted and unique. */
     std::vector<std::string> ObservedCapabilities;
-    /** Sorted by scope and then by name. The first variant that declares a resource with a size attribute adds it,
-     * because the attribute text is the same in every variant. */
+    /** Sorted by scope and name. The first declaring variant adds an entry: the attribute text never varies. */
     std::vector<FootprintAxisDeclaration> FootprintDeclarations;
 
     void DisableDedupe() noexcept
@@ -145,14 +115,12 @@ struct InternedModule
     }
 };
 
-/**@brief Interned tables and information about how efficiently they were built. We store these
- * separately as they collapse at very different rates, so it's worth having insight into each.
- * This object holds the results of the interning process, but doesn't do it itself. */
+/** @brief The frozen tables of one module, with statistics for each, since they collapse at very different rates. */
 struct CookedModule
 {
     std::string Name;
     const PermutationSpace* Space{ nullptr };
-    /** @brief Size of the dense index range, holes included. */
+    /** @brief Holes included. */
     uint64_t SpaceSize{ 0u };
     std::vector<LibraryEntryPoint> EntryPoints;
     std::vector<std::vector<std::byte>> Sources;
@@ -165,8 +133,10 @@ struct CookedModule
     std::vector<EntryPointConstants> EntryPointConstantsTable;
     std::vector<VariantKey> VariantKeys;
     std::vector<LibraryVariant> Variants;
+    /** Parallel to `Sources`. */
+    std::vector<SourceCodeFacts> SourceFacts;
+    /** The manifest's capability name table: sorted and unique. */
     std::vector<std::string> ObservedCapabilities;
-    /** Sorted by scope and then by name. */
     std::vector<FootprintAxisDeclaration> FootprintDeclarations;
 
     TableStatistics SourceTable;
@@ -179,21 +149,16 @@ struct CookedModule
     TableStatistics ConstantsTable;
 };
 
-/** @brief One cooked form of the library: a target and the access model it binds with. */
 struct CookedProfile
 {
     std::string TargetName;
     PlacementKind AccessModel{ PlacementKind::None };
     ShaderCodeFormat CodeFormat{ ShaderCodeFormat::None };
-    /** This only indicates if we could (or chose to) read the sampler pairs - not if any 
-      * implicitly exist in the shader code itself. */
+    /** Whether the pairs were read, not whether any exist. */
     bool SamplerTexturePairsRecorded{ false };
 };
 
-/**@brief The whole cook: every module, cooked for every profile.
- * `Environments` is just the flattened vector for the profiles * modulenames grid. 
- * Modules are listed together for each profile, so they're linear in memory.
- * Empty entries just mean that the module was not cooked for that profile. */
+/** @brief The whole cook. `Environments` is the profile-major grid, and an empty entry was not cooked. */
 struct CookedLibrary
 {
     std::vector<std::string> ModuleNames;
@@ -203,34 +168,22 @@ struct CookedLibrary
 
 void DisableDedupe(InternedModule& module) noexcept;
 
-/** Adds one compiled variant to the module, interning each source, layout, and raster state */
 CookError AppendVariantToModule(InternedModule& module,
                                 const CompiledVariant& variant,
                                 const VariantDescriptor& descriptor);
 
-/**@brief The cross-target validator for sampler and texture pairs. Since profiles cook the same inputs to
- * different output formats, we can use this to validate that both paths produce consistent sampler and
- * texture pairings.
- *
- * Skips profiles that did not or cannot record these pairings, as well as entry points that use combined 
- * texture samplers since those are not supported by all profiles.
- *
- * @returns `SamplerPairsTargetMismatch` and names the module, the profiles, the variant, and the entry point. */
+/** @brief Compares the pairs of each variant that two profiles cooked. Skips profiles that did not record pairs, and
+ * entry points with combined texture samplers. */
 CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library);
 
-/**@brief "Freezes" the module by *consuming* `InternedModule`. CookedModule takes the results, gathering
- * all the data so far in one place. The intent was that CookedModule is a bundle of data, it doesn't hold
- * systems that build or modify that data. */
+/** @brief Consumes the builder, so nothing after the freeze can reach an interner. */
 CookedModule FreezeModuleTables(InternedModule&& interned);
 
-/**@brief Resolves what a caller would get back for one entry point of one variant. The round-trip check
- * compares this against the text the compiler produced. */
+/** @brief Returns the code of one entry point of one variant. The round trip compares it with the compiler output. */
 std::span<const std::byte> ResolveSource(const CookedModule& module,
                                          const LibraryVariant& variant,
                                          size_t entry_point_index) noexcept;
 
-/**@brief Retrieve the final shader layout built for one entry point of one variant
- * within a module.*/
 CookResult<ShaderLayout> ResolveLayout(const CookedModule& module,
                                        const LibraryVariant& variant,
                                        size_t entry_point_index);

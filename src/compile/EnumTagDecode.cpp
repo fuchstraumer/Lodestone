@@ -6,9 +6,7 @@ namespace lodestone
 
 namespace
 {
-    // Copy the exact width out of the blob, then let the widening conversion do the work. A signed
-    // T sign-extends to int64_t, and an unsigned T zero-extends. memcpy avoids an alignment fault,
-    // because the blob pointer has no guaranteed alignment.
+    // memcpy, because the blob has no guaranteed alignment. The conversion sign- or zero-extends
     template<typename T>
     int64_t WidenTag(const void* bytes) noexcept
     {

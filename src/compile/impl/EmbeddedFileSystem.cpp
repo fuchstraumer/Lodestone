@@ -208,7 +208,6 @@ namespace
         return std::filesystem::path{ std::u8string_view{ reinterpret_cast<const char8_t*>(path) } };
     }
 
-    // A string blob holds its terminating zero. Slang reads the text up to that zero.
     SlangResult CreateStringBlob(std::string_view text, ISlangBlob** out_blob)
     {
         std::string terminated{ text };
@@ -232,7 +231,7 @@ namespace
             return SLANG_E_NOT_FOUND;
         }
 
-        // `slang_createBlob` refuses a size of zero, so an empty file is a failed load, not a null blob.
+        // slang_createBlob refuses size zero, so an empty file is a failed load
         const std::vector<char> contents{ std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
         *out_blob = contents.empty() ? nullptr : slang_createBlob(contents.data(), contents.size());
         return (*out_blob != nullptr) ? SLANG_OK : SLANG_FAIL;

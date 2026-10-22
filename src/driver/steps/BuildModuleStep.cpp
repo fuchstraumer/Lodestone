@@ -2,6 +2,7 @@
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "VulkanCapabilityTable.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "driver/CookerOptions.hpp"
@@ -36,57 +37,42 @@ namespace lodestone
 namespace
 {
     void RecordVariantStatistics(const CompiledVariant& variant, CookStatistics& statistics);
-    // writes a bunch of information to the diagnostics sink about the given variant's entry point reflection
     void ReportEntryPointReflection(const CompiledVariant& variant,
                                     size_t entry_point_index,
                                     DiagnosticSink& diagnostics);
     void ReportVariantIfRequested(const CookerOptions& options,
                                   const CompiledVariant& variant,
                                   DiagnosticSink& diagnostics);
-    // reads the emitted code of each entry point back with the target's reader. It always reads the sampler and
-    // texture pairs, which are cook output, into `variant`. When `validate` is true, it also runs the reflection
-    // cross check on the same parse, and returns the mismatch count. A target with no reader fails when
-    // `validate` is true, and otherwise leaves the pairs empty (the profile records that they were not read).
-    // The capabilities the validator reads are merged into `observed_capabilities`, sorted and unique.
+    // always reads the cook output facts. With `validate`, also runs the cross-check on the same parse and returns the
+    // mismatch count. A target with no reader fails only when `validate` is set
     CookResult<uint32_t> ReadEmittedCode(const TargetProfile& target,
                                          bool validate,
                                          CompiledVariant& variant,
-                                         std::vector<std::string>& observed_capabilities,
                                          DiagnosticSink& diagnostics);
-    // maps the pairs a target reader gives, by placement, to positions in the entry point's used bindings, then
-    // sorts them and removes duplicates. A placement that no used binding has, or a pair that is not a texture and
-    // a sampler, fails: the reader and reflection disagree, and a dropped pair would hide a sampler constraint.
+    // maps placement pairs to positions in the used bindings. Pairs that do not resolve fail, since a dropped pair
+    // would hide a sampler constraint
     CookError ResolveSamplerTexturePairs(CompiledVariant& variant,
                                          size_t entry_point_index,
                                          std::span<const SamplerTexturePlacement> placements,
                                          DiagnosticSink& diagnostics);
-    // settles the entry point constants of one entry point against its emitted code. Reflection states a push
-    // constant block whenever the parameters contain ordinary data, and Slang's metadata does not report whether the
-    // entry point reads it, so the code decides: no block in the code means that Slang removed unused data. A block
-    // that reflection does not state, or that covers more bytes than reflection's size, is a reflection mismatch. A
-    // block larger than the profile's limit fails with `EntryPointConstantsTooLarge`.
+    // no block in the code means Slang removed unread data. A block that reflection does not state, or that covers
+    // more bytes, is a mismatch
     CookError ReconcileEntryPointConstants(const TargetProfile& target,
                                            CompiledEntryPoint& entry_point,
                                            std::optional<uint32_t> push_constant_extent,
                                            DiagnosticSink& diagnostics);
-    // Workaround for shader-slang/slang#13789. Slang's metadata reports every resource in the element of the entry
-    // point constants' buffer as used when any part of the buffer is used. This removes such a resource from the
-    // entry point's visibility when the emitted code does not declare it, and prints a note for each one.
-    // SlangMetadataCanaryTest fails when Slang fixes the issue: then delete this function, its call, and
-    // `ConstantsElementBindings`.
+    // workaround for shader-slang/slang#13789. When SlangMetadataCanaryTest fails, delete this function, its call,
+    // and `ConstantsElementBindings`
     CookError ApplySlangWorkaround13789(const TargetProfile& target,
                                         CompiledVariant& variant,
                                         size_t entry_point_index,
                                         DiagnosticSink& diagnostics);
-    // the two steps that turn the facts of one entry point's emitted code into cook output
     CookError ApplyEmittedCodeFacts(const TargetProfile& target,
                                     CompiledVariant& variant,
                                     size_t entry_point_index,
                                     const EmittedCodeFacts& facts,
                                     DiagnosticSink& diagnostics);
     void ReportUnreferencedBindings(const CompiledVariant& variant, DiagnosticSink& diagnostics);
-    /** Adds the footprint declaration of each resource of `raw` that has a size attribute and which
-      * hasn't been added already */
     [[nodiscard]] CookError RecordFootprintDeclarations(InternedModule& interned_module,
                                                         const RawVariant& raw,
                                                         const DerivedConstantTable& derived_constants,
@@ -174,11 +160,10 @@ CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& share
     CookResult<TargetProfile> targetProfileResult = FindTargetProfile(target_name);
     if (!targetProfileResult)
     {
-        // this should not happen, since we also look this up during bootstrap, but I've been wrong before
+        // this should not happen, since bootstrap looks it up too, but I've been wrong before
         return std::unexpected(targetProfileResult.error());
     }
 
-    // points into rawModule.DerivedConstants, which the variant compile below does not change
     const CookResult<DerivedConstantTable> derivedConstants =
         MakeDerivedConstantTable(rawModule.DerivedConstants, space.Axes(), rawModule.ExternDefaults, *shared_state.Diagnostics);
     if (!derivedConstants)
@@ -201,8 +186,7 @@ CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& share
         return std::unexpected(compileVariantsResult.error());
     }
 
-    // The raw dump comes after the compile, because the compile keeps the raw variants in rawModule.
-    // Dump rawModule, not rawModuleResult: the move above empties rawModuleResult.
+    // dump rawModule, not rawModuleResult: the move above empties it
     std::optional<std::string> rawModuleDump = std::nullopt;
     if (IsStageDumpRequested(shared_state.Options, StageDumpKind::Raw))
     {
@@ -236,8 +220,6 @@ namespace
 
     void RecordVariantStatistics(const CompiledVariant& variant, CookStatistics& statistics)
     {
-        // because we plan to thread this step in the future, and I don't want this blowing up,
-        // we use atomic references to safely update the statistics from multiple threads.
         std::atomic_ref<uint32_t> variantsCompiledRef(statistics.VariantsCompiled);
         std::atomic_ref<uint32_t> entryPointsCompiledRef(statistics.EntryPointsCompiled);
         std::atomic_ref<size_t> totalSourceBytesRef(statistics.TotalSourceBytes);
@@ -305,7 +287,6 @@ namespace
     CookResult<uint32_t> ReadEmittedCode(const TargetProfile& target,
                                          bool validate,
                                          CompiledVariant& variant,
-                                         std::vector<std::string>& observed_capabilities,
                                          DiagnosticSink& diagnostics)
     {
         if (target.Validator == nullptr)
@@ -362,20 +343,7 @@ namespace
 
             if (!comparison)
             {
-                // because most validators load a backend for parsing the source code, there are
-                // failures not related to reflection mismatches that may occur
-                // (e.g, the backend parser failed to parse the entry point code)
                 return std::unexpected(comparison.error());
-            }
-
-            // a module declares a handful of capabilities, so a sorted insert stays cheap
-            for (const std::string& capability : comparison->Capabilities)
-            {
-                const auto position = std::ranges::lower_bound(observed_capabilities, capability);
-                if ((position == observed_capabilities.end()) || (*position != capability))
-                {
-                    observed_capabilities.insert(position, capability);
-                }
             }
 
             if (!comparison->Matches)
@@ -389,7 +357,6 @@ namespace
                                 target.Name,
                                 comparison->Report);
                 ReportWarning(diagnostics, warningStr);
-                // a mismatch fails the cook, and the pairs of a mismatched entry point need not resolve
                 continue;
             }
 
@@ -422,7 +389,7 @@ namespace
             return facts.error();
         }
 
-        // the element follows the container in placement order, so a removal never moves the container's position
+        // the element follows the container in placement order, so a removal never moves the container
         std::vector<uint32_t>& used = entryPoint.Reflection.UsedBindingIndices;
         for (const uint32_t bindingIndex : elementBindings)
         {
@@ -449,6 +416,26 @@ namespace
         return CookError::Success;
     }
 
+    /** Drops the names the profile's Vulkan version enables alone, such as `Shader`. */
+    std::vector<std::string> WithoutGuaranteedCapabilities(const TargetProfile& target,
+                                                           std::span<const std::string> names)
+    {
+        std::vector<std::string> kept;
+        kept.reserve(names.size());
+        for (const std::string& name : names)
+        {
+            const std::optional<vulkan::CapabilityEntry> entry =
+                target.VulkanApiVersion == 0u ? std::nullopt : vulkan::FindCapability(name);
+            const bool guaranteed =
+                entry && entry->CoreVersion != 0u && entry->CoreVersion <= target.VulkanApiVersion;
+            if (!guaranteed)
+            {
+                kept.push_back(name);
+            }
+        }
+        return kept;
+    }
+
     CookError ApplyEmittedCodeFacts(const TargetProfile& target,
                                     CompiledVariant& variant,
                                     size_t entry_point_index,
@@ -466,6 +453,11 @@ namespace
                                            target.Name,
                                            facts.EntryPointName));
         }
+
+        variant.EntryPoints[entry_point_index].CodeFacts = SourceCodeFacts{
+            .CapabilityNames = WithoutGuaranteedCapabilities(target, facts.CapabilityNames),
+            .WorkgroupMemoryBytes = facts.WorkgroupMemoryBytes
+        };
 
         const CookError resolved =
             ResolveSamplerTexturePairs(variant, entry_point_index, facts.SamplerTexturePairs, diagnostics);
@@ -533,7 +525,6 @@ namespace
         CompiledEntryPoint& entryPoint = variant.EntryPoints[entry_point_index];
         const std::vector<uint32_t>& used = entryPoint.Reflection.UsedBindingIndices;
 
-        // the position in `used` of the binding at (group, binding), when it has the expected kind
         auto findPosition = [&](uint32_t group, uint32_t binding, BindingKind kind) -> std::optional<uint32_t>
         {
             for (size_t position = 0u; position < used.size(); ++position)
@@ -580,7 +571,6 @@ namespace
             pairs.push_back(SamplerTexturePair{ .Texture = *texture, .Sampler = *sampler });
         }
 
-        // a reader reports one pair for each use, so one pair can appear many times
         std::ranges::sort(pairs);
         const auto duplicates = std::ranges::unique(pairs);
         pairs.erase(duplicates.begin(), duplicates.end());
@@ -676,11 +666,9 @@ namespace
             RecordVariantStatistics(variant, localStats);
             ReportVariantIfRequested(shared_state.Options, variant, *shared_state.Diagnostics);
 
-            // the reader runs with --no-validate too, because the sampler and texture pairs are cook output
             const CookResult<uint32_t> mismatches = ReadEmittedCode(target,
                                                                     shared_state.Options.ValidateAgainstEmittedText,
                                                                     variant,
-                                                                    interned_module.ObservedCapabilities,
                                                                     *shared_state.Diagnostics);
             if (!mismatches)
             {
@@ -694,7 +682,6 @@ namespace
                 ReportUnreferencedBindings(variant, *shared_state.Diagnostics);
             }
 
-            // every variant shares the same entry points, so only add them once
             if (interned_module.EntryPoints.empty())
             {
                 interned_module.EntryPoints.reserve(variant.EntryPoints.size());

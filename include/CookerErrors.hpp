@@ -87,15 +87,14 @@ enum class CookError : uint16_t
     ManifestSamplerPairMismatch = 113, // an entry point's sampler and texture pairs read back differently than the cook produced
     ManifestEntryPointConstantsMismatch = 114, // an entry point's constants read back differently than the cook produced
     ManifestFootprintAxesMismatch = 115, // a resource's footprint axes read back differently than the cook measured
+    ManifestSourceFactsMismatch = 116, // a source's capabilities or workgroup memory read back differently than the cook read them
 
-    // output and diagnostic sink operation errors
     OutputPathInvalid = 120,
     OutputPathTooLong = 121,
     OutputFileOpenFailed = 122,
     OutputWriteFailed = 123,
     ArtifactAlreadyWritten = 124,
 
-    // policy file (TOML) checked against the module's declared axes
     PolicyAxisNotDeclared = 130,
     PolicyValueNotInAxis = 131,
     PolicyCookIfInvalid = 132,
@@ -103,30 +102,25 @@ enum class CookError : uint16_t
     PolicyInertAxisNotInertWhenCooked = 134,
     PolicyUnknownTargetName = 135,
 
-    // the declared default of an axis, read from its initializer in the shader
     AxisDefaultMissing = 140, // the axis declaration has no initializer
     AxisDefaultUnreadable = 141, // the initializer could not be evaluated or resolved to a value
     AxisDefaultNotDeclared = 142, // the initializer is not one of the values the axis declares
     AxisDefaultMismatch = 143, // the source text and Slang reflection disagree on the initializer
     AxisDefaultAmbiguous = 144, // the module's sources declare the axis with two different initializers
 
-    // the derived constants (module-scope `static const` values) that size expressions use
     DerivedConstantShadowsSymbol = 150, // a derived constant has the name of an axis or an extern constant
     DerivedConstantAmbiguous = 151, // two declarations of one name have different expressions
     DerivedConstantCycle = 152, // a derived constant reaches itself through the constants its expression uses
     DerivedConstantUnreadable = 153, // a derived constant that a size attribute reaches does not parse or evaluate
 
-    // the roles and tags of a resource (`[ls_resource_role]`, `[ls_resource_tags]`)
     ResourceRoleUnknown = 160, // a role name is not in the role table, or the attribute is empty
     ResourceRoleKindMismatch = 161, // a role is on a resource that is not a structured or raw storage buffer
     ResourceRoleStrideMismatch = 162, // the element stride, or the element count, does not fit the role
     ResourceRoleNeedsElementCount = 163, // a 4-byte stride needs `[ls_element_count]` to check an indirect role
     ResourceTagInvalid = 164, // a tag holds a character outside letters, digits, and `_.:-`, or the attribute is empty
 
-    // the resource report
     FootprintAxisUndeclared = 170, // an axis changes a resource's footprint, and no size attribute of it names that axis
 
-    // start system errors
     SystemError = 200,
     DirectoryDoesNotExist = 201,
     DirectoryCouldNotBeCreated = 202,
@@ -150,7 +144,6 @@ enum class CookError : uint16_t
     SlangInterfaceHasResourceMember = 230,
     SlangCachedModuleWriteFailed = 231,
 
-    // start of target validation errors
     TargetValidatorUnavailable = 300,
     TargetValidationEntryPointParseFailed = 301,
     TargetValidationEntryPointInvalid = 302

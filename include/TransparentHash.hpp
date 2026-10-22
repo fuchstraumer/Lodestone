@@ -8,7 +8,7 @@
 namespace lodestone
 {
 
-// required to enable copy-free hashing of string_views when doing lookups in a map
+// copy-free string_view lookups in a map
 struct TransparentStringHash
 {
     using is_transparent = void;

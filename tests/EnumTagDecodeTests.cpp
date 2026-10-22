@@ -9,9 +9,7 @@ using lodestone::EnumTagKind;
 
 namespace
 {
-    // Lay one integer down in host byte order, exactly as Slang's value blob arrives, then read it
-    // back through the decode under test. The template mirrors the memcpy the decode itself does, so
-    // the test writes the intended value and never hand-assembles bytes.
+    // writes the value as Slang's blob arrives, in host byte order
     template<typename T>
     int64_t Decode(EnumTagKind kind, T value)
     {

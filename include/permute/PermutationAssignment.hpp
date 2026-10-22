@@ -10,8 +10,7 @@
 namespace lodestone
 {
 
-/** @brief A binding is a *concrete* assignment of a value to an axis,
-  * it's a real assignment that has actually been evaluated. */
+/** @brief One axis bound to one value. */
 struct PermutationBinding
 {
     const PermutationAxis* Axis{ nullptr };
@@ -20,9 +19,8 @@ struct PermutationBinding
 
 using PermutationAssignment = std::vector<PermutationBinding>;
 
-/** An assignment that holds every axis of one space, in declaration order. Only
- * `CanonicalizeAssignment` builds one, so a partial assignment cannot reach `ComputeVariantIndex` and
- * return a plausible wrong index. The conversion to `PermutationAssignment` runs one way only. */
+/** Every axis of one space, in declaration order. Only `CanonicalizeAssignment` builds one, so that a partial
+ * assignment cannot reach the key computation. */
 class CanonicalAssignment
 {
 public:
@@ -30,7 +28,7 @@ public:
 
     [[nodiscard]] operator const PermutationAssignment&() const noexcept;
 
-    // (clang annoyingly complains bc we don't match our clang-format, but these are stl-compat overrides) 
+    // stl-compatible names
     //NOLINTBEGIN(readability-identifier-naming)
     [[nodiscard]] std::size_t size() const noexcept;
     using value_type = PermutationBinding;
@@ -45,8 +43,7 @@ public:
     //NOLINTEND(readability-identifier-naming)
 
 private:
-    // friend class is ugly, but this lets us allow exactly one way to build a CanonicalAssignment, so 
-    // that's worth it
+    // ugly, but it allows exactly one way to build this
     friend class PermutationSpace;
     explicit CanonicalAssignment(PermutationAssignment&& canonical) noexcept;
     PermutationAssignment values;

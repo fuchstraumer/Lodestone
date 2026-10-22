@@ -10,19 +10,9 @@ namespace lodestone
 
 struct EmbeddedBuiltinModule;
 
-/** @brief A Slang file system that serves the builtin modules from memory, and every other path from disk.
- *
- * Slang finds a builtin the way it finds any imported file: through a search path. That search path is
- * `k_BuiltinSearchPath`, and no directory of that name exists on disk. The import flow therefore stays the
- * one Slang uses for a file. A builtin loaded with `loadModuleFromSourceString` instead broke every worker
- * session: the worker could not load the serialized root module, and Slang reported nothing.
- *
- * This implements the extended interface on purpose. Slang wraps a plain `ISlangFileSystem` in a cache that
- * reports a content hash instead of a path, and `getDependencyFilePath` then returns no readable file path.
- *
- * The object has no state, so one instance serves every session on every thread. It lives for the whole
- * process, so its reference count never changes.
- */
+/** @brief Serves the builtin modules from memory under `k_BuiltinSearchPath`, and every other path from disk. It
+ * implements the extended interface because Slang wraps a plain one in a cache that hides file paths. Stateless, so
+ * one instance serves every thread. */
 class EmbeddedFileSystem final : public ISlangFileSystemExt
 {
 public:
@@ -52,8 +42,7 @@ public:
 
 [[nodiscard]] EmbeddedFileSystem& GetEmbeddedFileSystem() noexcept;
 
-/** @brief Returns the builtin module that `path` refers to, or null. Paths refer to a builtin when they end
- * with `k_BuiltinSearchPath/<file name>`, with either separator. */
+/** @brief Matches paths ending in `k_BuiltinSearchPath/<file name>`, with either separator. */
 [[nodiscard]] const EmbeddedBuiltinModule* FindEmbeddedBuiltin(std::string_view path) noexcept;
 
 } // namespace lodestone
