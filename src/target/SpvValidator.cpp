@@ -143,6 +143,11 @@ namespace
             return;
         }
 
+        if (declared.ArrayCount != reflected.ArrayCount)
+        {
+            report(std::format("declared as an array of {}, reflection has {}", declared.ArrayCount, reflected.ArrayCount));
+        }
+
         if (ShapeIsStated(declared.Kind) && (declared.Shape != reflected.Shape))
         {
             report(std::format("declared with shape {}, reflection has shape {}",

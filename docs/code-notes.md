@@ -204,6 +204,14 @@ both targets. Both readers give 144 bytes for the same four variables (`SpvValid
 `UniformAndStorageBuffer16BitAccess`. `vk.xml` uses the primary name, so the reader stores
 `vulkan::PrimaryCapabilityName`. Extension names start with `SPV_`, so they never collide with capability names.
 
+**Binding arrays** (`ClassifyVariable`). A binding array is a variable whose pointer type points to one `OpTypeArray` of the
+resource type, so the reader takes the length from the constant and classifies the element type, and `SpvValidator`
+compares the length with `ReflectedBinding::ArrayCount`. A runtime array is the unbounded form (Indexed access model), and a
+specialization constant length is refused: both stay unsupported. Vulkan allows no array of arrays here, and `spirv-val`
+rejects one before the reader runs. Slang states no capability for a dynamic index into the array, so
+`CollectDynamicIndexingCapabilities` reads each access chain on a binding array (`ChainAccess`) and adds the capability
+name when the first index is not a constant. Texel buffer arrays are not covered.
+
 **Cross-profile facts** (`VerifySourceFactsAcrossProfiles`). Only a portable subset of the capability names can agree:
 `f16` with `Float16`, and `subgroups` with every `GroupNonUniform*` name (Slang emits `GroupNonUniform` for any wave
 operation, plus one name for each operation class). Names with no spelling in the other target, such as

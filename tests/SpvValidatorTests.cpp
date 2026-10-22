@@ -303,6 +303,47 @@ constexpr std::string_view k_WorkgroupCs = R"(
                OpFunctionEnd
 )";
 
+// An array of four storage images (a binding array), written through a constant index. Replacing `%uint_0` in the access
+// chain with `%index` makes it a dynamic index. The runtime array form is the
+// unbounded array of the Indexed access model, which this validator does not read.
+constexpr std::string_view k_ImageArrayCs = R"(
+               OpCapability Shader
+               OpCapability RuntimeDescriptorArray
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %WriteCS "main" %Levels %Index
+               OpExecutionMode %WriteCS LocalSize 4 4 4
+               OpName %Levels "Levels"
+               OpDecorate %Levels DescriptorSet 0
+               OpDecorate %Levels Binding 3
+       %void = OpTypeVoid
+     %fnVoid = OpTypeFunction %void
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+     %v3uint = OpTypeVector %uint 3
+    %v4float = OpTypeVector %float 4
+      %image = OpTypeImage %float 3D 0 0 0 2 R32f
+     %uint_4 = OpConstant %uint 4
+      %array = OpTypeArray %image %uint_4
+   %ptrArray = OpTypePointer UniformConstant %array
+   %ptrImage = OpTypePointer UniformConstant %image
+     %Levels = OpVariable %ptrArray UniformConstant
+ %ptrPrivate = OpTypePointer Private %uint
+      %Index = OpVariable %ptrPrivate Private
+     %uint_0 = OpConstant %uint 0
+    %float_0 = OpConstant %float 0
+    %float_1 = OpConstant %float 1
+      %coord = OpConstantComposite %v3uint %uint_0 %uint_0 %uint_0
+      %texel = OpConstantComposite %v4float %float_1 %float_0 %float_0 %float_0
+    %WriteCS = OpFunction %void None %fnVoid
+      %entry = OpLabel
+      %index = OpLoad %uint %Index
+    %element = OpAccessChain %ptrImage %Levels %uint_0
+     %loaded = OpLoad %image %element
+               OpImageWrite %loaded %coord %texel
+               OpReturn
+               OpFunctionEnd
+)";
+
 std::vector<ReflectedBinding> MakeAgreeingReflection()
 {
     std::vector<ReflectedBinding> reflected;
@@ -453,6 +494,37 @@ int main()
     runner.Check(Mismatches(validator.ValidateEntryPoint(shadeCs, wrongNamePointers, sink)),
                  "a resource of another name at the right slot is a mismatch");
 
+    runner.BeginSection("a binding array is read, and its length is compared");
+    const std::vector<std::byte> imageArray = Assemble(k_ImageArrayCs);
+    runner.Check(!imageArray.empty(), "the binding array fixture assembles");
+    const auto arrayReflection = [](uint32_t array_count)
+    {
+        std::vector<ReflectedBinding> reflected{ MakeReflected("Levels", 0u, 3u, BindingKind::StorageTexture,
+                                                               ResourceShape::Texture3D, ResourceAccess::ReadWrite) };
+        reflected[0].StorageFormat = TextureFormat::R32Float;
+        reflected[0].ArrayCount = array_count;
+        return reflected;
+    };
+    const std::vector<ReflectedBinding> fourLevels = arrayReflection(4u);
+    std::vector<const ReflectedBinding*> fourLevelsPointers = PointersTo(fourLevels);
+    const CookResult<BindingComparison> arrayMatch = validator.ValidateEntryPoint(imageArray, fourLevelsPointers, sink);
+    runner.Check(arrayMatch.has_value() && arrayMatch->Matches, "an array of four images matches reflection with four");
+
+    const std::vector<ReflectedBinding> oneLevel = arrayReflection(1u);
+    std::vector<const ReflectedBinding*> oneLevelPointers = PointersTo(oneLevel);
+    runner.Check(Mismatches(validator.ValidateEntryPoint(imageArray, oneLevelPointers, sink)),
+                 "an array that reflection reads as one binding is a mismatch");
+    const std::vector<ReflectedBinding> threeLevels = arrayReflection(3u);
+    std::vector<const ReflectedBinding*> threeLevelsPointers = PointersTo(threeLevels);
+    runner.Check(Mismatches(validator.ValidateEntryPoint(imageArray, threeLevelsPointers, sink)),
+                 "an array of another length is a mismatch");
+
+    const std::vector<std::byte> unbounded =
+        Assemble(Replace(k_ImageArrayCs, "OpTypeArray %image %uint_4", "OpTypeRuntimeArray %image"));
+    const CookResult<BindingComparison> unboundedResult = validator.ValidateEntryPoint(unbounded, fourLevelsPointers, sink);
+    runner.Check(Mismatches(unboundedResult) && unboundedResult->Report.find("unbounded") != std::string::npos,
+                 "an unbounded array is reported as unsupported until the Indexed access model reads it");
+
     runner.BeginSection("an illegal module is an error, not a mismatch");
     // Every module needs exactly one OpMemoryModel. Without it the text still assembles, and spirv-val
     // rejects it.
@@ -505,6 +577,21 @@ int main()
                  "each workgroup variable counts RoundUp(16, std430 size): 64 + 32 + 16 + 32 bytes");
     runner.Check(noPush.has_value() && noPush->WorkgroupMemoryBytes == 0u,
                  "a module with no workgroup variable uses no workgroup memory");
+
+    runner.BeginSection("a dynamic index into a binding array states the device feature it needs");
+    const CookResult<EmittedCodeFacts> constantIndex = validator.ReadEmittedCodeFacts(imageArray, sink);
+    runner.Check(constantIndex.has_value() &&
+                     std::ranges::find(constantIndex->CapabilityNames, "StorageImageArrayDynamicIndexing") ==
+                         constantIndex->CapabilityNames.end(),
+                 "a constant index into the array needs no dynamic indexing feature");
+    const std::vector<std::byte> dynamicArray =
+        Assemble(Replace(k_ImageArrayCs, "OpAccessChain %ptrImage %Levels %uint_0", "OpAccessChain %ptrImage %Levels %index"));
+    runner.Check(!dynamicArray.empty(), "the dynamic index fixture assembles");
+    const CookResult<EmittedCodeFacts> dynamicIndex = validator.ReadEmittedCodeFacts(dynamicArray, sink);
+    runner.Check(dynamicIndex.has_value() &&
+                     std::ranges::find(dynamicIndex->CapabilityNames, "StorageImageArrayDynamicIndexing") !=
+                         dynamicIndex->CapabilityNames.end(),
+                 "an index that is not a constant adds StorageImageArrayDynamicIndexing, which Slang does not state");
 
     return runner.Report();
 }

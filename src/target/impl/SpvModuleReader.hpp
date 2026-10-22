@@ -7,6 +7,7 @@
 #include "target/TargetProfile.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -105,6 +106,13 @@ struct SampledImageUse
     uint32_t SamplerId{ 0u };
 };
 
+/** One access chain with at least one index. The first index of a chain on a binding array picks the element. */
+struct ChainAccess
+{
+    uint32_t BaseId{ 0u };
+    uint32_t FirstIndexId{ 0u };
+};
+
 struct ParseState
 {
     // names point into these words
@@ -118,6 +126,7 @@ struct ParseState
     std::vector<MemberRecord> Members;
     spv::AddressingModel AddressingModel{ spv::AddressingModel::Max };
     std::vector<SampledImageUse> SampledImages;
+    std::vector<ChainAccess> ChainAccesses;
 };
 
 /** `Unsupported` marks a form this validator does not read yet. */
@@ -129,28 +138,27 @@ struct DeclaredBinding
     ResourceShape Shape{ ResourceShape::Invalid };
     ResourceAccess Access{ ResourceAccess::Invalid };
     TextureFormat StorageFormat{ TextureFormat::Invalid };
+    uint32_t ArrayCount{ 1u };
     std::string_view Name;
     std::string_view Unsupported;
 };
 
 std::vector<DeclaredBinding> CollectDeclaredBindings(const ParseState& parse_state);
-
+/** The device features that a dynamic index into a binding array needs. Slang does not state them as capabilities. The
+ * names repeat when several accesses need one. A texel buffer array is not covered. */
+std::vector<std::string_view> CollectDynamicIndexingCapabilities(const ParseState& parse_state);
 /** `validate` runs spirv-val with the Vulkan 1.2 rules first. The `--no-validate` read path skips it. */
 CookError ParseModule(spv_context_t* context,
                       std::span<const std::byte> source_code,
                       bool validate,
                       ParseState& out_state,
                       DiagnosticSink& sink);
-
 /** Fails when an operand does not trace to a decorated variable, since a dropped pair would hide a sampler. */
 CookResult<std::vector<SamplerTexturePlacement>> CollectSamplerTexturePairs(const ParseState& parse_state,
                                                                              DiagnosticSink& sink);
-
 /** Returns the end of the last member of the push constant block, or no value without a block. */
 CookResult<std::optional<uint32_t>> ReadPushConstantExtent(const ParseState& parse_state, DiagnosticSink& sink);
-
 CookResult<uint32_t> ReadWorkgroupMemoryBytes(const ParseState& parse_state, DiagnosticSink& sink);
-
 CookResult<EmittedCodeFacts> CollectEmittedCodeFacts(const ParseState& parse_state, DiagnosticSink& sink);
 
 } // namespace lodestone::spirv

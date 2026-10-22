@@ -1,23 +1,23 @@
 #include "SpvModuleReader.hpp"
+#include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "VulkanCapabilityTable.hpp"
+#include "spirv-tools/libspirv.h"
+#include "spirv/unified1/spirv.hpp11"
 #include "target/TargetProfile.hpp"
-#include "target/TargetUtils.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
-#include "model/ShaderDataSchema.hpp"
-#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <expected>
 #include <format>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <utility>
 #include <vector>
 #include <magic_enum/magic_enum.hpp>
@@ -474,11 +474,17 @@ namespace
             // an expression over constants, with no value and no SpecId
             parseState->Ids[resultId].Constant = ConstantKind::SpecDerived;
             break;
-        case spv::Op::OpLoad:
         case spv::Op::OpAccessChain:
         case spv::Op::OpInBoundsAccessChain:
+            if (words.size() > 4u)
+            {
+                parseState->ChainAccesses.push_back(ChainAccess{ .BaseId = words[3], .FirstIndexId = words[4] });
+            }
+            parseState->Ids[resultId].DerivedFrom = words[3];
+            break;
+        case spv::Op::OpLoad:
         case spv::Op::OpCopyObject:
-            // words[3] is the pointer, the base, or the copied value
+            // words[3] is the pointer, or the copied value
             parseState->Ids[resultId].DerivedFrom = words[3];
             break;
         case spv::Op::OpSampledImage:
@@ -533,16 +539,33 @@ namespace
         const IdRecord& pointer = parse_state.Ids[variable.TypeId];
         const IdRecord& pointee = parse_state.Ids[pointer.PointeeType];
 
-        if ((pointee.OpCode == spv::Op::OpTypeArray) || (pointee.OpCode == spv::Op::OpTypeRuntimeArray))
+        // a binding array is one OpTypeArray of the resource type. Vulkan allows no array of arrays here, and spirv-val
+        // rejects it before we get this far
+        const IdRecord* element = &pointee;
+        if (pointee.OpCode == spv::Op::OpTypeArray)
         {
-            declared.Unsupported = "a binding array, which this validator does not read yet";
+            const IdRecord& length = parse_state.Ids[pointee.LengthId];
+            if (length.Constant != ConstantKind::Constant ||
+                length.ConstantBits == 0u ||
+                length.ConstantBits > std::numeric_limits<uint32_t>::max())
+            {
+                declared.Unsupported = "a binding array whose length is not a constant";
+                return declared;
+            }
+            declared.ArrayCount = static_cast<uint32_t>(length.ConstantBits);
+            element = &parse_state.Ids[pointee.ElementType];
+        }
+
+        if (element->OpCode == spv::Op::OpTypeRuntimeArray)
+        {
+            declared.Unsupported = "an unbounded binding array, which needs the Indexed access model (phase F step F4)";
             return declared;
         }
 
         switch (static_cast<spv::StorageClass>(pointer.StorageClass))
         {
         case spv::StorageClass::UniformConstant:
-            switch (pointee.OpCode)
+            switch (element->OpCode)
             {
             case spv::Op::OpTypeSampler:
                 declared.Kind = BindingKind::Sampler;
@@ -551,12 +574,12 @@ namespace
                 declared.Kind = BindingKind::CombinedTextureSampler;
                 break;
             case spv::Op::OpTypeImage:
-                declared.Kind = (pointee.SampledMode == 2u) ? BindingKind::StorageTexture : BindingKind::Texture;
-                declared.Shape = pointee.Shape;
+                declared.Kind = (element->SampledMode == 2u) ? BindingKind::StorageTexture : BindingKind::Texture;
+                declared.Shape = element->Shape;
                 declared.Access = variable.Access;
                 if (declared.Kind == BindingKind::StorageTexture)
                 {
-                    declared.StorageFormat = TextureFormatFromSpirv(static_cast<spv::ImageFormat>(pointee.Format));
+                    declared.StorageFormat = TextureFormatFromSpirv(static_cast<spv::ImageFormat>(element->Format));
                 }
                 break;
             default:
@@ -678,6 +701,59 @@ CookResult<std::vector<SamplerTexturePlacement>> CollectSamplerTexturePairs(cons
                                                  .SamplerBinding = sampler.Binding });
     }
     return pairs;
+}
+
+std::vector<std::string_view> CollectDynamicIndexingCapabilities(const ParseState& parse_state)
+{
+    std::vector<std::string_view> names;
+    for (const ChainAccess& access : parse_state.ChainAccesses)
+    {
+        const IdRecord& base = parse_state.Ids[access.BaseId];
+        if (base.OpCode != spv::Op::OpVariable || base.Group == ~0u)
+        {
+            continue;
+        }
+
+        const IdRecord& pointee = parse_state.Ids[parse_state.Ids[base.TypeId].PointeeType];
+        if (pointee.OpCode != spv::Op::OpTypeArray)
+        {
+            continue;
+        }
+
+        // an index that is a constant or a specialization constant is fixed when the pipeline is built
+        const IdRecord& index = parse_state.Ids[access.FirstIndexId];
+        if (index.Constant != ConstantKind::None)
+        {
+            continue;
+        }
+
+        // Slang states none of these capabilities, and Vulkan needs a device feature for each
+        const IdRecord& element = parse_state.Ids[pointee.ElementType];
+        switch (static_cast<spv::StorageClass>(parse_state.Ids[base.TypeId].StorageClass))
+        {
+        case spv::StorageClass::UniformConstant:
+            if (element.OpCode == spv::Op::OpTypeImage && element.SampledMode == 2u)
+            {
+                names.emplace_back("StorageImageArrayDynamicIndexing");
+            }
+            else
+            {
+                // sampled images, samplers, and combined image samplers
+                names.emplace_back("SampledImageArrayDynamicIndexing");
+            }
+            break;
+        case spv::StorageClass::StorageBuffer:
+            names.emplace_back("StorageBufferArrayDynamicIndexing");
+            break;
+        case spv::StorageClass::Uniform:
+            names.emplace_back("UniformBufferArrayDynamicIndexing");
+            break;
+        default:
+            break;
+        }
+    }
+
+    return names;
 }
 
 std::vector<DeclaredBinding> CollectDeclaredBindings(const ParseState& parse_state)
@@ -911,6 +987,10 @@ CookResult<EmittedCodeFacts> CollectEmittedCodeFacts(const ParseState& parse_sta
         facts.DeclaredPlacements.emplace_back(binding.Group, binding.Binding);
     }
     facts.CapabilityNames.reserve(parse_state.Capabilities.size() + parse_state.Extensions.size());
+    for (const std::string_view name : CollectDynamicIndexingCapabilities(parse_state))
+    {
+        facts.CapabilityNames.emplace_back(name);
+    }
     // store primary names, which vk.xml uses (SPIRV-Headers may give `StorageUniform16`)
     for (const std::string_view name : parse_state.Capabilities)
     {

@@ -135,6 +135,11 @@ target_compile_definitions(EntryPointConstantsTest PRIVATE
 add_lodestone_unit_test(ResourceRoleTest ResourceRoleTests.cpp)
 target_compile_definitions(ResourceRoleTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/ResourceRoles")
+# Fixed-size binding arrays (DiamondDogs request C12) for SPIR-V, from the shader source to the manifest, and the two forms that
+# must still fail: WGSL, and an unbounded array. It cooks through Slang, so it takes about one second.
+add_lodestone_unit_test(BindingArrayTest BindingArrayTests.cpp)
+target_compile_definitions(BindingArrayTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/BindingArrays")
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)
