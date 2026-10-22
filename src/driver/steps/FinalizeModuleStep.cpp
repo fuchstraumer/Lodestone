@@ -5,6 +5,7 @@
 #include "driver/CookerSteps.hpp"
 #include "emit/DedupeReport.hpp"
 #include "emit/StageDump.hpp"
+#include "model/AxisInfluence.hpp"
 #include "model/CookedLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include <algorithm>
@@ -53,6 +54,13 @@ CookResult<FinalizedModule> FinalizeModuleStep::operator()(const SharedCookState
     if (!layoutResult)
     {
         return std::unexpected(layoutResult);
+    }
+
+    // the measured footprint axes against the axes the size attributes name: two readers of one fact
+    const CookError footprintError = VerifyFootprintAxes(cookedModule, *shared_state.Diagnostics);
+    if (footprintError != CookError::Success)
+    {
+        return std::unexpected(footprintError);
     }
 
     const std::string roundTripStr = std::format("module {} round trip verified: {} "

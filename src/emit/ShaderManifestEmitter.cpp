@@ -909,11 +909,16 @@ namespace
         }
 
         const VariantTables& variants = *variantsResult;
+        
         const CookResult<std::vector<uint64_t>> relevance = BuildAxisRelevanceTable(module);
         if (!relevance)
         {
             return std::unexpected(relevance.error());
         }
+
+        const size_t axisCount = module.Space != nullptr ? module.Space->AxisCount() : 0u;
+        const std::vector<uint64_t> footprintAxes =
+            BuildFootprintAxisMasks(module, (axisCount + k_AxisMaskWordBits - 1u) / k_AxisMaskWordBits);
         const LayoutTables layouts = BuildLayoutTables(module, strings);
         const RasterTables rasters = BuildRasterTables(module, strings);
         SourceTables sources = BuildSourceTables(module);
@@ -930,6 +935,8 @@ namespace
         environment.EntryPointInstanceTableOffset = AppendTable(extent, variants.Slots).Offset;
         // the entry point count and the module's axis count size this table, so it keeps its offset only
         environment.AxisRelevanceTableOffset = AppendTable(extent, relevance.value()).Offset;
+        // the binding count and the module's axis count size this table, so it keeps its offset only
+        environment.FootprintAxisTableOffset = AppendTable(extent, footprintAxes).Offset;
 
         environment.Sources = AppendTable(extent, sources.Refs);
         // The count of the blob is in bytes.

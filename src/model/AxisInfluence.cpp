@@ -1,10 +1,12 @@
 #include "model/AxisInfluence.hpp"
 #include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "model/ContentHash.hpp"
 #include "model/CookedLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "permute/PermutationAssignment.hpp"
+#include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 
 #include <algorithm>
@@ -12,9 +14,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <format>
+#include <functional>
 #include <numeric>
+#include <ranges>
 #include <span>
+#include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -198,19 +205,20 @@ namespace
         return order;
     }
 
-    /** Closes the relevance of one entry point. The per-axis pass compares only variants that differ in one axis,
-     * so it proves that variants which agree on every relevant axis hold one instance only along chains of
-     * cooked variants, and a sparse cook can break a chain. This groups the variants by their relevant axes, and
-     * in each group that holds more than one instance it marks every axis that varies within the group, until
-     * no group holds more than one instance.
+    /** Closes the relevance of one subject. The per-axis pass compares only variants that differ in one axis, so
+     * it proves that variants which agree on every relevant axis hold one value only along chains of cooked
+     * variants, and a sparse cook can break a chain. This groups the variants by their relevant axes, and in each
+     * group that holds more than one value it marks every axis that varies within the group, until no group holds
+     * more than one value.
      *
-     * Every axis that varies within such a group separates two variants with different instances, so the rule
-     * marks a set and picks no pair, which keeps the result independent of the variant order. A smaller set can
-     * exist, but it is not unique. Each round marks at least one axis, because two variants with different
-     * instances that agree on every relevant axis differ in some other axis. */
+     * Every axis that varies within such a group separates two variants with different values, so the rule marks
+     * a set and picks no pair, which keeps the result independent of the variant order. A smaller set can exist,
+     * but it is not unique. Each round marks at least one axis, because two variants with different values that
+     * agree on every relevant axis differ in some other axis. */
+    template<typename SharesOneValue>
     void CloseRelevance(const CookedModule& module,
-                        const InstanceTable& instances,
-                        size_t entry_point_index,
+                        const SharesOneValue& shares_one_value,
+                        size_t subject_index,
                         std::vector<AxisInfluence>& axes)
     {
         const size_t axisCount = axes.size();
@@ -263,7 +271,7 @@ namespace
             while (begin < order.size())
             {
                 size_t end = begin + 1u;
-                
+
                 while (end < order.size() && !lessOnRelevant(order[begin], order[end]))
                 {
                     ++end;
@@ -272,7 +280,7 @@ namespace
                 const std::span<const uint32_t> group{ order.data() + begin, end - begin };
                 begin = end;
 
-                if (group.size() < 2u || GroupSharesOneInstance(module, instances, group, entry_point_index))
+                if (group.size() < 2u || shares_one_value(group, subject_index))
                 {
                     continue;
                 }
@@ -309,6 +317,153 @@ namespace
         }
     }
 
+    /** The first pass over each of `subject_count` subjects. A subject is one thing that a variant gives a value
+     * for, such as one entry point instance or one resource footprint. `shares_one_value(group, subject)` returns true
+     * when every variant of `group` gives one value for the subject, and it decides by content. Returns one axis list
+     * for each subject: Active where a one-axis pair differs, and Undetermined for an axis with no such pair. */
+    template<typename SharesOneValue>
+    std::vector<std::vector<AxisInfluence>> MeasureAxisPairs(const CookedModule& module,
+                                                             size_t subject_count,
+                                                             const SharesOneValue& shares_one_value)
+    {
+        const size_t axisCount = module.Space->AxisCount();
+        std::vector<std::vector<AxisInfluence>> subjects(subject_count,
+                                                         std::vector<AxisInfluence>(axisCount, AxisInfluence::Inert));
+
+        for (size_t k = 0u; k < axisCount; ++k)
+        {
+            const std::vector<uint32_t> orderedIndices = OrderByOtherAxes(module, k);
+            bool foundPair = false;
+            // A while, not a for: `begin` already moves to the next group, and a for header would then
+            // increment past that group's first element and drop the group.
+            size_t begin = 0u;
+            while (begin < orderedIndices.size())
+            {
+                const PermutationAssignment& beginCanonical = module.Variants[orderedIndices[begin]].Canonical;
+
+                // The order puts variants that agree on every other axis next to each other, so a group
+                // ends at the first one that disagrees. Read `end` inside the condition: on the last
+                // group it is out of range until the range test runs.
+                size_t end = begin + 1u;
+                while (end < orderedIndices.size() &&
+                       !AssignmentComparatorExcludingAxis(beginCanonical,
+                                                          module.Variants[orderedIndices[end]].Canonical,
+                                                          k))
+                {
+                    ++end;
+                }
+
+                const std::span<const uint32_t> group{ orderedIndices.data() + begin, end - begin };
+                begin = end;
+
+                if (group.size() < 2u)
+                {
+                    continue;
+                }
+
+                foundPair = true;
+
+                for (size_t subjectIndex = 0u; subjectIndex < subject_count; ++subjectIndex)
+                {
+                    if (subjects[subjectIndex][k] != AxisInfluence::Active &&
+                        !shares_one_value(group, subjectIndex))
+                    {
+                        subjects[subjectIndex][k] = AxisInfluence::Active;
+                    }
+                }
+            }
+
+            if (!foundPair)
+            {
+                for (std::vector<AxisInfluence>& axes : subjects)
+                {
+                    axes[k] = AxisInfluence::Undetermined;
+                }
+            }
+        }
+
+        return subjects;
+    }
+
+    /** The resources of one module by scope and name, and the footprint each variant gives each of them. */
+    struct FootprintTable
+    {
+        /** Sorted by scope and then by name, with no repeats. */
+        std::vector<std::pair<std::string_view, std::string_view>> Identities;
+        /** Strided by the identity count. Null where the variant does not declare the resource. */
+        std::vector<const ResourceFootprint*> Footprints;
+
+        [[nodiscard]] const ResourceFootprint* At(size_t variant_index, size_t identity_index) const noexcept
+        {
+            return Footprints[(variant_index * Identities.size()) + identity_index];
+        }
+    };
+
+    FootprintTable BuildFootprintTable(const CookedModule& module)
+    {
+        FootprintTable table;
+        table.Identities.reserve(module.Resources.size());
+        for (const ReflectedBinding& resource : module.Resources)
+        {
+            table.Identities.emplace_back(resource.ScopeName, resource.Name);
+        }
+        std::ranges::sort(table.Identities);
+        const auto [uniqueEnd, rangeEnd] = std::ranges::unique(table.Identities);
+        table.Identities.erase(uniqueEnd, rangeEnd);
+
+        // the identity of each resource record, found once, so the variant walk below searches nothing
+        std::vector<uint32_t> identityOfResource;
+        identityOfResource.reserve(module.Resources.size());
+        for (const ReflectedBinding& resource : module.Resources)
+        {
+            const auto found = std::ranges::lower_bound(table.Identities,
+                                                        std::pair<std::string_view, std::string_view>{
+                                                            resource.ScopeName, resource.Name });
+            identityOfResource.push_back(static_cast<uint32_t>(found - table.Identities.begin()));
+        }
+
+        table.Footprints.assign(module.Variants.size() * table.Identities.size(), nullptr);
+        for (auto&& [variantIndex, variant] : std::views::enumerate(module.Variants))
+        {
+            const ResourceList& resources = module.ResourceLists[variant.ResourceListIndex];
+            const FootprintList& footprints = module.FootprintLists[variant.FootprintListIndex];
+            for (size_t position = 0u; position < resources.size(); ++position)
+            {
+                const size_t slot = (static_cast<size_t>(variantIndex) * table.Identities.size()) +
+                                    identityOfResource[resources[position]];
+                table.Footprints[slot] = &footprints[position];
+            }
+        }
+
+        return table;
+    }
+
+    /** Returns true when every variant of `group` that declares the resource gives it one footprint. */
+    bool GroupSharesOneFootprint(const FootprintTable& table, std::span<const uint32_t> group, size_t identity_index)
+    {
+        const ResourceFootprint* first = nullptr;
+        for (const uint32_t variantIndex : group)
+        {
+            const ResourceFootprint* footprint = table.At(variantIndex, identity_index);
+            if (footprint == nullptr)
+            {
+                continue;
+            }
+
+            if (first == nullptr)
+            {
+                first = footprint;
+            }
+            else if (!(*footprint == *first))
+            {
+                return false;
+            }
+
+        }
+
+        return true;
+    }
+
 } // namespace
 
 CookResult<ModuleInfluence> ComputeActualInfluence(const CookedModule& module)
@@ -322,7 +477,6 @@ CookResult<ModuleInfluence> ComputeActualInfluence(const CookedModule& module)
     }
 
     const size_t axisCount = module.Space->AxisCount();
-    const size_t entryPointCount = module.EntryPoints.size();
     // every pass reads one canonical value for each axis, and only CanonicalizeAssignment builds a canonical
     // assignment, so a variant with a shorter one was built by hand and skipped it
     auto checkAxisCount = [&axisCount](const LibraryVariant& variant)
@@ -331,77 +485,147 @@ CookResult<ModuleInfluence> ComputeActualInfluence(const CookedModule& module)
     };
     assert(std::ranges::all_of(module.Variants, checkAxisCount));
 
-    influence.EntryPoints.reserve(entryPointCount);
-    for (const LibraryEntryPoint& entryPoint : module.EntryPoints)
-    {
-        influence.EntryPoints.emplace_back(entryPoint.Name,
-                                           std::vector<AxisInfluence>(axisCount, AxisInfluence::Inert));
-    }
-
     const CookResult<InstanceTable> instances = BuildInstanceTable(module);
     if (!instances)
     {
         return std::unexpected(instances.error());
     }
 
-    for (size_t k = 0u; k < axisCount; ++k)
+    auto sharesOneInstance = [&](std::span<const uint32_t> group, size_t entry_point_index)
     {
-        const std::vector<uint32_t> orderedIndices = OrderByOtherAxes(module, k);
-        bool foundPair = false;
-        // A while, not a for: `begin` already moves to the next group, and a for header would then
-        // increment past that group's first element and drop the group.
-        size_t begin = 0u;
-        while (begin < orderedIndices.size())
-        {
-            const PermutationAssignment& beginCanonical = module.Variants[orderedIndices[begin]].Canonical;
+        return GroupSharesOneInstance(module, instances.value(), group, entry_point_index);
+    };
+    std::vector<std::vector<AxisInfluence>> measured =
+        MeasureAxisPairs(module, module.EntryPoints.size(), sharesOneInstance);
 
-            // The order puts variants that agree on every other axis next to each other, so a group
-            // ends at the first one that disagrees. Read `end` inside the condition: on the last
-            // group it is out of range until the range test runs.
-            size_t end = begin + 1u;
-            while (end < orderedIndices.size() &&
-                   !AssignmentComparatorExcludingAxis(beginCanonical,
-                                                      module.Variants[orderedIndices[end]].Canonical,
-                                                      k))
-            {
-                ++end;
-            }
-
-            const std::span<const uint32_t> group{ orderedIndices.data() + begin, end - begin };
-            begin = end;
-
-            if (group.size() < 2u)
-            {
-                continue;
-            }
-
-            foundPair = true;
-
-            for (size_t entryPointIndex = 0u; entryPointIndex < entryPointCount; ++entryPointIndex)
-            {
-                if (influence.EntryPoints[entryPointIndex].Axes[k] != AxisInfluence::Active &&
-                    !GroupSharesOneInstance(module, instances.value(), group, entryPointIndex))
-                {
-                    influence.EntryPoints[entryPointIndex].Axes[k] = AxisInfluence::Active;
-                }
-            }
-        }
-
-        if (!foundPair)
-        {
-            for (EntryPointInfluence& epInfluence : influence.EntryPoints)
-            {
-                epInfluence.Axes[k] = AxisInfluence::Undetermined;
-            }
-        }
+    for (size_t entryPointIndex = 0u; entryPointIndex < measured.size(); ++entryPointIndex)
+    {
+        CloseRelevance(module, sharesOneInstance, entryPointIndex, measured[entryPointIndex]);
     }
 
-    for (size_t entryPointIndex = 0u; entryPointIndex < entryPointCount; ++entryPointIndex)
+    influence.EntryPoints.reserve(module.EntryPoints.size());
+    for (auto&& [entryPoint, axes] : std::views::zip(module.EntryPoints, measured))
     {
-        CloseRelevance(module, instances.value(), entryPointIndex, influence.EntryPoints[entryPointIndex].Axes);
+        influence.EntryPoints.emplace_back(entryPoint.Name, std::move(axes));
     }
 
     return influence;
+}
+
+std::vector<ResourceFootprintInfluence> ComputeFootprintInfluence(const CookedModule& module)
+{
+    const FootprintTable table = BuildFootprintTable(module);
+    std::vector<ResourceFootprintInfluence> influence;
+    influence.reserve(table.Identities.size());
+    for (const auto& [scopeName, name] : table.Identities)
+    {
+        influence.push_back(ResourceFootprintInfluence{ .ScopeName = std::string{ scopeName },
+                                                        .Name = std::string{ name },
+                                                        .Axes = {} });
+    }
+
+    if (module.Space == nullptr)
+    {
+        return influence;
+    }
+
+    auto sharesOneFootprint = [&table](std::span<const uint32_t> group, size_t identity_index)
+    {
+        return GroupSharesOneFootprint(table, group, identity_index);
+    };
+    std::vector<std::vector<AxisInfluence>> measured = MeasureAxisPairs(module, table.Identities.size(), sharesOneFootprint);
+    for (auto&& [identityIndex, resource] : std::views::enumerate(influence))
+    {
+        resource.PairAxes = std::move(measured[static_cast<size_t>(identityIndex)]);
+        // the closing pass treats an Undetermined axis as relevant, which suits a pin and not a footprint: here it
+        // must mark the axes that a sparse cook left with no one-axis pair
+        resource.Axes = resource.PairAxes;
+        std::ranges::replace(resource.Axes, AxisInfluence::Undetermined, AxisInfluence::Inert);
+        CloseRelevance(module, sharesOneFootprint, static_cast<size_t>(identityIndex), resource.Axes);
+    }
+
+    return influence;
+}
+
+std::vector<uint64_t> BuildFootprintAxisMasks(const CookedModule& module, size_t word_count)
+{
+    std::vector<uint64_t> masks(module.Resources.size() * word_count, 0u);
+    if (word_count == 0u)
+    {
+        return masks;
+    }
+
+    const std::vector<ResourceFootprintInfluence> influence = ComputeFootprintInfluence(module);
+    for (auto&& [resourceIndex, resource] : std::views::enumerate(module.Resources))
+    {
+        // every record has an identity in the result, because the result is built from these records
+        const auto measured = std::ranges::lower_bound(influence,
+                                                       std::tie(resource.ScopeName, resource.Name),
+                                                       std::less{},
+                                                       [](const ResourceFootprintInfluence& entry)
+                                                       { return std::tie(entry.ScopeName, entry.Name); });
+        for (auto&& [axisIndex, axisInfluence] : std::views::enumerate(measured->Axes))
+        {
+            if (axisInfluence == AxisInfluence::Active)
+            {
+                const size_t wordIndex = (static_cast<size_t>(resourceIndex) * word_count) +
+                                         (static_cast<size_t>(axisIndex) / 64u);
+                masks[wordIndex] |= uint64_t{ 1u } << (static_cast<size_t>(axisIndex) % 64u);
+            }
+        }
+    }
+
+    return masks;
+}
+
+CookError VerifyFootprintAxes(const CookedModule& module, DiagnosticSink& sink)
+{
+    if (module.Space == nullptr)
+    {
+        return CookError::Success;
+    }
+
+    const std::span<const PermutationAxis> axes = module.Space->Axes();
+    const std::vector<ResourceFootprintInfluence> measured = ComputeFootprintInfluence(module);
+    CookError result = CookError::Success;
+    for (const ResourceFootprintInfluence& resource : measured)
+    {
+        // both lists are sorted by scope and then by name, and a resource with no size attribute has no declaration
+        const auto declaration = std::ranges::lower_bound(module.FootprintDeclarations,
+                                                          std::tie(resource.ScopeName, resource.Name),
+                                                          std::less{},
+                                                          [](const FootprintAxisDeclaration& entry)
+                                                          { return std::tie(entry.ScopeName, entry.Name); });
+        const bool declared = declaration != module.FootprintDeclarations.end() &&
+                              declaration->ScopeName == resource.ScopeName && declaration->Name == resource.Name;
+
+        // only a one-axis pair proves that one axis changes the footprint. The closed set can hold an axis that a
+        // sparse cook could not separate from the one that does
+        for (auto&& [axisIndex, axisInfluence] : std::views::enumerate(resource.PairAxes))
+        {
+
+            if (axisInfluence != AxisInfluence::Active)
+            {
+                continue;
+            }
+            
+            const bool named = declared && std::ranges::binary_search(declaration->Axes, static_cast<uint32_t>(axisIndex));
+            if (!named)
+            {
+                result = ReportError(sink,
+                                     CookError::FootprintAxisUndeclared,
+                                     std::format("module {}: axis '{}' changes the footprint of '{}', and no size "
+                                                 "attribute of that resource names it",
+                                                 module.Name,
+                                                 axes[static_cast<size_t>(axisIndex)].Name,
+                                                 resource.ScopeName.empty()
+                                                     ? resource.Name
+                                                     : std::format("{}.{}", resource.ScopeName, resource.Name)));
+            }
+        }
+    }
+
+    return result;
 }
 
 bool IsAxisRelevant(AxisInfluence influence) noexcept

@@ -163,6 +163,23 @@ namespace
         Black, // finished (value is in the symbol table)
     };
 
+    /** Finds a derived constant by name with a binary search over `ByName`. */
+    std::optional<uint32_t> FindDerivedConstant(const DerivedConstantTable& table, std::string_view name)
+    {
+        auto extractNameView = [&](uint32_t index) -> std::string_view
+        {
+            return std::string_view{ table.Constants[index].Name };
+        };
+
+        const auto found = std::ranges::lower_bound(table.ByName, name, std::less{}, extractNameView);
+        if (found == table.ByName.end() || table.Constants[*found].Name != name)
+        {
+            return std::nullopt;
+        }
+
+        return *found;
+    }
+
     /** The depth-first walk over the derived constants of one variant. Its roots are the size attribute
      * arguments, and the edges of each constant are the identifiers in its expression. Each constant is
      * evaluated when its visit finishes, which is post-order, so every derived constant that it uses is
@@ -238,10 +255,12 @@ CookResult<DerivedConstantTable> MakeDerivedConstantTable(std::span<const RawDer
     for (auto run : sorted | std::views::chunk_by(chunkFn))
     {
         const RawDerivedConstant& first = derived_constants[run.front()];
+
         auto expressionCompare = [&](uint32_t index)
         {
             return derived_constants[index].Expression == first.Expression;
         };
+
         const bool sameExpression = std::ranges::all_of(run, expressionCompare);
         if (!sameExpression)
         {
@@ -253,6 +272,7 @@ CookResult<DerivedConstantTable> MakeDerivedConstantTable(std::span<const RawDer
             }
             return std::unexpected(ReportError(sink, CookError::DerivedConstantAmbiguous, std::move(message)));
         }
+
         table.ByName.push_back(run.front());
     }
 
@@ -261,6 +281,7 @@ CookResult<DerivedConstantTable> MakeDerivedConstantTable(std::span<const RawDer
     for (const uint32_t index : table.ByName)
     {
         const RawDerivedConstant& constant = derived_constants[index];
+
         const bool shadowsAxis =
             std::ranges::any_of(axes, [&](const PermutationAxis& axis) { return axis.Name == constant.Name; });
         const bool shadowsExtern = std::ranges::any_of(
@@ -313,15 +334,72 @@ CookResult<ResolveContext> MakeResolveContext(const PermutationAssignment& canon
             std::format("[{}] on '{}'", ToString(attribute.Kind), raw.Bindings[attribute.BindingIndex].Name);
         for (const std::string& argument : attribute.Arguments)
         {
+
             const CookError visited = walk.VisitRoot(argument, root);
             if (!visited)
             {
                 return std::unexpected(visited);
             }
+            
         }
     }
 
     return context;
+}
+
+CookResult<std::vector<uint32_t>> CollectDeclaredFootprintAxes(const RawVariant& raw,
+                                                               size_t binding_index,
+                                                               std::span<const PermutationAxis> axes,
+                                                               const DerivedConstantTable& derived_constants,
+                                                               DiagnosticSink& sink)
+{
+    std::vector<uint32_t> axisIndices;
+    // a worklist, not a recursion: MakeDerivedConstantTable and the walk already reject a cycle, and `queued` keeps
+    // a constant that two expressions use (a diamond) from being read twice
+    std::vector<uint8_t> queued(derived_constants.Constants.size(), uint8_t{ 0u });
+    std::vector<std::string_view> pending;
+    for (const RawSizeAttribute& attribute : raw.SizeAttributes)
+    {
+        if (attribute.BindingIndex == binding_index)
+        {
+            pending.append_range(attribute.Arguments);
+        }
+    }
+
+    while (!pending.empty())
+    {
+        const std::string_view expression = pending.back();
+        pending.pop_back();
+
+        const CookResult<std::vector<std::string>> identifiers = CollectExpressionIdentifiers(expression, sink);
+        if (!identifiers)
+        {
+            return std::unexpected(identifiers.error());
+        }
+
+        for (const std::string& identifier : identifiers.value())
+        {
+            const auto axis = std::ranges::find(axes, identifier, &PermutationAxis::Name);
+            if (axis != axes.end())
+            {
+                axisIndices.push_back(static_cast<uint32_t>(axis - axes.begin()));
+                continue;
+            }
+
+            // an extern constant is a leaf with one value, so it names no axis
+            const std::optional<uint32_t> constant = FindDerivedConstant(derived_constants, identifier);
+            if (constant && queued[*constant] == 0u)
+            {
+                queued[*constant] = 1u;
+                pending.push_back(derived_constants.Constants[*constant].Expression);
+            }
+        }
+    }
+
+    std::ranges::sort(axisIndices);
+    const auto [uniqueEnd, rangeEnd] = std::ranges::unique(axisIndices);
+    axisIndices.erase(uniqueEnd, rangeEnd);
+    return axisIndices;
 }
 
 CookResult<CompiledVariant> ResolveVariant(const RawVariant& raw, const ResolveContext& context, DiagnosticSink& sink)
@@ -796,22 +874,7 @@ namespace
 
     std::optional<uint32_t> DerivedConstantWalk::findByName(std::string_view name) const
     {
-        auto extractNameView = [&](uint32_t index)->std::string_view
-        {
-            return std::string_view{ table.Constants[index].Name };
-        };
-
-        const auto found = std::ranges::lower_bound(table.ByName,
-                                                    name,
-                                                    std::less{},
-                                                    extractNameView);
-        
-        if (found == table.ByName.end() || table.Constants[*found].Name != name)
-        {
-            return std::nullopt;
-        }
-
-        return *found;
+        return FindDerivedConstant(table, name);
     }
 
     std::string DerivedConstantWalk::describePath(std::span<const uint32_t> nodes) const

@@ -1030,6 +1030,22 @@
             "members": []
         }
     ],
+    "footprintDeclarations": [
+        {
+            "scope": "",
+            "name": "InVolume",
+            "axes": [
+                "GRID_SIZE"
+            ]
+        },
+        {
+            "scope": "",
+            "name": "OutVolume",
+            "axes": [
+                "GRID_SIZE"
+            ]
+        }
+    ],
     "variants": [
         {
             "index": 0,

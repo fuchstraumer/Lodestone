@@ -203,8 +203,9 @@ void WriteUniformMembers(lodestone::JsonWriter& writer,
 
 void WriteBinding(lodestone::JsonWriter& writer,
                   const manifest::EnvironmentView& view,
-                  const manifest::Binding& binding) noexcept
+                  uint32_t binding_index) noexcept
 {
+    const manifest::Binding& binding = view.Bindings()[binding_index];
     writer.BeginObject();
     writer.KeyString("name", view.String(binding.NameString));
     writer.KeyString("scope", view.String(binding.ScopeString));
@@ -233,6 +234,16 @@ void WriteBinding(lodestone::JsonWriter& writer,
         writer.String(view.String(tag));
     }
     writer.EndArray();
+    writer.Key("footprintAxes");
+    writer.BeginArray();
+    for (uint32_t axisIndex = 0u; axisIndex < view.Module().AxisCount(); axisIndex++)
+    {
+        if (view.IsFootprintAxis(binding_index, axisIndex))
+        {
+            writer.String(view.String(view.Module().AxisData(axisIndex).NameString));
+        }
+    }
+    writer.EndArray();
     WriteUniformMembers(writer, view, view.UniformMembers(binding));
     writer.EndObject();
 }
@@ -241,9 +252,9 @@ void WriteBindingsFlat(lodestone::JsonWriter& writer, const manifest::Environmen
 {
     writer.Key("bindings");
     writer.BeginArray();
-    for (const manifest::Binding& binding : view.Bindings())
+    for (uint32_t bindingIndex = 0u; bindingIndex < view.Bindings().size(); bindingIndex++)
     {
-        WriteBinding(writer, view, binding);
+        WriteBinding(writer, view, bindingIndex);
     }
     writer.EndArray();
 }
@@ -333,7 +344,7 @@ void WriteSlot(lodestone::JsonWriter& writer,
     {
         writer.BeginObject();
         writer.Key("resource");
-        WriteBinding(writer, view, resource.Record());
+        WriteBinding(writer, view, resource.Index());
 
         if (const manifest::Footprint* footprint = resource.FootprintRecord(); footprint != nullptr)
         {

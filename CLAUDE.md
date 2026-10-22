@@ -115,8 +115,8 @@ it exits 1 on `NoOutputSpecified`, which reads like a failure rather than a usag
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
-Twenty-nine test targets exist. Twenty-four are unit tests, and each one proves a claim the repository
-makes. Eighteen need no Slang and no asset, and together they run in about half a second.
+Thirty test targets exist. Twenty-five are unit tests, and each one proves a claim the repository
+makes. Nineteen need no Slang and no asset, and together they run in about half a second.
 `WgslValidatorTest` links Tint to read WGSL. `SpvValidatorTest` links SPIRV-Tools to assemble SPIR-V.
 `AccessModelRejectTest`, `AxisDefaultTest`, `DerivedConstantTest`, `EntryPointConstantsTest`, and `ResourceRoleTest` cook small modules
 through Slang, and each takes about one second. `SlangMetadataCanaryTest` calls Slang directly.
@@ -137,7 +137,7 @@ through Slang, and each takes about one second. `SlangMetadataCanaryTest` calls 
 | `DiagnosticParserTest` | The parser reads Slang's machine-readable diagnostic form into a record, and counts the records whose severity is a failure. Codegen reads that count. It names no Slang type, so it needs no compiler. |
 | `ResolveStageTest` | Stage 4 resolves a hand-built `RawVariant` with no Slang present. This test is the proof that the stage 3 and stage 4 split worked, and before phase D step D5 it could not be written at all. |
 | `AxisDefaultTest` | The declared default of each axis, from the shader initializer to `ManifestIndex::AxisDefault`. `tests/assets/AxisDefaults/AxisDefaults.slang` declares every default as a value other than the first, in all four domains, with a literal initializer (which reflection also reads, so the two readers are compared) and an expression initializer (which only the source text can read). It proves that a missing default and a default outside the declared values each fail the cook, and that a policy which drops the default cooks, keeps the default in the manifest, and leaves no variant for it. |
-| `DerivedConstantTest` | Derived constants in size expressions, from the shader source to the element count in the manifest. `tests/assets/DerivedConstants/DerivedConstants.slang` sizes a buffer with `LIGHT_SLOTS`, which uses another derived constant, two axes, and a constant from an `__include`d fragment. The test compares each variant's count with a hand-computed value, because nothing else checks it: reflection cannot fold the expression. It proves that a function-local constant with the name of an axis fails the cook, and that Slang rejects a cycle of constants before stage 4 runs (E39999). It also reads a `[ls_extent_1d]` width from the manifest (task L18). |
+| `DerivedConstantTest` | Derived constants in size expressions, from the shader source to the element count in the manifest. `tests/assets/DerivedConstants/DerivedConstants.slang` sizes a buffer with `LIGHT_SLOTS`, which uses another derived constant, two axes, and a constant from an `__include`d fragment. The test compares each variant's count with a hand-computed value, because nothing else checks it: reflection cannot fold the expression. It proves that a function-local constant with the name of an axis fails the cook, and that Slang rejects a cycle of constants before stage 4 runs (E39999). It also reads a `[ls_extent_1d]` width from the manifest (task L18), and proves that the footprint axes of both resources are `GRID_X` and `GRID_Y`, reached through the derived constants (task L16). |
 | `AccessModelRejectTest` | The table of cooks that must fail. A pointer member under a bound access model, a reflection mismatch, and a codegen error each fail the cook with their own error. A control module still cooks, and so does `EntryPointUnusedResource.slang`, which needs the workaround for shader-slang/slang#13789. No row proves a reflection mismatch end to end now: the validator unit tests prove each mismatch kind. It also cooks into a folder on disk, and proves that a failed cook removes the manifest of an earlier cook and that each atomic write leaves no temporary file. |
 | `SlangMetadataCanaryTest` | Shader-slang/slang#13789 still exists: Slang's metadata reports an unused resource beside entry point constants as used. When Slang fixes the issue, this test fails, and its header comment lists the workaround code to delete. |
 | `EntryPointConstantsTest` | The entry point constants (task L14), from the shader source to the manifest, for both targets. `tests/assets/EntryPointConstants/EntryPointConstants.slang` declares a struct parameter with a resource and two scalars, loose parameters, data that is never read, and resources only. The test compares each delivery, byte size, and member with values computed by hand from std140 (the WGSL uniform buffer) and std430 (the SPIR-V push constant block), so the two targets of one variant differ in size. It proves that the WGSL constants resolve to the `entryPointParams` uniform buffer in the layout, that the resource in the struct is a binding on both targets, that unread data gives no constants, and that a 144-byte push constant block fails the SPIR-V cook with `EntryPointConstantsTooLarge` and cooks for WGSL. |
@@ -147,6 +147,7 @@ through Slang, and each takes about one second. `SlangMetadataCanaryTest` calls 
 | `ManifestIndexTest` | The client query surface, end to end. It builds a bundle inline through the emitter, with one axis of each domain, then drives `ManifestQueryBuilder` through every valid construction and every error path, plus a sparse manifest and an `ActiveWhen`-gated one. On the gated manifest, a constraint on the gated axis selects only the variants where that axis is active, and `Decode` marks the inactive axis. It proves that two profiles of one module each key their own subset, and that two modules share a root axis only when their values agree in order. It also covers `AxisNames` and `AxisValues`, the axis relevance of each entry point, `SingleFor` (an irrelevant axis is not ambiguous, a pipeline joins the masks of its stages), and both failures of the relevance validator. It also proves the query presets: a `WhenActive` pin keeps the gated-off variants, a `Required` pin removes them, two modes on one axis merge, a pin on an undeclared axis gives a note and no error, a bad value is an error, `NotesFor` names a pin that cannot change the named entry points, and a repeated value gives a `DuplicateValue` note. It needs no Slang. |
 | `ResourceRoleTest` | The resource roles and tags (task L17), from the shader source to the manifest, for both targets. `tests/assets/ResourceRoles/ResourceRoles.slang` puts each role on a buffer that fits it: the stride of the command, a 4-byte stride with an element count of whole commands, a raw buffer, and two roles on one buffer. The test reads each role and the creation usage (`ResolvedResource::RequiredBufferUsage`) back, and proves that tags in another order, with a repeat, read back sorted and unique. Six other assets each break one rule, and each cook fails with its own error: a role on a texture, a misspelled role, a stride that is not the command's, a count that is not whole commands, a 4-byte stride with no count, and a tag with a character outside the tag set. |
 | `MergedLayoutTest` | The merged layout of one pipeline. It builds a bundle inline through the emitter, with a vertex, a fragment, and a compute entry point. It proves that a resource both stages read appears once with both stage bits, that the order is (group, binding), and that instances from two variants merge. It proves a conflict of kind and of byte size, a duplicate stage, and too many stages. It also proves that `Open` rejects a visibility list that is not in placement order, and that `SamplerTexturePairs` gives a pair that two stages sample once, with both stage bits. It proves that two push constant blocks merge into the larger one when one is a prefix of the other, with both stage bits, and that two blocks that differ at offset 0 fail. It proves that two resources at one placement that differ only in their tags conflict. It needs no Slang. |
+| `ResourceReportTest` | The resource report (task L16), with no Slang. A hand-built module has an axis that changes one buffer's element count and an axis that changes nothing. It proves that the measurement finds the first axis and not the second, that a sparse cook with no one-axis pair is closed by the second pass, that `VerifyFootprintAxes` passes a declared axis and fails an undeclared one or a wrong one, and that a sparse cook does not fail it. It reads the masks back through the manifest, rejects a mask bit past the module's axes at `Open`, and proves the `DescribeCreation` answer for a counted storage buffer, a uniform buffer, a sampled texture, a storage texture, and a sampler. It reads the report from the written bytes and checks its entries and its text. |
 
 An error check prints a diagnostic to `stderr` on purpose. Read the last line for the result.
 
@@ -483,11 +484,13 @@ number would state that every target must supply one. A target supplies a valida
    profile and then by module, and writes through the `OutputSink`:
    - one binary manifest bundle for the whole cook, `ShaderLibrary.ldmanifest`, plus `VerifyManifestRoundTrip`
    - `ShaderLibrary.dedupe.txt`, from `GenerateDedupeReport`
+   - `ShaderLibrary.resources.txt`, from `BuildResourceReport` and `FormatResourceReport`, read from the written
+     manifest bytes through the client views
 
    A cooked module points into its `PermutationSpace`, so the driver moves each space to the heap and
    keeps it until the emit is done.
 
-Five validators run inside that loop. None of them is a stage.
+Six validators run inside that loop. None of them is a stage.
 
 - **The reflection cross-check**, after stage 4. `ReadEmittedCode` (in `BuildModuleStep.cpp`) asks the target
   profile for a validator. The WGSL profile parses the emitted text with Tint (`WgslValidator`) and reads the
@@ -527,6 +530,12 @@ Five validators run inside that loop. None of them is a stage.
   and name. The two readers are independent, so agreement is a second opinion. It skips an entry point with a
   combined texture sampler, which SPIR-V samples with no `OpSampledImage`. A difference fails the cook with
   `SamplerPairsTargetMismatch`.
+- **The footprint axis cross-check**, after stage 7. `VerifyFootprintAxes` (in `model/AxisInfluence`) compares the
+  axes that change each resource's footprint, measured from the cooked tables, with the axes that its size
+  attributes name. Stage 4 reads the named axes from the expression text, through the derived constants
+  (`CollectDeclaredFootprintAxes`), so the two sides share no code. Only an axis that a one-axis pair proves is
+  compared, because the closing pass can mark an axis that a sparse cook cannot separate. A proven axis that no
+  attribute names fails the cook with `FootprintAxisUndeclared`.
 - **The library round trip**, after stage 7. `VerifyLibraryRoundTrip` replays every variant through
   the finished tables and compares the result against the text the compiler produced. It covers the
   **source text** only.
@@ -699,8 +708,10 @@ keeps the axis addresses.
 
 The cook writes one output form, the binary manifest bundle, from the `CookedLibrary`. The C++
 header/source emitter is gone. `-o` names an output **directory**, and every artifact goes inside it:
-one `ShaderLibrary.ldmanifest` for the whole cook, one `ShaderLibrary.dedupe.txt`, and, when
-`--dump-stage` asks, the stage-dump JSON files.
+one `ShaderLibrary.ldmanifest` for the whole cook, one `ShaderLibrary.dedupe.txt`, one
+`ShaderLibrary.resources.txt`, and, when `--dump-stage` asks, the stage-dump JSON files. A cook removes the
+manifest, the two reports, and the depfile of an earlier cook before it starts, so a failed cook leaves none of
+them, and the file sink writes each artifact to a temporary file and renames it into place.
 
 The bundle has three scopes, and the reader has one view type for each.
 
@@ -794,6 +805,19 @@ trips, and the merged layout (a difference is a `MergedLayoutConflict`). `Bindin
 `Binding::FirstTag` and `TagCount` are a run of string indices in the `ResourceTags` table. The client reads them with
 `ResolvedResource::Roles`, `TagCount`, `Tag`, and `HasTag`, and `RequiredBufferUsage` joins the usage of the binding
 kind with the usage of the roles. Copies, readback, and render attachments stay with the graph.
+
+Each binding record has a footprint axis mask (format version 13, task L16): `EnvironmentHeader::FootprintAxisTableOffset`,
+one mask for each binding record in the word layout of the axis-active mask. Bit k is set when axis k changes the
+resource's element count or extent. `model/AxisInfluence` measures it by scope and name with the two passes of the
+axis relevance, and a variant that does not declare the resource does not take part. Before the closing pass an
+Undetermined axis counts as Inert: one cooked value changes nothing, and a sparse cook with no one-axis pair is then
+closed by the second pass. The client reads it with `ResolvedResource::FootprintAxes` and `IsFootprintAxis`.
+`DescribeCreation` gives a `CreationFields` value for a resource: for each creation field (size, usage, dimension,
+format, extent, layers, mips, samples, sampler state), whether the shader fixes it, fixes it for each variant, or
+the renderer must supply it. A resource with no `Cpu` field is complete. `ShaderLibrary.resources.txt` prints it
+for every resource that an entry point reads, and counts the complete buffers only: no shader states a texture's
+mip count, so a texture is never complete. The report keeps its data (`ResourceReport`) apart from its text, so a
+JSON form is a second writer over the same data.
 
 Each profile records its `ShaderCodeFormat` (since format version 7). A SPIR-V source is read as words, so
 `Open` rejects a SPIR-V source that is not on a 4-byte boundary or not whole words. The sources are packed

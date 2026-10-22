@@ -315,6 +315,29 @@ namespace
         WriteUniformMembers(writer, "members", constants.Members);
     }
 
+    /** The axes that each resource's size attributes name, by axis name. The validator compares them with the
+     * measured footprint axes. */
+    void WriteFootprintDeclarations(JsonWriter& writer, const CookedModule& module)
+    {
+        writer.Key("footprintDeclarations");
+        writer.BeginArray();
+        for (const FootprintAxisDeclaration& declaration : module.FootprintDeclarations)
+        {
+            writer.BeginObject();
+            writer.KeyString("scope", declaration.ScopeName);
+            writer.KeyString("name", declaration.Name);
+            writer.Key("axes");
+            writer.BeginArray();
+            for (const uint32_t axis : declaration.Axes)
+            {
+                writer.String(module.Space->Axes()[axis].Name);
+            }
+            writer.EndArray();
+            writer.EndObject();
+        }
+        writer.EndArray();
+    }
+
     void WriteEntryPointConstantsTable(JsonWriter& writer, const CookedModule& module)
     {
         writer.Key("entryPointConstants");
@@ -947,6 +970,7 @@ std::string DumpCookedModule(const CookedModule& module)
     WriteRasterTable(writer, module);
     WriteSamplerPairTable(writer, module);
     WriteEntryPointConstantsTable(writer, module);
+    WriteFootprintDeclarations(writer, module);
     WriteVariantTable(writer, module.Variants);
     WriteInternerTable(writer, module);
 

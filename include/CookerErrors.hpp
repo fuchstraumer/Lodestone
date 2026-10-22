@@ -86,6 +86,7 @@ enum class CookError : uint16_t
     ManifestShaderLayoutResourceListIndexInvalid = 112,
     ManifestSamplerPairMismatch = 113, // an entry point's sampler and texture pairs read back differently than the cook produced
     ManifestEntryPointConstantsMismatch = 114, // an entry point's constants read back differently than the cook produced
+    ManifestFootprintAxesMismatch = 115, // a resource's footprint axes read back differently than the cook measured
 
     // output and diagnostic sink operation errors
     OutputPathInvalid = 120,
@@ -121,6 +122,9 @@ enum class CookError : uint16_t
     ResourceRoleStrideMismatch = 162, // the element stride, or the element count, does not fit the role
     ResourceRoleNeedsElementCount = 163, // a 4-byte stride needs `[ls_element_count]` to check an indirect role
     ResourceTagInvalid = 164, // a tag holds a character outside letters, digits, and `_.:-`, or the attribute is empty
+
+    // the resource report
+    FootprintAxisUndeclared = 170, // an axis changes a resource's footprint, and no size attribute of it names that axis
 
     // start system errors
     SystemError = 200,

@@ -192,5 +192,33 @@ int main(int argc, char** argv)
                      "the 1d extent equals GRID_X * GRID_Y, and its other axes are 1");
     }
 
+    // task L16: the footprint axes are measured from the cooked variants, and the cook compares them with the axes
+    // that each attribute names through LIGHT_SLOTS and CLUSTER_COUNT. Both resources reach GRID_X and GRID_Y
+    runner.BeginSection("the footprint axes follow the derived constants back to the axes");
+    const auto footprintAxisNames = [&](std::string_view resource_name)
+    {
+        std::vector<std::string_view> names;
+        const std::optional<manifest::ResolvedResource> resource =
+            FindResource(environment.value(), index, k_ExpectedCounts.front(), resource_name);
+        if (!resource.has_value())
+        {
+            return names;
+        }
+        const manifest::ModuleView& module = environment->Module();
+        for (uint32_t axis = 0u; axis < module.AxisCount(); ++axis)
+        {
+            if (resource->IsFootprintAxis(axis))
+            {
+                names.push_back(environment->String(module.AxisData(axis).NameString));
+            }
+        }
+        return names;
+    };
+    const std::vector<std::string_view> k_GridAxes{ "GRID_X", "GRID_Y" };
+    runner.Check(footprintAxisNames("gLightIndices") == k_GridAxes,
+                 "the element count changes with GRID_X and GRID_Y, through two derived constants");
+    runner.Check(footprintAxisNames("gClusterRamp") == k_GridAxes,
+                 "the 1d extent changes with GRID_X and GRID_Y, through one derived constant");
+
     return runner.Report();
 }

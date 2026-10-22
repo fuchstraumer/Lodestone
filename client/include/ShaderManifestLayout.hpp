@@ -151,6 +151,10 @@ public:
     /** @brief The usage a buffer needs at creation for its binding kind and its roles. Copy and map usages are not
      * included: the graph knows them. `Invalid` for a resource that is not a uniform or storage buffer. */
     [[nodiscard]] BufferUsageFlags RequiredBufferUsage() const noexcept;
+    /** @brief The axes that change this resource's element count or extent in its environment, in the word layout of
+     * `EnvironmentView::AxisMask`. A size that no axis changes has an empty mask. */
+    [[nodiscard]] std::span<const uint64_t> FootprintAxes() const noexcept;
+    [[nodiscard]] bool IsFootprintAxis(uint32_t local_axis) const noexcept;
     /** @brief The position of the binding record in `EnvironmentView::Bindings()`. */
     [[nodiscard]] uint32_t Index() const noexcept;
     [[nodiscard]] const Binding& Record() const noexcept;
@@ -167,6 +171,43 @@ private:
     const Binding* record{ nullptr };
     const Footprint* footprint{ nullptr };
 };
+
+/** Where the value of one creation field comes from. */
+enum class CreationSource : uint8_t
+{
+    /** The binding kind has no such field. */
+    NotApplicable = 0,
+    /** The shader fixes the value, and no axis changes it. */
+    Shader,
+    /** The shader fixes the value for each variant, and the axes in `ResolvedResource::FootprintAxes` change it. */
+    ShaderPerVariant,
+    /** The shader does not state the value, so the renderer must supply it. */
+    Cpu,
+};
+
+/** The source of each field that a renderer needs to create the resource of one binding. A resource with no `Cpu`
+ * field is complete: the manifest gives every value, and the graph needs no code for it. */
+struct CreationFields
+{
+    /** A buffer's size: the byte size of a uniform block, or the element count of a storage buffer. */
+    CreationSource Size{ CreationSource::NotApplicable };
+    CreationSource Usage{ CreationSource::NotApplicable };
+    /** A texture's dimension (1D, 2D, 3D, or cube). */
+    CreationSource Dimension{ CreationSource::NotApplicable };
+    CreationSource Format{ CreationSource::NotApplicable };
+    CreationSource Extent{ CreationSource::NotApplicable };
+    CreationSource ArrayLayers{ CreationSource::NotApplicable };
+    CreationSource MipLevels{ CreationSource::NotApplicable };
+    CreationSource SampleCount{ CreationSource::NotApplicable };
+    /** A sampler's filters and address modes. Whether it compares is fixed by the shader. */
+    CreationSource SamplerState{ CreationSource::NotApplicable };
+
+    [[nodiscard]] bool IsComplete() const noexcept;
+};
+
+/** @brief Returns the source of each creation field of one resource. It reads only what the manifest stores: the
+ * binding kind and shape, the storage format, the footprint, the roles, and the footprint axes. */
+[[nodiscard]] CreationFields DescribeCreation(const ResolvedResource& resource) noexcept;
 
 /** One texture and one sampler that a pipeline samples together, and the stages that sample them. */
 struct MergedSamplerTexturePair

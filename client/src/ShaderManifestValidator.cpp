@@ -77,6 +77,7 @@ namespace
     ErrorState ValidateVariants(const EnvironmentContext& context) noexcept;
     ErrorState ValidateAxisMasks(const EnvironmentContext& context) noexcept;
     ErrorState ValidateAxisRelevance(const EnvironmentContext& context) noexcept;
+    ErrorState ValidateFootprintAxes(const EnvironmentContext& context) noexcept;
     ErrorState ValidateRasterStates(const EnvironmentContext& context) noexcept;
     ErrorState ValidateVertexInputs(const EnvironmentContext& context) noexcept;
     ErrorState ValidateUniformMembers(const EnvironmentContext& context) noexcept;
@@ -94,12 +95,13 @@ namespace
         &ValidateModuleHeaders,  &ValidateEntryPoints,  &ValidateModuleAxes, &ValidateDirectory,
     };
 
-    constexpr std::array<EnvironmentValidator, 15u> k_EnvironmentValidators{
+    constexpr std::array<EnvironmentValidator, 16u> k_EnvironmentValidators{
         &ValidateEnvironmentSections, &ValidateSources,      &ValidateBindings,
         &ValidateEntryPointConstants,
         &ValidateResourceIndices,     &ValidateRunTables,    &ValidateSlots,
         &ValidateVariantKeys,         &ValidateVariants,     &ValidateAxisMasks,
-        &ValidateAxisRelevance,       &ValidateRasterStates, &ValidateVertexInputs,
+        &ValidateAxisRelevance,       &ValidateFootprintAxes, &ValidateRasterStates,
+        &ValidateVertexInputs,
         &ValidateUniformMembers,      &ValidateSpecializationConstants,
     };
 
@@ -512,9 +514,12 @@ namespace
                                      environment.VariantCount * context.AxisMaskWordCount };
         const TableRef axisRelevanceLoc{ environment.AxisRelevanceTableOffset,
                                          static_cast<uint32_t>(context.EntryPointCount) * context.AxisMaskWordCount };
-        const std::array<Section, 22u> sections
+        const TableRef footprintAxesLoc{ environment.FootprintAxisTableOffset,
+                                         environment.Bindings.Count * context.AxisMaskWordCount };
+        const std::array<Section, 23u> sections
         {
             Section{ ShaderManifestTable::AxisRelevance, axisRelevanceLoc, sizeof(uint64_t) },
+            Section{ ShaderManifestTable::FootprintAxes, footprintAxesLoc, sizeof(uint64_t) },
             Section{ ShaderManifestTable::VariantKeys, varKeysLoc, sizeof(VariantKey) },
             Section{ ShaderManifestTable::Variants, varsLoc, sizeof(Variant) },
             Section{ ShaderManifestTable::AxisMasks, axisMasksLoc, sizeof(uint64_t) },
@@ -993,7 +998,13 @@ namespace
         return k_ManifestOk;
     }
 
-    ErrorState ValidateAxisRelevance(const EnvironmentContext& context) noexcept
+    /** Checks a table of `mask_count` axis masks, in the word layout of the axis mask table, for a bit past the
+     * module's axes. Only the last word of each mask can hold one. */
+    ErrorState ValidateAxisMaskBits(const EnvironmentContext& context,
+                                    uint32_t table_offset,
+                                    uint32_t mask_count,
+                                    ErrorCode error_code,
+                                    ShaderManifestTable table) noexcept
     {
         const uint32_t wordCount = context.AxisMaskWordCount;
         const auto usedBitsInLastWord = static_cast<uint32_t>(context.ModuleAxisCount % k_AxisMaskWordBits);
@@ -1002,23 +1013,35 @@ namespace
             return k_ManifestOk;
         }
 
-        const EnvironmentHeader& environment = context.Environment;
-        const TableRef relevanceLoc{ environment.AxisRelevanceTableOffset,
-                                     static_cast<uint32_t>(context.EntryPointCount) * wordCount };
-        const std::span<const uint64_t> relevanceSpan = Map<uint64_t>(context.Extent, relevanceLoc);
-        // only the last word of each mask can hold a bit past the module's axes
-        for (int32_t i = 0; std::cmp_less(i, context.EntryPointCount); ++i)
+        const std::span<const uint64_t> masks = Map<uint64_t>(context.Extent, TableRef{ table_offset, mask_count * wordCount });
+        for (uint32_t i = 0u; i < mask_count; ++i)
         {
-            const uint64_t lastWord = relevanceSpan[(static_cast<size_t>(i) * wordCount) + wordCount - 1u];
+            const uint64_t lastWord = masks[(static_cast<size_t>(i) * wordCount) + wordCount - 1u];
             if ((lastWord >> usedBitsInLastWord) != 0u)
             {
-                return { .Code = ErrorCode::InvalidAxisRelevance,
-                         .Table = ShaderManifestTable::AxisRelevance,
-                         .RecordIndex = static_cast<uint32_t>(i) };
+                return { .Code = error_code, .Table = table, .RecordIndex = i };
             }
         }
 
         return k_ManifestOk;
+    }
+
+    ErrorState ValidateAxisRelevance(const EnvironmentContext& context) noexcept
+    {
+        return ValidateAxisMaskBits(context,
+                                    context.Environment.AxisRelevanceTableOffset,
+                                    static_cast<uint32_t>(context.EntryPointCount),
+                                    ErrorCode::InvalidAxisRelevance,
+                                    ShaderManifestTable::AxisRelevance);
+    }
+
+    ErrorState ValidateFootprintAxes(const EnvironmentContext& context) noexcept
+    {
+        return ValidateAxisMaskBits(context,
+                                    context.Environment.FootprintAxisTableOffset,
+                                    context.Environment.Bindings.Count,
+                                    ErrorCode::InvalidFootprintAxes,
+                                    ShaderManifestTable::FootprintAxes);
     }
 
     ErrorState ValidateRasterStates(const EnvironmentContext& context) noexcept

@@ -1,4 +1,6 @@
 #include "ShaderManifest.hpp"
+#include "ShaderManifestFormat.hpp"
+#include "ShaderManifestLayout.hpp"
 #include "ShaderManifestRead.hpp"
 #include "ShaderManifestValidator.hpp"
 #include "EnumClassUtils.hpp"
@@ -15,9 +17,7 @@
 #include <cstring>
 #include <expected>
 #include <format>
-#include <functional>
 #include <iterator>
-#include <limits>
 #include <magic_enum/magic_enum.hpp>
 #include <memory>
 #include <optional>
@@ -111,6 +111,7 @@ namespace
             "a merged layout got two push constant blocks whose members differ where the blocks overlap",
             "a binding sets a role bit that ResourceRoleFlags does not define",
             "a binding's tag run is outside the tag table, names a string past the string table, or repeats a tag",
+            "a binding's footprint axis mask sets a bit past the module's axes",
         });
 
     static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ErrorCode::Count),
@@ -464,6 +465,10 @@ ManifestResult<EnvironmentView> EnvironmentView::Open(const BundleView& bundle,
     const TableRef64 axisRelevanceTableRef{ .Offset = static_cast<uint64_t>(parsed.AxisRelevanceTableOffset),
                                             .Count = context.EntryPointCount * context.AxisMaskWordCount };
     view.axisRelevance = Map<uint64_t>(extent_bytes, axisRelevanceTableRef);
+    const TableRef64 footprintAxisTableRef{ .Offset = static_cast<uint64_t>(parsed.FootprintAxisTableOffset),
+                                            .Count = static_cast<uint64_t>(parsed.Bindings.Count) *
+                                                     context.AxisMaskWordCount };
+    view.footprintAxes = Map<uint64_t>(extent_bytes, footprintAxisTableRef);
     const TableRef64 entryPointInstanceTableRef{
         .Offset = static_cast<uint64_t>(parsed.EntryPointInstanceTableOffset), .Count = slotCount };
     view.entryPointInstances = Map<EntryPointInstance>(extent_bytes, entryPointInstanceTableRef);
@@ -593,6 +598,19 @@ std::span<const uint64_t> EnvironmentView::AxisRelevance(uint32_t entry_point_in
 bool EnvironmentView::IsAxisRelevant(uint32_t entry_point_index, uint32_t local_axis) const noexcept
 {
     const std::span<const uint64_t> mask = AxisRelevance(entry_point_index);
+    const uint64_t word = mask[local_axis / k_AxisMaskWordBits];
+    return ((word >> (local_axis % k_AxisMaskWordBits)) & 1u) != 0u;
+}
+
+std::span<const uint64_t> EnvironmentView::FootprintAxes(uint32_t binding_index) const noexcept
+{
+    const size_t wordCount = module.AxisMaskWordCount();
+    return footprintAxes.subspan(static_cast<size_t>(binding_index) * wordCount, wordCount);
+}
+
+bool EnvironmentView::IsFootprintAxis(uint32_t binding_index, uint32_t local_axis) const noexcept
+{
+    const std::span<const uint64_t> mask = FootprintAxes(binding_index);
     const uint64_t word = mask[local_axis / k_AxisMaskWordBits];
     return ((word >> (local_axis % k_AxisMaskWordBits)) & 1u) != 0u;
 }

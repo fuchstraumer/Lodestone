@@ -16,7 +16,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 12u;
+inline constexpr uint32_t k_ShaderManifestVersion = 13u;
 
 // clang-tidy complains about enums being too big, but uint32_t means
 // the error struct is 16bytes, which is great alignment and still compact
@@ -89,6 +89,8 @@ enum class ErrorCode : uint32_t
     InvalidBindingRoles = 57,
     // a binding's tag run is outside the tag table, names a string past the string table, or repeats a tag
     InvalidBindingTags = 58,
+    // a binding's footprint axis mask sets a bit past the module's axes
+    InvalidFootprintAxes = 59,
     Count
 };
 
@@ -125,6 +127,7 @@ enum class ShaderManifestTable : uint32_t
     SamplerTexturePairs,
     EntryPointConstants,
     ResourceTags,
+    FootprintAxes,
     Count
 };
 //NOLINTEND(readability-enum-initial-value, performance-enum-size)
@@ -306,7 +309,11 @@ struct alignas(8) EntryPoint
  *   Thus, the entry point instance for (variant V, entry point E) is at `V * EntryPointCount + E`.
  * - The axis relevance table has one bitmask for each entry point, in the same word layout as the axis mask
  *   table: `EntryPointCount * ceil(ModuleAxisCount / 64)` words. Bit k is set when axis k can change that
- *   entry point's instance in this environment, so a consumer must pin it. */
+ *   entry point's instance in this environment, so a consumer must pin it.
+ * - The footprint axis table has one bitmask for each binding record, in the same word layout:
+ *   `Bindings.Count * ceil(ModuleAxisCount / 64)` words. Bit k is set when axis k changes the footprint (the
+ *   element count or the extent) of that resource in this environment. Every record of one resource (one scope and
+ *   name) holds the same mask. An axis with one cooked value cannot change anything, so it is never set. */
 struct alignas(8) EnvironmentHeader
 {
     uint32_t VariantCount{ 0u };
@@ -315,6 +322,7 @@ struct alignas(8) EnvironmentHeader
     uint32_t AxisMaskTableOffset{ 0u };
     uint32_t EntryPointInstanceTableOffset{ 0u };
     uint32_t AxisRelevanceTableOffset{ 0u };
+    uint32_t FootprintAxisTableOffset{ 0u };
 
     TableRef Sources{ 0u, 0u };
     TableRef SourceBlob{ 0u, 0u };

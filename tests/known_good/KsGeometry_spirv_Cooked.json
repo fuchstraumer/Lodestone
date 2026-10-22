@@ -310,6 +310,13 @@
             "members": []
         }
     ],
+    "footprintDeclarations": [
+        {
+            "scope": "",
+            "name": "BaseColorTexture",
+            "axes": []
+        }
+    ],
     "variants": [
         {
             "index": 0,

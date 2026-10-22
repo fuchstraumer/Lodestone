@@ -15,6 +15,7 @@
 #include "emit/DedupeReport.hpp"
 #include "emit/Depfile.hpp"
 #include "emit/OutputSink.hpp"
+#include "emit/ResourceReport.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 #include "emit/ShaderManifestVerify.hpp"
 #include "target/TargetProfile.hpp"
@@ -423,6 +424,20 @@ namespace
             return manifestWriteError;
         }
 
+        // read from the written bytes through the client views, so the report states what a renderer reads
+        const CookResult<ResourceReport> resourceReport = BuildResourceReport(*manifest);
+        if (!resourceReport)
+        {
+            return resourceReport.error();
+        }
+
+        const CookError reportWriteError =
+            sink.WriteArtifact(k_ResourceReportFileName, FormatResourceReport(resourceReport.value()));
+        if (!reportWriteError)
+        {
+            return reportWriteError;
+        }
+
         return sink.WriteArtifact(k_DedupeReportFileName, GenerateDedupeReport(library));
     }
 } // namespace
@@ -431,9 +446,16 @@ CookResult<CookStatistics> RunCook(CookerOptions options, OutputSink& sink)
 {
     // create one diag sink for the *whole* cook
     StderrDiagnosticSink diagnostics;
+    const std::string_view artifactNames[4]
+    {
+        k_ManifestFileName,
+        k_DedupeReportFileName,
+        k_ResourceReportFileName,
+        k_DepfileName
+    };
 
     // a failed cook must leave no manifest of an earlier cook, or a reader takes the old file for this cook's output
-    for (const std::string_view artifactName : { k_ManifestFileName, k_DedupeReportFileName, k_DepfileName })
+    for (const std::string_view artifactName : artifactNames)
     {
         if (sink.RemoveArtifact(artifactName) != CookError::Success)
         {

@@ -59,6 +59,15 @@ struct LibraryVariant
     std::vector<uint32_t> ConstantsIndices;
 };
 
+/**@brief The axes that the size attributes of one resource name, directly or through derived constants. */
+struct FootprintAxisDeclaration
+{
+    std::string ScopeName;
+    std::string Name;
+    /** Indices into the module's permutation space, sorted and unique. */
+    std::vector<uint32_t> Axes;
+};
+
 /**@brief Indices into `CookedModule::Resources`: the resources one variant declares. */
 using ResourceList = std::vector<uint32_t>;
 /**@brief Indices into a variant's own resource list: the resources one entry point reads. Local, so the
@@ -119,6 +128,9 @@ struct InternedModule
     // Required capabilities read back from the target's validator in any variant, stored as names since those
     // are easiest to associate with renderer runtime caps (e.g., Vulkan device features/extensions)
     std::vector<std::string> ObservedCapabilities;
+    /** Sorted by scope and then by name. The first variant that declares a resource with a size attribute adds it,
+     * because the attribute text is the same in every variant. */
+    std::vector<FootprintAxisDeclaration> FootprintDeclarations;
 
     void DisableDedupe() noexcept
     {
@@ -154,6 +166,8 @@ struct CookedModule
     std::vector<VariantKey> VariantKeys;
     std::vector<LibraryVariant> Variants;
     std::vector<std::string> ObservedCapabilities;
+    /** Sorted by scope and then by name. */
+    std::vector<FootprintAxisDeclaration> FootprintDeclarations;
 
     TableStatistics SourceTable;
     TableStatistics ResourceTable;

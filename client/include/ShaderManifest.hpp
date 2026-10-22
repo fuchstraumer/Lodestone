@@ -159,6 +159,10 @@ public:
      * instance in this environment. An axis with only one cooked value counts as relevant. */
     [[nodiscard]] std::span<const uint64_t> AxisRelevance(uint32_t entry_point_index) const noexcept;
     [[nodiscard]] bool IsAxisRelevant(uint32_t entry_point_index, uint32_t local_axis) const noexcept;
+    /** @brief The footprint axis mask of one binding record: bit k is set when axis k changes the element count or
+     * the extent of that resource in this environment. */
+    [[nodiscard]] std::span<const uint64_t> FootprintAxes(uint32_t binding_index) const noexcept;
+    [[nodiscard]] bool IsFootprintAxis(uint32_t binding_index, uint32_t local_axis) const noexcept;
 
     [[nodiscard]] std::span<const EntryPointInstance> EntryPointInstanceTable() const noexcept;
     [[nodiscard]] std::span<const EntryPointInstance> VariantEntryPoints(uint32_t variant_index) const noexcept;
@@ -197,6 +201,7 @@ private:
     std::span<const Variant> variants;
     std::span<const uint64_t> axisMasks;
     std::span<const uint64_t> axisRelevance;
+    std::span<const uint64_t> footprintAxes;
     std::span<const EntryPointInstance> entryPointInstances;
     std::span<const SourceRef> sources;
     std::span<const char> sourceBlob;

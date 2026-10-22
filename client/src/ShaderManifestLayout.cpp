@@ -42,6 +42,9 @@ namespace
                            const SamplerTexturePair& rhs) noexcept;
     // compare by text, because the two resources can come from two environments
     bool TagsEqual(const ResolvedResource& lhs, const ResolvedResource& rhs) noexcept;
+    /** The source of a value that a size attribute states: per variant when an axis changes the footprint. */
+    CreationSource SourceOfFootprint(const ResolvedResource& resource, bool stated) noexcept;
+    void DescribeTexture(const ResolvedResource& resource, CreationFields& fields) noexcept;
 } // namespace
 
 static_assert(std::input_iterator<LayoutRange::Iterator>);
@@ -238,6 +241,60 @@ bool ResolvedResource::HasTag(std::string_view tag) const noexcept
         return environment->String(string_idx) == tag;
     };
     return std::ranges::any_of(tagIndices, checkStrIndex);
+}
+
+bool CreationFields::IsComplete() const noexcept
+{
+    const std::array<CreationSource, 9u> sources{ Size,        Usage,     Dimension,   Format,      Extent,
+                                                  ArrayLayers, MipLevels, SampleCount, SamplerState };
+    return std::ranges::none_of(sources, [](CreationSource source) { return source == CreationSource::Cpu; });
+}
+
+CreationFields DescribeCreation(const ResolvedResource& resource) noexcept
+{
+    CreationFields fields;
+    switch (resource.Kind())
+    {
+    case BindingKind::UniformBuffer:
+        fields.Size = CreationSource::Shader;
+        fields.Usage = CreationSource::Shader;
+        break;
+    case BindingKind::StorageBuffer:
+        fields.Size = SourceOfFootprint(resource, resource.ElementCount() != 0u);
+        fields.Usage = CreationSource::Shader;
+        break;
+    case BindingKind::StorageTexture:
+        DescribeTexture(resource, fields);
+        fields.Format = resource.StorageFormat() != TextureFormat::Invalid ? CreationSource::Shader : CreationSource::Cpu;
+        break;
+    case BindingKind::Texture:
+        DescribeTexture(resource, fields);
+        // the sample type limits the format, and the renderer chooses one
+        fields.Format = CreationSource::Cpu;
+        break;
+    case BindingKind::CombinedTextureSampler:
+        DescribeTexture(resource, fields);
+        fields.Format = CreationSource::Cpu;
+        fields.SamplerState = CreationSource::Cpu;
+        break;
+    case BindingKind::Sampler:
+        fields.SamplerState = CreationSource::Cpu;
+        break;
+    default:
+        // the remaining kinds have no reflection that states their creation fields yet
+        break;
+    }
+    return fields;
+}
+
+std::span<const uint64_t> ResolvedResource::FootprintAxes() const noexcept
+{
+    return environment->FootprintAxes(Index());
+}
+
+bool ResolvedResource::IsFootprintAxis(uint32_t local_axis) const noexcept
+{
+    return environment->IsFootprintAxis(Index(), local_axis);
 }
 
 BufferUsageFlags ResolvedResource::RequiredBufferUsage() const noexcept
@@ -884,6 +941,29 @@ namespace
             }
         }
         return true;
+    }
+
+    CreationSource SourceOfFootprint(const ResolvedResource& resource, bool stated) noexcept
+    {
+        if (!stated)
+        {
+            return CreationSource::Cpu;
+        }
+        const std::span<const uint64_t> axes = resource.FootprintAxes();
+        const bool varies = std::ranges::any_of(axes, [](uint64_t word) { return word != 0u; });
+        return varies ? CreationSource::ShaderPerVariant : CreationSource::Shader;
+    }
+
+    void DescribeTexture(const ResolvedResource& resource, CreationFields& fields) noexcept
+    {
+        const ResourceShape shape = resource.Shape();
+        fields.Usage = CreationSource::Shader;
+        fields.Dimension = CreationSource::Shader;
+        fields.Extent = SourceOfFootprint(resource, resource.ExtentX() != 0u);
+        // a cube has six layers, and every other shape that is not an array has one
+        fields.ArrayLayers = ResourceShapeIsArray(shape) ? CreationSource::Cpu : CreationSource::Shader;
+        fields.MipLevels = CreationSource::Cpu;
+        fields.SampleCount = ResourceShapeIsMultisample(shape) ? CreationSource::Cpu : CreationSource::Shader;
     }
 
 } // namespace

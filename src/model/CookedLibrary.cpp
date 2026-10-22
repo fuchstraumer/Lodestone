@@ -242,6 +242,7 @@ CookedModule FreezeModuleTables(InternedModule&& interned)
     module.SamplerPairLists = interned.SamplerPairInterner.ConsumeTable();
     module.EntryPointConstantsTable = interned.ConstantsInterner.ConsumeTable();
     module.ObservedCapabilities = std::move(interned.ObservedCapabilities);
+    module.FootprintDeclarations = std::move(interned.FootprintDeclarations);
 
     module.SourceTable = DescribeTable(interned.SourceInterner);
     module.ResourceTable = DescribeTable(interned.ResourceInterner);

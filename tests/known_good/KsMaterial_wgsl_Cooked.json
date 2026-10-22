@@ -1917,6 +1917,67 @@
             "members": []
         }
     ],
+    "footprintDeclarations": [
+        {
+            "scope": "Surface_Material",
+            "name": "Albedo",
+            "axes": []
+        },
+        {
+            "scope": "Surface_Material",
+            "name": "ColorGradeLut",
+            "axes": []
+        },
+        {
+            "scope": "Surface_Material",
+            "name": "DetailMap",
+            "axes": []
+        },
+        {
+            "scope": "Surface_Material",
+            "name": "NormalMap",
+            "axes": []
+        },
+        {
+            "scope": "Surface_Material",
+            "name": "Palette",
+            "axes": [
+                "SAMPLE_COUNT"
+            ]
+        },
+        {
+            "scope": "Surface_Shadow",
+            "name": "Cascades",
+            "axes": []
+        },
+        {
+            "scope": "entryPointParams_probe",
+            "name": "Albedo",
+            "axes": []
+        },
+        {
+            "scope": "entryPointParams_probe",
+            "name": "ColorGradeLut",
+            "axes": []
+        },
+        {
+            "scope": "entryPointParams_probe",
+            "name": "DetailMap",
+            "axes": []
+        },
+        {
+            "scope": "entryPointParams_probe",
+            "name": "NormalMap",
+            "axes": []
+        },
+        {
+            "scope": "entryPointParams_probe",
+            "name": "Palette",
+            "axes": [
+                "SAMPLE_COUNT"
+            ]
+        }
+    ],
     "variants": [
         {
             "index": 0,

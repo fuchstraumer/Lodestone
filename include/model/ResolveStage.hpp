@@ -2,14 +2,18 @@
 #ifndef LODESTONE_RESOLVE_STAGE_HPP
 #define LODESTONE_RESOLVE_STAGE_HPP
 #include "CookerErrors.hpp"
-#include "permute/PermutationSpace.hpp"
-#include "compile/RawLibrary.hpp"
 #include "ShaderDataSchema.hpp"
+#include "compile/RawLibrary.hpp"
 #include "permute/AttributeExpression.hpp"
 #include "permute/PermutationAssignment.hpp"
+#include "permute/PermutationAxis.hpp"
+#include "permute/PermutationSpace.hpp"
 #include "permute/PermutationTypes.hpp"
+#include <cstddef>
+#include <cstdint>
 #include <span>
 #include <vector>
+
 
 /**Pipeline Stage 4. Turns what the compiler said into what the runtime needs.
  *
@@ -56,10 +60,11 @@ struct DerivedConstantTable
  * Returns `DerivedConstantShadowsSymbol` when a derived constant has the name of an axis or of an undriven
  * extern constant, and `DerivedConstantAmbiguous` when two declarations of one name have different
  * expressions. Two declarations with the same expression are one constant. */
-CookResult<DerivedConstantTable> MakeDerivedConstantTable(std::span<const RawDerivedConstant> derived_constants,
-                                                          std::span<const PermutationAxis> axes,
-                                                          std::span<const ExternConstantDefault> extern_defaults,
-                                                          DiagnosticSink& sink);
+CookResult<DerivedConstantTable> MakeDerivedConstantTable(
+    std::span<const RawDerivedConstant> derived_constants,
+    std::span<const PermutationAxis> axes,
+    std::span<const ExternConstantDefault> extern_defaults,
+    DiagnosticSink& sink);
 
 /**@brief Builds the symbol table for one variant, and evaluates every derived constant that a size attribute
  * of `raw` reaches.
@@ -79,9 +84,19 @@ CookResult<ResolveContext> MakeResolveContext(const PermutationAssignment& canon
                                               const RawVariant& raw,
                                               DiagnosticSink& sink);
 
+/**@brief Returns the axes that the size attributes of binding `binding_index` of `raw` name, directly or
+ * through the derived constants that they use: indices into `axes`, sorted and unique. */
+CookResult<std::vector<uint32_t>> CollectDeclaredFootprintAxes(const RawVariant& raw,
+                                                               size_t binding_index,
+                                                               std::span<const PermutationAxis> axes,
+                                                               const DerivedConstantTable& derived_constants,
+                                                               DiagnosticSink& sink);
+
 /** Takes the RawVariant - "raw" here meaning just carrying our meta-annotations - and evaluates
  *  them to populate the `CompiledVariant` with resolved resource footprints and other derived information. */
-CookResult<CompiledVariant> ResolveVariant(const RawVariant& raw, const ResolveContext& context, DiagnosticSink& sink);
+CookResult<CompiledVariant> ResolveVariant(const RawVariant& raw,
+                                           const ResolveContext& context,
+                                           DiagnosticSink& sink);
 
 } // namespace lodestone
 

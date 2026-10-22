@@ -32,6 +32,7 @@
     "rasterStates": [],
     "samplerPairLists": [],
     "entryPointConstants": [],
+    "footprintDeclarations": [],
     "variants": [
         {
             "index": 0,

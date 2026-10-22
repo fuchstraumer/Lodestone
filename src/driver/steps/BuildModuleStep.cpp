@@ -1,6 +1,7 @@
 #include "driver/steps/BuildModuleStep.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
+#include "ShaderLibraryTypes.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "driver/CookerOptions.hpp"
@@ -12,11 +13,13 @@
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "target/TargetProfile.hpp"
+#include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <format>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -24,6 +27,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <tuple>
 #include <vector>
 
 namespace lodestone
@@ -81,6 +85,52 @@ namespace
                                     const EmittedCodeFacts& facts,
                                     DiagnosticSink& diagnostics);
     void ReportUnreferencedBindings(const CompiledVariant& variant, DiagnosticSink& diagnostics);
+    /** Adds the footprint declaration of each resource of `raw` that has a size attribute and which
+      * hasn't been added already */
+    [[nodiscard]] CookError RecordFootprintDeclarations(InternedModule& interned_module,
+                                                        const RawVariant& raw,
+                                                        const DerivedConstantTable& derived_constants,
+                                                        DiagnosticSink& sink)
+    {
+        if (interned_module.Space == nullptr)
+        {
+            return CookError::Success;
+        }
+
+        std::vector<FootprintAxisDeclaration>& declarations = interned_module.FootprintDeclarations;
+        for (const RawSizeAttribute& attribute : raw.SizeAttributes)
+        {
+            const RawBinding& binding = raw.Bindings[attribute.BindingIndex];
+            const auto position = std::ranges::lower_bound(declarations,
+                                                           std::tie(binding.ScopeName, binding.Name),
+                                                           std::less{},
+                                                           [](const FootprintAxisDeclaration& entry)
+                                                           { return std::tie(entry.ScopeName, entry.Name); });
+            if (position != declarations.end() && position->ScopeName == binding.ScopeName &&
+                position->Name == binding.Name)
+            {
+                continue;
+            }
+
+            CookResult<std::vector<uint32_t>> axes = CollectDeclaredFootprintAxes(raw,
+                                                                                 attribute.BindingIndex,
+                                                                                 interned_module.Space->Axes(),
+                                                                                 derived_constants,
+                                                                                 sink);
+            if (!axes)
+            {
+                return axes.error();
+            }
+
+            declarations.insert(position,
+                                FootprintAxisDeclaration{ .ScopeName = binding.ScopeName,
+                                                          .Name = binding.Name,
+                                                          .Axes = std::move(axes.value()) });
+        }
+
+        return CookError::Success;
+    }
+
     [[nodiscard]] CookResult<CookStatistics> CompileModuleVariants(const SharedCookState& shared_state,
                                                                    const TargetProfile& target,
                                                                    SlangCompiler& compiler,
@@ -606,6 +656,15 @@ namespace
                                                        DescribeAssignment(currVariant.Canonical),
                                                        ToString(variantResult.error()));
                 return std::unexpected(ReportError(*shared_state.Diagnostics, variantResult.error(), errStr));
+            }
+
+            const CookError declarationError = RecordFootprintDeclarations(interned_module,
+                                                                           currRawVariant,
+                                                                           derived_constants,
+                                                                           *shared_state.Diagnostics);
+            if (declarationError != CookError::Success)
+            {
+                return std::unexpected(declarationError);
             }
 
             if (keepRawVariants)

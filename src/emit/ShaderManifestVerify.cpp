@@ -46,6 +46,7 @@ namespace
     /** The axis relevance validator. It reads the written environment only, through the client views, and
      * derives relevance a second time */
     CookError VerifyAxisRelevance(const manifest::EnvironmentView& view);
+    CookError CheckFootprintAxes(const CookedModule& module, const manifest::EnvironmentView& view);
     CookError CheckVariantAxisMask(const CookedModule& module,
                                    const LibraryVariant& variant,
                                    manifest::VariantView read_variant);
@@ -237,6 +238,12 @@ namespace
         if (relevanceError != CookError::Success)
         {
             return relevanceError;
+        }
+
+        const CookError footprintAxesError = CheckFootprintAxes(module, view);
+        if (footprintAxesError != CookError::Success)
+        {
+            return footprintAxesError;
         }
 
         const manifest::ShaderSourceProvider provider{ view, 0u };
@@ -510,6 +517,7 @@ namespace
         std::ranges::stable_sort(order, lessOnKept);
 
         std::vector<std::span<const uint32_t>> classes;
+        
         size_t begin = 0u;
         while (begin < order.size())
         {
@@ -521,7 +529,33 @@ namespace
             classes.emplace_back(order.data() + begin, end - begin);
             begin = end;
         }
+
         return classes;
+    }
+
+    /** Compares the footprint axis mask of each binding record with the mask the model measures. The binding
+     * records are written in the order of `CookedModule::Resources`. */
+    CookError CheckFootprintAxes(const CookedModule& module, const manifest::EnvironmentView& view)
+    {
+        const size_t wordCount = view.Module().AxisMaskWordCount();
+        const std::vector<uint64_t> expected = BuildFootprintAxisMasks(module, wordCount);
+
+        for (uint32_t resourceIndex = 0u; resourceIndex < module.Resources.size(); ++resourceIndex)
+        {
+            const std::span<const uint64_t> written = view.FootprintAxes(resourceIndex);
+            const std::span<const uint64_t> measured{ expected.data() + (resourceIndex * wordCount), wordCount };
+            if (!std::ranges::equal(written, measured))
+            {
+                std::println(stderr,
+                             "[lodestone] manifest round trip: module {} resource '{}' reads back footprint axes that "
+                             "differ from the measured axes",
+                             module.Name,
+                             module.Resources[resourceIndex].Name);
+                return CookError::ManifestFootprintAxesMismatch;
+            }
+        }
+
+        return CookError::Success;
     }
 
     CookError VerifyAxisRelevance(const manifest::EnvironmentView& view)
