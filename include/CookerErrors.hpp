@@ -41,6 +41,7 @@ enum class CookError : uint16_t
     ReflectionSamplerPairUnresolved = 50, // a sampler and texture pair in the emitted code does not resolve to two used bindings
     SamplerPairsTargetMismatch = 51, // two profiles of one variant read different sampler and texture pairs
     EntryPointConstantsTooLarge = 52, // an entry point's push constant block is larger than its profile guarantees
+    SourceFactsTargetMismatch = 53, // two profiles of one variant read different workgroup memory or portable capabilities
 
     NoModulesSpecified = 60,
     NoOutputSpecified = 61,

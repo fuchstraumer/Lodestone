@@ -250,6 +250,14 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                                            "two profiles read different sampler and texture pairs from one variant"));
     }
 
+    const CookError factsError = VerifySourceFactsAcrossProfiles(library);
+    if (factsError != CookError::Success)
+    {
+        return std::unexpected(ReportError(diagnostics,
+                                           factsError,
+                                           "two profiles read different workgroup memory or capabilities from one variant"));
+    }
+
     const CookError emitError = EmitLibraryArtifacts(library, sink);
     if (!emitError)
     {
@@ -367,7 +375,8 @@ namespace
             library.Profiles.push_back(CookedProfile{ .TargetName = targetName,
                                                           .AccessModel = PlacementKindFromAccessModel(profile.Access),
                                                           .CodeFormat = CodeFormatFromLanguage(profile.Language),
-                                                          .SamplerTexturePairsRecorded = profile.Validator != nullptr });
+                                                          .SamplerTexturePairsRecorded = profile.Validator != nullptr,
+                                                          .CodeFactsRead = profile.Validator != nullptr });
         }
 
         library.Environments.resize(library.Profiles.size() * library.ModuleNames.size());

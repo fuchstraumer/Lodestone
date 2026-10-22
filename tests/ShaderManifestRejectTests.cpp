@@ -307,6 +307,59 @@ void TestSourceFacts(lodestone::tests::TestRunner& runner)
                  "a capability name past the string table is rejected");
 }
 
+/** Two profiles of one variant need the same workgroup memory and the same portable capabilities. The names that only
+ * one target spells (`StorageInputOutput16`) are not compared. */
+void TestSourceFactsAcrossProfiles(lodestone::tests::TestRunner& runner)
+{
+    runner.BeginSection("two profiles of one variant must read the same workgroup memory and portable capabilities");
+    const auto makeLibrary = [](lodestone::SourceCodeFacts wgsl, lodestone::SourceCodeFacts spirv)
+    {
+        CookedLibrary library = MakeSampledLibrary({}, {});
+        library.Profiles[0].CodeFactsRead = true;
+        library.Profiles[1].CodeFactsRead = true;
+        library.Environments[0]->SourceFacts = { wgsl, wgsl };
+        library.Environments[1]->SourceFacts = { spirv, spirv };
+        return library;
+    };
+
+    const lodestone::SourceCodeFacts wgslFacts
+    {
+        .CapabilityNames = { "f16", "subgroups" },
+        .WorkgroupMemoryBytes = 144u
+    };
+    const lodestone::SourceCodeFacts spirvFacts
+    {
+        .CapabilityNames = { "Float16", "GroupNonUniform", "GroupNonUniformArithmetic", "StorageInputOutput16" },
+        .WorkgroupMemoryBytes = 144u
+    };
+    runner.Check(lodestone::VerifySourceFactsAcrossProfiles(makeLibrary(wgslFacts, spirvFacts)) ==
+                     lodestone::CookError::Success,
+                 "f16 is Float16, subgroups is the GroupNonUniform family, and a SPIR-V only name is not compared");
+
+    lodestone::SourceCodeFacts otherBytes = spirvFacts;
+    otherBytes.WorkgroupMemoryBytes = 160u;
+    runner.Check(lodestone::VerifySourceFactsAcrossProfiles(makeLibrary(wgslFacts, otherBytes)) ==
+                     lodestone::CookError::SourceFactsTargetMismatch,
+                 "workgroup memory that differs fails the cook");
+
+    lodestone::SourceCodeFacts noFloat16 = spirvFacts;
+    noFloat16.CapabilityNames = { "GroupNonUniform" };
+    runner.Check(lodestone::VerifySourceFactsAcrossProfiles(makeLibrary(wgslFacts, noFloat16)) ==
+                     lodestone::CookError::SourceFactsTargetMismatch,
+                 "a 16-bit float that only one profile reads fails the cook");
+
+    lodestone::SourceCodeFacts noSubgroups = spirvFacts;
+    noSubgroups.CapabilityNames = { "Float16" };
+    runner.Check(lodestone::VerifySourceFactsAcrossProfiles(makeLibrary(wgslFacts, noSubgroups)) ==
+                     lodestone::CookError::SourceFactsTargetMismatch,
+                 "a subgroup operation that only one profile reads fails the cook");
+
+    CookedLibrary unread = makeLibrary(wgslFacts, otherBytes);
+    unread.Profiles[1].CodeFactsRead = false;
+    runner.Check(lodestone::VerifySourceFactsAcrossProfiles(unread) == lodestone::CookError::Success,
+                 "a profile with no reader is not compared");
+}
+
 int main()
 {
     lodestone::tests::TestRunner runner{ "ShaderManifestRejectTests" };
@@ -646,6 +699,7 @@ int main()
     }
 
     TestSourceFacts(runner);
+    TestSourceFactsAcrossProfiles(runner);
 
     return runner.Report();
 }

@@ -37,6 +37,99 @@ namespace lodestone
 namespace
 {
 
+    /** One variant that the baseline profile and another profile both cooked, for the same module. */
+    struct SharedVariant
+    {
+        size_t Module;
+        size_t Profile;
+        size_t BaselineProfile;
+        const CookedModule& Environment;
+        const CookedModule& Baseline;
+        const LibraryVariant& Variant;
+        const LibraryVariant& BaselineVariant;
+    };
+
+    /** Calls `visit` for each variant that the first recording profile of a module and a later one both cooked. Each
+     * profile applies its own policy, so only the shared keys are compared. */
+    template <typename Visitor>
+    CookError VisitSharedVariants(const CookedLibrary& library, bool CookedProfile::* recorded, Visitor&& visit)
+    {
+        const size_t moduleCount = library.ModuleNames.size();
+        for (size_t moduleIndex = 0u; moduleIndex < moduleCount; ++moduleIndex)
+        {
+            const CookedModule* baseline = nullptr;
+            size_t baselineProfile = 0u;
+            std::unordered_map<VariantKey, size_t> baselineVariants;
+            for (size_t profileIndex = 0u; profileIndex < library.Profiles.size(); ++profileIndex)
+            {
+                const std::optional<CookedModule>& environment =
+                    library.Environments[(profileIndex * moduleCount) + moduleIndex];
+
+                if (!environment.has_value() || !(library.Profiles[profileIndex].*recorded))
+                {
+                    continue;
+                }
+
+                if (baseline == nullptr)
+                {
+                    baseline = std::to_address(environment);
+                    baselineProfile = profileIndex;
+                    for (auto&& [variantIndex, variantKey] : std::span<const VariantKey>{ baseline->VariantKeys } | std::views::enumerate)
+                    {
+                        baselineVariants.emplace(variantKey, variantIndex);
+                    }
+                    continue;
+                }
+
+                for (size_t variantIndex = 0u; variantIndex < environment->VariantKeys.size(); ++variantIndex)
+                {
+                    const auto match = baselineVariants.find(environment->VariantKeys[variantIndex]);
+                    if (match == baselineVariants.end())
+                    {
+                        continue;
+                    }
+
+                    const CookError visited = visit(SharedVariant{ .Module = moduleIndex,
+                                                                   .Profile = profileIndex,
+                                                                   .BaselineProfile = baselineProfile,
+                                                                   .Environment = *environment,
+                                                                   .Baseline = *baseline,
+                                                                   .Variant = environment->Variants[variantIndex],
+                                                                   .BaselineVariant = baseline->Variants[match->second] });
+                    if (visited != CookError::Success)
+                    {
+                        return visited;
+                    }
+                }
+            }
+        }
+
+        return CookError::Success;
+    }
+
+    constexpr uint32_t k_PortableFloat16 = 1u << 0u;
+    constexpr uint32_t k_PortableSubgroups = 1u << 1u;
+
+    /** The capabilities that both targets can spell: `f16` and `Float16`, `subgroups` and the `GroupNonUniform` family. */
+    uint32_t PortableCapabilities(ShaderCodeFormat format, const std::vector<std::string>& names)
+    {
+        uint32_t portable = 0u;
+        for (const std::string& name : names)
+        {
+            if (format == ShaderCodeFormat::Wgsl)
+            {
+                portable |= name == "f16" ? k_PortableFloat16 : 0u;
+                portable |= name == "subgroups" ? k_PortableSubgroups : 0u;
+            }
+            else
+            {
+                portable |= name == "Float16" ? k_PortableFloat16 : 0u;
+                portable |= name.starts_with("GroupNonUniform") ? k_PortableSubgroups : 0u;
+            }
+        }
+        return portable;
+    }
+
     /** Texture scope, texture name, sampler scope, sampler name. */
     using NamedPair = std::array<std::string_view, 4u>;
 
@@ -352,84 +445,86 @@ CookResult<ShaderLayoutView> ResolveLayoutView(const CookedModule& module,
 
 CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library)
 {
-    const size_t moduleCount = library.ModuleNames.size();
-    for (size_t moduleIndex = 0u; moduleIndex < moduleCount; ++moduleIndex)
-    {
-        const CookedModule* baseline = nullptr;
-        size_t baselineProfile = 0u;
-        std::unordered_map<VariantKey, size_t> baselineVariants;
-        for (size_t profileIndex = 0u; profileIndex < library.Profiles.size(); ++profileIndex)
+    return VisitSharedVariants(library,
+                               &CookedProfile::SamplerTexturePairsRecorded,
+                               [&library](const SharedVariant& shared) -> CookError
+                               {
+        for (size_t entryPointIndex = 0u; entryPointIndex < shared.Environment.EntryPoints.size(); ++entryPointIndex)
         {
-            const std::optional<CookedModule>& environment =
-                library.Environments[(profileIndex * moduleCount) + moduleIndex];
+            bool combined = false;
+            bool baselineCombined = false;
 
-            if (!environment.has_value() || !library.Profiles[profileIndex].SamplerTexturePairsRecorded)
+            const CookResult<std::vector<NamedPair>> pairs =
+                NamePairs(shared.Environment, shared.Variant, entryPointIndex, combined);
+            const CookResult<std::vector<NamedPair>> baselinePairs =
+                NamePairs(shared.Baseline, shared.BaselineVariant, entryPointIndex, baselineCombined);
+
+            if (!pairs || !baselinePairs)
+            {
+                return !pairs ? pairs.error() : baselinePairs.error();
+            }
+
+            if (combined || baselineCombined || *pairs == *baselinePairs)
             {
                 continue;
             }
 
-            if (baseline == nullptr)
-            {
-                baseline = std::to_address(environment);
-                baselineProfile = profileIndex;
-                std::span<const VariantKey> variantKeys = baseline->VariantKeys;
-                for (auto&& [variantIndex, variantKey] : variantKeys | std::views::enumerate)
-                {
-                    baselineVariants.emplace(variantKey, variantIndex);
-                }
-                continue;
-            }
+            std::println(stderr,
+                         "[lodestone] SAMPLER PAIRS: module '{}' variant [{}] entry point '{}' samples {} "
+                         "pairs in profile '{}' and {} pairs in profile '{}', or one pair differs",
+                         library.ModuleNames[shared.Module],
+                         shared.Variant.Description,
+                         shared.Environment.EntryPoints[entryPointIndex].Name,
+                         pairs->size(),
+                         library.Profiles[shared.Profile].TargetName,
+                         baselinePairs->size(),
+                         library.Profiles[shared.BaselineProfile].TargetName);
 
-            // each profile has its own policy, so compare the variants both cooked
-            for (size_t variantIndex = 0u; variantIndex < environment->VariantKeys.size(); ++variantIndex)
-            {
-
-                const auto match = baselineVariants.find(environment->VariantKeys[variantIndex]);
-                if (match == baselineVariants.end())
-                {
-                    continue;
-                }
-
-                const LibraryVariant& variant = environment->Variants[variantIndex];
-                const LibraryVariant& baselineVariant = baseline->Variants[match->second];
-                for (size_t entryPointIndex = 0u; entryPointIndex < environment->EntryPoints.size(); ++entryPointIndex)
-                {
-                    bool combined = false;
-                    bool baselineCombined = false;
-
-                    const CookResult<std::vector<NamedPair>> pairs =
-                        NamePairs(*environment, variant, entryPointIndex, combined);
-                    const CookResult<std::vector<NamedPair>> baselinePairs =
-                        NamePairs(*baseline, baselineVariant, entryPointIndex, baselineCombined);
-
-                    if (!pairs || !baselinePairs)
-                    {
-                        return !pairs ? pairs.error() : baselinePairs.error();
-                    }
-
-                    if (combined || baselineCombined || *pairs == *baselinePairs)
-                    {
-                        continue;
-                    }
-
-                    std::println(stderr,
-                                 "[lodestone] SAMPLER PAIRS: module '{}' variant [{}] entry point '{}' samples {} "
-                                 "pairs in profile '{}' and {} pairs in profile '{}', or one pair differs",
-                                 library.ModuleNames[moduleIndex],
-                                 variant.Description,
-                                 environment->EntryPoints[entryPointIndex].Name,
-                                 pairs->size(),
-                                 library.Profiles[profileIndex].TargetName,
-                                 baselinePairs->size(),
-                                 library.Profiles[baselineProfile].TargetName);
-
-                    return CookError::SamplerPairsTargetMismatch;
-                }
-            }
+            return CookError::SamplerPairsTargetMismatch;
         }
-    }
+        return CookError::Success;
+    });
+}
 
-    return CookError::Success;
+CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library)
+{
+    return VisitSharedVariants(
+        library,
+        &CookedProfile::CodeFactsRead,
+        [&library](const SharedVariant& shared) -> CookError
+        {
+        const ShaderCodeFormat format = library.Profiles[shared.Profile].CodeFormat;
+        const ShaderCodeFormat baselineFormat = library.Profiles[shared.BaselineProfile].CodeFormat;
+        for (size_t entryPointIndex = 0u; entryPointIndex < shared.Environment.EntryPoints.size(); ++entryPointIndex)
+        {
+            const SourceCodeFacts& facts = shared.Environment.SourceFacts[shared.Variant.SourceIndices[entryPointIndex]];
+            const SourceCodeFacts& baselineFacts =
+                shared.Baseline.SourceFacts[shared.BaselineVariant.SourceIndices[entryPointIndex]];
+
+            const uint32_t portable = PortableCapabilities(format, facts.CapabilityNames);
+            const uint32_t baselinePortable = PortableCapabilities(baselineFormat, baselineFacts.CapabilityNames);
+            if (facts.WorkgroupMemoryBytes == baselineFacts.WorkgroupMemoryBytes && portable == baselinePortable)
+            {
+                continue;
+            }
+
+            std::println(stderr,
+                         "[lodestone] SOURCE FACTS: module '{}' variant [{}] entry point '{}' needs {} bytes of workgroup "
+                         "memory and portable capabilities {:#x} in profile '{}', and {} bytes and {:#x} in profile '{}'",
+                         library.ModuleNames[shared.Module],
+                         shared.Variant.Description,
+                         shared.Environment.EntryPoints[entryPointIndex].Name,
+                         facts.WorkgroupMemoryBytes,
+                         portable,
+                         library.Profiles[shared.Profile].TargetName,
+                         baselineFacts.WorkgroupMemoryBytes,
+                         baselinePortable,
+                         library.Profiles[shared.BaselineProfile].TargetName);
+
+            return CookError::SourceFactsTargetMismatch;
+        }
+        return CookError::Success;
+    });
 }
 
 namespace

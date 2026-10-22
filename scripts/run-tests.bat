@@ -33,7 +33,7 @@ if not exist "%BIN%" (
 set "FAILED=0"
 
 for %%T in ("%BIN%\*Test.exe") do (
-    if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" if /I not "%%~nT"=="EnumAxisCookTest" if /I not "%%~nT"=="KitchenSinkCookTest" (
+    if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="WorkgroupMemoryCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" if /I not "%%~nT"=="EnumAxisCookTest" if /I not "%%~nT"=="KitchenSinkCookTest" (
         "%%~fT" >nul 2>&1
         if !ERRORLEVEL! neq 0 (
             echo [FAIL] %%~nT
@@ -81,6 +81,15 @@ if !ERRORLEVEL! neq 0 (
     set "FAILED=1"
 ) else (
     echo [ ok ] ParameterBlocksCookTest
+)
+
+REM The workgroup memory probe. The cross-profile validator compares the bytes and the 16-bit float requirement.
+"%BIN%\WorkgroupMemoryCookTest.exe" -o "%REPO%\build\%PRESET%\tests\workgroup_memory_output" --target=wgsl --target=spirv --verify-deterministic "%REPO%\tests\assets\WorkgroupMemory.slang" >nul 2>&1
+if !ERRORLEVEL! neq 0 (
+    echo [FAIL] WorkgroupMemoryCookTest
+    set "FAILED=1"
+) else (
+    echo [ ok ] WorkgroupMemoryCookTest
 )
 
 REM The multi-module KitchenSink cook. Four consumer modules cook together against one policy, for

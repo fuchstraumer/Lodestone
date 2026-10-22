@@ -156,6 +156,8 @@ struct CookedProfile
     ShaderCodeFormat CodeFormat{ ShaderCodeFormat::None };
     /** Whether the pairs were read, not whether any exist. */
     bool SamplerTexturePairsRecorded{ false };
+    /** Whether the capability names and workgroup memory were read */
+    bool CodeFactsRead{ false };
 };
 
 /** @brief The whole cook. `Environments` is the profile-major grid, and an empty entry was not cooked. */
@@ -175,6 +177,10 @@ CookError AppendVariantToModule(InternedModule& module,
 /** @brief Compares the pairs of each variant that two profiles cooked. Skips profiles that did not record pairs, and
  * entry points with combined texture samplers. */
 CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library);
+
+/** @brief Compares the workgroup memory and the portable capabilities (16-bit floats, subgroups) of each entry point
+ * that two profiles cooked for one variant. Skips profiles that did not read their facts. */
+CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library);
 
 /** @brief Consumes the builder, so nothing after the freeze can reach an interner. */
 CookedModule FreezeModuleTables(InternedModule&& interned);

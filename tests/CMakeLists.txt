@@ -46,6 +46,14 @@ add_lodestone_unit_test(ParameterBlocksCookTest CookTest.cpp
               --target=spirv
               --verify-deterministic
               "${PROJECT_SOURCE_DIR}/tests/assets/ParameterBlocks.slang")
+# The workgroup memory probe: four groupshared variables that pad differently, and one half4 array. The cross-profile
+# validator fails the cook when the two targets read different bytes or a different 16-bit float requirement.
+add_lodestone_unit_test(WorkgroupMemoryCookTest CookTest.cpp
+    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/workgroup_memory_output"
+              --target=wgsl
+              --target=spirv
+              --verify-deterministic
+              "${PROJECT_SOURCE_DIR}/tests/assets/WorkgroupMemory.slang")
 # The same driver, on the module added with interface axes. `InterfaceAxisTest.slang` declares an
 # interface axis: an `extern struct SHADE_MODE : IShadeMode` that a per-variant `export struct` makes
 # concrete. Its three implementations are tagged `ls_axis_interface_impl` and reach the module through
