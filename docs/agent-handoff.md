@@ -14,7 +14,7 @@ fixed, remove it; when a task is done, add one line to section 7 and remove its 
 
 ## 1. State on 2026-10-22
 
-- RelWithDebInfo, `ninja-msvc`: build green, 31 of 31 tests (after F3.4a to c). Known-good dumps: not rerun after F3.3. The change adds a check and moves no cook output.
+- RelWithDebInfo, `ninja-msvc`: build green, 31 of 31 tests (after F3.4a to c and DiamondDogs C7, C8, C9, C13). The suite has 32 targets. Known-good dumps: not rerun after F3.3. The change adds a check and moves no cook output.
 - Debug: do not run it unattended (section 2, item 2).
 - Manifest format version 15. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
 - Phases D and E are complete. Phase F is paused after F1 (two Bound targets, `wgsl` and `spirv`).
@@ -190,6 +190,9 @@ One line for each step. Git history holds the full text.
   generated `VulkanCapabilityTable.hpp`, L6 closed without a device-bound axis.
 - **2026-10-22.** F3.3: `VerifySourceFactsAcrossProfiles` (`SourceFactsTargetMismatch` = 53), `VisitSharedVariants` shared with
   the sampler pair check, `CookedProfile::CodeFactsRead`, `WorkgroupMemoryCookTest` (31st test target). F3.4 proposed.
+- **2026-10-22 (DiamondDogs).** C13 root cause: an import found only through the module cache loads in the first session
+  and not in the workers. C8: `--include-dir` and `INCLUDE_DIRS`, `CrossModuleCookTest`. C7: `UniformMemberRange::Find`.
+  C9: no code location on warnings, `File.cpp:line` on errors. C12, C11, C6 wait (see the requests file).
 - **2026-10-22 (later).** F3.4a to c, format 15: `CodeFactsRead`, `EntryPointInstanceView::Fit`, `ManifestQueryBuilder::ForDevice`
   (C function pointer predicate), `NoVariantFitsDevice`. F3.4d deferred.
 - **2026-10-21 (later).** L16 resource report (format 13, `ResourceReportTest`): footprint axis masks, `DescribeCreation`,

@@ -46,6 +46,16 @@ add_lodestone_unit_test(ParameterBlocksCookTest CookTest.cpp
               --target=spirv
               --verify-deterministic
               "${PROJECT_SOURCE_DIR}/tests/assets/ParameterBlocks.slang")
+# Two modules in separate folders, cooked in one run: the kernel imports the other module, which is outside its folder and
+# its parent. Without --include-dir the cook fails (it once failed in worker setup). The shared module comes first, so the
+# kernel finds a cached copy of it, which a worker cannot load.
+add_lodestone_unit_test(CrossModuleCookTest CookTest.cpp
+    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/cross_module_output"
+              --target=spirv
+              --include-dir "${PROJECT_SOURCE_DIR}/tests/assets/CrossModule/lib"
+              --verify-deterministic
+              "${PROJECT_SOURCE_DIR}/tests/assets/CrossModule/lib/CmShared.slang"
+              "${PROJECT_SOURCE_DIR}/tests/assets/CrossModule/app/CmKernel.slang")
 # The workgroup memory probe: four groupshared variables that pad differently, and one half4 array. The cross-profile
 # validator fails the cook when the two targets read different bytes or a different 16-bit float requirement.
 add_lodestone_unit_test(WorkgroupMemoryCookTest CookTest.cpp

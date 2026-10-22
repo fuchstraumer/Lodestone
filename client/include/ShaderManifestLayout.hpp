@@ -98,6 +98,8 @@ public:
     [[nodiscard]] uint32_t Size() const noexcept;
     [[nodiscard]] bool Empty() const noexcept;
     [[nodiscard]] UniformMemberView operator[](uint32_t position) const noexcept;
+    /** @brief Finds a member by its whole path (through nested scopes with a uniform block) */
+    [[nodiscard]] std::optional<UniformMemberView> Find(std::string_view path) const noexcept;
 
 private:
     friend class ResolvedResource;

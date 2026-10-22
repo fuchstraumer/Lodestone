@@ -151,6 +151,7 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
     // one folder per Slang build and configuration: Slang rejects another IR version (E00131) or worse
     const std::filesystem::path cachePath =
         create_info.ModuleCacheDirectory / BuildCacheFolderName(globalSession->getBuildTagString());
+
     std::error_code cacheError;
     std::filesystem::create_directories(cachePath, cacheError);
     if (cacheError)
@@ -162,13 +163,23 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
                                        cacheError.message()));
     }
     cacheDirectory = cachePath.string();
-    const std::array<const char*, 4> searchPaths
+
+    // The include directories come before the module cache. An import that only the cache can find is a module that an
+    // earlier module of this cook wrote there: it loads in this session, and it cannot be serialized for the workers.
+    std::vector<std::string> includePaths;
+    includePaths.reserve(create_info.IncludeDirectories.size());
+    for (const std::filesystem::path& includeDirectory : create_info.IncludeDirectories)
     {
-        sourceDirectory.c_str(),
-        sharedDirectory.c_str(),
-        cacheDirectory.c_str(),
-        EmbeddedFileSystem::k_BuiltinSearchPath.data(),
-    };
+        includePaths.push_back(std::filesystem::canonical(includeDirectory).string());
+    }
+
+    std::vector<const char*> searchPaths{ sourceDirectory.c_str(), sharedDirectory.c_str() };
+    for (const std::string& includePath : includePaths)
+    {
+        searchPaths.push_back(includePath.c_str());
+    }
+    searchPaths.push_back(cacheDirectory.c_str());
+    searchPaths.push_back(EmbeddedFileSystem::k_BuiltinSearchPath.data());
 
     slang::TargetDesc target{};
     target.format = ToSlangCompileTarget(create_info.Language);
@@ -381,7 +392,10 @@ CookError WriteModuleCache(std::span<const SerializedModule> serialized_modules,
                                                serializedModule.Blob->getBufferSize());
         if (WriteFileAtomically(serializedModule.Path, bytes) != CookError::Success)
         {
-            ReportWarning(sink, std::format("cannot write the module cache file '{}'", serializedModule.Path));
+            ReportWarning(sink,
+                          std::format("cannot replace the module cache file '{}', which another cook may be reading. "
+                                      "The old file stays, and the next cook may recompile this module",
+                                      serializedModule.Path));
             result = CookError::FileWriteFailed;
         }
     }
@@ -430,6 +444,11 @@ CookError SlangModuleContext::primeSessionFromCache(std::span<const SerializedMo
         if (module == nullptr)
         {
             ReportDiagnostics(*diagnosticSink, "SlangModuleContext::loadSerializedModules", diagnosticsBlob);
+            static_cast<void>(ReportError(*diagnosticSink,
+                                          CookError::ModuleLoadFailed,
+                        std::format("a worker cannot load the module '{}'. Slang gives no reason. If the module was found "
+                                    "only in the module cache, pass the folder of its source with --include-dir",
+                                    serializedModule.Name)));
             return CookError::ModuleLoadFailed;
         }
     }

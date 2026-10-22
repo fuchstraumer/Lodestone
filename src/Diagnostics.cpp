@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <format>
 #include <print>
+#include <filesystem>
 #include <source_location>
 #include <string>
 #include <string_view>
@@ -78,7 +79,7 @@ void StderrDiagnosticSink::Report(const Diagnostic& diagnostic)
         ++failureCount;
     }
 
-    if (diagnostic.Severity != DiagnosticSeverity::Note)
+    if (diagnostic.Severity != DiagnosticSeverity::Note && !diagnostic.Context.empty())
     {
         std::println(stderr,
                     "[lodestone] {}{}{}: {} [{}]",
@@ -171,11 +172,10 @@ void ReportToSink(DiagnosticSink& sink,
     Diagnostic diag;
     diag.Severity = severity;
     diag.Message = std::move(message);
-    // don't attach source location for notes/info logs: it's not needed or helpful
-    if (severity != DiagnosticSeverity::Note)
+    // Notes and warnings carry no location
+    if (severity == DiagnosticSeverity::Error || severity == DiagnosticSeverity::Fatal)
     {
-        diag.Context = std::format(
-            "{} {}:L{}", location.file_name(), location.function_name(), location.line());
+        diag.Context = std::format("{}:{}", std::filesystem::path{ location.file_name() }.filename().string(), location.line());
     }
     sink.Report(std::move(diag));
 }

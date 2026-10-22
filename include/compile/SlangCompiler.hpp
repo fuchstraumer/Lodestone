@@ -30,6 +30,7 @@ struct SlangCompilerCreateInfo
 {
     std::filesystem::path ModulePath;
     std::filesystem::path ModuleCacheDirectory;
+    std::vector<std::filesystem::path> IncludeDirectories;
     uint32_t OptimizationLevel{ 0u };
     bool MultithreadVariantBuild{ true };
     /** @brief Sessions are expensive, so a small batch on every thread oversubscribes. */

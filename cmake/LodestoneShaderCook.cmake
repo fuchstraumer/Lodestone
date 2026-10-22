@@ -5,6 +5,7 @@
 #       TARGETS <profile>...              # wgsl, spirv: each becomes a --target=
 #       MODULES <file.slang>...
 #       [POLICY_FILE <file.toml>]
+#       [INCLUDE_DIRS <dir>...]           # searched for imported modules, after the folder of each module
 #       [OPTIONS <cooker argument>...])   # passed to the cooker as written, for example --quiet
 #
 # This adds a custom target <name>. Use add_dependencies to make the consuming target depend on it. The
@@ -22,7 +23,7 @@ set(LODESTONE_COOKER_EXECUTABLE "" CACHE FILEPATH
     "A host lodestone_cooker_console executable. Required when this build has no cooker, as in a cross build.")
 
 function(lodestone_add_shader_cook NAME)
-    cmake_parse_arguments(PARSE_ARGV 1 COOK "" "OUTPUT_DIR;POLICY_FILE" "TARGETS;MODULES;OPTIONS")
+    cmake_parse_arguments(PARSE_ARGV 1 COOK "" "OUTPUT_DIR;POLICY_FILE" "TARGETS;MODULES;OPTIONS;INCLUDE_DIRS")
     if (COOK_UNPARSED_ARGUMENTS)
         message(FATAL_ERROR "lodestone_add_shader_cook(${NAME}): unknown arguments: ${COOK_UNPARSED_ARGUMENTS}")
     endif()
@@ -61,6 +62,10 @@ function(lodestone_add_shader_cook NAME)
         list(APPEND COOK_ARGUMENTS --policy-file "${COOK_POLICY_FILE}")
         list(APPEND INPUT_DEPENDENCIES "${COOK_POLICY_FILE}")
     endif()
+    foreach (INCLUDE_DIR IN LISTS COOK_INCLUDE_DIRS)
+        cmake_path(ABSOLUTE_PATH INCLUDE_DIR BASE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" NORMALIZE)
+        list(APPEND COOK_ARGUMENTS --include-dir "${INCLUDE_DIR}")
+    endforeach ()
     list(APPEND COOK_ARGUMENTS ${COOK_OPTIONS} ${MODULE_PATHS})
 
     set(MANIFEST_PATH "${COOK_OUTPUT_DIR}/ShaderLibrary.ldmanifest")

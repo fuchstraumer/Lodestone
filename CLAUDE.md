@@ -115,7 +115,7 @@ it exits 1 on `NoOutputSpecified`, which reads like a failure rather than a usag
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
-Thirty-one test targets exist. Twenty-five are unit tests, and each one proves a claim the repository
+Thirty-two test targets exist. Twenty-five are unit tests, and each one proves a claim the repository
 makes. Nineteen need no Slang and no asset, and together they run in about half a second.
 `WgslValidatorTest` links Tint to read WGSL. `SpvValidatorTest` links SPIRV-Tools to assemble SPIR-V.
 `AccessModelRejectTest`, `AxisDefaultTest`, `DerivedConstantTest`, `EntryPointConstantsTest`, and `ResourceRoleTest` cook small modules
@@ -151,8 +151,8 @@ through Slang, and each takes about one second. `SlangMetadataCanaryTest` calls 
 
 An error check prints a diagnostic to `stderr` on purpose. Read the last line for the result.
 
-The last six are different. Each one is the cooker driver, and not an assertion suite.
-`tests/CMakeLists.txt` gives each a command line through `TEST_ARGS`, and all six build from
+The last seven are different. Each one is the cooker driver, and not an assertion suite.
+`tests/CMakeLists.txt` gives each a command line through `TEST_ARGS`, and all seven build from
 `CookTest.cpp`. Each one passes `--target=wgsl`, `--target=spirv`, and `--verify-deterministic`, so one
 cook writes a bundle with two profiles. Exit code 0 there is a real statement: every variant compiled
 for both targets, every reflection agreed with the emitted WGSL (Tint) and the emitted SPIR-V
@@ -166,6 +166,11 @@ for both targets, every reflection agreed with the emitted WGSL (Tint) and the e
   points declare a `uniform` parameter, and one of those takes a struct with an annotated field.
   Phase E step E0a needed it, and it is the acceptance test for the entry point scope walk. It cooks
   one variant in about half a second.
+
+- `CrossModuleCookTest` cooks `tests/assets/CrossModule/lib/CmShared.slang` and `tests/assets/CrossModule/app/CmKernel.slang`
+  in one run, with `--include-dir` for the `lib` folder. The kernel imports the shared module from a folder that is neither
+  its own nor its parent. The shared module cooks first, so the kernel session can find it through the module cache, which
+  the worker sessions cannot load from. It cooks two modules in about one second.
 
 - `WorkgroupMemoryCookTest` cooks `tests/assets/WorkgroupMemory.slang`. Four `groupshared` variables pad
   differently (a `float3` array, a struct, a `float` array, a `half4` array), and both targets must read 144 bytes and
@@ -207,7 +212,8 @@ it. `lodestone` itself stays a static library: the tool parses a command line, b
 that `tests/CMakeLists.txt` supplies.
 
 `ParseCommandLine` in `src/driver/CookerOptions.cpp` parses the flags, and `GetUsageText` prints them:
-`--output/-o`, `--cache-dir`, `--O0` to `--O3`, `--target=<name>`, `--no-validate`, `--quiet`,
+`--output/-o`, `--cache-dir`, `--include-dir/-I <path>` (repeatable),
+`--O0` to `--O3`, `--target=<name>`, `--no-validate`, `--quiet`,
 `--single-threaded`, `--no-dedupe`, `--verify-deterministic`, `--dump-stage=<name>`, `--dump-sources`,
 and `--depfile`. `--depfile` writes `ShaderLibrary.d`, a Makefile-form depfile that names every file Slang
 read, `import` and `__include` included. `--dump-sources` writes every unique compiled source to a subfolder
@@ -216,6 +222,11 @@ and its source hashes. Each file holds the target code only (`.wgsl` or `.spv`),
 and `spirv-val` read it directly. The output sink creates the subfolder.
 
 A value flag is a row in `k_ValueFlags`, beside `k_SwitchFlags`. Add a row, not a branch.
+
+A module finds an imported module in its own folder, in that folder's parent, in each `--include-dir` in the order given,
+and in the module cache, in that order. The cache comes last on purpose. A module that only the cache can find loads in
+the first session and fails in the worker sessions, with no reason from Slang (the 2026-10-22 DiamondDogs report C13), so
+the priming error names `--include-dir`. `lodestone_add_shader_cook` takes `INCLUDE_DIRS <dir>...`.
 
 `--target` is required, like `-o` and a module path. A cook with no target cooks nothing, so
 `ParseCommandLine` fails with `NoTargetSpecified`. Repeat the flag for more than one target. An unknown
@@ -851,7 +862,7 @@ different fact from a source that needs nothing (`EnvironmentView::HasCodeFacts`
 only when the bit is set.
 
 The client reads them with `EntryPointInstanceView::RequiredCapabilities`, `RequiresCapability`, and
-`WorkgroupMemoryBytes`. `EntryPointInstanceView::Fit(supported, limits)` (header `ShaderManifestDevice.hpp`) tells whether a
+`WorkgroupMemoryBytes`. `UniformMemberRange::Find(path)` finds a uniform member by its whole dotted path, with no suffix matching. `EntryPointInstanceView::Fit(supported, limits)` (header `ShaderManifestDevice.hpp`) tells whether a
 device can run one instance, and returns the first reason when it cannot (`DeviceFit`, `DeviceMismatch`): a missing
 capability, the workgroup memory, the invocations, the size on one side, or the push constant bytes. The device is a
 capability predicate and a `DeviceLimits` value. The predicate is a plain function pointer with a user pointer

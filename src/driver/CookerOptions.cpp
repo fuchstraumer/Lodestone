@@ -26,7 +26,7 @@ namespace
 
     constexpr std::string_view k_UsageText =
         "Usage: lodestone --output <directory> --target=<name> [--O<level>] [--no-validate] [--quiet]\n"
-        "                 [--cache-dir <path>] [--single-threaded] [--no-dedupe]\n"
+        "                 [--cache-dir <path>] [--include-dir <path>]... [--single-threaded] [--no-dedupe]\n"
         "                 [--verify-deterministic] [--dump-stage=<name>]\n"
         "                 [--policy-file <path>] [--depfile] <module.slang>...\n"
         "  --output, -o    output directory (required)\n"
@@ -35,6 +35,8 @@ namespace
         "  --no-validate   skip cross-checking reflection against the emitted text\n"
         "  --quiet         suppress the per-variant reflection report\n"
         "  --cache-dir     directory for precompiled slang modules\n"
+        "  --include-dir <path> directory to search for imported modules, after the folder of each module\n"
+        "                  and its parent. Repeat it for more than one\n"
         "  --single-threaded disable multi-threaded entry point codegen\n"
         "  --no-dedupe     disable content deduplication\n"
         "  --verify-deterministic cook twice and compare all artifacts\n"
@@ -384,6 +386,15 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
                 return std::unexpected(cacheDirectory.error());
             }
             options.ModuleCacheDirectory = cacheDirectory.value();
+        }
+        else if (argument == "--include-dir" || argument == "-I")
+        {
+            CookResult<std::filesystem::path> includeDirectory = ReadPathArgument(arguments, i, CreateDirectory::No);
+            if (!includeDirectory)
+            {
+                return std::unexpected(includeDirectory.error());
+            }
+            options.IncludeDirectories.push_back(std::move(includeDirectory.value()));
         }
         else if (argument == "--policy-file")
         {

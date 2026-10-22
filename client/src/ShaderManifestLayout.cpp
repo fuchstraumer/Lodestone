@@ -117,6 +117,20 @@ UniformMemberView UniformMemberRange::operator[](uint32_t position) const noexce
     return UniformMemberView{ environment, &members[position] };
 }
 
+std::optional<UniformMemberView> UniformMemberRange::Find(std::string_view path) const noexcept
+{
+    for (uint32_t position = 0u; position < Size(); ++position)
+    {
+        const UniformMemberView member = (*this)[position];
+        if (member.Name() == path)
+        {
+            return member;
+        }
+    }
+    
+    return std::nullopt;
+}
+
 ResolvedResource::ResolvedResource(const EnvironmentView* _environment,
                                    const Binding* _record,
                                    const Footprint* _footprint) noexcept

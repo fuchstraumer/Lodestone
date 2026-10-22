@@ -33,7 +33,7 @@ if not exist "%BIN%" (
 set "FAILED=0"
 
 for %%T in ("%BIN%\*Test.exe") do (
-    if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="WorkgroupMemoryCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" if /I not "%%~nT"=="EnumAxisCookTest" if /I not "%%~nT"=="KitchenSinkCookTest" (
+    if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="WorkgroupMemoryCookTest" if /I not "%%~nT"=="CrossModuleCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" if /I not "%%~nT"=="EnumAxisCookTest" if /I not "%%~nT"=="KitchenSinkCookTest" (
         "%%~fT" >nul 2>&1
         if !ERRORLEVEL! neq 0 (
             echo [FAIL] %%~nT
@@ -81,6 +81,15 @@ if !ERRORLEVEL! neq 0 (
     set "FAILED=1"
 ) else (
     echo [ ok ] ParameterBlocksCookTest
+)
+
+REM Two modules in separate folders, cooked in one run. The kernel imports the other module through --include-dir.
+"%BIN%\CrossModuleCookTest.exe" -o "%REPO%\build\%PRESET%\tests\cross_module_output" --target=spirv --include-dir "%REPO%\tests\assets\CrossModule\lib" --verify-deterministic "%REPO%\tests\assets\CrossModule\lib\CmShared.slang" "%REPO%\tests\assets\CrossModule\app\CmKernel.slang" >nul 2>&1
+if !ERRORLEVEL! neq 0 (
+    echo [FAIL] CrossModuleCookTest
+    set "FAILED=1"
+) else (
+    echo [ ok ] CrossModuleCookTest
 )
 
 REM The workgroup memory probe. The cross-profile validator compares the bytes and the 16-bit float requirement.

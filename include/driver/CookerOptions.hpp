@@ -38,6 +38,7 @@ struct CookerOptions
 {
     std::filesystem::path OutputPath;
     std::filesystem::path ModuleCacheDirectory;
+    std::vector<std::filesystem::path> IncludeDirectories;
     std::vector<std::filesystem::path> ModulePaths;
     uint32_t OptimizationLevel{ 0u };
     std::vector<std::string> TargetNames;

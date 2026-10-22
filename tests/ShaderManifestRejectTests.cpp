@@ -369,6 +369,54 @@ void TestSourceFactsAcrossProfiles(lodestone::tests::TestRunner& runner)
                  "a profile with no reader is not compared");
 }
 
+/** A member is found by its whole path. The names are the ones from the DiamondDogs report: `SwellWindSpeed`-style
+ * suffix matching took the wrong member, so `WindSpeed` and `Swell.WindSpeed` must stay apart. */
+void TestMemberLookup(lodestone::tests::TestRunner& runner)
+{
+    runner.BeginSection("a uniform member is found by its whole path");
+    CookedLibrary library = MakeConstantsLibrary(true);
+    CookedModule& module = *library.Environments[0u];
+    const auto member = [](std::string name, uint32_t offset)
+    {
+        lodestone::ReflectedUniformMember result;
+        result.Name = std::move(name);
+        result.Data.Offset = offset;
+        result.Data.Size = 4u;
+        return result;
+    };
+    const std::vector<lodestone::ReflectedUniformMember> members{ member("WindSpeed", 8u),
+                                                                  member("Swell.Height", 48u),
+                                                                  member("Swell.WindSpeed", 52u) };
+    module.Resources[0u].UniformMembers = members;
+    module.Resources[0u].ByteSize = 64u;
+    module.EntryPointConstantsTable[1u].Members = members;
+    module.EntryPointConstantsTable[1u].ByteSize = 64u;
+
+    const lodestone::CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library);
+    const ManifestResult<BundleView> bundle =
+        manifest.has_value() ? BundleView::Open(*manifest) : ManifestResult<BundleView>{ std::unexpected(ErrorCode::TooSmall) };
+    const ManifestResult<EnvironmentView> environment =
+        bundle.has_value() ? bundle->OpenEnvironment(0u, 0u) : ManifestResult<EnvironmentView>{ std::unexpected(bundle.error()) };
+    runner.Check(environment.has_value(), "the module with nested member names opens");
+    if (!environment.has_value())
+    {
+        return;
+    }
+
+    const lodestone::manifest::EntryPointInstanceView instance = environment->VariantAt(0u).EntryPoint(0u);
+    for (const lodestone::manifest::UniformMemberRange range :
+         { instance.Constants().Members(), instance.Layout()[0u].Members() })
+    {
+        const auto wind = range.Find("WindSpeed");
+        const auto swellWind = range.Find("Swell.WindSpeed");
+        runner.Check(wind.has_value() && wind->Offset() == 8u, "a plain name finds its own member");
+        runner.Check(swellWind.has_value() && swellWind->Offset() == 52u, "a dotted path finds the nested member");
+        runner.Check(!range.Find("Wind").has_value() && !range.Find("Speed").has_value() && !range.Find("Swell").has_value() &&
+                         !range.Find("").has_value(),
+                     "a prefix, a suffix, a parent, and an empty path match nothing");
+    }
+}
+
 int main()
 {
     lodestone::tests::TestRunner runner{ "ShaderManifestRejectTests" };
@@ -709,6 +757,7 @@ int main()
 
     TestSourceFacts(runner);
     TestSourceFactsAcrossProfiles(runner);
+    TestMemberLookup(runner);
 
     return runner.Report();
 }
