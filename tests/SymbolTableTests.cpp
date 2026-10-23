@@ -261,6 +261,8 @@ void TestExternTypeDefaultExtraction(TestRunner& runner)
 // that used to be in the ExternConstScanner.
 void TestExternConstExtraction(TestRunner& runner)
 {
+    runner.BeginSection("extern const extraction");
+
     constexpr std::string_view k_Source = R"(module OceanFft;
 
     extern static const uint IFFT_SIZE = 256;

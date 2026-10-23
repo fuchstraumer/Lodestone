@@ -430,7 +430,11 @@ void CheckSharedLayoutRejectsADifference(lodestone::tests::TestRunner& runner, c
     module.Variants.front().ResourceListIndex = static_cast<uint32_t>(module.ResourceLists.size() - 1u);
 
     const CookResult<bool> finalResult = AllVariantsShareOneLayout(module);
-    runner.Check(finalResult.has_value() ? !finalResult.value() : true, "one variant with a different layout ends the claim");
+    // an error here must fail: it would let the claim pass without being tested
+    if (runner.CheckOk(finalResult, "the changed module still resolves its layouts"))
+    {
+        runner.Check(!finalResult.value(), "one variant with a different layout ends the claim");
+    }
 }
 
 /** The measurement must read every group of variants, not the first one it finds. */

@@ -10,6 +10,8 @@
 #include "TestHarness.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <format>
+#include <string>
 #include <vector>
 
 // the space has the shape of OceanFft's: two independent axes, and one gated on its parent
@@ -189,6 +191,23 @@ int main()
     }
 
     runner.Check(matchesRealVariant, "the partial assignment names a variant the cook produced");
+
+    runner.BeginSection("MaxVariants is the largest variant count that cooks");
+    for (const uint32_t budget : { k_ExpectedVariantCount - 1u, k_ExpectedVariantCount, k_ExpectedVariantCount + 1u })
+    {
+        const TargetCookPolicy policy{ .MaxVariants = budget };
+        lodestone::RecordingDiagnosticSink budgetSink;
+        const CookResult<VariantSet> budgeted = k_TestSpace.EnumerateVariants(policy, budgetSink);
+        const std::string claim = std::format("{} variants against a budget of {}", k_ExpectedVariantCount, budget);
+        if (budget < k_ExpectedVariantCount)
+        {
+            runner.CheckError(budgeted, lodestone::CookError::PermutationVariantBudgetExceeded, claim);
+        }
+        else
+        {
+            runner.CheckOk(budgeted, claim);
+        }
+    }
 
     runner.BeginSection("a module with no registered space still cooks");
     const PermutationSpace emptySpace{ {} };

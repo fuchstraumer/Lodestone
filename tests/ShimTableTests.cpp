@@ -9,9 +9,13 @@
 #include "target/TargetProfile.hpp"
 
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <ios>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -111,6 +115,10 @@ int main()
     runner.Check(boundComplete, "every interface has a Bound implementation and a resource class");
 
     const ShimInterface* readBuffer = FindShimInterface("IReadBuffer");
+    if (!runner.Check(readBuffer != nullptr, "IReadBuffer is in the table"))
+    {
+        return runner.Report();
+    }
     runner.Check(readBuffer != nullptr && readBuffer->Class == ShimResourceClass::Buffer && readBuffer->TypeParameterCount == 1u &&
                      ShimImplName(*readBuffer, AccessModel::Bound) == "BoundReadBuffer",
                  "an interface is found by name with its class, arity, and Bound implementation");

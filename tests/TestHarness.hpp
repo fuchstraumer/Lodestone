@@ -30,8 +30,8 @@ struct Claim
     explicit Claim(std::string_view text,
                    std::source_location location = std::source_location::current()) noexcept;
 
-    explicit Claim(const std::string& text,
-                   std::source_location location = std::source_location::current()) noexcept;
+    Claim(const std::string& text,
+          std::source_location location = std::source_location::current()) noexcept;
 
     std::string_view Text;
     std::source_location Location;

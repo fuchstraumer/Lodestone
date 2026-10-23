@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <format>
 #include <initializer_list>
 #include <span>
 #include <string>
@@ -36,7 +37,11 @@ void CheckValue(lodestone::tests::TestRunner& runner,
                 DiagnosticSink& sink)
 {
     const auto result = EvaluateExpression(expression, k_Symbols, sink);
-    runner.Check(result.has_value() && result.value() == expected, description);
+    const std::string claim = std::format("{}: `{}`", description, expression);
+    if (runner.CheckOk(result, claim))
+    {
+        runner.CheckEqual(*result, expected, claim);
+    }
 }
 
 void CheckError(lodestone::tests::TestRunner& runner,
@@ -45,11 +50,10 @@ void CheckError(lodestone::tests::TestRunner& runner,
                 std::string_view description,
                 StderrDiagnosticSink& sink)
 {
-    static int64_t diagCount = 0;
+    const int32_t failuresBefore = sink.FailureCount();
     const auto result = EvaluateExpression(expression, k_Symbols, sink);
-    runner.Check(!result.has_value() && result.error() == expected, description);
-    runner.Check(sink.FailureCount() > diagCount, "expected diagnostic emitted");
-    ++diagCount;
+    runner.CheckError(result, expected, std::format("{}: `{}`", description, expression));
+    runner.Check(sink.FailureCount() > failuresBefore, std::format("`{}` reports a diagnostic", expression));
 }
 
 void CheckIdentifierCollection(lodestone::tests::TestRunner& runner, std::string_view expression, std::initializer_list<std::string_view> expected_identifiers, StderrDiagnosticSink& sink)

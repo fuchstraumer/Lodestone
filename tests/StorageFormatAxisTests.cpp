@@ -1,9 +1,15 @@
+#include "ShaderLibraryTypes.hpp"
+#include "ShaderManifestFormat.hpp"
 #include "TestHarness.hpp"
 
 #include "CookComparison.hpp"
 #include "ShaderManifest.hpp"
 #include "ShaderManifestIndex.hpp"
 #include "VariantKey.hpp"
+#include "driver/CookerDriver.hpp"
+#include "driver/CookerOptions.hpp"
+#include "emit/OutputSink.hpp"
+#include "emit/ShaderManifestEmitter.hpp"
 #include "target/StorageFormatTable.hpp"
 
 #include <cstddef>
@@ -114,9 +120,12 @@ int main(int argc, char** argv)
             for (const StorageFormatInfo& format : table)
             {
                 const int32_t controlModule = controlBundle->FindModule(std::format("MipControl_{}", format.EnumCase));
+                if (!runner.Check(controlModule >= 0, std::format("{}: the control module is in the bundle", format.EnumCase)))
+                {
+                    continue;
+                }
                 const manifest::ManifestResult<manifest::EnvironmentView> control =
-                    controlModule >= 0 ? controlBundle->OpenEnvironment(profile, static_cast<uint32_t>(controlModule))
-                                       : std::unexpected(controlBundle.error());
+                    controlBundle->OpenEnvironment(profile, static_cast<uint32_t>(controlModule));
                 const std::optional<uint32_t> variant = FindVariantOf(*environment, format.EnumCase);
                 if (!control.has_value() || !variant.has_value())
                 {
