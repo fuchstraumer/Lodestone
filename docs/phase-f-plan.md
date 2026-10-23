@@ -633,3 +633,22 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
     for the undriven warning: no size expression can name it, because the scanner reads attribute strings too.
     `AxisDefaultTest` cooks `AxisDefaultUnread.slang` (an unread enum axis); the row fails without the fix.
   - Next: C11.4.
+- 2026-10-23. **C11.4 done, and DiamondDogs C11 is done**, not committed. 41 of 41 tests, 60 of 60 known-good dumps.
+  - `StorageFormatAxisTest`: `tests/assets/StorageFormatAxis/MipDownsample.slang` (a 2x2 box filter, the format axis read by
+    the attribute only) against one control for each format, written by the test from the table with a literal
+    `WTexture2D<Type>`. Same resources, places, and format on both targets. `tests/CookComparison.hpp` is the compare that
+    `ShimCookTest` used, now with `StorageFormat` in the key.
+  - **Found, fixed:** `CookValues` took booleans and integers only, so a subset of an enum axis could not be written, and
+    decision O24 had no mechanism. `AxisCookValues::CaseNames` holds the strings (the TOML is read before the axes exist),
+    `PermutationAxis::FindEnumCase` resolves them, the validation checks each with a "did you mean", and `EnumerateVariants`
+    turns them into `MakeEnum`. `PolicyDocumentTest` has the rows.
+  - **Measured:** Slang infers `rgba32f` for `RWTexture2D<float4>` with no `[format]` (`slang-check-decl.cpp`, unless
+    `-default-image-format-unknown`), so that form needs no `StorageImageWriteWithoutFormat` either. `[format("unknown")]`
+    needs `StorageImageReadWithoutFormat` and `StorageImageWriteWithoutFormat`; the test uses it as the positive arm of the
+    capability check.
+  - Cook time: the subject (one module, six variants, two targets, two cooks) takes about 1.8 s, and the six controls as six
+    modules take about 9.7 s, so module startup dominates. The cost of the value modules alone is not isolated; F2.6 measured
+    about 4 percent for one link module on a one-variant cook.
+  - Not covered: a shim extern in an array (the DiamondDogs pyramid binds `imageMipLevels[16]`), integer formats, and
+    `read_write`.
+  - Next: F4.

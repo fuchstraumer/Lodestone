@@ -26,7 +26,7 @@ DiamondDogs needs from Lodestone. Text follows ASD-STE100. Ask the author before
 | C7 | **Done 2026-10-22.** Exact member lookup. `UniformMemberView` lookup by path (for example `FindMember("WindSpeed")`) with exact matching. Document how member names are qualified. Use `UniformMemberRange::Find(path)`: `instance.Constants().Members().Find("Swell.WindSpeed")`, or `resource.Members().Find(...)`. It returns `std::optional<UniformMemberView>`. See the notes below. | Member names in the manifest can be qualified. A client that matches by suffix gets the wrong member. | A hand-written suffix match took `SwellWindSpeed` (offset 52) for `WindSpeed` (offset 8). DiamondDogs now compares the last name component whole. |
 | C8 | **Done 2026-10-22.** Include search paths. `INCLUDE_DIRS` on `lodestone_add_shader_cook`, and `--include-dir <path>` (or `-I <path>`) on the cooker. See the notes below. | Build-generated Slang must be able to stay in the build directory. | The cooker searches only the module's folder, so `OceanFftGenerated.slang` is written into the DiamondDogs source tree (only when its contents change). |
 | C9 | **Done 2026-10-22** (the warning text and the context; the cache message is explained below). Shorter diagnostics. The "no specific policy coverage" warning prints a full C++ function signature on every build. Print the module and the target. Leave out the source location, or show it only with `--verbose`. Warnings now print no code location, and an error prints `File.cpp:line` in place of the function signature. | The build log is hard to read. | Not applicable. Separately, "cannot write the module cache file" appeared once during a concurrent build. |
-| C11 | **Planned 2026-10-22** (phase F, after F2; see `docs/phase-f-plan.md`). It will be an enum axis over a `StorageFormat` enum in `LodestoneShims` (six float formats) and a write-only storage shim, not an `ls_format` string. A storage format that the cook evaluates for each variant: `[ls_format("expr")]`, a string evaluated against the axis values, as `ls_extent_*` is. It sets the storage image's format in each variant, and the manifest records it as `StorageFormat`. | Slang's `[format(...)]` takes a literal, so an axis cannot pick the format of a storage image. A shader that works on several formats (a mip generator, a blur, a copy) must then write without a format. Without any `[format]`, Slang guesses `rgba32f` from `float4`, which is wrong for every other format: validation reports `Undefined-Value-StorageImage-FormatMismatch-ImageView`. | `NvproPyramid` (`assets/shaders/compute/Pyramid`) declares its level bindings `[format("unknown")]`, and `pyramid::MipGenerator` requires `shaderStorageImageWriteWithoutFormat`. The WGSL target cannot cook it, because WGSL storage textures need a format. |
+| C11 | **Done 2026-10-23** (phase F steps C11.0 to C11.4; see the notes below). Not an `ls_format` string: an enum axis over `StorageFormat` in `LodestoneShims` (six float formats) selects the type argument of a write-only storage shim, `[ls_storage_format("AXIS")] extern struct Next : IWriteStorageTexture2D;`. A policy `CookValues` list of case names cooks a subset. The manifest records each variant's format as `StorageFormat`, as before. | Slang's `[format(...)]` takes a literal, so an axis cannot pick the format of a storage image. A shader that works on several formats (a mip generator, a blur, a copy) must then write without a format. Without any `[format]`, Slang guesses `rgba32f` from `float4`, which is wrong for every other format: validation reports `Undefined-Value-StorageImage-FormatMismatch-ImageView`. | `NvproPyramid` (`assets/shaders/compute/Pyramid`) declares its level bindings `[format("unknown")]`, and `pyramid::MipGenerator` requires `shaderStorageImageWriteWithoutFormat`. The WGSL target cannot cook it, because WGSL storage textures need a format. |
 | C12 | **Done 2026-10-22** (SPIR-V; see the notes below). Binding arrays in the SPIR-V validator: a fixed-size `OpTypeArray` of images, samplers or buffers. The validator now rejects them ("a binding array, which this validator does not read yet", `SpvModuleReader.cpp` `ClassifyVariable`), so the cook fails with `ReflectionMismatch`. The client already reads `ResolvedResource::ArrayCount()`. | A shader that indexes one of several views by a uniform index, such as the mip levels of a texture (nvpro_pyramid's `imageMipLevels[16]`). | `NvproPyramid` declares sixteen bindings, `PyramidLevel0` to `PyramidLevel15`, and switches on the level. `WriteManifestDescriptors` (DiamondDogs RhiResources) already writes array bindings from `ArrayCount()`, so the switch can go when C12 lands. |
 | C13 | **Done 2026-10-22** (one fault, fixed by C8; see the notes below). Cross-module imports in one cook (added 2026-10-22). Two parts: (1) when module B imports module A and both are in `MODULES`, the cook fails in worker setup with `WorkerSetupFailed (ModuleLoadFailed)`, also with a 4-line test module, so it is not specific to one shader; (2) an imported module is found only in the importer's folder or that folder's parent. C8 (include search paths) may solve part 2, but part 1 is a separate failure. | Shared shader libraries. `ddColor` (`assets/shaders/common/Color`) is the color math that every HDR pass and opt-in material shader imports, in other folders. | `ColorMathTest/CMakeLists.txt` copies the kernel, `ddColor.slang` and `ddColorGenerated.slang` into one build folder, and cooks only the kernel. OceanFft cannot import `ddColor` until this is fixed. |
 
@@ -37,6 +37,48 @@ variant with `Where(...).SingleFor(...)`, reads uniform offsets and bindings fro
 compares every output word with the CPU. A Lodestone change that breaks the client contract fails this test.
 
 ## Notes for the DiamondDogs agent
+
+### C11: a storage format for each variant
+
+Declare the axis and the shim extern, and write through the shim:
+
+```slang
+import LodestoneAttributes;
+import LodestoneShims;
+
+[ls_axis_enum]
+extern static const StorageFormat LEVEL_FORMAT = StorageFormat::Rgba16Float;
+
+extern struct Previous : ITexture2DRef;
+[ls_storage_format("LEVEL_FORMAT")]
+extern struct Next : IWriteStorageTexture2D;
+
+struct MipLevel { Previous previous; Next next; };
+ParameterBlock<MipLevel> level;
+// level.next.Store(id.xy, value); takes a float4, narrowed to the texel of the format
+```
+
+- The accepted formats are the cases of `StorageFormat`: `Rgba8Unorm`, `Rgba8Snorm`, `Rgba16Float`, `R32Float`, `Rg32Float`,
+  `Rgba32Float`. The comment on the enum in `builtins/LodestoneShims.slang` lists the formats that are not accepted, and why.
+- Each variant binds a storage texture of its format on both targets: `texture_storage_2d<rgba16float, write>` on WGSL, and an
+  image with that format on SPIR-V, so no variant needs `StorageImageWriteWithoutFormat`. Select the variant with
+  `Where("LEVEL_FORMAT", AxisValueDomain::Enum, "Rgba16Float")`, and read the format back with `ResolvedResource::StorageFormat()`.
+- The shim is write-only. Read the previous level through `ITexture2DRef` (a sampled texture). A `read_write` storage texture
+  is portable for `R32Float` only, because core WebGPU allows no other format there.
+- A subset of formats is policy, not shader code: `[Module.targets.spirv.CookValues]` with `LEVEL_FORMAT = ["Rgba16Float", "R32Float"]`.
+  A misspelled case fails the cook with a suggestion.
+- The axis must not be gated by `ls_axis_active_when`. A storage extern with no attribute, an attribute that names no axis,
+  and an axis over another enum each fail the cook with their own error (`ShimStorageFormatMissing` = 180,
+  `ShimStorageFormatAxisUnknown` = 181, `ShimStorageFormatAxisInvalid` = 182).
+- **Not covered: an array of shim externs.** `NvproPyramid` binds its levels as one array (`imageMipLevels[16]`, C12). A shim
+  extern cannot be an array element yet, so this form serves a kernel that writes one level for each dispatch (the shape of
+  `tests/assets/StorageFormatAxis/MipDownsample.slang`). Tell the author if the pyramid needs the array form with a format
+  axis.
+- On this Slang a plain `RWTexture2D<float4>` with no `[format]` gets `rgba32f` from its element type, so it does not need
+  `StorageImageWriteWithoutFormat` either. That is the wrong format for any other image view, which is the fault C11 removes.
+
+`tests/StorageFormatAxisTest` is the proof: for both targets and every format, the variant binds the same resources at the
+same places, with the same format, as a control written with the literal type.
 
 ### C13 and C8: imports across folders
 

@@ -1,78 +1,29 @@
 #include "TestHarness.hpp"
 
-#include "CookerErrors.hpp"
-#include "ShaderLibraryTypes.hpp"
+#include "CookComparison.hpp"
 #include "ShaderManifest.hpp"
-#include "driver/CookerDriver.hpp"
-#include "driver/CookerOptions.hpp"
-#include "emit/OutputSink.hpp"
-#include "emit/ShaderManifestEmitter.hpp"
 
-#include <algorithm>
-#include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <filesystem>
 #include <format>
-#include <map>
-#include <string>
-#include <string_view>
-#include <tuple>
 #include <vector>
 
 namespace
 {
 
 using namespace lodestone;
-
-/** What a renderer needs to create and bind one resource, without its name: the names differ by design. */
-using ResourceKey = std::tuple<uint32_t, uint32_t, BindingKind, ResourceShape, ResourceAccess, uint32_t, uint32_t, uint64_t>;
-
-struct CookedBundle
-{
-    std::vector<std::byte> Bytes;
-    bool Cooked{ false };
-};
+using tests::CookBothTargets;
+using tests::CookedBundle;
+using tests::ResourceKey;
 
 CookedBundle Cook(const std::filesystem::path& module_path)
 {
-    CookerOptions options;
-    options.ModulePaths.push_back(module_path);
-    options.TargetNames.emplace_back("wgsl");
-    options.TargetNames.emplace_back("spirv");
-    options.OutputPath = "ShimCook";
-    // two cooks of the module must agree byte for byte
-    options.VerifyDeterministic = true;
-
-    MemoryOutputSink sink;
-    CookedBundle result;
-    result.Cooked = RunCook(options, sink).has_value();
-    const auto manifest = sink.GetArtifacts().find(std::string{ k_ManifestFileName });
-    if (manifest != sink.GetArtifacts().end())
-    {
-        result.Bytes.resize(manifest->second.size());
-        std::memcpy(result.Bytes.data(), manifest->second.data(), result.Bytes.size());
-    }
-    return result;
+    return CookBothTargets({ module_path }, std::nullopt);
 }
 
 std::vector<ResourceKey> KeysOf(const manifest::EnvironmentView& environment, uint32_t entry_point)
 {
-    std::vector<ResourceKey> keys;
-    for (const manifest::ResolvedResource resource : environment.VariantAt(0u).EntryPoint(entry_point).Layout())
-    {
-        const manifest::PlacementPayload placement = resource.PlacementValue();
-        keys.emplace_back(placement.Word0,
-                          placement.Word1,
-                          resource.Kind(),
-                          resource.Shape(),
-                          resource.Access(),
-                          resource.ElementStride(),
-                          resource.ArrayCount(),
-                          resource.ByteSize());
-    }
-    std::ranges::sort(keys);
-    return keys;
+    return tests::ResourceKeysOf(environment, 0u, entry_point);
 }
 
 } // namespace

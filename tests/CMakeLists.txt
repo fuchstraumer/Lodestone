@@ -171,6 +171,11 @@ target_compile_definitions(ShimCookTest PRIVATE
 add_lodestone_unit_test(StorageFormatTest StorageFormatTests.cpp)
 target_compile_definitions(StorageFormatTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/Shims")
+# A mip kernel whose storage format is an axis (DiamondDogs request C11, step C11.4), compared with one control for each format
+# written with the literal type, and a policy that cooks a subset. It cooks through Slang four times, so it takes a few seconds.
+add_lodestone_unit_test(StorageFormatAxisTest StorageFormatAxisTests.cpp)
+target_compile_definitions(StorageFormatAxisTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/StorageFormatAxis")
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)

@@ -14,22 +14,20 @@ fixed, remove it; when a task is done, add one line to section 7 and remove its 
 
 ## 1. State on 2026-10-22
 
-- RelWithDebInfo, `ninja-msvc`: build green, 40 of 40 tests (after C11.3; C11.3 is not committed). Known-good dumps: 60 of 60
+- RelWithDebInfo, `ninja-msvc`: build green, 41 of 41 tests (after C11.4; C11.4 is not committed). Known-good dumps: 60 of 60
   (checked 2026-10-22).
 - Debug: do not run it unattended (section 2, item 2).
 - Manifest format version 15. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
-- Phases D and E are complete. Phase F has F0, F1, F3.1 to F3.4c, F3.5, and F2 done; C11, F4, F5, and F6 are open.
+- Phases D and E are complete. Phase F has F0, F1, F2, F3.1 to F3.4c, F3.5, and C11 done; F4, F5, and F6 are open.
 - **Phase F is the current work.** The VeloxRhi rendergraph tasks (`docs/rendergraph-integration-tasks.md`) are done
   except L11 (optional dispatch extent) and a JSON writer for the resource report. L5 and L6 became phase F slice F3:
-  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: C11.4**
-  (a mip kernel with a format axis against a control for each format), then F4 (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
+  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: F4** (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
   bind groups) waits for a consumer to name its limits. After F3: F2 (the shim module and the two tables), F4 (Pointer and
   Handle placements, and unbounded binding arrays), F5 (binding-time lowering), and F6. `docs/phase-f-plan.md` has the
   slices and a progress log. The author calls phase F the last major feature work.
-- **DiamondDogs requests still open** (`docs/diamonddogs-requests.md`): C11 (`ls_format` per variant, folds into F2:
-  the format must reach the emitted image type, so it is per-variant type selection and not an attribute alone), C6
+- **DiamondDogs requests still open** (`docs/diamonddogs-requests.md`): C6
   (generated host layout headers, after phase F, as a second writer over the written manifest), C3 (live cook,
-  deferred), C4 (bindless, F4). C1, C2, C5 (all but F3.4d), C7, C8, C9, C12, and C13 are done.
+  deferred), C4 (bindless, F4). C1, C2, C5 (all but F3.4d), C7, C8, C9, C11, C12, and C13 are done.
 - **Comments are compressed** (2026-10-21). Write one-line comments by default. Technique explanations go to
   `docs/code-notes.md`, which links to the code. Code never links to `docs/`.
 - **DiamondDogs** embeds Lodestone and sends requests in `docs/diamonddogs-requests.md`. Each row has a state.
@@ -243,3 +241,5 @@ One line for each step. Git history holds the full text.
   overloads (one with `Related` notes), and the sink prints `file(line): ` or `file(line,col): `. The shim, axis-default, and
   derived-constant errors use it (derived constants list each declaration as a note). `DescribeShimExtern`. Both validators
   report an unmatched binding through `ReportDeclaredOnly` and `ReportReflectedOnly`.
+- **2026-10-23 (C11.4).** `StorageFormatAxisTest` (a mip kernel with a format axis against a control for each format), enum case
+  names in `CookValues`. DiamondDogs C11 is done.

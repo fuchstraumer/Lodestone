@@ -1,0 +1,7 @@
+# A subset of the storage formats, as a renderer that writes only half and single float mips would cook it. The shader keeps
+# the axis over every format; StorageFormatAxisTest cooks with this file to show that the subset is policy.
+[MipDownsample.targets.wgsl.CookValues]
+LEVEL_FORMAT = ["Rgba16Float", "R32Float"]
+
+[MipDownsample.targets.spirv.CookValues]
+LEVEL_FORMAT = ["Rgba16Float", "R32Float"]
