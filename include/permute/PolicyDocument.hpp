@@ -28,6 +28,8 @@ struct AxisCookValues
 {
     std::string Axis;
     std::vector<PermutationValue> Values;
+    /** @brief The cases of an enum axis. The TOML is read before the axes exist, so they stay names until then. */
+    std::vector<std::string> CaseNames;
 };
 
 struct TargetCookPolicy

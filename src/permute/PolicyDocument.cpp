@@ -2,6 +2,7 @@
 
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
+#include "ShaderManifestIndex.hpp"
 #include "permute/AttributeExpression.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
@@ -292,10 +293,14 @@ namespace
                 // todo-ship: TOML has no unsigned integers, so this assumes unsigned. Drop signed values or handle them
                 cookValues.Values.emplace_back(static_cast<uint32_t>(val));
             }
+            else if (element.is_string())
+            {
+                cookValues.CaseNames.emplace_back(*element.value<std::string>());
+            }
             else
             {
                 return std::unexpected(ErrorAt(
-                    element, std::format("CookValues.{} entries must be integers or booleans", axis_name)));
+                    element, std::format("CookValues.{} entries must be integers, booleans, or enum case names", axis_name)));
             }
         }
 
@@ -464,6 +469,40 @@ namespace
                                        targetName,
                                        cookValues.Axis,
                                        module_name));
+                }
+
+                for (const std::string& caseName : cookValues.CaseNames)
+                {
+                    if (axis->ValueDomain != AxisValueDomain::Enum)
+                    {
+                        return ReportError(sink,
+                                           CookError::PolicyValueNotInAxis,
+                                           std::format("target '{}' CookValues for axis '{}' lists '{}', and only an enum "
+                                                       "axis takes case names",
+                                                       targetName,
+                                                       cookValues.Axis,
+                                                       caseName));
+                    }
+
+                    const std::optional<uint32_t> ordinal = axis->FindEnumCase(caseName);
+                    if (!ordinal.has_value() || !AxisDeclaresValue(*axis, PermutationValue::MakeEnum(*ordinal)))
+                    {
+                        std::vector<std::string_view> caseNames;
+                        for (const PermutationValue& value : axis->GetValues())
+                        {
+                            caseNames.push_back(axis->EnumCaseName(value.AsUInt()));
+                        }
+                        const std::string_view nearest = NearestName(caseName, caseNames);
+                        return ReportError(sink,
+                                           CookError::PolicyValueNotInAxis,
+                                           std::format("target '{}' CookValues for axis '{}' lists '{}', which the axis "
+                                                       "does not declare{}",
+                                                       targetName,
+                                                       cookValues.Axis,
+                                                       caseName,
+                                                       nearest.empty() ? std::string{}
+                                                                       : std::format(". Did you mean '{}'?", nearest)));
+                    }
                 }
 
                 for (const PermutationValue value : cookValues.Values)

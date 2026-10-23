@@ -6,6 +6,10 @@
 #include "Diagnostics.hpp"
 #include "TestHarness.hpp"
 #include <array>
+#include <cstddef>
+#include <string>
+#include <utility>
+#include <vector>
 #include <string_view>
 
 using lodestone::AxisKind;
@@ -169,6 +173,62 @@ void TestValidationAgainstSpace(TestRunner& runner)
 
 } // namespace
 
+void TestEnumCaseNames(TestRunner& runner)
+{
+    runner.BeginSection("CookValues of an enum axis are case names, resolved against the axis");
+
+    // the axis takes Low and High, and not Medium
+    std::vector<lodestone::RawEnumCase> cases{ { .Name = "Low", .Value = 5 },
+                                               { .Name = "Medium", .Value = 10 },
+                                               { .Name = "High", .Value = 1 } };
+    std::vector<PermutationAxis> axes;
+    axes.emplace_back("QUALITY",
+                      std::vector<PermutationValue>{ PermutationValue::MakeEnum(0u), PermutationValue::MakeEnum(2u) },
+                      AxisKind::Tuning,
+                      EarliestBindingTime::Cook,
+                      AxisValueDomain::Enum,
+                      "",
+                      "Quality",
+                      "Probe",
+                      std::move(cases));
+    axes.emplace_back("FOG",
+                      std::vector<PermutationValue>{ PermutationValue{ false }, PermutationValue{ true } },
+                      AxisKind::Technique,
+                      EarliestBindingTime::Cook,
+                      AxisValueDomain::Boolean);
+    const PermutationSpace space{ std::move(axes) };
+
+    auto validate = [&space](std::string_view toml) -> CookError
+    {
+        RecordingDiagnosticSink sink;
+        const auto document = PolicyDocument::Parse(toml);
+        return document ? document->ValidateAgainstSpace("Probe", space, sink) : CookError::Invalid;
+    };
+
+    const auto document = PolicyDocument::Parse("[Probe.targets.spirv.CookValues]\nQUALITY = [\"High\"]\n");
+    RecordingDiagnosticSink sink;
+    runner.Check(document.has_value() && document->ValidateAgainstSpace("Probe", space, sink) == CookError::Success,
+                 "a case that the axis takes validates");
+    if (document.has_value())
+    {
+        const lodestone::CookResult<lodestone::VariantSet> variants =
+            space.EnumerateVariants(document->FindTargetPolicy("Probe", "spirv"), sink);
+        bool onlyHigh = variants.has_value() && variants->Variants.size() == 2u;
+        for (size_t i = 0u; onlyHigh && i < variants->Variants.size(); ++i)
+        {
+            onlyHigh = variants->Variants[i].Active[0].Value == PermutationValue::MakeEnum(2u);
+        }
+        runner.Check(onlyHigh, "the cook takes High alone, crossed with both FOG values");
+    }
+
+    runner.Check(validate("[Probe.targets.spirv.CookValues]\nQUALITY = [\"Hihg\"]\n") == CookError::PolicyValueNotInAxis,
+                 "a misspelled case fails");
+    runner.Check(validate("[Probe.targets.spirv.CookValues]\nQUALITY = [\"Medium\"]\n") == CookError::PolicyValueNotInAxis,
+                 "a case of the enum that the axis does not take fails");
+    runner.Check(validate("[Probe.targets.spirv.CookValues]\nFOG = [\"true\"]\n") == CookError::PolicyValueNotInAxis,
+                 "a name on an axis that is not an enum fails");
+}
+
 void TestTargetCoverage(TestRunner& runner)
 {
     runner.BeginSection("target coverage");
@@ -239,6 +299,7 @@ int main()
     TestParseAndQuery(runner);
     TestParseRejections(runner);
     TestValidationAgainstSpace(runner);
+    TestEnumCaseNames(runner);
     TestTargetCoverage(runner);
     TestTargetNames(runner);
     return runner.Report();

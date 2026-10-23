@@ -6,6 +6,7 @@
 #include "permute/PermutationValue.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -65,6 +66,8 @@ struct PermutationAxis
     [[nodiscard]] const RawEnumCase& EnumCase(uint32_t idx) const noexcept;
     [[nodiscard]] std::string_view EnumTypeName() const noexcept;
     [[nodiscard]] std::string_view EnumCaseName(uint32_t idx) const noexcept;
+    /** @brief The ordinal of the case, for `PermutationValue::MakeEnum`. */
+    [[nodiscard]] std::optional<uint32_t> FindEnumCase(std::string_view case_name) const noexcept;
     [[nodiscard]] std::string_view InterfaceImplTypeName(uint32_t idx) const noexcept;
     
     /** @brief The module that declares this axis's type, for the synthetic module's import. */

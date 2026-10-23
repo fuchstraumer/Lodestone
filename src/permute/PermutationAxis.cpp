@@ -5,6 +5,9 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <algorithm>
+#include <iterator>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -155,6 +158,16 @@ std::string_view PermutationAxis::Module() const noexcept
 std::string_view PermutationAxis::EnumCaseName(uint32_t idx) const noexcept
 {
     return enumCases[static_cast<size_t>(idx)].Name;
+}
+
+std::optional<uint32_t> PermutationAxis::FindEnumCase(std::string_view case_name) const noexcept
+{
+    const auto found = std::ranges::find(enumCases, case_name, &RawEnumCase::Name);
+    if (found == enumCases.end())
+    {
+        return std::nullopt;
+    }
+    return static_cast<uint32_t>(std::distance(enumCases.begin(), found));
 }
 
 } // namespace lodestone

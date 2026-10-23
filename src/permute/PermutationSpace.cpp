@@ -117,7 +117,13 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetCookPolic
         if (iter != axisIndexMap.end())
         {
             const std::ptrdiff_t axisIndex = iter->second;
-            axisValueOverrides[axisIndex] = axisValues.Values;
+            std::vector<PermutationValue> values = axisValues.Values;
+            // the policy validation found each case
+            for (const std::string& caseName : axisValues.CaseNames)
+            {
+                values.push_back(PermutationValue::MakeEnum(*axes[static_cast<size_t>(axisIndex)].FindEnumCase(caseName)));
+            }
+            axisValueOverrides[axisIndex] = std::move(values);
         }
     }
 
