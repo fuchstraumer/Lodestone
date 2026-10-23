@@ -12,7 +12,9 @@
 #include "target/StorageFormatTable.hpp"
 #include "target/TargetProfile.hpp"
 
+#include <algorithm>
 #include <array>
+#include <format>
 #include <iterator>
 #include <filesystem>
 #include <string>
@@ -118,6 +120,15 @@ int main(int argc, char** argv)
         const CookResult<RawModule> raw = compiler.PrepareRawModule(emptySpace);
         runner.CheckError(raw, CookError::ShimExternNotReflected,
                           "an extern inside a namespace is seen by the text reader only");
+
+        const std::vector<Diagnostic>& records = sink.Records();
+        const auto error = std::ranges::find(records, DiagnosticSeverity::Error, &Diagnostic::Severity);
+        if (runner.Check(error != records.end(), "the cook reports an error record"))
+        {
+            runner.Check(error->File.ends_with("ShimExternHidden.slang"), std::format("the error names the module file: '{}'", error->File));
+            runner.CheckEqual(error->Range.StartLine, 9, "the error names the line of the extern");
+            runner.Check(error->Message.contains("Samp"), std::format("the error names the extern: '{}'", error->Message));
+        }
     }
 
     runner.BeginSection("reflection reads ls_storage_format on the line before an extern with no default");

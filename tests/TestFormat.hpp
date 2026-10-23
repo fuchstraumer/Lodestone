@@ -62,7 +62,9 @@ struct IsVariant<std::variant<Types...>> : std::true_type
 };
 
 template<typename Type>
-concept TupleLike = requires { std::tuple_size_v<Type>; };
+// tuple_size<Type>::value, not tuple_size_v<Type>: the variable template is a hard error for a type that is not a tuple,
+// where the member lookup is a substitution failure that leaves the concept false
+concept TupleLike = requires { std::tuple_size<Type>::value; }; // NOLINT(modernize-type-traits)
 
 /** Converts to any field type, so that an unevaluated aggregate initialization can count the fields. This is the
  * technique Boost.PFR uses. It never runs, so the conversion has no definition. */

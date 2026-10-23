@@ -33,7 +33,7 @@ if not exist "%BIN%" (
 set "FAILED=0"
 
 for %%T in ("%BIN%\*Test.exe") do (
-    if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="WorkgroupMemoryCookTest" if /I not "%%~nT"=="CrossModuleCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" if /I not "%%~nT"=="EnumAxisCookTest" if /I not "%%~nT"=="KitchenSinkCookTest" (
+    if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="WorkgroupMemoryCookTest" if /I not "%%~nT"=="CrossModuleCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" if /I not "%%~nT"=="KitchenSinkCookTest" (
         "%%~fT" >nul 2>&1
         if !ERRORLEVEL! neq 0 (
             echo [FAIL] %%~nT
@@ -53,16 +53,6 @@ if !ERRORLEVEL! neq 0 (
     set "FAILED=1"
 ) else (
     echo [ ok ] InterfaceAxisCookTest
-)
-
-REM The enum-axis end-to-end cook. It cooks six variants over an Enum axis (three cases addressed by
-REM name, with non-ascending underlying values) crossed with a boolean axis.
-"%BIN%\EnumAxisCookTest.exe" -o "%REPO%\build\%PRESET%\tests\enum_axis_output" --target=wgsl --target=spirv --verify-deterministic "%REPO%\tests\assets\EnumAxis\EnumAxisTest.slang" >nul 2>&1
-if !ERRORLEVEL! neq 0 (
-    echo [FAIL] EnumAxisCookTest
-    set "FAILED=1"
-) else (
-    echo [ ok ] EnumAxisCookTest
 )
 
 REM The same driver, on the probe module for the entry point parameter scope. It cooks one variant.

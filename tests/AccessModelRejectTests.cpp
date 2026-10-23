@@ -1,18 +1,26 @@
+#include "TestFormat.hpp"
 #include "TestHarness.hpp"
 
 #include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
 #include "driver/CookerDriver.hpp"
 #include "driver/CookerOptions.hpp"
+#include "driver/CookerSteps.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <filesystem>
+#include <format>
 #include <fstream>
+#include <ios>
 #include <print>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace
 {
@@ -77,7 +85,13 @@ constexpr std::array<RejectionCase, 9u> k_Cases
 };
 
 /** Cooks one module into a `MemoryOutputSink`, so that rows write no files and cannot collide. */
-CookError CookOneModule(const std::filesystem::path& module_path, std::string_view target_name)
+struct RowOutcome
+{
+    CookError Result{ CookError::Invalid };
+    std::vector<Diagnostic> Records;
+};
+
+RowOutcome CookOneModule(const std::filesystem::path& module_path, std::string_view target_name)
 {
     CookerOptions options;
     options.ModulePaths.push_back(module_path);
@@ -85,8 +99,30 @@ CookError CookOneModule(const std::filesystem::path& module_path, std::string_vi
     options.OutputPath = "AccessModelReject";
 
     MemoryOutputSink sink;
-    const CookResult<CookStatistics> result = RunCook(options, sink);
-    return result ? CookError::Success : result.error();
+    RecordingDiagnosticSink diagnostics;
+    const CookResult<CookStatistics> result = RunCook(options, sink, diagnostics);
+    return RowOutcome{ .Result = result ? CookError::Success : result.error(), .Records = std::move(diagnostics.Records()) };
+}
+
+/** True when an error record points at the module, by its file or in its text, so the author can find the cause. */
+bool AnErrorNamesTheModule(const std::vector<Diagnostic>& records, const std::filesystem::path& module_path)
+{
+    const std::string fileName = module_path.filename().string();
+    const std::string stem = module_path.stem().string();
+    return std::ranges::any_of(records,
+                               [&](const Diagnostic& record)
+                               {
+                                   return record.Severity == DiagnosticSeverity::Error &&
+                                          (record.File.ends_with(fileName) || record.Message.contains(stem));
+                               });
+}
+
+void PrintRecords(const std::vector<Diagnostic>& records)
+{
+    for (const Diagnostic& record : records)
+    {
+        std::println(stderr, "      record: {} {} '{}' {}", tests::FormatForTest(record.Severity), record.File, record.Message, record.Context);
+    }
 }
 
 /** Cooks one module into a folder on disk, through the sink the console uses. */
@@ -137,8 +173,17 @@ int main(int argc, char** argv)
             continue;
         }
 
-        const CookError actual = CookOneModule(modulePath, testCase.TargetName);
-        runner.CheckEqual(actual, testCase.Expected, std::format("{}: {}", testCase.ModuleFile, testCase.Claim));
+        const RowOutcome outcome = CookOneModule(modulePath, testCase.TargetName);
+        bool passed = runner.CheckEqual(outcome.Result, testCase.Expected, std::format("{}: {}", testCase.ModuleFile, testCase.Claim));
+        if (testCase.Expected != CookError::Success)
+        {
+            passed = runner.Check(AnErrorNamesTheModule(outcome.Records, modulePath),
+                                  std::format("{}: an error record names the module", testCase.ModuleFile)) && passed;
+        }
+        if (!passed)
+        {
+            PrintRecords(outcome.Records);
+        }
     }
 
     runner.BeginSection("a failed cook leaves no manifest of an earlier cook");

@@ -516,7 +516,18 @@ CookError SlangModuleContext::stageInterfaceStruct(slang::DeclReflection* reflec
                            errStr);
     }
 
-    const CookError resourceCheck = rejectResourceMembers(type, typeName);
+    // best effort: Slang gives no location for a declaration inside an __include'd fragment
+    ShaderLocation where;
+    slang::SourceLocation sourceLoc;
+    if (SLANG_SUCCEEDED(session->getDeclSourceLocation(reflection, &sourceLoc)) &&
+        sourceLoc.filePath != nullptr)
+    {
+        where = ShaderLocation{ .File = sourceLoc.filePath,
+                                .Line = static_cast<uint32_t>(sourceLoc.line),
+                                .Column = static_cast<uint32_t>(sourceLoc.column) };
+    }
+    
+    const CookError resourceCheck = rejectResourceMembers(type, typeName, module_name, where);
     if (!resourceCheck)
     {
         return resourceCheck;
@@ -636,7 +647,10 @@ CookError SlangModuleContext::buildInterfaceAxes(AxesBuildContext& axes_build_co
     return CookError::Success;
 }
 
-CookError SlangModuleContext::rejectResourceMembers(slang::TypeReflection* type, std::string_view type_name) const
+CookError SlangModuleContext::rejectResourceMembers(slang::TypeReflection* type,
+                                                   std::string_view type_name,
+                                                   std::string_view module_name,
+                                                   const ShaderLocation& where) const
 {
     // a conformance cannot carry a resource: binding layout is fixed before link-time specialization
     const uint32_t memberCount = static_cast<uint32_t>(type->getFieldCount());
@@ -653,10 +667,12 @@ CookError SlangModuleContext::rejectResourceMembers(slang::TypeReflection* type,
         {
             const char* fieldName = field->getName();
             const std::string_view fieldNameView = fieldName != nullptr ? fieldName : "<field>";
-            const std::string errStr = std::format("Interface type '{}' declares a resource member '{}', which is not allowed",
-                                                   type_name,
-                                                   fieldNameView);
-            return ReportError(*diagnosticSink, CookError::SlangInterfaceHasResourceMember, errStr);
+            const std::string errStr =
+                std::format("Interface type '{}' in module '{}' declares a resource member '{}', which is not allowed",
+                            type_name,
+                            module_name,
+                            fieldNameView);
+            return ReportError(*diagnosticSink, CookError::SlangInterfaceHasResourceMember, where, errStr);
         }
     }
     return CookError::Success;

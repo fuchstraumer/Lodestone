@@ -78,17 +78,11 @@ add_lodestone_unit_test(InterfaceAxisCookTest CookTest.cpp
               --target=spirv
               --verify-deterministic
               "${PROJECT_SOURCE_DIR}/tests/assets/InterfaceAxis/InterfaceAxisTest.slang")
-# The same driver, on an enum-axis module. `EnumAxisTest.slang` declares an `[ls_axis_enum]` extern
-# const whose Slang enum has explicit, non-ascending case values. The axis read reflects the enum's
-# cases (names and values); the manifest stores the case names, and the digit stays the declaration
-# order, so a cook that assumed "case index == case value" would produce wrong data. Crossed with a
-# boolean axis it is a product of six variants.
-add_lodestone_unit_test(EnumAxisCookTest CookTest.cpp
-    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/enum_axis_output"
-              --target=wgsl
-              --target=spirv
-              --verify-deterministic
-              "${PROJECT_SOURCE_DIR}/tests/assets/EnumAxis/EnumAxisTest.slang")
+# An enum axis whose cases have non-ascending values. The exit code of a cook cannot show a cook that links the digit in
+# place of the case value, so this suite compares the code of each case. It cooks both targets twice.
+add_lodestone_unit_test(EnumAxisTest EnumAxisTests.cpp)
+target_compile_definitions(EnumAxisTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/EnumAxis")
 # The same driver, on the multi-module KitchenSink set. This is the stress and coverage asset: four
 # consumer modules cook together against one policy, and KsTypes and KsShading are imported for their
 # enum and interface declarations. It crosses every axis kind, groups resources into nested parameter
@@ -180,6 +174,10 @@ target_compile_definitions(StorageFormatAxisTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/StorageFormatAxis")
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
+# The command line, which every later step trusts. It needs no Slang.
+add_lodestone_unit_test(CookerOptionsTest CookerOptionsTests.cpp)
+target_compile_definitions(CookerOptionsTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets")
 # The harness itself: each helper can fail, and a section that runs no check fails.
 add_lodestone_unit_test(TestHarnessTest TestHarnessTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)
@@ -206,15 +204,6 @@ add_lodestone_unit_test(EnumTagDecodeTest EnumTagDecodeTests.cpp)
 add_lodestone_unit_test(ManifestIndexTest ManifestIndexTests.cpp)
 add_lodestone_unit_test(MergedLayoutTest MergedLayoutTests.cpp)
 add_lodestone_unit_test(ResourceReportTest ResourceReportTests.cpp)
-
-# Standalone Slang-only probe (not a unit test). Prints DeclReflection kinds so we can see what an
-# interface vs an enum reports, and whether getType() identity holds. It links ONLY slang, so it
-# builds while lodestone is mid-refactor. Build it directly: --target DeclKindProbe
-add_executable(DeclKindProbe DeclKindProbe.cpp)
-set_target_properties(DeclKindProbe PROPERTIES FOLDER "Tests" CXX_STANDARD 23 CXX_STANDARD_REQUIRED YES)
-target_include_directories(DeclKindProbe PRIVATE "${PROJECT_SOURCE_DIR}/third_party/slang/include")
-target_link_libraries(DeclKindProbe PRIVATE slang)
-copy_slang_dlls_to_target(DeclKindProbe)
 
 # Standalone Slang-only probe (not a unit test). It reproduces the Debug-only Slang assert
 # "duplicate global instruction" on the modules in tests/assets/SlangPrelinkRepro. Run it after a

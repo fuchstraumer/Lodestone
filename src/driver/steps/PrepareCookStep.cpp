@@ -43,11 +43,11 @@ CookError ErrorCodeToCookError(std::error_code errc)
     return CookError::SystemError;
 }
 
-CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input) const
+CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input, DiagnosticSink& diagnostics) const
 {
     SharedCookState result;
     result.Options = std::move(input);
-    result.Diagnostics = std::make_unique<StderrDiagnosticSink>();
+    result.Diagnostics = &diagnostics;
 
     // reused whenever we touch the filesystem (the third rail)
     std::error_code filesystemError;

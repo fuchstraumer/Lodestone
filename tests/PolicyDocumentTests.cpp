@@ -7,6 +7,7 @@
 #include "TestHarness.hpp"
 #include <array>
 #include <cstddef>
+#include <format>
 #include <string>
 #include <utility>
 #include <vector>
@@ -291,6 +292,11 @@ void TestTargetNames(TestRunner& runner)
         RecordingDiagnosticSink sink;
         runner.CheckEqual(misspelled->ValidateTargetNames(k_KnownTargets, sink), CookError::PolicyUnknownTargetName,
                           "a section for an unknown target is rejected by name");
+        if (runner.CheckEqual(sink.Records().size(), 1u, "the rejection reports one record"))
+        {
+            const std::string& message = sink.Records().front().Message;
+            runner.Check(message.contains("spriv"), std::format("the record names the misspelled target: '{}'", message));
+        }
     }
 
     const auto noTargets = PolicyDocument::Parse("[OceanFft.InertAxesForEntryPoints]\nMainCS = [\"A\"]\n");

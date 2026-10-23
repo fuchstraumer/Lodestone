@@ -99,7 +99,8 @@ namespace
         uint32_t level = 0u;
         const std::from_chars_result result =
             std::from_chars(level_text.data(), level_text.data() + level_text.size(), level);
-        if (result.ec != std::errc{} || level > 3u)
+        // a level must be the whole value: from_chars stops at the first non-digit, so `--O2x` would read as 2
+        if (result.ec != std::errc{} || result.ptr != level_text.data() + level_text.size() || level > 3u)
         {
             return std::unexpected(CookError::MalformedArgument);
         }
@@ -398,11 +399,12 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
         }
         else if (argument == "--policy-file")
         {
+            // a policy file that the author named and that does not exist is an error. Ignoring it would cook every
+            // variant with no budget, and nothing would say why
             CookResult<std::filesystem::path> policyFile = ReadFileArgument(arguments, i);
             if (!policyFile)
             {
-                options.PolicyFile = std::nullopt;
-                continue;
+                return std::unexpected(policyFile.error());
             }
 
             options.PolicyFile = *policyFile;

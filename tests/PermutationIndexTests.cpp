@@ -8,6 +8,7 @@
 #include "permute/PermutationValue.hpp"
 #include "permute/PolicyDocument.hpp"
 #include "TestHarness.hpp"
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -179,17 +180,35 @@ int main()
                       "a partial assignment canonicalizes to every axis");
 
     const VariantKey partialKey = k_TestSpace.ComputeVariantKey(filled);
+    // TEST_SIZE=512 is digit 2, and the missing axes take digit 0: (2 * 2 + 0) * 3 + 0
+    runner.CheckEqual(partialKey, VariantKey{ 12u }, "the partial assignment keys the variant with wave operations off");
 
-    bool matchesRealVariant = false;
-    for (const VariantDescriptor& descriptor : variants.Variants)
+    const auto match = std::ranges::find(variants.Variants, partialKey, &VariantDescriptor::Key);
+    if (runner.Check(match != variants.Variants.end(), "the partial assignment names a variant the cook produced"))
     {
-        if (descriptor.Key == partialKey)
-        {
-            matchesRealVariant = true;
-        }
+        const lodestone::PermutationBinding* size = FindBinding(match->Active, &k_SizeAxis);
+        const lodestone::PermutationBinding* waveOps = FindBinding(match->Active, &k_UseWaveOpsAxis);
+        runner.Check(size != nullptr && size->Value == PermutationValue{ 512u }, "that variant has TEST_SIZE=512");
+        runner.Check(waveOps != nullptr && waveOps->Value == PermutationValue{ false }, "that variant has wave operations off");
     }
 
-    runner.Check(matchesRealVariant, "the partial assignment names a variant the cook produced");
+    // A key packs digits against the axis order and value counts, first axis most significant. These values pin that
+    // packing, so a change to it fails here and not in a renderer that persisted a key.
+    runner.BeginSection("variant keys are stable known values");
+    const auto keyOf = [](uint32_t size, bool wave_ops, uint32_t wave_size)
+    {
+        PermutationAssignment assignment{ PermutationBinding{ .Axis = &k_SizeAxis, .Value = PermutationValue{ size } },
+                                          PermutationBinding{ .Axis = &k_UseWaveOpsAxis, .Value = PermutationValue{ wave_ops } } };
+        if (wave_ops)
+        {
+            assignment.push_back(PermutationBinding{ .Axis = &k_WaveSizeAxis, .Value = PermutationValue{ wave_size } });
+        }
+        return k_TestSpace.ComputeVariantKey(k_TestSpace.CanonicalizeAssignment(assignment));
+    };
+    runner.CheckEqual(keyOf(128u, false, 0u), VariantKey{ 0u }, "the first value of every axis is key 0");
+    runner.CheckEqual(keyOf(512u, true, 64u), VariantKey{ 17u }, "TEST_SIZE=512, wave operations on, wave size 64: (2 * 2 + 1) * 3 + 2");
+    runner.CheckEqual(keyOf(1024u, false, 0u), VariantKey{ 18u }, "TEST_SIZE=1024, wave operations off: (3 * 2 + 0) * 3 + 0");
+    runner.CheckEqual(keyOf(1024u, true, 64u), VariantKey{ 23u }, "the last value of every axis is the space size less one");
 
     runner.BeginSection("MaxVariants is the largest variant count that cooks");
     for (const uint32_t budget : { k_ExpectedVariantCount - 1u, k_ExpectedVariantCount, k_ExpectedVariantCount + 1u })

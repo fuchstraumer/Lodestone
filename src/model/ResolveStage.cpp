@@ -23,9 +23,7 @@
 #include <string>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
 #include <expected>
-#include <print>
 #include <span>
 #include <string_view>
 #include <utility>
@@ -449,12 +447,12 @@ namespace
     {
         if (argument_index >= attribute.Arguments.size())
         {
-            std::println(stderr,
-                         "[lodestone] [{}] on '{}' is missing argument {}",
-                         ToString(attribute.Kind),
-                         binding_name,
-                         argument_index);
-            return std::unexpected(CookError::AttributeExpressionParseFailed);
+            return std::unexpected(ReportError(sink,
+                                               CookError::AttributeExpressionParseFailed,
+                                               std::format("[{}] on '{}' is missing argument {}",
+                                                           ToString(attribute.Kind),
+                                                           binding_name,
+                                                           argument_index)));
         }
 
         const CookResult<int64_t> value =
@@ -466,13 +464,13 @@ namespace
 
         if (value.value() <= 0)
         {
-            std::println(stderr,
-                         "[lodestone] extent argument {} on '{}' evaluated to {}, which is not a "
-                         "valid texture dimension",
-                         argument_index,
-                         binding_name,
-                         value.value());
-            return std::unexpected(CookError::AttributeExpressionOutOfRange);
+            return std::unexpected(ReportError(sink,
+                                               CookError::AttributeExpressionOutOfRange,
+                                               std::format("extent argument {} on '{}' evaluated to {}, which is not a "
+                                                           "valid texture dimension",
+                                                           argument_index,
+                                                           binding_name,
+                                                           value.value())));
         }
 
         return static_cast<uint32_t>(value.value());
@@ -510,32 +508,33 @@ namespace
     {
         if (attribute.Arguments.empty())
         {
-            std::println(stderr,
-                         "[lodestone] [{}] on '{}' has no argument",
-                         ToString(attribute.Kind),
-                         binding_name);
-            return std::unexpected(CookError::AttributeExpressionParseFailed);
+            return std::unexpected(ReportError(sink,
+                                               CookError::AttributeExpressionParseFailed,
+                                               std::format("[{}] on '{}' has no argument",
+                                                           ToString(attribute.Kind),
+                                                           binding_name)));
         }
 
         const CookResult<int64_t> value =
             EvaluateExpression(attribute.Arguments.front(), context.Symbols, sink);
         if (!value)
         {
-            std::println(stderr,
-                         "[lodestone] [{}] on '{}' did not evaluate",
-                         ToString(attribute.Kind),
-                         binding_name);
-            return std::unexpected(value.error());
+            // the evaluator reported why; this record names the resource it was sizing
+            return std::unexpected(ReportError(sink,
+                                               value.error(),
+                                               std::format("[{}] on '{}' did not evaluate",
+                                               ToString(attribute.Kind),
+                                               binding_name)));
         }
 
         if (value.value() <= 0)
         {
-            std::println(stderr,
-                         "[lodestone] [{}] on '{}' evaluated to {}, which cannot size a buffer",
-                         ToString(attribute.Kind),
-                         binding_name,
-                         value.value());
-            return std::unexpected(CookError::AttributeExpressionOutOfRange);
+            return std::unexpected(ReportError(sink,
+                                               CookError::AttributeExpressionOutOfRange,
+                                               std::format("[{}] on '{}' evaluated to {}, which cannot size a buffer",
+                                               ToString(attribute.Kind),
+                                               binding_name,
+                                               value.value())));
         }
 
         return BufferFootprint{ .ElementCount = static_cast<uint64_t>(value.value()),
@@ -556,12 +555,12 @@ namespace
                 attribute.Kind == RawSizeAttributeKind::ElementCount ? count : extent;
             if (slot != nullptr)
             {
-                std::println(stderr,
-                             "[lodestone] '{}' carries [{}] and [{}]; only one may size a resource",
-                             binding_name,
-                             ToString(slot->Kind),
-                             ToString(attribute.Kind));
-                return std::unexpected(CookError::ReflectionSizeUnresolved);
+                return std::unexpected(ReportError(sink,
+                                                   CookError::ReflectionSizeUnresolved,
+                                                   std::format("'{}' carries [{}] and [{}]; only one may size a resource",
+                                                   binding_name,
+                                                   ToString(slot->Kind),
+                                                   ToString(attribute.Kind))));
             }
 
             slot = &attribute;
@@ -569,11 +568,11 @@ namespace
 
         if (count != nullptr && extent != nullptr)
         {
-            std::println(stderr,
-                         "[lodestone] '{}' carries an element count and an extent; a resource is a "
-                         "buffer or a texture",
-                         binding_name);
-            return std::unexpected(CookError::ReflectionSizeUnresolved);
+            return std::unexpected(ReportError(sink,
+                                               CookError::ReflectionSizeUnresolved,
+                                               std::format("'{}' carries an element count and an extent; a resource is a "
+                                               "buffer or a texture",
+                                               binding_name)));
         }
 
         if (count != nullptr)

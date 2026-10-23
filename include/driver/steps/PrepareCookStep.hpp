@@ -8,9 +8,12 @@
 namespace lodestone
 {
 
+
+class DiagnosticSink;
+
 struct PrepareCookStep
 {
-    CookResult<PreparedCook> operator()(CookerOptions&& input) const;
+    CookResult<PreparedCook> operator()(CookerOptions&& input, DiagnosticSink& diagnostics) const;
 };
 
 };

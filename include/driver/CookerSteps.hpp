@@ -51,7 +51,8 @@ struct CookStatistics
 struct SharedCookState
 {
     CookerOptions Options;
-    std::unique_ptr<DiagnosticSink> Diagnostics;
+    // the caller of RunCook owns the sink, so that an embedding host receives every record
+    DiagnosticSink* Diagnostics{ nullptr };
     PolicyDocument Policy;
     std::vector<std::string> AllModuleNames;
     // views into the Options strings

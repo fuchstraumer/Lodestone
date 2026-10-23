@@ -102,7 +102,9 @@ private:
                                                  AxesBuildContext& axes_build_context) const;
     [[nodiscard]] CookError buildInterfaceAxes(AxesBuildContext& axes_build_context) const;
     [[nodiscard]] CookError rejectResourceMembers(slang::TypeReflection* type,
-                                                  std::string_view type_name) const;
+                                                  std::string_view type_name,
+                                                  std::string_view module_name,
+                                                  const ShaderLocation& where) const;
 
     std::string cacheDirectory;
     Slang::ComPtr<slang::IGlobalSession> globalSession;

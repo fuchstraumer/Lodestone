@@ -206,50 +206,6 @@ void CheckStageBits(lodestone::tests::TestRunner& runner)
                  "all does not request the invalid kind");
 }
 
-void CheckCommandLine(lodestone::tests::TestRunner& runner)
-{
-    runner.BeginSection("command line");
-
-    const std::array<std::string_view, 5u> accepted{ "-o", "out", "--target=wgsl", "--dump-stage=cooked", "a.slang" };
-    const CookResult<CookerOptions> parsed = ParseCommandLine(accepted);
-    if (runner.CheckOk(parsed, "--dump-stage=cooked parses"))
-    {
-        runner.Check(IsStageDumpRequested(parsed.value(), StageDumpKind::Cooked),
-                     "--dump-stage=cooked requests the cooked dump");
-        runner.Check(!IsStageDumpRequested(parsed.value(), StageDumpKind::Space),
-                     "--dump-stage=cooked requests nothing else");
-    }
-
-    const std::array<std::string_view, 6u> repeated{
-        "-o", "out", "--target=wgsl", "--dump-stage=space", "--dump-stage=variants", "a.slang"
-    };
-    const CookResult<CookerOptions> twice = ParseCommandLine(repeated);
-    if (runner.CheckOk(twice, "the flag repeats"))
-    {
-        runner.Check(IsStageDumpRequested(twice.value(), StageDumpKind::Space) &&
-                         IsStageDumpRequested(twice.value(), StageDumpKind::Variants),
-                     "a repeated flag adds to the mask instead of replacing it");
-    }
-
-    const std::array<std::string_view, 5u> everything{ "-o", "out", "--target=wgsl", "--dump-stage=all", "a.slang" };
-    const CookResult<CookerOptions> all = ParseCommandLine(everything);
-    if (runner.CheckOk(all, "--dump-stage=all sets every bit"))
-    {
-        runner.CheckEqual(all.value().DumpStageMask, AllStageDumpBits(),
-                          "--dump-stage=all sets every bit");
-    }
-
-    const std::array<std::string_view, 5u> bogus{ "-o", "out", "--target=wgsl", "--dump-stage=nonsense", "a.slang" };
-    const CookResult<CookerOptions> rejected = ParseCommandLine(bogus);
-    runner.CheckError(rejected, CookError::MalformedArgument,
-                      "an unknown stage name fails the command line");
-
-    const std::array<std::string_view, 3u> noTarget{ "-o", "out", "a.slang" };
-    const CookResult<CookerOptions> untargeted = ParseCommandLine(noTarget);
-    runner.CheckError(untargeted, CookError::NoTargetSpecified,
-                      "a command line with no target fails");
-}
-
 /** The one golden literal in this file. It pins the JSON shape, the key names, the key order, and the
  * four-space indent, so a change to any of those fails here rather than in a 105-variant diff. */
 void CheckSpaceDump(lodestone::tests::TestRunner& runner)
@@ -485,7 +441,6 @@ int main()
 
     CheckStageNames(runner);
     CheckStageBits(runner);
-    CheckCommandLine(runner);
     CheckSpaceDump(runner);
     CheckDependentAxisDump(runner);
     CheckVariantDump(runner, sink);

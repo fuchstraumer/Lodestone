@@ -21,7 +21,7 @@
 #include <expected>
 #include <format>
 #include <functional>
-#include <memory>
+#include <iterator>
 #include <optional>
 #include <ranges>
 #include <span>
@@ -125,6 +125,13 @@ namespace
                                                                    RawModule& raw_module,
                                                                    const DerivedConstantTable& derived_constants,
                                                                    std::vector<CompiledVariant>& out_module_variants);
+    // names the module file, the target, and the variant, as the record that caused the failure can name none
+    [[nodiscard]] CookError ReportVariantFailure(const SharedCookState& shared_state,
+                                                 const TargetProfile& target,
+                                                 std::string_view module_name,
+                                                 const VariantDescriptor& variant,
+                                                 CookError error);
+
 }
 
 CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& shared_state,
@@ -619,10 +626,11 @@ namespace
             const auto& currVariant = variant_set.Variants[static_cast<size_t>(idx)];
             if (!result)
             {
-                const std::string errStr = std::format("variant [{}] failed: {}",
-                                                       DescribeAssignment(currVariant.Canonical),
-                                                       ToString(result.error()));
-                return std::unexpected(ReportError(*shared_state.Diagnostics, result.error(), errStr));
+                return std::unexpected(ReportVariantFailure(shared_state,
+                                                                target,
+                                                                raw_module.Name,
+                                                                currVariant,
+                                                                result.error()));
             }
 
             const RawVariant& currRawVariant = result.value();
@@ -633,19 +641,21 @@ namespace
                                                                           *shared_state.Diagnostics);
             if (!contextResult)
             {
-                const std::string errStr = std::format("variant [{}] failed: {}",
-                                                       DescribeAssignment(currVariant.Canonical),
-                                                       ToString(contextResult.error()));
-                return std::unexpected(ReportError(*shared_state.Diagnostics, contextResult.error(), errStr));
+                return std::unexpected(ReportVariantFailure(shared_state,
+                                                                  target,
+                                                                  raw_module.Name,
+                                                                  currVariant,
+                                                                  contextResult.error()));
             }
 
             CookResult<CompiledVariant> variantResult = ResolveVariant(currRawVariant, contextResult.value(), *shared_state.Diagnostics);
             if (!variantResult)
             {
-                const std::string errStr = std::format("variant [{}] failed: {}",
-                                                       DescribeAssignment(currVariant.Canonical),
-                                                       ToString(variantResult.error()));
-                return std::unexpected(ReportError(*shared_state.Diagnostics, variantResult.error(), errStr));
+                return std::unexpected(ReportVariantFailure(shared_state,
+                                                                  target,
+                                                                  raw_module.Name,
+                                                                  currVariant,
+                                                                  variantResult.error()));
             }
 
             const CookError declarationError = RecordFootprintDeclarations(interned_module,
@@ -702,6 +712,28 @@ namespace
         }
 
         return localStats;
+    }
+
+    CookError ReportVariantFailure(const SharedCookState& shared_state,
+                                   const TargetProfile& target,
+                                   std::string_view module_name,
+                                   const VariantDescriptor& variant,
+                                   CookError error)
+    {
+        // module names are the stems of the module paths, in the same order
+        const auto nameIter = std::ranges::find(shared_state.AllModuleNames, module_name);
+        const size_t moduleIndex = static_cast<size_t>(std::distance(shared_state.AllModuleNames.begin(), nameIter));
+        const std::string modulePath = shared_state.Options.ModulePaths[moduleIndex].generic_string();
+
+        const std::string assignment = DescribeAssignment(variant.Canonical);
+        return ReportError(*shared_state.Diagnostics,
+                           error,
+                           ShaderLocation{ .File = modulePath },
+                           std::format("module '{}' for target '{}' failed in variant [{}]: {}",
+                                       module_name,
+                                       target.Name,
+                                       assignment.empty() ? std::string_view{ "no axes" } : std::string_view{ assignment },
+                                       ToString(error)));
     }
 }
 

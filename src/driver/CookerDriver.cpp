@@ -76,7 +76,7 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
     const static FinalizeModuleStep FinalizeModule;
     //NOLINTEND(readability-identifier-naming)
 
-    CookResult<PreparedCook> preparedCookResult = PrepareCook(std::move(options));
+    CookResult<PreparedCook> preparedCookResult = PrepareCook(std::move(options), diagnostics);
     if (!preparedCookResult)
     {
         return std::unexpected(preparedCookResult.error());
@@ -439,6 +439,11 @@ namespace
 CookResult<CookStatistics> RunCook(CookerOptions options, OutputSink& sink)
 {
     StderrDiagnosticSink diagnostics;
+    return RunCook(std::move(options), sink, diagnostics);
+}
+
+CookResult<CookStatistics> RunCook(CookerOptions options, OutputSink& sink, DiagnosticSink& diagnostics)
+{
     const std::string_view artifactNames[4]
     {
         k_ManifestFileName,
