@@ -9,11 +9,13 @@
 #include "impl/ThreadPool.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
+#include "target/ShimTable.hpp"
 
 
 #include <algorithm>
 #include <cstddef>
 #include <expected>
+#include <format>
 #include <memory>
 #include <ranges>
 #include <slang.h>
@@ -110,6 +112,36 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
                                                               .Expression = std::string{ declaration.Expression },
                                                               .SourceFile = std::string{ declaration.SourcePath },
                                                               .SourceLine = declaration.SourceLine });
+    }
+
+    // the symbol table reads the text and reflection confirms the type exists, so each is a second opinion for the other
+    const std::vector<std::string> moduleScopeStructs = bootstrapContext->BuildModuleScopeStructNames();
+    for (const ExternStructDeclaration& declaration : symbolTable.ExternStructsForModule(ModuleName()))
+    {
+        const ShimInterface* shimInterface = FindShimInterface(declaration.Interface);
+        if (shimInterface == nullptr)
+        {
+            continue;
+        }
+
+        if (!std::ranges::binary_search(moduleScopeStructs, declaration.Name))
+        {
+            return std::unexpected(ReportError(*diagnosticSink,
+                                               CookError::ShimExternNotReflected,
+                                               std::format("{}({}): extern struct '{}' names the shim interface '{}', but "
+                                                           "reflection finds no module scope struct of that name",
+                                                           declaration.SourcePath,
+                                                           declaration.SourceLine,
+                                                           declaration.Name,
+                                                           declaration.Interface)));
+        }
+
+        module.ShimExterns.push_back(RawShimExtern{ .Name = std::string{ declaration.Name },
+                                                    .Interface = std::string{ declaration.Interface },
+                                                    .TypeArguments = std::string{ declaration.TypeArguments },
+                                                    .Class = shimInterface->Class,
+                                                    .SourceFile = std::string{ declaration.SourcePath },
+                                                    .SourceLine = declaration.SourceLine });
     }
     return module;
 }

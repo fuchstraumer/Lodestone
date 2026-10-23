@@ -33,6 +33,17 @@ namespace lodestone
         uint32_t SourceLine{ 0u };
     };
 
+    /** @brief One `extern struct <Name> : <Interface><<TypeArguments>> [= <Default>];` declaration on one line. */
+    struct ExternStructDeclaration
+    {
+        std::string_view Name;
+        std::string_view Interface;
+        /** @brief The text between the outer angle brackets of the interface, trimmed. Empty without brackets. */
+        std::string_view TypeArguments;
+        std::string_view SourcePath;
+        uint32_t SourceLine{ 0u };
+    };
+
     struct ExternConstHash
     {
         std::size_t operator()(const ExternConstantDeclaration& decl) const noexcept
@@ -54,6 +65,8 @@ namespace lodestone
         [[nodiscard]] std::vector<ExternConstantDeclaration> ExternConstantsForModule(std::string_view module_name) const;
         /** @brief Kept apart from the extern constants: a type default is never an expression. */
         [[nodiscard]] std::vector<ExternConstantDeclaration> ExternTypeDefaultsForModule(std::string_view module_name) const;
+        /** @brief In source order. Every `extern struct` that names an interface, an axis or not. */
+        [[nodiscard]] std::span<const ExternStructDeclaration> ExternStructsForModule(std::string_view module_name) const;
         /** @brief In source order. A name can repeat, and the caller decides which are module scope. */
         [[nodiscard]] std::span<const DerivedConstantDeclaration> DerivedConstantsForModule(std::string_view module_name) const;
     private:
@@ -63,6 +76,7 @@ namespace lodestone
         std::unordered_map<std::string_view, ExternConstSet> externConstMap;
         std::unordered_map<std::string_view, ExternConstSet> externTypeDefaultMap;
         std::unordered_map<std::string_view, std::vector<DerivedConstantDeclaration>> derivedConstantMap;
+        std::unordered_map<std::string_view, std::vector<ExternStructDeclaration>> externStructMap;
     };
 }
 

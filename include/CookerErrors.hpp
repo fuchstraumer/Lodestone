@@ -44,6 +44,7 @@ enum class CookError : uint16_t
     SourceFactsTargetMismatch = 53, // two profiles of one variant read different workgroup memory or portable capabilities
     CapabilityAxisInert = 54, // an axis of kind capability changes no capability name of any entry point
     CapabilityAxisInverted = 55, // the off value of a boolean capability axis needs a name that its on value does not
+    ShimExternNotReflected = 56, // the source declares an extern struct of a shim interface that reflection does not find
 
     NoModulesSpecified = 60,
     NoOutputSpecified = 61,

@@ -149,6 +149,78 @@ namespace lodestone
                                                .SourceLine = source_line };
         }
 
+        /** @brief Reads `extern struct <Name> : <Interface><<Arguments>> [= <Default>];`. The declaration ends at the first
+         * `=`, `;`, or `{`, and a line comment is ignored. */
+        std::optional<ExternStructDeclaration> ExtractExternStruct(std::string_view line,
+                                                                   std::string_view source_path,
+                                                                   uint32_t source_line)
+        {
+            const size_t commentIndex = line.find("//");
+            const std::string_view code = commentIndex == std::string_view::npos ? line : line.substr(0, commentIndex);
+            const size_t endIndex = code.find_first_of("=;{");
+            const std::string_view header = endIndex == std::string_view::npos ? code : code.substr(0, endIndex);
+            if (!HasAllFlags(ScanDeclarationKeywords(header), DeclarationKeyword::Extern | DeclarationKeyword::Struct))
+            {
+                return std::nullopt;
+            }
+
+            const size_t colonIndex = header.find(':');
+            if (colonIndex == std::string_view::npos)
+            {
+                return std::nullopt;
+            }
+
+            std::string_view name;
+            bool sawStruct = false;
+            for (auto chunk : header.substr(0, colonIndex) | std::views::chunk_by(ChunkSeparator))
+            {
+                const std::string_view token(std::ranges::data(chunk), std::ranges::size(chunk));
+                if (!IsValidIdentifier(token))
+                {
+                    continue;
+                }
+
+                if (sawStruct)
+                {
+                    name = token;
+                    break;
+                }
+
+                sawStruct = token == "struct";
+            }
+
+            if (name.empty())
+            {
+                return std::nullopt;
+            }
+
+            const std::string_view conformance = TrimWhitespace(header.substr(colonIndex + 1u));
+            const size_t openIndex = conformance.find('<');
+            
+            const std::string_view interfaceName = TrimWhitespace(conformance.substr(0, openIndex));
+            if (!IsValidIdentifier(interfaceName))
+            {
+                return std::nullopt;
+            }
+
+            std::string_view typeArguments;
+            if (openIndex != std::string_view::npos)
+            {
+                const size_t closeIndex = conformance.rfind('>');
+                if (closeIndex == std::string_view::npos || closeIndex < openIndex)
+                {
+                    return std::nullopt;
+                }
+                typeArguments = TrimWhitespace(conformance.substr(openIndex + 1u, closeIndex - openIndex - 1u));
+            }
+
+            return ExternStructDeclaration{ .Name = name,
+                                            .Interface = interfaceName,
+                                            .TypeArguments = typeArguments,
+                                            .SourcePath = source_path,
+                                            .SourceLine = source_line };
+        }
+
         /** @brief Reads `extern struct <Name> : <Interface> = <Default>;`. The name follows `struct`. */
         std::optional<ExternConstantDeclaration> ExtractExternTypeDefault(std::string_view line, size_t assignment_index)
         {
@@ -213,6 +285,7 @@ namespace lodestone
         ExternConstSet& externConsts = externConstMap[module_name];
         ExternConstSet& externTypeDefaults = externTypeDefaultMap[module_name];
         std::vector<DerivedConstantDeclaration>& derivedConstants = derivedConstantMap[module_name];
+        std::vector<ExternStructDeclaration>& externStructs = externStructMap[module_name];
         size_t lineStart = 0u;
         uint32_t lineNumber = 0u;
 
@@ -227,6 +300,16 @@ namespace lodestone
             std::string_view line = source_code.substr(lineStart, lineEnd - lineStart);
             lineStart = lineEnd + 1;
             ++lineNumber;
+
+            // a declaration with no default has no `=`, so the extractor reads the header up to the first `=`, `;`, or `{`
+            if (line.find("extern") != std::string_view::npos)
+            {
+                if (const std::optional<ExternStructDeclaration> externStruct =
+                        ExtractExternStruct(line, source_path, lineNumber))
+                {
+                    externStructs.push_back(*externStruct);
+                }
+            }
 
             const size_t assignmentIndex = line.find('=');
             const DeclarationKeyword keywords = assignmentIndex == std::string_view::npos
@@ -307,6 +390,16 @@ namespace lodestone
     {
         const auto iter = derivedConstantMap.find(module_name);
         if (iter != derivedConstantMap.end())
+        {
+            return iter->second;
+        }
+        return {};
+    }
+
+    std::span<const ExternStructDeclaration> SymbolTable::ExternStructsForModule(std::string_view module_name) const
+    {
+        const auto iter = externStructMap.find(module_name);
+        if (iter != externStructMap.end())
         {
             return iter->second;
         }

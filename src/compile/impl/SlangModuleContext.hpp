@@ -34,6 +34,8 @@ public:
     /** @brief Sorted module-scope variable names, including `__include` fragments. Filters the symbol table's derived
       * constants, since a line scanner cannot tell scopes apart. */
     [[nodiscard]] std::vector<std::string> BuildModuleScopeVariableNames() const;
+    /** @brief Sorted module-scope struct names, including `__include` fragments. Confirms what the symbol table read. */
+    [[nodiscard]] std::vector<std::string> BuildModuleScopeStructNames() const;
     [[nodiscard]] slang::IGlobalSession* GlobalSession() const noexcept;
     [[nodiscard]] slang::ISession* Session() const noexcept;
     [[nodiscard]] std::vector<slang::IComponentType*> BaseComponents() const noexcept;

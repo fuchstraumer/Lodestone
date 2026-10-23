@@ -247,7 +247,9 @@ namespace
 {
     // NOLINTBEGIN(misc-no-recursion)
     // only `__include` fragments are walked into: their declarations are still at module scope
-    void CollectModuleScopeVariableNames(slang::DeclReflection* reflection, std::vector<std::string>& names)
+    void CollectModuleScopeNames(slang::DeclReflection* reflection,
+                                 slang::DeclReflection::Kind kind,
+                                 std::vector<std::string>& names)
     {
         const unsigned int childCount = reflection->getChildrenCount();
         for (unsigned int i = 0u; i < childCount; ++i)
@@ -258,7 +260,7 @@ namespace
                 continue;
             }
 
-            if (child->getKind() == slang::DeclReflection::Kind::Variable)
+            if (child->getKind() == kind)
             {
                 const char* name = child->getName();
                 if (name != nullptr)
@@ -268,15 +270,17 @@ namespace
             }
             else if (child->getKind() == slang::DeclReflection::Kind::Unsupported && child->getChildrenCount() > 0u)
             {
-                CollectModuleScopeVariableNames(child, names);
+                CollectModuleScopeNames(child, kind, names);
             }
         }
     }
     // NOLINTEND(misc-no-recursion)
 }
 
-std::vector<std::string> SlangModuleContext::BuildModuleScopeVariableNames() const
+namespace
 {
+    std::vector<std::string> BuildModuleScopeNames(slang::ISession* session, slang::DeclReflection::Kind kind)
+    {
     std::vector<std::string> names;
     const int64_t loadedModuleCount = static_cast<int64_t>(session->getLoadedModuleCount());
     for (int64_t i = 0; i < loadedModuleCount; ++i)
@@ -284,7 +288,7 @@ std::vector<std::string> SlangModuleContext::BuildModuleScopeVariableNames() con
         slang::DeclReflection* moduleReflection = session->getLoadedModule(i)->getModuleReflection();
         if (moduleReflection != nullptr)
         {
-            CollectModuleScopeVariableNames(moduleReflection, names);
+            CollectModuleScopeNames(moduleReflection, kind, names);
         }
     }
 
@@ -292,6 +296,17 @@ std::vector<std::string> SlangModuleContext::BuildModuleScopeVariableNames() con
     const auto [duplicatesBegin, duplicatesEnd] = std::ranges::unique(names);
     names.erase(duplicatesBegin, duplicatesEnd);
     return names;
+    }
+}
+
+std::vector<std::string> SlangModuleContext::BuildModuleScopeVariableNames() const
+{
+    return BuildModuleScopeNames(session, slang::DeclReflection::Kind::Variable);
+}
+
+std::vector<std::string> SlangModuleContext::BuildModuleScopeStructNames() const
+{
+    return BuildModuleScopeNames(session, slang::DeclReflection::Kind::Struct);
 }
 
 

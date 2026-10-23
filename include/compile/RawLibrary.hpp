@@ -5,6 +5,7 @@
 #include "model/ShaderDataSchema.hpp"
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "target/ShimTable.hpp"
 #include <cstdint>
 #include <cstddef>
 #include <optional>
@@ -129,6 +130,18 @@ struct RawDerivedConstant
     uint32_t SourceLine{ 0u };
 };
 
+/** @brief An `extern struct` whose interface is in the shim table. The profile decides which implementation links. */
+struct RawShimExtern
+{
+    std::string Name;
+    std::string Interface;
+    /** @brief The type argument of the interface, as written. Empty for an interface with none. */
+    std::string TypeArguments;
+    ShimResourceClass Class{ ShimResourceClass::Invalid };
+    std::string SourceFile;
+    uint32_t SourceLine{ 0u };
+};
+
 /** Stage 3's module output. `ExternDefaults` carries the undriven extern constants' defaults, which only Slang knows. */
 struct RawModule
 {
@@ -136,6 +149,7 @@ struct RawModule
     std::vector<std::string> EntryPointNames;
     std::vector<ExternConstantDefault> ExternDefaults;
     std::vector<RawDerivedConstant> DerivedConstants;
+    std::vector<RawShimExtern> ShimExterns;
     std::vector<RawVariant> Variants;
 };
 

@@ -122,7 +122,7 @@ The Bound form works on WGSL, so this slice needs no SPIR-V. It can run beside F
 |---|---|---|
 | F2.1 | **Done 2026-10-22.** Add the shim module to `builtins/`, beside `LodestoneAttributes.slang`. | `ShimModuleTest` cooks `ShimDirect.slang` for both targets. |
 | F2.2 | **Done 2026-10-22.** Add the shim table in `target/`. The profile form table waits for F4.1: every profile is Bound, so `TargetProfile::Access` is enough. | `ShimTableTest`, the agreement test of D6. |
-| F2.3 | Recognize an extern whose interface is in the shim table. Keep it out of the axis space. | The variant count of a shim module does not change. |
+| F2.3 | **Done 2026-10-22.** Recognize an extern whose interface is in the shim table. Keep it out of the axis space. | `ShimExternTest`: the axis list of a shim module is unchanged. |
 | F2.4 | Allow a resource member in a shim impl, which the spike (F2.0) found works for a parameter type. Keep `rejectResourceMembers` for a technique axis, and reject a shim extern used as a local. | The technique-axis rejection test still fails the cook. |
 | F2.5 | Build the impl name from the extern (`IReadBuffer<PointLight>` gives `BoundReadBuffer<PointLight>`). Import the module that declares the element type. | `FindDeclaringModule` gives the import. `todo.md` holds the related import item. |
 | F2.6 | A cook test asset: a material that uses buffer, texture, and sampler shims in a `ParameterBlock` and in an entry point `uniform` parameter. | The cross-check agrees. Check the binding numbers: no global may move down a set (vocabulary §9e, measurement notes). |
@@ -509,3 +509,15 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
     cooks only when the type exists, takes the arity, and conforms. Three modified tables fail, each with its own Slang
     error (E30015 undefined identifier, E38029 type argument does not conform, E30401 and E30408 for a wrong arity).
   - Next: F2.3 (recognize an extern whose interface is in the table).
+- 2026-10-22. **F2.3 done**, not committed. `SymbolTable::ExternStructsForModule` reads each `extern struct <Name> : <Interface>
+  <<Args>>` header from the source text (one line, with or without a default, a line comment ignored).
+  `SlangCompiler::PrepareRawModule` keeps those whose interface `FindShimInterface` knows as `RawModule::ShimExterns`
+  (`RawShimExtern`: name, interface, type arguments, resource class, file, line), and confirms each against
+  `SlangModuleContext::BuildModuleScopeStructNames` (reflection). A shim extern that reflection does not find fails with
+  `ShimExternNotReflected` = 56. 37 of 37 tests.
+  - The attribute-free design (O18) needed no change to the axis code: `stageInterfaceStruct` already skips a struct with
+    neither `ls_axis_interface` nor `ls_axis_interface_impl`.
+  - Limits, on purpose: the declaration is on one line, and the module scope walk does not enter a namespace, so a shim
+    extern in a namespace fails with the new error. A shim interface that also carries `ls_axis_interface` is not checked
+    yet.
+  - Next: F2.5 (link the implementation).

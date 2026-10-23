@@ -153,6 +153,11 @@ target_compile_definitions(ShimModuleTest PRIVATE
 # The shim table agrees with the shim module (decision D6, phase F step F2.2): every cell names a type that exists, takes the
 # right arity, and conforms to its interface, and a table that disagrees fails. It cooks through Slang four times.
 add_lodestone_unit_test(ShimTableTest ShimTableTests.cpp)
+# Shim externs (phase F step F2.3): the symbol table reads `extern struct X : IReadBuffer<T>` from the source, reflection confirms it,
+# and the extern stays out of the axis space. It starts two bootstrap compiles, so it takes about one second.
+add_lodestone_unit_test(ShimExternTest ShimExternTests.cpp)
+target_compile_definitions(ShimExternTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/Shims")
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)
