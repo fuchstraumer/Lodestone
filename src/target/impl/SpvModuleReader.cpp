@@ -265,6 +265,8 @@ namespace
             return TextureFormat::RG8Unorm;
         case spv::ImageFormat::Rgba8:
             return TextureFormat::RGBA8Unorm;
+        case spv::ImageFormat::Rgba8Snorm:
+            return TextureFormat::RGBA8Snorm;
         case spv::ImageFormat::R16f:
             return TextureFormat::R16Float;
         case spv::ImageFormat::Rg16f:

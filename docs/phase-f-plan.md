@@ -538,3 +538,75 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
   - Not covered: a type argument that is not `public` in its module (Slang reports it as an undefined identifier in the link
     module), a shim extern in an array, and a shim interface that carries `ls_axis_interface`.
   - Next: C11 (`ls_format` per variant) on this machinery, planned first. Then F4.
+- 2026-10-22. **C11.0 spike done** (DiamondDogs C11, `ls_format` per variant). No code change. Decisions O22 to O24 made by the
+  author: accept the six float formats now (integer formats have no use case), the format is specified by the author as
+  data, and a subset of formats is policy (`CookValues`), not a second mechanism in the shader.
+
+  **Measured (slangc 2026.18.1, `spirv` and `wgsl`):**
+  - **The format is a type argument in this Slang, not only an attribute.** `hlsl.meta.slang` defines a named storage format
+    type for each entry of `slang-image-format-defs.h` (`RGBA8Unorm`, `RGBA8Snorm`, `RGBA16F`, `R32F`, `RG32F`, `RGBA32F`),
+    each an `ITexelElement` whose `DataType` is `float`, `float2`, or `float4`. `WTexture2D<RGBA16F>` is a write-only storage
+    texture of that format, and the `[format(...)]` attribute is deprecated for Slang 2026 (`DeprecatedFormatAttribute`).
+  - So a generic shim impl takes the format as a **type** argument: `BoundWriteStorageTexture2D<F : ITexelElement>` holds a
+    `WTexture2D<F>`, and a link module exports `Dst : IWriteStorageTexture2D = BoundWriteStorageTexture2D<RGBA16F>`. All six
+    formats link on both targets, as a block field, and WGSL gives `texture_storage_2d<rgba16float, write>` and the other
+    five spellings. The type argument is a plain identifier, so the F2.5 link source needs no new syntax.
+  - The texel width differs (`R32F` stores a `float`, `RG32F` a `float2`). A small helper interface `IWiden` with
+    `FromFloat4` on `float`, `float2`, and `float4`, and a constraint `where F.DataType : IWiden`, lets one impl serve all six
+    behind `Store(uint2, float4)`.
+  - **Access decides which formats WGSL allows.** `RWTexture2D<F>` is always `read_write` in WGSL, even for a store-only
+    kernel, and Slang rejects `rgba16float` there (E56106). It also accepts `rgba8unorm`, `rg32float`, and `rgba32float` as
+    `read_write`, but core WebGPU allows `read_write` for `r32*` only (the others need the
+    `readonly_and_readwrite_storage_textures` feature, `slang-emit-wgsl.cpp` `wgslFormatSupportsReadWrite`). `WTexture2D<F>`
+    gives `write` access for all six, and it has `Store` and no subscript. A read-only use of a format type
+    (`Texture2D<RGBA16F>`) is a sampled `texture_2d`, so a read needs no storage format.
+  - The portable pattern is therefore: read through `ITexture2DRef`, write through a write-only storage shim.
+    Read and write of one storage texture (`read_write`) is portable for `R32Float` only.
+  - The manifest needs no change: the reflected `StorageFormat` of the linked program is already recorded per binding and
+    compared by both validators.
+
+  **Plan (each slice ends green):**
+  - **C11.1.** `public enum StorageFormat` in `builtins/LodestoneShims.slang` (the six cases, a comment that lists each format
+    with its WGSL and Vulkan names, and the formats that are not accepted with the reason), a table in `target/` (case,
+    Slang type name, `TextureFormat`, WGSL name), `TextureFormat::RGBA8Snorm` and its case in the three readers (Slang
+    reflection, `SpvModuleReader`, `WgslValidator`). Proof: a test reads the enum cases through reflection and compares them
+    with the table, and cooks one probe per format with a literal `WTexture2D<Type>` for both targets: all three readers
+    must report the same `TextureFormat`.
+  - **C11.2.** `IWriteStorageTexture2D`, `IWiden`, and `BoundWriteStorageTexture2D<F>` in the shim module, and a table row whose
+    implementation takes the format. `ShimTableTest` covers each format.
+  - **C11.3.** An attribute on the extern names the format axis (`[ls_storage_format("LEVEL_FORMAT")]`); the axis is an enum
+    axis over `StorageFormat`. The link module of these externs is built for each variant, from the axis value, like the
+    enum-axis modules; fixed externs stay in the module that each worker context loads once. Errors: an axis that does not
+    exist or is not a `StorageFormat`.
+  - **C11.4.** A mip-style kernel with a format axis, and a control with a literal type for each value. Proof, for both
+    targets and every value: the binding's `StorageFormat` and placement equal the control's, and no variant needs
+    `StorageImageWriteWithoutFormat`. A policy that lists a subset of values cooks that subset.
+  - Not in this plan: integer formats, a `read_write` shim (R32Float only on core WebGPU), `Bgra8Unorm`, and the 8-bit,
+    16-bit, and packed formats, which are not WebGPU core storage formats.
+- 2026-10-23. **C11.1 done**, not committed. 40 of 40 tests, 60 of 60 known-good dumps.
+  - `public enum StorageFormat` in `builtins/LodestoneShims.slang` (six cases, with a comment that lists WGSL and Vulkan names
+    and the formats that are not accepted). `target/StorageFormatTable` (case, Slang type, `TextureFormat`, WGSL name).
+    `TextureFormat::RGBA8Snorm` is appended at the end of the enum, so that a stored value keeps its meaning, and it has a
+    case in the three readers (`FromSlangImageFormat`, `TextureFormatFromTint`, `TextureFormatFromSpirv`).
+  - `StorageFormatTest` compares the enum (through the cases of an enum axis), the table, and what all three readers give
+    for a probe with one texture of each format. It compares each reading with the table, because readers that both give
+    `Invalid` agree.
+  - **Found, fixed:** `SymbolTable::AddSource` read declarations inside comments. The new doc comment of `StorageFormat` shows
+    an axis declaration as an example, and `ShimTableTest` failed with "could not read the default of extern constant
+    'LEVEL_FORMAT'" because every module that imports the shim module saw a second axis. The scanner now drops `//` comments,
+    block comments over one line or several, and keeps a string with two slashes (`StripComments`). Words in a comment no
+    longer count as tokens, so an axis that only a comment names is pruned from the space. No known-good dump changed.
+  - Not checked: the Vulkan names in the enum comment are the `VkFormat` names, and the claim that these six formats are
+    mandatory storage image formats still comes from memory of the Vulkan required format table.
+  - Next: C11.2.
+- 2026-10-23. **C11.2 done**, not committed. 40 of 40 tests.
+  - `builtins/LodestoneShims.slang`: `IWriteStorageTexture2D` (`Store(uint2, float4)`), `IStorageTexelFromFloat4` (implemented
+    by `float`, `float2`, and `float4`), and `BoundWriteStorageTexture2D<F : ITexelElement>` over a `WTexture2D<F>`.
+  - `ShimTable`: a fifth row, with `ShimResourceClass::StorageTexture` and `ImplementationTakesFormat` (the implementation
+    takes the Slang type of a format as its only type argument and the interface takes none). `ShimTableTest` instantiates the
+    implementation with each of the six formats against the interface.
+  - `StorageFormatTest` cooks `ShimStorage.slang` (one shim texture of each format in a block): both targets cook with both
+    cross-checks, and each binding is a write-only storage texture with the format of the table.
+  - `MakeShimLinkSource` rejects a format row with `ShimExternInvalid` until step C11.3 supplies a format: no extern can
+    link a storage shim yet, so a shader uses the implementation type directly for now.
+  - Next: C11.3 (the attribute that names the format axis, and the link module for each variant).

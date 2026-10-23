@@ -121,6 +121,18 @@ CookResult<std::string> MakeShimLinkSource(std::span<const RawShimExtern> extern
                                                            profile_name)));
         }
 
+        if (shimInterface->ImplementationTakesFormat)
+        {
+            return std::unexpected(ReportError(sink,
+                                               CookError::ShimExternInvalid,
+                                               std::format("{}({}): extern '{}' of '{}' needs a storage format, and nothing "
+                                                           "names one yet",
+                                                           shimExtern.SourceFile,
+                                                           shimExtern.SourceLine,
+                                                           shimExtern.Name,
+                                                           shimExtern.Interface)));
+        }
+
         const std::vector<std::string_view> arguments = SplitShimTypeArguments(shimExtern.TypeArguments);
         if (arguments.size() != shimInterface->TypeParameterCount ||
             shimExtern.ArgumentModules.size() != arguments.size())

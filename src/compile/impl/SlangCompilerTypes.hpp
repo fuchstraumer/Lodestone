@@ -180,6 +180,8 @@ constexpr TextureFormat FromSlangImageFormat(SlangImageFormat format) noexcept
         return TextureFormat::RG8Unorm;
     case SLANG_IMAGE_FORMAT_rgba8:
         return TextureFormat::RGBA8Unorm;
+    case SLANG_IMAGE_FORMAT_rgba8_snorm:
+        return TextureFormat::RGBA8Snorm;
     case SLANG_IMAGE_FORMAT_r16f:
         return TextureFormat::R16Float;
     case SLANG_IMAGE_FORMAT_rg16f:

@@ -5,6 +5,7 @@
 #include "driver/CookerOptions.hpp"
 #include "emit/OutputSink.hpp"
 #include "target/ShimTable.hpp"
+#include "target/StorageFormatTable.hpp"
 #include "target/TargetProfile.hpp"
 
 #include <array>
@@ -49,6 +50,21 @@ std::string MakeAgreementSource(std::span<const ShimInterface> table)
                 continue;
             }
 
+            if (row.ImplementationTakesFormat)
+            {
+                // one cell for each accepted format
+                for (const StorageFormatInfo& format : GetStorageFormats())
+                {
+                    source += std::format("struct Check{0}<T : {1}> {{}};\ntypealias Cell{0} = Check{0}<{2}<{3}>>;\n",
+                                          cell,
+                                          row.Name,
+                                          impl,
+                                          format.SlangType);
+                    ++cell;
+                }
+                continue;
+            }
+
             source += std::format("struct Check{0}<T : {1}> {{}};\ntypealias Cell{0} = Check{0}<{2}>;\n",
                                   cell,
                                   Spell(row.Name, row.TypeParameterCount),
@@ -86,7 +102,7 @@ int main()
 
     runner.BeginSection("the table holds the interfaces of the shim module, and the Bound form is complete");
     const std::span<const ShimInterface> table = GetShimInterfaces();
-    runner.Check(table.size() == 4u, "four interfaces: two buffers, a texture, and a sampler");
+    runner.Check(table.size() == 5u, "five interfaces: two buffers, a texture, a sampler, and a write-only storage texture");
     bool boundComplete = true;
     for (const ShimInterface& row : table)
     {
@@ -100,6 +116,11 @@ int main()
                  "an interface is found by name with its class, arity, and Bound implementation");
     runner.Check(ShimImplName(*readBuffer, AccessModel::Pointer).empty() && ShimImplName(*readBuffer, AccessModel::Indexed).empty(),
                  "the Pointer and Indexed cells are empty until phase F step F4.1");
+    const ShimInterface* writeStorage = FindShimInterface("IWriteStorageTexture2D");
+    runner.Check(writeStorage != nullptr && writeStorage->Class == ShimResourceClass::StorageTexture &&
+                     writeStorage->TypeParameterCount == 0u && writeStorage->ImplementationTakesFormat &&
+                     !readBuffer->ImplementationTakesFormat,
+                 "the write-only storage texture takes a format as its implementation argument, and no other row does");
     runner.Check(FindShimInterface("IWriteBuffer") == nullptr && FindShimInterface("") == nullptr,
                  "a name that is not a shim interface is not found");
     runner.Check(ShimImplName(*readBuffer, AccessModel::Invalid).empty(), "an invalid access model has no cell");

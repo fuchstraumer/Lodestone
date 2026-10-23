@@ -130,7 +130,10 @@ enum class TextureFormat : uint8_t
     Depth16Unorm,
     Depth24Plus,
     Depth24PlusStencil8,
-    Depth32Float
+    Depth32Float,
+
+    // appended, so that the value of an earlier format in an existing manifest keeps its meaning
+    RGBA8Snorm
 };
 
 /** @brief The allocated dimension: an array texture is 2D with layers. */

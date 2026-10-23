@@ -15,6 +15,7 @@ enum class ShimResourceClass : uint8_t
     Buffer,
     Texture,
     Sampler,
+    StorageTexture,
 };
 
 /** @brief One shim interface of `builtins/LodestoneShims.slang` and the type that implements it for each access model. An
@@ -28,6 +29,9 @@ struct ShimInterface
     std::string_view Bound;
     std::string_view Indexed;
     std::string_view Pointer;
+    /** @brief The implementations take the Slang type of a storage format (`RGBA16F`) as their only type argument, and the
+     * interface has none. A format axis chooses it for each variant. */
+    bool ImplementationTakesFormat{ false };
 };
 
 std::span<const ShimInterface> GetShimInterfaces() noexcept;

@@ -88,6 +88,8 @@ int main()
                  "a type argument with no module entry");
     runner.Check(ErrorOf({ MakeExtern("Points", "IUnrelated", "Light", { "" }) }, AccessModel::Bound) == CookError::ShimExternInvalid,
                  "an interface that is not in the table");
+    runner.Check(ErrorOf({ MakeExtern("Dst", "IWriteStorageTexture2D", "", {}) }, AccessModel::Bound) == CookError::ShimExternInvalid,
+                 "a storage texture needs a format, and nothing names one until step C11.3");
 
     runner.Check(AccessModelFromPlacementKind(PlacementKindFromAccessModel(AccessModel::Bound)) == AccessModel::Bound &&
                      AccessModelFromPlacementKind(PlacementKindFromAccessModel(AccessModel::Pointer)) == AccessModel::Pointer &&

@@ -56,6 +56,32 @@ uint FFF = 2;
                  "a declaration with only one of the three keywords keeps its name");
 }
 
+// A comment declares nothing: the doc comment of a builtin module shows an axis declaration as an example.
+void TestCommentsDeclareNothing(TestRunner& runner)
+{
+    runner.BeginSection("comments");
+
+    constexpr std::string_view k_Source = R"(
+// extern static const uint IN_LINE_COMMENT = 1u;
+extern static const uint REAL = 2u; // extern static const uint AFTER_CODE = 3u;
+/* extern static const uint IN_ONE_LINE_BLOCK = 4u; */
+/** a block over several lines
+ *  extern static const uint IN_MULTI_LINE_BLOCK = 5u;
+ *  extern struct InBlockStruct : IReadBuffer<float4>;
+ */
+extern static const uint AFTER_BLOCK = 6u;
+[ls_axis_values("a//b")] extern static const uint WITH_SLASHES = 7u;
+)";
+
+    SymbolTable table;
+    table.AddSource("comments", k_TestSourcePath, k_Source);
+    const std::vector<ExternConstantDeclaration> externs = table.ExternConstantsForModule("comments");
+    runner.Check(externs.size() == 3u && DeclarationMatches(externs, "REAL", "2u") &&
+                     DeclarationMatches(externs, "AFTER_BLOCK", "6u") && DeclarationMatches(externs, "WITH_SLASHES", "7u"),
+                 "only the three declarations outside a comment are read, and a string with two slashes is not a comment");
+    runner.Check(table.ExternStructsForModule("comments").empty(), "an extern struct in a block comment is not read");
+}
+
 // A reserved word or a built-in type name never enters the table. An ordinary identifier does.
 void TestKeywordStripping(TestRunner& runner)
 {
@@ -273,6 +299,7 @@ int main()
     TestRunner runner{ "SymbolTableTests" };
     TestExternStaticConstStripping(runner);
     TestKeywordStripping(runner);
+    TestCommentsDeclareNothing(runner);
     TestAxisReachability(runner);
     TestAccumulationAndUnknownModule(runner);
     TestExternConstExtraction(runner);

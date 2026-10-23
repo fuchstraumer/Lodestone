@@ -131,10 +131,12 @@ set(LODESTONE_PERMUTE_SOURCES
 
 set(LODESTONE_TARGET_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/target/ShimTable.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/target/StorageFormatTable.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/target/SpvValidator.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/target/TargetProfile.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/target/TargetUtils.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/target/ShimTable.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/target/StorageFormatTable.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/target/SpvValidator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetProfile.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/target/TargetUtils.cpp"

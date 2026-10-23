@@ -2,11 +2,12 @@
 #include "EnumClassUtils.hpp"
 #include <algorithm>
 #include <cassert>
-#include <cctype>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <ranges>
 #include <span>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -69,6 +70,7 @@ namespace lodestone
             {
                 return {};
             }
+
             size_t idStartIdx = line.find_last_not_of(k_ValidIdChars, idEndIdx);
             assert(idStartIdx != std::string_view::npos);
             ++idStartIdx;
@@ -84,6 +86,65 @@ namespace lodestone
                                         line.substr(valueStartIdx) :
                                         line.substr(valueStartIdx, valueEndIdx - valueStartIdx);
             return TrimWhitespace(valueStr);
+        }
+
+        /** @brief Returns the part of `line` that is code. A `//` comment ends the line, a block comment that opens the line is
+         * dropped, a block comment inside a declaration stays, and a block comment that does not close on the line starts a
+         * comment that `in_block_comment` carries to the next lines. Views keep pointing into the source. */
+        std::string_view StripComments(std::string_view line, bool& in_block_comment) noexcept
+        {
+            if (in_block_comment)
+            {
+                const size_t close = line.find("*/");
+                if (close == std::string_view::npos)
+                {
+                    return {};
+                }
+                in_block_comment = false;
+                line = line.substr(close + 2u);
+            }
+
+            bool inString = false;
+            for (size_t i = 0u; i < line.size(); ++i)
+            {
+
+                const char character = line[i];
+                if (character == '"')
+                {
+                    inString = !inString;
+                }
+                else if (!inString && character == '/' && i + 1u < line.size())
+                {
+                    if (line[i + 1u] == '/')
+                    {
+                        return line.substr(0u, i);
+                    }
+
+                    if (line[i + 1u] == '*')
+                    {
+                        const size_t close = line.find("*/", i + 2u);
+                        if (close == std::string_view::npos)
+                        {
+                            in_block_comment = true;
+                            return line.substr(0u, i);
+                        }
+
+                        // a comment that opens the line is dropped, and code may follow it
+                        const std::string_view beforeComment = line.substr(0u, i);
+                        const size_t beforeCommentNonWhitespace = beforeComment.find_first_not_of(" \t\r");
+                        const bool opensLine = beforeCommentNonWhitespace == std::string_view::npos;
+                        if (opensLine)
+                        {
+                            return StripComments(line.substr(close + 2u), in_block_comment);
+                        }
+                        
+                        i = close + 1u;
+                    }
+                }
+
+            }
+
+            return line;
         }
 
         /** @brief Flags, so the keywords combine in any order, as in C. */
@@ -288,6 +349,7 @@ namespace lodestone
         std::vector<ExternStructDeclaration>& externStructs = externStructMap[module_name];
         size_t lineStart = 0u;
         uint32_t lineNumber = 0u;
+        bool inBlockComment = false;
 
         while (std::cmp_less(lineStart, source_code.size()))
         {
@@ -297,12 +359,13 @@ namespace lodestone
                 lineEnd = source_code.size();
             }
 
-            std::string_view line = source_code.substr(lineStart, lineEnd - lineStart);
+            // a comment declares nothing: the doc comment of a builtin can show `extern static const` as an example
+            std::string_view line = StripComments(source_code.substr(lineStart, lineEnd - lineStart), inBlockComment);
             lineStart = lineEnd + 1;
             ++lineNumber;
 
             // a declaration with no default has no `=`, so the extractor reads the header up to the first `=`, `;`, or `{`
-            if (line.find("extern") != std::string_view::npos)
+            if (line.contains("extern"))
             {
                 if (const std::optional<ExternStructDeclaration> externStruct =
                         ExtractExternStruct(line, source_path, lineNumber))
@@ -367,7 +430,7 @@ namespace lodestone
         for (auto token : tokens)
         {
             bool found = false;
-            for (auto moduleName : module_names)
+            for (const std::string& moduleName : module_names)
             {
                 auto iter = tokenMap.find(moduleName);
                 if (iter != tokenMap.end() && iter->second.contains(token))
@@ -393,6 +456,7 @@ namespace lodestone
         {
             return iter->second;
         }
+        
         return {};
     }
 
@@ -403,6 +467,7 @@ namespace lodestone
         {
             return iter->second;
         }
+
         return {};
     }
 
@@ -413,6 +478,7 @@ namespace lodestone
         {
             return std::vector<ExternConstantDeclaration>(iter->second.begin(), iter->second.end());
         }
+
         return {};
     }
 
@@ -424,6 +490,7 @@ namespace lodestone
             const ExternConstSet& externConsts = iter->second;
             return std::vector<ExternConstantDeclaration>(externConsts.begin(), externConsts.end());
         }
+
         return {};
     }
 }

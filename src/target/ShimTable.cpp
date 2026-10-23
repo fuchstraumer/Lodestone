@@ -11,24 +11,58 @@ namespace lodestone
 namespace
 {
     // Pointer and Indexed cells stay empty until phase F step F4.1 adds their implementations
-    constexpr std::array<ShimInterface, 4u> k_ShimInterfaces
+    constexpr std::array<ShimInterface, 5u> k_ShimInterfaces
     {
-        ShimInterface{ .Name = "IReadBuffer",
-                       .Class = ShimResourceClass::Buffer,
-                       .TypeParameterCount = 1u,
-                       .Bound = "BoundReadBuffer" },
-        ShimInterface{ .Name = "IReadWriteBuffer",
-                       .Class = ShimResourceClass::Buffer,
-                       .TypeParameterCount = 1u,
-                       .Bound = "BoundReadWriteBuffer" },
-        ShimInterface{ .Name = "ITexture2DRef",
-                       .Class = ShimResourceClass::Texture,
-                       .TypeParameterCount = 0u,
-                       .Bound = "BoundTexture2D" },
-        ShimInterface{ .Name = "ISamplerRef",
-                       .Class = ShimResourceClass::Sampler,
-                       .TypeParameterCount = 0u,
-                       .Bound = "BoundSampler" },
+        ShimInterface
+        { 
+            .Name = "IReadBuffer",
+            .Class = ShimResourceClass::Buffer,
+            .TypeParameterCount = 1u,
+            .Bound = "BoundReadBuffer",
+            .Indexed = {},
+            .Pointer = {},
+            .ImplementationTakesFormat = false,
+        },
+        ShimInterface
+        { 
+            .Name = "IReadWriteBuffer",
+            .Class = ShimResourceClass::Buffer,
+            .TypeParameterCount = 1u,
+            .Bound = "BoundReadWriteBuffer",
+            .Indexed = {},
+            .Pointer = {},
+            .ImplementationTakesFormat = false,
+        },
+        ShimInterface
+        { 
+            .Name = "ITexture2DRef",
+            .Class = ShimResourceClass::Texture,
+            .TypeParameterCount = 0u,
+            .Bound = "BoundTexture2D",
+            .Indexed = {},
+            .Pointer = {},
+            .ImplementationTakesFormat = false,
+        },
+        ShimInterface
+        { 
+            .Name = "ISamplerRef",
+            .Class = ShimResourceClass::Sampler,
+            .TypeParameterCount = 0u,
+            .Bound = "BoundSampler",
+            .Indexed = {},
+            .Pointer = {},
+            .ImplementationTakesFormat = false,
+        },
+        ShimInterface
+        { 
+            .Name = "IWriteStorageTexture2D",
+            .Class = ShimResourceClass::StorageTexture,
+            .TypeParameterCount = 0u,
+            .Bound = "BoundWriteStorageTexture2D",
+            .Indexed = {},
+            .Pointer = {},
+            .ImplementationTakesFormat = true,
+        },
     };
 }
 
@@ -69,6 +103,8 @@ std::string_view ToString(ShimResourceClass resource_class) noexcept
         return "texture";
     case ShimResourceClass::Sampler:
         return "sampler";
+    case ShimResourceClass::StorageTexture:
+        return "storage texture";
     case ShimResourceClass::Invalid:
         break;
     }

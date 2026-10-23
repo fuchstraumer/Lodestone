@@ -166,6 +166,11 @@ add_lodestone_unit_test(ShimLinkSourceTest ShimLinkSourceTests.cpp)
 add_lodestone_unit_test(ShimCookTest ShimCookTests.cpp)
 target_compile_definitions(ShimCookTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/Shims")
+# The storage formats that every target accepts (DiamondDogs request C11, step C11.1): the enum in the shim module, the table in
+# target/, and the three readers of a texture format must agree. It cooks one probe for both targets, so it takes about one second.
+add_lodestone_unit_test(StorageFormatTest StorageFormatTests.cpp)
+target_compile_definitions(StorageFormatTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/Shims")
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)

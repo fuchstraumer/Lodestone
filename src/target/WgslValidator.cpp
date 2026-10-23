@@ -284,6 +284,8 @@ namespace
             return TextureFormat::RG8Unorm;
         case tTexelFormat::kRgba8Unorm:
             return TextureFormat::RGBA8Unorm;
+        case tTexelFormat::kRgba8Snorm:
+            return TextureFormat::RGBA8Snorm;
         case tTexelFormat::kR16Float:
             return TextureFormat::R16Float;
         case tTexelFormat::kRg16Float:
