@@ -652,3 +652,52 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
   - Not covered: a shim extern in an array (the DiamondDogs pyramid binds `imageMipLevels[16]`), integer formats, and
     `read_write`.
   - Next: F4.
+- 2026-10-23. **F4 reordered by the author:** F4.0 (shim externs in an array, Bound form, for DiamondDogs' pyramid), then F4.A
+  (unbounded binding arrays on `spirv`), then F4.1 to F4.5 (`spirv-modern`). WebGPU `binding_array` is out of phase F (no core
+  support, no consumer). For F4.A, the recommendation is an unsigned `ArrayCount()` of 0 plus an explicit `IsUnbounded()` flag,
+  and `DescribeCreation` reports the count as `Cpu`; the author asked whether a signed count of -1 is clearer, and the
+  decision waits for F4.A.
+- 2026-10-23. **F4.0 spike done.** No code change. Probes cooked through `lodestone_cooker_console` (Slang `e9fc02c8d`, `v2026.19-87`), in the
+  scratchpad: `PyramidShim` (`Level levels[16]` of a storage shim in a `ParameterBlock`, a format axis, an entry point `uniform`
+  index), `PyramidControl` (the literal `WTexture2D<RGBA16F> levels[16]`), `ShimArrayGlobal` (a storage shim array of 4 and a
+  buffer shim array of 2 as globals), `ShimArrayConstant` (index 3).
+
+  **Measured:**
+  - **An array of shims is one binding array.** In a block and as a global: one binding, `ArrayCount()` 16 (or 4, or 2), the
+    format of each variant's value, kind `StorageTexture` or `StorageBuffer`. Scope `pyramid`, name `texture` (O16). The cooker
+    needs no change for the layout.
+  - **Slang drops `NonReadable` on an array of `WTexture2D`.** A single `WTexture2D<RGBA16F>` gets `OpDecorate NonReadable`; an
+    array of them gets none, so the SPIR-V declares read-write and the cross-check fails on access (declared `ReadWrite`,
+    reflection `WriteOnly`). This fails the control too, with no shim. Cause: `maybeEmitWriteOnlyImageDecoration`
+    (`slang-emit-spirv.cpp:8258`) casts the pointee to `IRTextureType`, and an array pointee returns early. The GLSL path
+    (`-emit-spirv-via-glsl`) decorates the array, and `spirv-val` accepts it. Unchanged on `master` at `d29325a7f`. Draft
+    issue: `docs/slang-issue-nonreadable-image-array.md`.
+  - **A shim adds a dynamic-indexing feature to a constant index.** Slang does not inline `BoundWriteStorageTexture2D::Store`:
+    the index is a function parameter, the access chain uses it, and the reader correctly adds
+    `StorageImageArrayDynamicIndexing`. The literal control with a constant index needs no capability. A copy of the impl
+    with `[ForceInline]` on `Store` keeps `%int_3` in the access chain and needs none.
+  - **WGSL fails through Tint, for a shim array and a plain array alike.** Slang emits `array<texture_storage_2d<...>, 16>`,
+    and Tint rejects it (`TargetValidationEntryPointParseFailed`). E56105 (#10924) covers arrays of structured and
+    byte-address buffers only, which is why `BindingArrayTest` sees `CodeGenerationFailed`. Corrected: an earlier note here
+    said that E56105 misses an array of shims, and that was wrong; no issue. Upstream #13708 (merged 2026-10-22, after our
+    submodule) emits `binding_array` for arrays of textures and samplers.
+  - **Not a Slang fault: the `...ArrayDynamicIndexing` capabilities.** Slang never declares them (C12). No instruction or
+    enumerant in the SPIR-V grammar (1.0 and unified) requires one; each only implies `Shader`, and a dynamic index is an
+    `OpAccessChain`. glslang (`-emit-spirv-via-glsl`) omits them too. Vulkan ties the rule to the device feature
+    (`vk.xml` `<spirvcapabilities>`), not to a declaration, and SPIRV-Tools lists them as guaranteed in Vulkan 1.4. So the
+    reader that adds the name from the access chain (C12) is the only place the requirement shows, by design.
+- 2026-10-23. **F4.0 decided, not started.** The author chose the validator workaround with a canary test for the `NonReadable`
+  fault (the pattern of slang#13789), because the issue is reported upstream. Draft: `docs/slang-issue-nonreadable-image-array.md`
+  (the author files it). The F4.0 work, in order:
+  1. `[ForceInline]` on every method of the Bound impls in `builtins/LodestoneShims.slang` (`Load`, `Store`, `Get`), so that
+     a constant index stays an `OpConstant` and needs no `...ArrayDynamicIndexing` feature.
+  2. In `SpvValidator`: accept declared `ReadWrite` against reflected `WriteOnly` only for an array of storage images whose
+     variable has no `NonReadable`. Print a warning for each, as `ApplySlangWorkaround13789` does. A canary test (beside
+     `SlangMetadataCanaryTest`) compiles an array of `WTexture2D` through Slang and fails when the array gets `NonReadable`;
+     its header lists the code to delete.
+  3. A test on the C11.4 harness (`tests/CookComparison.hpp`), `spirv` only: a pyramid asset (`Level levels[16]`, a format
+     axis) with a dynamic index and with a constant index, against a literal control (`WTexture2D<Type> levels[16]`). Same
+     resources, `ArrayCount()` 16, the format of each variant, and the same capability names (none for the constant index,
+     `StorageImageArrayDynamicIndexing` for the dynamic one). WGSL must fail (Tint).
+  4. Update the DiamondDogs C11 note: the array form works, with an example; the dynamic index needs the device feature.
+  Then F4.A (unbounded arrays; the `IsUnbounded()` decision), then F4.1 to F4.5.

@@ -3,6 +3,7 @@
 #include "model/AxisInfluence.hpp"
 #include "model/CookedLibrary.hpp"
 #include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "model/ShaderDataSchema.hpp"
@@ -13,14 +14,12 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
 #include <cstring>
 #include <expected>
 #include <format>
 #include <functional>
 #include <numeric>
 #include <optional>
-#include <print>
 #include <ranges>
 #include <span>
 #include <string>
@@ -36,34 +35,47 @@ namespace lodestone
 namespace
 {
 
-    CookError CheckBundleDirectory(const CookedLibrary& library, const manifest::BundleView& bundle);
+    CookError CheckBundleDirectory(const CookedLibrary& library,
+                                   const manifest::BundleView& bundle,
+                                   DiagnosticSink& sink);
     CookError CheckEnvironment(const CookedModule& module,
                                const manifest::EnvironmentView& view,
-                               uint32_t& checked_count);
+                               uint32_t& checked_count,
+                               DiagnosticSink& sink);
     CookError CheckVariantKeyDecode(const manifest::EnvironmentView& view,
                                     const LibraryVariant& variant,
-                                    VariantKey key);
+                                    VariantKey key,
+                                    DiagnosticSink& sink);
     /** Derives the relevance again from the written environment alone, through the client views. */
-    CookError VerifyAxisRelevance(const manifest::EnvironmentView& view);
-    CookError CheckFootprintAxes(const CookedModule& module, const manifest::EnvironmentView& view);
-    CookError CheckSourceFacts(const CookedModule& module, const manifest::EnvironmentView& view);
+    CookError VerifyAxisRelevance(const manifest::EnvironmentView& view, DiagnosticSink& sink);
+    CookError CheckFootprintAxes(const CookedModule& module,
+                                 const manifest::EnvironmentView& view,
+                                 DiagnosticSink& sink);
+    CookError CheckSourceFacts(const CookedModule& module,
+                               const manifest::EnvironmentView& view,
+                               DiagnosticSink& sink);
     CookError CheckVariantAxisMask(const CookedModule& module,
                                    const LibraryVariant& variant,
-                                   manifest::VariantView read_variant);
+                                   manifest::VariantView read_variant,
+                                   DiagnosticSink& sink);
     bool StoredAxisValueMatches(const manifest::EnvironmentView& view,
                                 uint32_t axis_index,
                                 uint32_t digit,
                                 const PermutationAxis& axis,
                                 const PermutationValue& value);
-    CookError CheckAxisDefaults(const CookedModule& module, const manifest::EnvironmentView& view);
+    CookError CheckAxisDefaults(const CookedModule& module,
+                                const manifest::EnvironmentView& view,
+                                DiagnosticSink& sink);
     CookError CheckManifestSource(const CookedModule& module,
                                   const manifest::ShaderSourceProvider& provider,
                                   const LibraryVariant& variant,
-                                  size_t entry_point_index);
+                                  size_t entry_point_index,
+                                  DiagnosticSink& sink);
     CookError CheckManifestWorkgroup(const CookedModule& module,
                                      const manifest::ShaderSourceProvider& provider,
                                      const LibraryVariant& variant,
-                                     size_t entry_point_index);
+                                     size_t entry_point_index,
+                                     DiagnosticSink& sink);
     bool RecordMatchesFootprint(const manifest::Footprint& record, const ResourceFootprint& footprint) noexcept;
     bool RecordMatchesBinding(const manifest::Binding& record, const ReflectedBinding& binding) noexcept;
     bool ManifestUniformMembersMatch(const manifest::EnvironmentView& view,
@@ -73,40 +85,47 @@ namespace
                                   const manifest::EnvironmentView& view,
                                   const LibraryVariant& variant,
                                   manifest::VariantView read_variant,
-                                  size_t entry_point_index);
+                                  size_t entry_point_index,
+                                  DiagnosticSink& sink);
     CookError CheckManifestVertexInputs(std::span<const manifest::VertexInput> read_inputs,
                                         const ReflectedRasterState& expected_raster,
-                                        const manifest::EnvironmentView& view);
+                                        const manifest::EnvironmentView& view,
+                                        DiagnosticSink& sink);
     CookError CheckManifestColorTargets(std::span<const manifest::ColorTarget> read_targets,
-                                        const ReflectedRasterState& expected_raster);
+                                        const ReflectedRasterState& expected_raster,
+                                        DiagnosticSink& sink);
     CookError CheckManifestRaster(const CookedModule& module,
                                   const manifest::EnvironmentView& view,
                                   const LibraryVariant& variant,
-                                  size_t entry_point_index);
+                                  size_t entry_point_index,
+                                  DiagnosticSink& sink);
     CookError CheckManifestSlot(const CookedModule& module,
                                 const manifest::EnvironmentView& view,
                                 const manifest::ShaderSourceProvider& provider,
                                 const LibraryVariant& variant,
                                 manifest::VariantView read_variant,
-                                size_t entry_point_index);
+                                size_t entry_point_index,
+                                DiagnosticSink& sink);
 
 } // namespace
 
-CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::vector<std::byte>& manifest_bytes)
+CookError VerifyManifestRoundTrip(const CookedLibrary& library,
+                                  const std::vector<std::byte>& manifest_bytes,
+                                  DiagnosticSink& sink)
 {
     const std::span<const std::byte> raw{ manifest_bytes.data(), manifest_bytes.size() };
 
     const manifest::ManifestResult<manifest::BundleView> opened = manifest::BundleView::Open(raw);
     if (!opened)
     {
-        std::println(stderr,
-                     "[lodestone] manifest bundle does not open: {}",
-                     manifest::DescribeShaderManifestError(opened.error()));
-        return CookError::LibraryRoundTripFailed;
+        return ReportError(sink,
+                           CookError::LibraryRoundTripFailed,
+                           std::format("manifest bundle does not open: {}",
+                                       manifest::DescribeShaderManifestError(opened.error())));
     }
 
     const manifest::BundleView& bundle = *opened;
-    const CookError directoryError = CheckBundleDirectory(library, bundle);
+    const CookError directoryError = CheckBundleDirectory(library, bundle, sink);
     if (directoryError != CookError::Success)
     {
         return directoryError;
@@ -127,26 +146,27 @@ CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::vecto
             {
                 if (view.has_value() || view.error().Code != manifest::ErrorCode::EnvironmentNotCooked)
                 {
-                    std::println(stderr,
-                                 "[lodestone] manifest holds module {} for target '{}', but the cook did not",
-                                 library.ModuleNames[moduleIndex],
-                                 library.Profiles[profileIndex].TargetName);
-                    return CookError::LibraryRoundTripFailed;
+                    return ReportError(
+                        sink,
+                        CookError::LibraryRoundTripFailed,
+                        std::format("manifest holds module {} for target '{}', but the cook did not",
+                                    library.ModuleNames[moduleIndex],
+                                    library.Profiles[profileIndex].TargetName));
                 }
                 continue;
             }
 
             if (!view)
             {
-                std::println(stderr,
-                             "[lodestone] module {} for target '{}' does not open: {}",
-                             library.ModuleNames[moduleIndex],
-                             library.Profiles[profileIndex].TargetName,
-                             manifest::DescribeShaderManifestError(view.error()));
-                return CookError::LibraryRoundTripFailed;
+                return ReportError(sink,
+                                   CookError::LibraryRoundTripFailed,
+                                   std::format("module {} for target '{}' does not open: {}",
+                                               library.ModuleNames[moduleIndex],
+                                               library.Profiles[profileIndex].TargetName,
+                                               manifest::DescribeShaderManifestError(view.error())));
             }
 
-            const CookError environmentError = CheckEnvironment(*environment, *view, checked);
+            const CookError environmentError = CheckEnvironment(*environment, *view, checked, sink);
             if (environmentError != CookError::Success)
             {
                 return environmentError;
@@ -154,41 +174,44 @@ CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::vecto
         }
     }
 
-    std::println(stderr,
-                 "[lodestone] manifest round trip verified: {} modules x {} profiles, {} entrypoint variants "
-                 "read back identical ({} KiB)",
-                 moduleCount,
-                 library.Profiles.size(),
-                 checked,
-                 manifest_bytes.size() / 1024u);
+    ReportInfo(sink,
+               std::format("manifest round trip verified: {} modules x {} profiles, {} entrypoint variants "
+                           "read back identical ({} KiB)",
+                           moduleCount,
+                           library.Profiles.size(),
+                           checked,
+                           manifest_bytes.size() / 1024u));
 
     return CookError::Success;
 }
 namespace
 {
 
-    CookError CheckBundleDirectory(const CookedLibrary& library, const manifest::BundleView& bundle)
+    CookError CheckBundleDirectory(const CookedLibrary& library,
+                                   const manifest::BundleView& bundle,
+                                   DiagnosticSink& sink)
     {
         if (bundle.ModuleCount() != library.ModuleNames.size() || bundle.Profiles().size() != library.Profiles.size())
         {
-            std::println(stderr,
-                         "[lodestone] manifest holds {} modules and {} profiles, the cook produced {} and {}",
-                         bundle.ModuleCount(),
-                         bundle.Profiles().size(),
-                         library.ModuleNames.size(),
-                         library.Profiles.size());
-            return CookError::LibraryRoundTripFailed;
+            return ReportError(
+                sink,
+                CookError::LibraryRoundTripFailed,
+                std::format("manifest holds {} modules and {} profiles, the cook produced {} and {}",
+                            bundle.ModuleCount(),
+                            bundle.Profiles().size(),
+                            library.ModuleNames.size(),
+                            library.Profiles.size()));
         }
 
         for (uint32_t moduleIndex = 0u; moduleIndex < bundle.ModuleCount(); ++moduleIndex)
         {
             if (bundle.Module(moduleIndex).Name() != library.ModuleNames[moduleIndex])
             {
-                std::println(stderr,
-                             "[lodestone] manifest names module '{}', but the cook produced '{}'",
-                             bundle.Module(moduleIndex).Name(),
-                             library.ModuleNames[moduleIndex]);
-                return CookError::LibraryRoundTripFailed;
+                return ReportError(sink,
+                                   CookError::LibraryRoundTripFailed,
+                                   std::format("manifest names module '{}', but the cook produced '{}'",
+                                               bundle.Module(moduleIndex).Name(),
+                                               library.ModuleNames[moduleIndex]));
             }
         }
 
@@ -198,12 +221,13 @@ namespace
             if (bundle.String(profile.TargetNameString) != expected.TargetName ||
                 profile.AccessModel != expected.AccessModel)
             {
-                std::println(stderr,
-                             "[lodestone] manifest profile {} names target '{}', but the cook produced '{}'",
-                             profileIndex,
-                             bundle.String(profile.TargetNameString),
-                             expected.TargetName);
-                return CookError::LibraryRoundTripFailed;
+                return ReportError(
+                    sink,
+                    CookError::LibraryRoundTripFailed,
+                    std::format("manifest profile {} names target '{}', but the cook produced '{}'",
+                                profileIndex,
+                                bundle.String(profile.TargetNameString),
+                                expected.TargetName));
             }
         }
 
@@ -212,37 +236,38 @@ namespace
 
     CookError CheckEnvironment(const CookedModule& module,
                                const manifest::EnvironmentView& view,
-                               uint32_t& checked_count)
+                               uint32_t& checked_count,
+                               DiagnosticSink& sink)
     {
         if (view.Variants().size() != module.Variants.size())
         {
-            std::println(stderr,
-                         "[lodestone] manifest module {} holds {} variants, the cook produced {}",
-                         module.Name,
-                         view.Variants().size(),
-                         module.Variants.size());
-            return CookError::ManifestMissingVariant;
+            return ReportError(sink,
+                               CookError::ManifestMissingVariant,
+                               std::format("manifest module {} holds {} variants, the cook produced {}",
+                                           module.Name,
+                                           view.Variants().size(),
+                                           module.Variants.size()));
         }
 
-        const CookError defaultsError = CheckAxisDefaults(module, view);
+        const CookError defaultsError = CheckAxisDefaults(module, view, sink);
         if (defaultsError != CookError::Success)
         {
             return defaultsError;
         }
 
-        const CookError relevanceError = VerifyAxisRelevance(view);
+        const CookError relevanceError = VerifyAxisRelevance(view, sink);
         if (relevanceError != CookError::Success)
         {
             return relevanceError;
         }
 
-        const CookError footprintAxesError = CheckFootprintAxes(module, view);
+        const CookError footprintAxesError = CheckFootprintAxes(module, view, sink);
         if (footprintAxesError != CookError::Success)
         {
             return footprintAxesError;
         }
 
-        const CookError sourceFactsError = CheckSourceFacts(module, view);
+        const CookError sourceFactsError = CheckSourceFacts(module, view, sink);
         if (sourceFactsError != CookError::Success)
         {
             return sourceFactsError;
@@ -255,17 +280,19 @@ namespace
             const std::optional<manifest::VariantView> readVariant = view.VariantByKey(key);
             if (!readVariant.has_value())
             {
-                std::println(stderr, "[lodestone] manifest holds no variant {} [{}]", variant.Index, variant.Description);
-                return CookError::ManifestMissingVariant;
+                return ReportError(
+                    sink,
+                    CookError::ManifestMissingVariant,
+                    std::format("manifest holds no variant {} [{}]", variant.Index, variant.Description));
             }
 
-            const CookError keyError = CheckVariantKeyDecode(view, variant, key);
+            const CookError keyError = CheckVariantKeyDecode(view, variant, key, sink);
             if (keyError != CookError::Success)
             {
                 return keyError;
             }
 
-            const CookError maskError = CheckVariantAxisMask(module, variant, readVariant.value());
+            const CookError maskError = CheckVariantAxisMask(module, variant, readVariant.value(), sink);
             if (maskError != CookError::Success)
             {
                 return maskError;
@@ -273,8 +300,8 @@ namespace
 
             for (size_t entryPointIndex = 0u; entryPointIndex < module.EntryPoints.size(); ++entryPointIndex)
             {
-                const CookError slotError =
-                    CheckManifestSlot(module, view, provider, variant, readVariant.value(), entryPointIndex);
+                const CookError slotError = CheckManifestSlot(
+                    module, view, provider, variant, readVariant.value(), entryPointIndex, sink);
                 if (slotError != CookError::Success)
                 {
                     return slotError;
@@ -289,20 +316,21 @@ namespace
 
     CookError CheckVariantKeyDecode(const manifest::EnvironmentView& view,
                                     const LibraryVariant& variant,
-                                    VariantKey key)
+                                    VariantKey key,
+                                    DiagnosticSink& sink)
     {
         // decode the key as a client does, and compare with the canonical assignment
         const manifest::ModuleView& moduleView = view.Module();
         const uint32_t axisCount = moduleView.AxisCount();
         if (variant.Canonical.size() != axisCount)
         {
-            std::println(stderr,
-                         "[lodestone] manifest module {} has {} axes, variant [{}] has {}",
-                         moduleView.Name(),
-                         axisCount,
-                         variant.Description,
-                         variant.Canonical.size());
-            return CookError::ManifestVariantKeyMismatch;
+            return ReportError(sink,
+                               CookError::ManifestVariantKeyMismatch,
+                               std::format("manifest module {} has {} axes, variant [{}] has {}",
+                                           moduleView.Name(),
+                                           axisCount,
+                                           variant.Description,
+                                           variant.Canonical.size()));
         }
 
         std::vector<uint32_t> radices(axisCount);
@@ -319,14 +347,15 @@ namespace
             const PermutationAxis& axis = *binding.Axis;
             if (!StoredAxisValueMatches(view, axisIndex, digits[axisIndex], axis, binding.Value))
             {
-                std::println(stderr,
-                             "[lodestone] manifest key {} of module {} decodes axis '{}' differently than "
-                             "variant [{}]",
-                             std::to_underlying(key),
-                             moduleView.Name(),
-                             axis.Name,
-                             variant.Description);
-                return CookError::ManifestVariantKeyMismatch;
+                return ReportError(
+                    sink,
+                    CookError::ManifestVariantKeyMismatch,
+                    std::format("manifest key {} of module {} decodes axis '{}' differently than "
+                                "variant [{}]",
+                                std::to_underlying(key),
+                                moduleView.Name(),
+                                axis.Name,
+                                variant.Description));
             }
         }
 
@@ -362,7 +391,9 @@ namespace
         std::unreachable();
     }
 
-    CookError CheckAxisDefaults(const CookedModule& module, const manifest::EnvironmentView& view)
+    CookError CheckAxisDefaults(const CookedModule& module,
+                                const manifest::EnvironmentView& view,
+                                DiagnosticSink& sink)
     {
         if (module.Space == nullptr)
         {
@@ -376,13 +407,14 @@ namespace
             const uint32_t digit = view.Module().AxisDefaultDigit(axisIndex);
             if (!StoredAxisValueMatches(view, axisIndex, digit, axis, axis.GetDeclaredDefault()))
             {
-                std::println(stderr,
-                             "[lodestone] manifest module {} reads the default of axis '{}' back as digit {}, which "
-                             "is not the declared default",
-                             module.Name,
-                             axis.Name,
-                             digit);
-                return CookError::ManifestAxisDefaultMismatch;
+                return ReportError(
+                    sink,
+                    CookError::ManifestAxisDefaultMismatch,
+                    std::format("manifest module {} reads the default of axis '{}' back as digit {}, which "
+                                "is not the declared default",
+                                module.Name,
+                                axis.Name,
+                                digit));
             }
         }
 
@@ -527,7 +559,9 @@ namespace
     }
 
     /** Compares names by text, so a wrong bit and a wrong name table both fail. */
-    CookError CheckSourceFacts(const CookedModule& module, const manifest::EnvironmentView& view)
+    CookError CheckSourceFacts(const CookedModule& module,
+                               const manifest::EnvironmentView& view,
+                               DiagnosticSink& sink)
     {
         for (uint32_t sourceIndex = 0u; sourceIndex < module.SourceFacts.size(); ++sourceIndex)
         {
@@ -544,19 +578,22 @@ namespace
             if (!std::ranges::equal(read, expected.CapabilityNames) ||
                 view.SourceWorkgroupMemoryBytes(sourceIndex) != expected.WorkgroupMemoryBytes)
             {
-                std::println(stderr,
-                             "[lodestone] manifest round trip: module {} source {} reads back capabilities or "
-                             "workgroup memory that differ from the code",
-                             module.Name,
-                             sourceIndex);
-                return CookError::ManifestSourceFactsMismatch;
+                return ReportError(
+                    sink,
+                    CookError::ManifestSourceFactsMismatch,
+                    std::format("manifest round trip: module {} source {} reads back capabilities or "
+                                "workgroup memory that differ from the code",
+                                module.Name,
+                                sourceIndex));
             }
         }
 
         return CookError::Success;
     }
 
-    CookError CheckFootprintAxes(const CookedModule& module, const manifest::EnvironmentView& view)
+    CookError CheckFootprintAxes(const CookedModule& module,
+                                 const manifest::EnvironmentView& view,
+                                 DiagnosticSink& sink)
     {
         const size_t wordCount = view.Module().AxisMaskWordCount();
         const std::vector<uint64_t> expected = BuildFootprintAxisMasks(module, wordCount);
@@ -567,19 +604,20 @@ namespace
             const std::span<const uint64_t> measured{ expected.data() + (resourceIndex * wordCount), wordCount };
             if (!std::ranges::equal(written, measured))
             {
-                std::println(stderr,
-                             "[lodestone] manifest round trip: module {} resource '{}' reads back footprint axes that "
-                             "differ from the measured axes",
-                             module.Name,
-                             module.Resources[resourceIndex].Name);
-                return CookError::ManifestFootprintAxesMismatch;
+                return ReportError(
+                    sink,
+                    CookError::ManifestFootprintAxesMismatch,
+                    std::format("manifest round trip: module {} resource '{}' reads back footprint axes that "
+                                "differ from the measured axes",
+                                module.Name,
+                                module.Resources[resourceIndex].Name));
             }
         }
 
         return CookError::Success;
     }
 
-    CookError VerifyAxisRelevance(const manifest::EnvironmentView& view)
+    CookError VerifyAxisRelevance(const manifest::EnvironmentView& view, DiagnosticSink& sink)
     {
         const manifest::ModuleView& module = view.Module();
         const uint32_t axisCount = module.AxisCount();
@@ -671,14 +709,16 @@ namespace
                 const bool relevant = derived[entryPoint][axis] != 0u;
                 if (view.IsAxisRelevant(entryPoint, axis) != relevant)
                 {
-                    std::println(stderr,
-                                 "[lodestone] AXIS RELEVANCE: the manifest stores axis '{}' as {} for entry point '{}', "
-                                 "and the written instances say {}",
-                                 describe(axis),
-                                 relevant ? "irrelevant" : "relevant",
-                                 entryPointName(entryPoint),
-                                 relevant ? "relevant" : "irrelevant");
-                    return CookError::ManifestAxisRelevanceMismatch;
+                    return ReportError(
+                        sink,
+                        CookError::ManifestAxisRelevanceMismatch,
+                        std::format(
+                            "AXIS RELEVANCE: the manifest stores axis '{}' as {} for entry point '{}', "
+                            "and the written instances say {}",
+                            describe(axis),
+                            relevant ? "irrelevant" : "relevant",
+                            entryPointName(entryPoint),
+                            relevant ? "relevant" : "irrelevant"));
                 }
             }
         }
@@ -688,7 +728,8 @@ namespace
 
     CookError CheckVariantAxisMask(const CookedModule& module,
                                    const LibraryVariant& variant,
-                                   manifest::VariantView read_variant)
+                                   manifest::VariantView read_variant,
+                                   DiagnosticSink& sink)
     {
         if (module.Space == nullptr)
         {
@@ -702,12 +743,13 @@ namespace
             const bool expected = std::ranges::contains(variant.Active, axis, &PermutationBinding::Axis);
             if (read_variant.IsAxisActive(axisIndex) != expected)
             {
-                std::println(stderr,
-                             "[lodestone] manifest marks axis '{}' {} in variant [{}], the cook did not",
-                             axis->Name,
-                             expected ? "inactive" : "active",
-                             variant.Description);
-                return CookError::ManifestVariantAxisMaskMismatch;
+                return ReportError(
+                    sink,
+                    CookError::ManifestVariantAxisMaskMismatch,
+                    std::format("manifest marks axis '{}' {} in variant [{}], the cook did not",
+                                axis->Name,
+                                expected ? "inactive" : "active",
+                                variant.Description));
             }
         }
 
@@ -717,7 +759,8 @@ namespace
     CookError CheckManifestSource(const CookedModule& module,
                                   const manifest::ShaderSourceProvider& provider,
                                   const LibraryVariant& variant,
-                                  size_t entry_point_index)
+                                  size_t entry_point_index,
+                                  DiagnosticSink& sink)
     {
         const std::span<const std::byte> expectedSource = ResolveSource(module, variant, entry_point_index);
         const VariantKey variantKey = module.VariantKeys[variant.Index];
@@ -731,18 +774,19 @@ namespace
             return CookError::Success;
         }
 
-        std::println(stderr,
-                     "[lodestone] manifest returns different text for {} variant {} [{}]",
-                     module.EntryPoints[entry_point_index].Name,
-                     variant.Index,
-                     variant.Description);
-        return CookError::ManifestVariantSourceCodeMismatch;
+        return ReportError(sink,
+                           CookError::ManifestVariantSourceCodeMismatch,
+                           std::format("manifest returns different text for {} variant {} [{}]",
+                                       module.EntryPoints[entry_point_index].Name,
+                                       variant.Index,
+                                       variant.Description));
     }
 
     CookError CheckManifestWorkgroup(const CookedModule& module,
                                      const manifest::ShaderSourceProvider& provider,
                                      const LibraryVariant& variant,
-                                     size_t entry_point_index)
+                                     size_t entry_point_index,
+                                     DiagnosticSink& sink)
     {
         const WorkgroupSize expected = variant.Workgroups[entry_point_index];
         const VariantKey variantKey = module.VariantKeys[variant.Index];
@@ -753,11 +797,11 @@ namespace
             return CookError::Success;
         }
 
-        std::println(stderr,
-                     "[lodestone] manifest returns a different workgroup size for {} variant {}",
-                     module.EntryPoints[entry_point_index].Name,
-                     variant.Index);
-        return CookError::ManifestVariantWorkgroupSizeMismatch;
+        return ReportError(sink,
+                           CookError::ManifestVariantWorkgroupSizeMismatch,
+                           std::format("manifest returns a different workgroup size for {} variant {}",
+                                       module.EntryPoints[entry_point_index].Name,
+                                       variant.Index));
     }
 
     bool RecordMatchesFootprint(const manifest::Footprint& record, const ResourceFootprint& footprint) noexcept
@@ -841,7 +885,8 @@ namespace
                                   const manifest::EnvironmentView& view,
                                   const LibraryVariant& variant,
                                   manifest::VariantView read_variant,
-                                  size_t entry_point_index)
+                                  size_t entry_point_index,
+                                  DiagnosticSink& sink)
     {
         const CookResult<ShaderLayoutView> expectedLayoutResult = ResolveLayoutView(module, variant, entry_point_index);
         if (!expectedLayoutResult)
@@ -852,11 +897,10 @@ namespace
 
         if (entry_point_index >= read_variant.EntryPointCount())
         {
-            std::println(stderr,
-                         "[lodestone] manifest variant {} holds no slot {}",
-                         variant.Index,
-                         entry_point_index);
-            return CookError::ManifestVariantMissingEntryPoint;
+            return ReportError(
+                sink,
+                CookError::ManifestVariantMissingEntryPoint,
+                std::format("manifest variant {} holds no slot {}", variant.Index, entry_point_index));
         }
 
         const manifest::LayoutRange layout =
@@ -864,14 +908,14 @@ namespace
 
         if (layout.Size() != expectedLayout.size())
         {
-            std::println(stderr,
-                         "[lodestone] manifest variant {} entry point {} sees {} resources, the cook "
-                         "produced {}",
-                         variant.Index,
-                         entry_point_index,
-                         layout.Size(),
-                         expectedLayout.size());
-            return CookError::ManifestVariantResourceVisibilityMismatch;
+            return ReportError(sink,
+                               CookError::ManifestVariantResourceVisibilityMismatch,
+                               std::format("manifest variant {} entry point {} sees {} resources, the cook "
+                                           "produced {}",
+                                           variant.Index,
+                                           entry_point_index,
+                                           layout.Size(),
+                                           expectedLayout.size()));
         }
 
         size_t position = 0u;
@@ -882,11 +926,11 @@ namespace
 
             if (footprint == nullptr)
             {
-                std::println(stderr,
-                             "[lodestone] manifest variant {} resolves resource {} out of range",
-                             variant.Index,
-                             position);
-                return CookError::ManifestVariantResourceResolveOutOfRange;
+                return ReportError(sink,
+                                   CookError::ManifestVariantResourceResolveOutOfRange,
+                                   std::format("manifest variant {} resolves resource {} out of range",
+                                               variant.Index,
+                                               position));
             }
 
             const manifest::Binding& read = resource.Record();
@@ -898,11 +942,11 @@ namespace
                 !ManifestUniformMembersMatch(view, view.UniformMembers(read), expected.Resource->UniformMembers) ||
                 !ManifestTagsMatch(view, view.ResourceTags(read), expected.Resource->Tags))
             {
-                std::println(stderr,
-                             "[lodestone] manifest binding '{}' of variant {} does not match the cook",
-                             expected.Resource->Name,
-                             variant.Index);
-                return CookError::ManifestVariantResourceBindingMismatch;
+                return ReportError(sink,
+                                   CookError::ManifestVariantResourceBindingMismatch,
+                                   std::format("manifest binding '{}' of variant {} does not match the cook",
+                                               expected.Resource->Name,
+                                               variant.Index));
             }
 
             ++position;
@@ -917,14 +961,15 @@ namespace
         });
         if (!pairsMatch)
         {
-            std::println(stderr,
-                         "[lodestone] manifest variant {} entry point {} reads {} sampler and texture pairs, the cook "
-                         "produced {}, or one pair differs",
-                         variant.Index,
-                         entry_point_index,
-                         readPairs.size(),
-                         expectedPairs.size());
-            return CookError::ManifestSamplerPairMismatch;
+            return ReportError(
+                sink,
+                CookError::ManifestSamplerPairMismatch,
+                std::format("manifest variant {} entry point {} reads {} sampler and texture pairs, the cook "
+                            "produced {}, or one pair differs",
+                            variant.Index,
+                            entry_point_index,
+                            readPairs.size(),
+                            expectedPairs.size()));
         }
 
         const EntryPointConstants& expectedConstants =
@@ -940,12 +985,13 @@ namespace
                                                                 expectedConstants.Members);
         if (!constantsMatch)
         {
-            std::println(stderr,
-                         "[lodestone] manifest variant {} entry point {} reads entry point constants that differ from "
-                         "the cook",
-                         variant.Index,
-                         entry_point_index);
-            return CookError::ManifestEntryPointConstantsMismatch;
+            return ReportError(
+                sink,
+                CookError::ManifestEntryPointConstantsMismatch,
+                std::format("manifest variant {} entry point {} reads entry point constants that differ from "
+                            "the cook",
+                            variant.Index,
+                            entry_point_index));
         }
 
         return CookError::Success;
@@ -953,7 +999,8 @@ namespace
 
     CookError CheckManifestVertexInputs(std::span<const manifest::VertexInput> read_inputs,
                                         const ReflectedRasterState& expected_raster,
-                                        const manifest::EnvironmentView& view)
+                                        const manifest::EnvironmentView& view,
+                                        DiagnosticSink& sink)
     {
         for (size_t inputIndex = 0u; inputIndex < read_inputs.size(); ++inputIndex)
         {
@@ -966,10 +1013,10 @@ namespace
                 readInput.ScalarType != static_cast<uint32_t>(expectedInput.Data.ScalarType) ||
                 readInput.ComponentCount != expectedInput.Data.ComponentCount)
             {
-                std::println(stderr,
-                             "[lodestone] manifest vertex input '{}' does not match the cook",
-                             expectedInput.SemanticName);
-                return CookError::ManifestVertexInputMismatch;
+                return ReportError(sink,
+                                   CookError::ManifestVertexInputMismatch,
+                                   std::format("manifest vertex input '{}' does not match the cook",
+                                               expectedInput.SemanticName));
             }
         }
 
@@ -977,7 +1024,8 @@ namespace
     }
 
     CookError CheckManifestColorTargets(std::span<const manifest::ColorTarget> read_targets,
-                                        const ReflectedRasterState& expected_raster)
+                                        const ReflectedRasterState& expected_raster,
+                                        DiagnosticSink& sink)
     {
         for (size_t targetIndex = 0u; targetIndex < read_targets.size(); ++targetIndex)
         {
@@ -988,10 +1036,10 @@ namespace
                 readTarget.ScalarType != static_cast<uint32_t>(expectedTarget.ScalarType) ||
                 readTarget.ComponentCount != expectedTarget.ComponentCount)
             {
-                std::println(stderr,
-                             "[lodestone] manifest color target {} does not match the cook",
-                             expectedTarget.Location);
-                return CookError::ManifestColorTargetMismatch;
+                return ReportError(
+                    sink,
+                    CookError::ManifestColorTargetMismatch,
+                    std::format("manifest color target {} does not match the cook", expectedTarget.Location));
             }
         }
 
@@ -1001,7 +1049,8 @@ namespace
     CookError CheckManifestRaster(const CookedModule& module,
                                   const manifest::EnvironmentView& view,
                                   const LibraryVariant& variant,
-                                  size_t entry_point_index)
+                                  size_t entry_point_index,
+                                  DiagnosticSink& sink)
     {
         const uint32_t rasterIndex = variant.RasterIndices[entry_point_index];
         const ReflectedRasterState& expectedRaster = module.RasterStates[rasterIndex];
@@ -1013,20 +1062,20 @@ namespace
             readTargets.size() != expectedRaster.ColorTargets.size() ||
             view.WritesFragDepth(rasterIndex) != expectedRaster.WritesFragDepth)
         {
-            std::println(stderr,
-                         "[lodestone] manifest raster state {} does not match the cook for {}",
-                         rasterIndex,
-                         module.EntryPoints[entry_point_index].Name);
-            return CookError::ManifestRasterStateMismatch;
+            return ReportError(sink,
+                               CookError::ManifestRasterStateMismatch,
+                               std::format("manifest raster state {} does not match the cook for {}",
+                                           rasterIndex,
+                                           module.EntryPoints[entry_point_index].Name));
         }
 
-        const CookError inputsError = CheckManifestVertexInputs(readInputs, expectedRaster, view);
+        const CookError inputsError = CheckManifestVertexInputs(readInputs, expectedRaster, view, sink);
         if (inputsError != CookError::Success)
         {
             return inputsError;
         }
 
-        return CheckManifestColorTargets(readTargets, expectedRaster);
+        return CheckManifestColorTargets(readTargets, expectedRaster, sink);
     }
 
     CookError CheckManifestSlot(const CookedModule& module,
@@ -1034,27 +1083,30 @@ namespace
                                 const manifest::ShaderSourceProvider& provider,
                                 const LibraryVariant& variant,
                                 manifest::VariantView read_variant,
-                                size_t entry_point_index)
+                                size_t entry_point_index,
+                                DiagnosticSink& sink)
     {
-        const CookError sourceError = CheckManifestSource(module, provider, variant, entry_point_index);
+        const CookError sourceError = CheckManifestSource(module, provider, variant, entry_point_index, sink);
         if (sourceError != CookError::Success)
         {
             return sourceError;
         }
 
-        const CookError workgroupError = CheckManifestWorkgroup(module, provider, variant, entry_point_index);
+        const CookError workgroupError =
+            CheckManifestWorkgroup(module, provider, variant, entry_point_index, sink);
         if (workgroupError != CookError::Success)
         {
             return workgroupError;
         }
 
-        const CookError layoutError = CheckManifestLayout(module, view, variant, read_variant, entry_point_index);
+        const CookError layoutError =
+            CheckManifestLayout(module, view, variant, read_variant, entry_point_index, sink);
         if (layoutError != CookError::Success)
         {
             return layoutError;
         }
 
-        return CheckManifestRaster(module, view, variant, entry_point_index);
+        return CheckManifestRaster(module, view, variant, entry_point_index, sink);
     }
 
 } // namespace

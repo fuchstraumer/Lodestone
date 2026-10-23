@@ -10,6 +10,7 @@
 #include "permute/PermutationTypes.hpp"
 #include "permute/PermutationValue.hpp"
 #include "ManifestFixtures.hpp"
+#include "Diagnostics.hpp"
 #include "TestHarness.hpp"
 
 #include <array>
@@ -182,6 +183,7 @@ std::vector<std::byte> EmitBytes(const PermutationSpace& space,
                                  std::vector<lodestone::VisibilityList> visibility_lists,
                                  const std::array<std::array<uint32_t, 3>, k_CaseCount>& visibility)
 {
+    lodestone::StderrDiagnosticSink manifestDiagnostics;
     lodestone::CookedLibrary library;
     library.ModuleNames = { "MergeTestModule" };
     library.Profiles = { lodestone::CookedProfile{ .TargetName = "wgsl",
@@ -189,7 +191,7 @@ std::vector<std::byte> EmitBytes(const PermutationSpace& space,
                                                    .CodeFormat = lodestone::ShaderCodeFormat::Wgsl } };
     library.Environments.emplace_back(BuildModule(space, std::move(visibility_lists), visibility));
 
-    lodestone::CookResult<std::vector<std::byte>> manifest = lodestone::EmitShaderManifest(library);
+    lodestone::CookResult<std::vector<std::byte>> manifest = lodestone::EmitShaderManifest(library, manifestDiagnostics);
     if (!manifest.has_value())
     {
         return {};
@@ -362,6 +364,7 @@ void TestOpenRejectsOrder(lodestone::tests::TestRunner& runner, const Permutatio
 // fragment stage's resources, and both sample Albedo with LinearSampler (positions 1 and 2 of each list).
 void TestSamplerPairs(lodestone::tests::TestRunner& runner, const PermutationSpace& space)
 {
+    lodestone::StderrDiagnosticSink manifestDiagnostics;
     runner.BeginSection("sampler and texture pairs");
 
     lodestone::CookedModule module = BuildModule(space, GoodVisibilityLists(), k_GoodVisibility);
@@ -377,7 +380,7 @@ void TestSamplerPairs(lodestone::tests::TestRunner& runner, const PermutationSpa
                                                    .CodeFormat = lodestone::ShaderCodeFormat::Wgsl,
                                                    .SamplerTexturePairsRecorded = true } };
     library.Environments.emplace_back(std::move(module));
-    const lodestone::CookResult<std::vector<std::byte>> manifest = lodestone::EmitShaderManifest(library);
+    const lodestone::CookResult<std::vector<std::byte>> manifest = lodestone::EmitShaderManifest(library, manifestDiagnostics);
     const ManifestResult<EnvironmentView> opened =
         manifest.has_value() ? OpenEnvironment(*manifest) : ManifestResult<EnvironmentView>{ std::unexpected(lodestone::manifest::ErrorState{}) };
     if (!runner.CheckOk(opened, "a module with pairs in two stages emits and opens"))
@@ -437,6 +440,7 @@ void TestSamplerPairs(lodestone::tests::TestRunner& runner, const PermutationSpa
 // after it (80 bytes), and entry 3 is a float4 at offset 0, which a matrix at offset 0 cannot share.
 void TestPushConstants(lodestone::tests::TestRunner& runner, const PermutationSpace& space)
 {
+    lodestone::StderrDiagnosticSink manifestDiagnostics;
     runner.BeginSection("push constants");
 
     const auto member = [](const char* name, uint32_t offset, uint32_t size, lodestone::MatrixLayout layout) {
@@ -475,7 +479,7 @@ void TestPushConstants(lodestone::tests::TestRunner& runner, const PermutationSp
                                                    .CodeFormat = lodestone::ShaderCodeFormat::Wgsl,
                                                    .SamplerTexturePairsRecorded = true } };
     library.Environments.emplace_back(std::move(module));
-    const lodestone::CookResult<std::vector<std::byte>> manifest = lodestone::EmitShaderManifest(library);
+    const lodestone::CookResult<std::vector<std::byte>> manifest = lodestone::EmitShaderManifest(library, manifestDiagnostics);
     const ManifestResult<EnvironmentView> opened =
         manifest.has_value() ? OpenEnvironment(*manifest) : ManifestResult<EnvironmentView>{ std::unexpected(lodestone::manifest::ErrorState{}) };
     if (!runner.CheckOk(opened, "a module with push constant blocks emits and opens"))
@@ -523,6 +527,7 @@ void TestPushConstants(lodestone::tests::TestRunner& runner, const PermutationSp
 // The tags and roles are part of a resource: case 2's second Scene is changed to 64 bytes, so only its tag differs.
 void TestTagConflict(lodestone::tests::TestRunner& runner, const PermutationSpace& space)
 {
+    lodestone::StderrDiagnosticSink manifestDiagnostics;
     runner.BeginSection("tags and roles");
 
     lodestone::CookedModule module = BuildModule(space, GoodVisibilityLists(), k_GoodVisibility);
@@ -542,7 +547,7 @@ void TestTagConflict(lodestone::tests::TestRunner& runner, const PermutationSpac
                                                    .CodeFormat = lodestone::ShaderCodeFormat::Wgsl,
                                                    .SamplerTexturePairsRecorded = true } };
     library.Environments.emplace_back(std::move(module));
-    const lodestone::CookResult<std::vector<std::byte>> manifest = lodestone::EmitShaderManifest(library);
+    const lodestone::CookResult<std::vector<std::byte>> manifest = lodestone::EmitShaderManifest(library, manifestDiagnostics);
     const ManifestResult<EnvironmentView> opened =
         manifest.has_value() ? OpenEnvironment(*manifest) : ManifestResult<EnvironmentView>{ std::unexpected(lodestone::manifest::ErrorState{}) };
     if (!runner.CheckOk(opened, "a module with a tagged resource emits and opens"))

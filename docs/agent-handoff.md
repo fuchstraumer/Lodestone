@@ -12,16 +12,17 @@ fixed, remove it; when a task is done, add one line to section 7 and remove its 
 
 ---
 
-## 1. State on 2026-10-22
+## 1. State on 2026-10-23
 
-- RelWithDebInfo, `ninja-msvc`: build green, 41 of 41 tests (after C11.4; C11.4 is not committed). Known-good dumps: 60 of 60
+- RelWithDebInfo, `ninja-msvc`: build green, 43 of 43 tests (after the test audit, 2026-10-23). Known-good dumps: 60 of 60
   (checked 2026-10-22).
 - Debug: do not run it unattended (section 2, item 2).
 - Manifest format version 15. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
 - Phases D and E are complete. Phase F has F0, F1, F2, F3.1 to F3.4c, F3.5, and C11 done; F4, F5, and F6 are open.
 - **Phase F is the current work.** The VeloxRhi rendergraph tasks (`docs/rendergraph-integration-tasks.md`) are done
   except L11 (optional dispatch extent) and a JSON writer for the resource report. L5 and L6 became phase F slice F3:
-  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: F4** (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
+  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: F4.0**
+  (shim externs in an array for DiamondDogs' pyramid; the spike is done and the work list is in the plan), then F4.A and F4.1 to F4.5 (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
   bind groups) waits for a consumer to name its limits. After F3: F2 (the shim module and the two tables), F4 (Pointer and
   Handle placements, and unbounded binding arrays), F5 (binding-time lowering), and F6. `docs/phase-f-plan.md` has the
   slices and a progress log. The author calls phase F the last major feature work.
@@ -34,6 +35,9 @@ fixed, remove it; when a task is done, add one line to section 7 and remove its 
   Do not edit the DiamondDogs tree: the author passes news to its agent.
 - **The author wants feature discipline.** A feature goes in only with a named consumer and a test that proves
   it. Say so when a proposal has neither.
+- **An audit track runs beside phase F** (2026-10-23). One agent audits and cleans up; another builds features. The test
+  audit is in `docs/test-audit.md` (its status section lists what is done and open). The code audit (cognitive
+  complexity, hidden costs, rule breaks) starts next; `docs/code-audit.md` holds the candidates found so far.
 
 ## 2. Open faults
 
@@ -62,7 +66,6 @@ Ordered by what can write wrong output first.
 8. **Axis declarations have no source location.** The axis-default errors (`AxisDefaultMissing`, `AxisDefaultNotDeclared`, ...)
    print none, because `getDeclSourceLocation` fails for the axis `Variable` decl and `RawAxisDeclaration::SourceFile` is
    `<unknown>`. Not measured why. The symbol table has the line, and could supply it.
-9. **`tests/DeclKindProbe.cpp`** is a throwaway Slang probe. Remove it when it stops earning its place.
 
 `todo.md` holds the rest, grouped by area.
 
@@ -81,6 +84,14 @@ Ordered by what can write wrong output first.
   summarize the diff by line kind (`sed 's/[0-9]\+/N/g' | sort | uniq -c`), which saves context.
 - Bash heredocs with `'''` break. Write a Python edit script with the Write tool. Edits must keep CRLF.
 - `gh` is at `C:\Program Files\GitHub CLI\gh.exe`, logged in. Read only: never post for the author.
+- **A removed test target leaves its `.exe` in `build/<preset>/tests/<config>/`**, and `run-tests.bat` runs every
+  `*Test.exe` it finds, so the stale binary fails with `NoOutputSpecified`. Delete it after you remove a target.
+- `git clang-format` fails here (its wrapper finds no Python). To format only changed lines, pass the diff hunks to
+  `C:\Program Files\LLVM\bin\clang-format.exe --lines=<a>:<b>`. Do not reformat lines the author wrote.
+- `std::tuple_size_v<T>` in a concept is a hard error on MSVC for a type that is not a tuple. Use
+  `std::tuple_size<T>::value` (`tests/TestFormat.hpp` carries the NOLINT and the reason).
+- A multi-line regex rewrite of C++ must stop at the end of its own statement: a lazy `.*?` over `re.S` once ran
+  from one `println` to the next `return` and swallowed code. Back up the file, and read the diff.
 
 ## 4. Measured facts (do not measure again)
 
@@ -138,6 +149,18 @@ and `phase-e-interface-spike.md`).
 - A module cache from another Slang version stops every cook. The cache path names the Slang build tag and the
   configuration (`%TEMP%\LodestoneShaderCooker\<tag>-<config>`). A stale binary still writes the tag it was built
   with.
+
+**Arrays and write-only images (F4.0 spike, 2026-10-23, Slang `e9fc02c8d`).**
+
+- An array of shim externs (`Level levels[16]`) is one binding array with `ArrayCount()` 16, in a block or as a global.
+- The direct SPIR-V path drops `NonReadable` on an array of `WTexture*` (`maybeEmitWriteOnlyImageDecoration` does not
+  unwrap the array). The glslang path keeps it. The cross-check fails on access. Draft issue in `docs/`.
+- Slang does not inline a shim method, so `levels[3].Store(...)` passes the index as a parameter and needs
+  `StorageImageArrayDynamicIndexing`. `[ForceInline]` keeps the constant.
+- A plain or shim array of storage textures fails on WGSL in Tint. E56105 covers buffer arrays only. Upstream #13708 (after
+  our submodule) emits `binding_array` for texture arrays.
+- No SPIR-V grammar entry requires an `...ArrayDynamicIndexing` capability, and glslang omits them. Only the device feature
+  matters, and only our reader states it.
 
 **Debug Slang.**
 
@@ -243,3 +266,9 @@ One line for each step. Git history holds the full text.
   report an unmatched binding through `ReportDeclaredOnly` and `ReportReflectedOnly`.
 - **2026-10-23 (C11.4).** `StorageFormatAxisTest` (a mip kernel with a format axis against a control for each format), enum case
   names in `CookValues`. DiamondDogs C11 is done.
+- **2026-10-23 (F4.0 spike).** Shim arrays work; the `NonReadable` array fault (issue drafted, workaround and canary chosen);
+  `[ForceInline]` for constant indices. The `...ArrayDynamicIndexing` question closed as not a Slang fault.
+- **2026-10-23 (test audit).** New harness (`CheckEqual`, `CheckOk`, `CheckError`, `TestFormat.hpp`), every suite converted,
+  `RunCook` takes a `DiagnosticSink&` and every cooker message reaches it, `CookerOptionsTest`, `EnumAxisTest`, known-answer
+  keys. Fixed: `MaxVariants` = N rejected N variants; a missing `--policy-file` was ignored; `--O2x` read as 2; three
+  rejections named no module. `docs/test-audit.md` has the status.

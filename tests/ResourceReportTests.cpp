@@ -138,14 +138,15 @@ const ResourceFootprintInfluence* FindInfluence(std::span<const ResourceFootprin
 
 std::vector<std::byte> EmitBytes(const CookedModule& module)
 {
+    lodestone::StderrDiagnosticSink manifestDiagnostics;
     CookedLibrary library;
     library.ModuleNames = { module.Name };
     library.Profiles = { CookedProfile{ .TargetName = "wgsl",
                                         .AccessModel = PlacementKind::Bound,
                                         .CodeFormat = ShaderCodeFormat::Wgsl } };
     library.Environments.emplace_back(module);
-    CookResult<std::vector<std::byte>> bytes = EmitShaderManifest(library);
-    if (!bytes || VerifyManifestRoundTrip(library, *bytes) != CookError::Success)
+    CookResult<std::vector<std::byte>> bytes = EmitShaderManifest(library, manifestDiagnostics);
+    if (!bytes || VerifyManifestRoundTrip(library, *bytes, manifestDiagnostics) != CookError::Success)
     {
         return {};
     }
@@ -206,6 +207,7 @@ void CheckValidator(tests::TestRunner& runner, const PermutationSpace& space)
 
 void CheckManifest(tests::TestRunner& runner, const PermutationSpace& space)
 {
+    lodestone::StderrDiagnosticSink manifestDiagnostics;
     runner.BeginSection("the footprint axes and the creation fields read back through the manifest");
     const std::vector<std::byte> bytes = EmitBytes(BuildModule(space, k_EveryVariant));
     const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(bytes);
@@ -271,7 +273,7 @@ void CheckManifest(tests::TestRunner& runner, const PermutationSpace& space)
     runner.CheckEqual(sampler.Size, CreationSource::NotApplicable, "a sampler needs its state from the renderer");
 
     runner.BeginSection("the report reads the written manifest");
-    const CookResult<ResourceReport> report = BuildResourceReport(bytes);
+    const CookResult<ResourceReport> report = BuildResourceReport(bytes, manifestDiagnostics);
     if (!runner.CheckOk(report, "the report has one environment"))
     {
         return;

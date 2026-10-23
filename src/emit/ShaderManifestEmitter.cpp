@@ -1,22 +1,22 @@
 #include "emit/ShaderManifestEmitter.hpp"
+#include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
+#include "ShaderLibraryTypes.hpp"
 #include "ShaderManifestFormat.hpp"
+#include "TransparentHash.hpp"
 #include "VariantKey.hpp"
 #include "model/AxisInfluence.hpp"
 #include "model/CookedLibrary.hpp"
-#include "CookerErrors.hpp"
+#include "model/ShaderDataSchema.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
-#include "model/ShaderDataSchema.hpp"
-#include "ShaderLibraryTypes.hpp"
 #include "permute/PermutationValue.hpp"
-#include "TransparentHash.hpp"
 
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
 #include <cstring>
 #include <expected>
 #include <format>
@@ -24,7 +24,6 @@
 #include <iterator>
 #include <numeric>
 #include <optional>
-#include <print>
 #include <ranges>
 #include <span>
 #include <string>
@@ -194,7 +193,8 @@ namespace
      * module's D-th value. */
     CookResult<manifest::ModuleAxis> MergeIntoRootAxes(std::vector<EncodedAxis>& root_axes,
                                                        const EncodedAxis& module_axis,
-                                                       StringTableBuilder& strings);
+                                                       StringTableBuilder& strings,
+                                                       DiagnosticSink& sink);
     bool TryMergeValues(const EncodedAxis& root_axis,
                         const EncodedAxis& module_axis,
                         std::vector<AxisValueType>& appended_values,
@@ -204,15 +204,19 @@ namespace
 
     LayoutTables BuildLayoutTables(const CookedModule& module, StringTableBuilder& strings);
     RasterTables BuildRasterTables(const CookedModule& module, StringTableBuilder& strings);
-    CookResult<VariantTables> BuildVariantTables(const CookedModule& module, StringTableBuilder& strings);
+    CookResult<VariantTables> BuildVariantTables(const CookedModule& module,
+                                                 StringTableBuilder& strings,
+                                                 DiagnosticSink& sink);
     SourceTables BuildSourceTables(const CookedModule& module, StringTableBuilder& strings);
-    CookResult<std::vector<std::byte>> BuildExtent(const CookedModule& module, StringTableBuilder& strings);
+    CookResult<std::vector<std::byte>> BuildExtent(const CookedModule& module,
+                                                   StringTableBuilder& strings,
+                                                   DiagnosticSink& sink);
 
     const CookedModule* FirstCookedEnvironment(const CookedLibrary& library, size_t module_index) noexcept;
 
 } // namespace
 
-CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& library)
+CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& library, DiagnosticSink& sink)
 {
     const size_t moduleCount = library.ModuleNames.size();
     const size_t profileCount = library.Profiles.size();
@@ -243,11 +247,12 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
             if (environment.has_value() &&
                 !SameModuleShape(moduleShapes[moduleIndex], EncodeModuleShape(*environment, strings)))
             {
-                std::println(stderr,
-                             "[lodestone] module {} states different entry points or axes for target '{}'",
-                             library.ModuleNames[moduleIndex],
-                             library.Profiles[profileIndex].TargetName);
-                return std::unexpected(CookError::ManifestModuleShapeMismatch);
+                return std::unexpected(
+                    ReportError(sink,
+                                CookError::ManifestModuleShapeMismatch,
+                                std::format("module {} states different entry points or axes for target '{}'",
+                                            library.ModuleNames[moduleIndex],
+                                            library.Profiles[profileIndex].TargetName)));
             }
         }
     }
@@ -259,7 +264,7 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
         const ModuleShape& shape = moduleShapes[moduleIndex];
         for (const auto&& [axisIndex, moduleAxis] : std::views::enumerate(shape.Axes))
         {
-            CookResult<manifest::ModuleAxis> merged = MergeIntoRootAxes(rootAxes, moduleAxis, strings);
+            CookResult<manifest::ModuleAxis> merged = MergeIntoRootAxes(rootAxes, moduleAxis, strings, sink);
             if (!merged)
             {
                 return std::unexpected(merged.error());
@@ -293,7 +298,7 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
             continue;
         }
 
-        CookResult<std::vector<std::byte>> extent = BuildExtent(*environment, strings);
+        CookResult<std::vector<std::byte>> extent = BuildExtent(*environment, strings, sink);
         if (!extent)
         {
             return std::unexpected(extent.error());
@@ -618,16 +623,18 @@ namespace
 
     CookResult<manifest::ModuleAxis> MergeIntoRootAxes(std::vector<EncodedAxis>& root_axes,
                                                        const EncodedAxis& module_axis,
-                                                       StringTableBuilder& strings)
+                                                       StringTableBuilder& strings,
+                                                       DiagnosticSink& sink)
     {
         if (module_axis.Values.size() > k_MaxModuleAxisValues)
         {
-            std::println(stderr,
-                         "[lodestone] axis '{}' holds {} values, and a module axis can hold at most {}",
-                         strings.Text(module_axis.NameString),
-                         module_axis.Values.size(),
-                         k_MaxModuleAxisValues);
-            return std::unexpected(CookError::ManifestAxisTooManyValues);
+            return std::unexpected(
+                ReportError(sink,
+                            CookError::ManifestAxisTooManyValues,
+                            std::format("axis '{}' holds {} values, and a module axis can hold at most {}",
+                                        strings.Text(module_axis.NameString),
+                                        module_axis.Values.size(),
+                                        k_MaxModuleAxisValues)));
         }
 
         std::vector<AxisValueType> appendedValues;
@@ -769,7 +776,9 @@ namespace
         return tables;
     }
 
-    CookResult<VariantTables> BuildVariantTables(const CookedModule& module, StringTableBuilder& strings)
+    CookResult<VariantTables> BuildVariantTables(const CookedModule& module,
+                                                 StringTableBuilder& strings,
+                                                 DiagnosticSink& sink)
     {
         // the reader binary searches the keys, so the parallel tables are written in key order
         std::vector<uint32_t> order(module.Variants.size());
@@ -783,11 +792,11 @@ namespace
         const auto duplicate = std::ranges::adjacent_find(order, std::equal_to<VariantKey>{}, keyOf);
         if (duplicate != order.end())
         {
-            std::println(stderr,
-                         "[lodestone] module {} holds two variants with key {}",
-                         module.Name,
-                         std::to_underlying(keyOf(*duplicate)));
-            return std::unexpected(CookError::ManifestDuplicateVariantKey);
+            return std::unexpected(ReportError(sink,
+                                               CookError::ManifestDuplicateVariantKey,
+                                               std::format("module {} contains two variants with key {}",
+                                                           module.Name,
+                                                           std::to_underlying(keyOf(*duplicate)))));
         }
 
         const size_t axisCount = module.Space != nullptr ? module.Space->AxisCount() : 0u;
@@ -893,9 +902,11 @@ namespace
         return relevance;
     }
 
-    CookResult<std::vector<std::byte>> BuildExtent(const CookedModule& module, StringTableBuilder& strings)
+    CookResult<std::vector<std::byte>> BuildExtent(const CookedModule& module,
+                                                   StringTableBuilder& strings,
+                                                   DiagnosticSink& sink)
     {
-        CookResult<VariantTables> variantsResult = BuildVariantTables(module, strings);
+        CookResult<VariantTables> variantsResult = BuildVariantTables(module, strings, sink);
         if (!variantsResult)
         {
             return std::unexpected(variantsResult.error());

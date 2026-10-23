@@ -1,5 +1,6 @@
 #include "emit/ResourceReport.hpp"
 #include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifest.hpp"
 #include "ShaderManifestLayout.hpp"
@@ -10,7 +11,6 @@
 #include <cstdint>
 #include <expected>
 #include <format>
-#include <print>
 #include <span>
 #include <string>
 #include <string_view>
@@ -230,15 +230,17 @@ namespace
 
 } // namespace
 
-CookResult<ResourceReport> BuildResourceReport(std::span<const std::byte> manifest_bytes)
+CookResult<ResourceReport> BuildResourceReport(std::span<const std::byte> manifest_bytes,
+                                               DiagnosticSink& sink)
 {
     const manifest::ManifestResult<manifest::BundleView> opened = manifest::BundleView::Open(manifest_bytes);
     if (!opened)
     {
-        std::println(stderr,
-                     "[lodestone] the resource report cannot open the manifest: {}",
-                     manifest::DescribeShaderManifestError(opened.error()));
-        return std::unexpected(CookError::LibraryRoundTripFailed);
+        return std::unexpected(
+            ReportError(sink,
+                        CookError::LibraryRoundTripFailed,
+                        std::format("the resource report cannot open the manifest: {}",
+                                    manifest::DescribeShaderManifestError(opened.error()))));
     }
 
     const manifest::BundleView& bundle = *opened;
@@ -256,10 +258,11 @@ CookResult<ResourceReport> BuildResourceReport(std::span<const std::byte> manife
                 bundle.OpenEnvironment(profileIndex, moduleIndex);
             if (!view)
             {
-                std::println(stderr,
-                             "[lodestone] the resource report cannot open an environment: {}",
-                             manifest::DescribeShaderManifestError(view.error()));
-                return std::unexpected(CookError::LibraryRoundTripFailed);
+                return std::unexpected(
+                    ReportError(sink,
+                                CookError::LibraryRoundTripFailed,
+                                std::format("the resource report cannot open an environment: {}",
+                                            manifest::DescribeShaderManifestError(view.error()))));
             }
             report.Environments.push_back(ReadEnvironment(bundle, *view, profileIndex));
         }

@@ -249,6 +249,7 @@ ErrorCode EnvironmentErrorFrom(std::span<const std::byte> bytes, uint32_t profil
  * and 4096 bytes of workgroup memory, variant one's needs one name and none. */
 void TestSourceFacts(lodestone::tests::TestRunner& runner)
 {
+    lodestone::RecordingDiagnosticSink manifestDiagnostics;
     runner.BeginSection("the capability names and the workgroup memory of each source read back");
     CookedLibrary library = MakeSmallLibrary();
     CookedModule& module = *library.Environments[0u];
@@ -258,13 +259,13 @@ void TestSourceFacts(lodestone::tests::TestRunner& runner)
                                                        .WorkgroupMemoryBytes = 0u } };
     module.ObservedCapabilities = { "Float16", "GroupNonUniform" };
 
-    const lodestone::CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library);
+    const lodestone::CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library, manifestDiagnostics);
     if (!runner.CheckOk(manifest, "the emitter accepts a module with source facts"))
     {
         return;
     }
     const std::vector<std::byte>& bytes = *manifest;
-    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(library, bytes), lodestone::CookError::Success,
+    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(library, bytes, manifestDiagnostics), lodestone::CookError::Success,
                       "the round trip reads back the facts the cook wrote");
 
     const ManifestResult<BundleView> bundle = BundleView::Open(bytes);
@@ -277,7 +278,7 @@ void TestSourceFacts(lodestone::tests::TestRunner& runner)
     runner.Check(!environment->HasCodeFacts(), "a profile whose reader did not run reads as not having facts");
     CookedLibrary readLibrary = library;
     readLibrary.Profiles[0].CodeFactsRead = true;
-    const lodestone::CookResult<std::vector<std::byte>> readManifest = EmitShaderManifest(readLibrary);
+    const lodestone::CookResult<std::vector<std::byte>> readManifest = EmitShaderManifest(readLibrary, manifestDiagnostics);
     const ManifestResult<BundleView> readBundle = BundleView::Open(readManifest.value());
     const ManifestResult<EnvironmentView> readEnvironment =
         readBundle.has_value() ? readBundle->OpenEnvironment(0u, 0u) : ManifestResult<EnvironmentView>{ std::unexpected(readBundle.error()) };
@@ -297,11 +298,11 @@ void TestSourceFacts(lodestone::tests::TestRunner& runner)
 
     CookedLibrary otherFacts = library;
     otherFacts.Environments[0u]->SourceFacts[1u].WorkgroupMemoryBytes = 16u;
-    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(otherFacts, bytes), lodestone::CookError::ManifestSourceFactsMismatch,
+    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(otherFacts, bytes, manifestDiagnostics), lodestone::CookError::ManifestSourceFactsMismatch,
                       "the round trip fails on workgroup memory that differs");
     CookedLibrary otherNames = library;
     otherNames.Environments[0u]->SourceFacts[1u].CapabilityNames = { "Float16" };
-    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(otherNames, bytes), lodestone::CookError::ManifestSourceFactsMismatch,
+    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(otherNames, bytes, manifestDiagnostics), lodestone::CookError::ManifestSourceFactsMismatch,
                       "the round trip fails on a capability name that differs");
 
     const Header header = ReadRecord<Header>(bytes, 0u);
@@ -375,6 +376,7 @@ void TestSourceFactsAcrossProfiles(lodestone::tests::TestRunner& runner)
  * suffix matching took the wrong member, so `WindSpeed` and `Swell.WindSpeed` must stay apart. */
 void TestMemberLookup(lodestone::tests::TestRunner& runner)
 {
+    lodestone::RecordingDiagnosticSink manifestDiagnostics;
     runner.BeginSection("a uniform member is found by its whole path");
     CookedLibrary library = MakeConstantsLibrary(true);
     CookedModule& module = *library.Environments[0u];
@@ -394,7 +396,7 @@ void TestMemberLookup(lodestone::tests::TestRunner& runner)
     module.EntryPointConstantsTable[1u].Members = members;
     module.EntryPointConstantsTable[1u].ByteSize = 64u;
 
-    const lodestone::CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library);
+    const lodestone::CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library, manifestDiagnostics);
     const ManifestResult<BundleView> bundle =
         manifest.has_value() ? BundleView::Open(*manifest) : ManifestResult<BundleView>{ std::unexpected(ErrorCode::TooSmall) };
     const ManifestResult<EnvironmentView> environment =
@@ -428,11 +430,12 @@ void TestMemberLookup(lodestone::tests::TestRunner& runner)
 
 int main()
 {
+    lodestone::RecordingDiagnosticSink manifestDiagnostics;
     lodestone::RecordingDiagnosticSink crossProfileDiagnostics;
     lodestone::tests::TestRunner runner{ "ShaderManifestRejectTests" };
 
     const CookedLibrary library = MakeSmallLibrary();
-    const lodestone::CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library);
+    const lodestone::CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library, manifestDiagnostics);
     if (!runner.CheckOk(manifest, "the emitter accepts the library"))
     {
         return runner.Report();
@@ -455,7 +458,7 @@ int main()
                               "the reader returns both variants of the cooked environment");
         }
     }
-    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(library, *manifest), lodestone::CookError::Success,
+    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(library, *manifest, manifestDiagnostics), lodestone::CookError::Success,
                       "the round trip reads back what the cook wrote");
 
     runner.BeginSection("an environment the cook skipped reads as absent");
@@ -538,10 +541,10 @@ int main()
                       "a SPIR-V environment whose source is not whole words is rejected when it opens");
 
     const CookedLibrary spirvLibrary = MakeSpirvLibrary();
-    const lodestone::CookResult<std::vector<std::byte>> spirvManifest = EmitShaderManifest(spirvLibrary);
+    const lodestone::CookResult<std::vector<std::byte>> spirvManifest = EmitShaderManifest(spirvLibrary, manifestDiagnostics);
     if (runner.CheckOk(spirvManifest, "the emitter accepts a SPIR-V environment"))
     {
-        runner.CheckEqual(lodestone::VerifyManifestRoundTrip(spirvLibrary, *spirvManifest), lodestone::CookError::Success,
+        runner.CheckEqual(lodestone::VerifyManifestRoundTrip(spirvLibrary, *spirvManifest, manifestDiagnostics), lodestone::CookError::Success,
                           "the round trip reads the SPIR-V words back through SpirvWords");
         const std::vector<std::byte>& spirvBytes = *spirvManifest;
         const ManifestResult<BundleView> spirvBundle = BundleView::Open(spirvBytes);
@@ -558,11 +561,11 @@ int main()
     runner.BeginSection("the sampler and texture pairs read back, and a damaged pair is rejected");
     const lodestone::SamplerPairList onePair{ lodestone::SamplerTexturePair{ .Texture = 0u, .Sampler = 1u } };
     const CookedLibrary sampledLibrary = MakeSampledLibrary(onePair, onePair);
-    const lodestone::CookResult<std::vector<std::byte>> sampledManifest = EmitShaderManifest(sampledLibrary);
+    const lodestone::CookResult<std::vector<std::byte>> sampledManifest = EmitShaderManifest(sampledLibrary, manifestDiagnostics);
     if (runner.CheckOk(sampledManifest, "the emitter accepts a module with a sampler and texture pair"))
     {
         const std::vector<std::byte>& sampledBytes = *sampledManifest;
-        runner.CheckEqual(lodestone::VerifyManifestRoundTrip(sampledLibrary, sampledBytes), lodestone::CookError::Success,
+        runner.CheckEqual(lodestone::VerifyManifestRoundTrip(sampledLibrary, sampledBytes, manifestDiagnostics), lodestone::CookError::Success,
                           "the round trip reads the pairs back");
         const ManifestResult<BundleView> sampledBundle = BundleView::Open(sampledBytes);
         const ManifestResult<EnvironmentView> sampledEnvironment =
@@ -585,7 +588,7 @@ int main()
 
         // a round trip against a cook with no pairs proves that the round trip compares the pairs
         const CookedLibrary unpairedLibrary = MakeSampledLibrary({}, {});
-        runner.CheckEqual(lodestone::VerifyManifestRoundTrip(unpairedLibrary, sampledBytes),
+        runner.CheckEqual(lodestone::VerifyManifestRoundTrip(unpairedLibrary, sampledBytes, manifestDiagnostics),
                           lodestone::CookError::ManifestSamplerPairMismatch,
                           "a manifest whose pairs differ from the cook fails the round trip");
 
@@ -617,7 +620,7 @@ int main()
 
     CookedLibrary unrecordedLibrary = MakeSampledLibrary({}, {});
     unrecordedLibrary.Profiles[0].SamplerTexturePairsRecorded = false;
-    const lodestone::CookResult<std::vector<std::byte>> unrecordedManifest = EmitShaderManifest(unrecordedLibrary);
+    const lodestone::CookResult<std::vector<std::byte>> unrecordedManifest = EmitShaderManifest(unrecordedLibrary, manifestDiagnostics);
     if (unrecordedManifest.has_value())
     {
         const std::vector<std::byte>& unrecordedBytes = *unrecordedManifest;
@@ -644,13 +647,13 @@ int main()
 
     runner.BeginSection("the entry point constants read back, and a damaged record is rejected");
     const CookedLibrary constantsLibrary = MakeConstantsLibrary(true);
-    const lodestone::CookResult<std::vector<std::byte>> constantsManifest = EmitShaderManifest(constantsLibrary);
+    const lodestone::CookResult<std::vector<std::byte>> constantsManifest = EmitShaderManifest(constantsLibrary, manifestDiagnostics);
     if (runner.CheckOk(constantsManifest, "the emitter accepts a module with entry point constants"))
     {
         const std::vector<std::byte>& constantsBytes = *constantsManifest;
-        runner.CheckEqual(lodestone::VerifyManifestRoundTrip(constantsLibrary, constantsBytes), lodestone::CookError::Success,
+        runner.CheckEqual(lodestone::VerifyManifestRoundTrip(constantsLibrary, constantsBytes, manifestDiagnostics), lodestone::CookError::Success,
                           "the round trip reads the constants back");
-        runner.CheckEqual(lodestone::VerifyManifestRoundTrip(MakeConstantsLibrary(false), constantsBytes),
+        runner.CheckEqual(lodestone::VerifyManifestRoundTrip(MakeConstantsLibrary(false), constantsBytes, manifestDiagnostics),
                           lodestone::CookError::ManifestEntryPointConstantsMismatch,
                           "a manifest whose constants differ from the cook fails the round trip");
 
@@ -728,16 +731,16 @@ int main()
     CookedLibrary taggedLibrary = MakeConstantsLibrary(true);
     taggedLibrary.Environments[0]->Resources[0].Roles = lodestone::ResourceRoleFlags::IndexData;
     taggedLibrary.Environments[0]->Resources[0].Tags = { "Alpha", "Beta" };
-    const lodestone::CookResult<std::vector<std::byte>> taggedManifest = EmitShaderManifest(taggedLibrary);
+    const lodestone::CookResult<std::vector<std::byte>> taggedManifest = EmitShaderManifest(taggedLibrary, manifestDiagnostics);
     if (runner.CheckOk(taggedManifest, "the emitter accepts a binding with roles and tags"))
     {
         const std::vector<std::byte>& taggedBytes = *taggedManifest;
-        runner.CheckEqual(lodestone::VerifyManifestRoundTrip(taggedLibrary, taggedBytes), lodestone::CookError::Success,
+        runner.CheckEqual(lodestone::VerifyManifestRoundTrip(taggedLibrary, taggedBytes, manifestDiagnostics), lodestone::CookError::Success,
                           "the round trip reads the roles and tags back");
         CookedLibrary otherTags = MakeConstantsLibrary(true);
         otherTags.Environments[0]->Resources[0].Roles = lodestone::ResourceRoleFlags::IndexData;
         otherTags.Environments[0]->Resources[0].Tags = { "Alpha", "Gamma" };
-        runner.Check(lodestone::VerifyManifestRoundTrip(otherTags, taggedBytes) != lodestone::CookError::Success,
+        runner.Check(lodestone::VerifyManifestRoundTrip(otherTags, taggedBytes, manifestDiagnostics) != lodestone::CookError::Success,
                      "a manifest whose tags differ from the cook fails the round trip");
 
         const EnvironmentDirectoryEntry taggedEntry = ReadRecord<EnvironmentDirectoryEntry>(

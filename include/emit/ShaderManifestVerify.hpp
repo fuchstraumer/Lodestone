@@ -11,7 +11,9 @@ namespace lodestone
 
 /** The manifest round trip: reads the bundle back through the client views and compares every environment with its
  * module. It runs on every cook. */
-[[nodiscard]] CookError VerifyManifestRoundTrip(const CookedLibrary& library, const std::vector<std::byte>& manifest_bytes);
+[[nodiscard]] CookError VerifyManifestRoundTrip(const CookedLibrary& library,
+                                                const std::vector<std::byte>& manifest_bytes,
+                                                DiagnosticSink& sink);
 
 } // namespace lodestone
 

@@ -52,7 +52,7 @@ namespace
     }
 
     CookedLibrary MakeEmptyLibrary(const SharedCookState& cook_state);
-    CookError EmitLibraryArtifacts(const CookedLibrary& library, OutputSink& sink);
+    CookError EmitLibraryArtifacts(const CookedLibrary& library, OutputSink& sink, DiagnosticSink& diagnostics);
 
     std::string NormalizeDependencyPath(const std::filesystem::path& path)
     {
@@ -274,7 +274,7 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                                            "an axis of kind capability does not change the capabilities that the code needs"));
     }
 
-    const CookError emitError = EmitLibraryArtifacts(library, sink);
+    const CookError emitError = EmitLibraryArtifacts(library, sink, diagnostics);
     if (!emitError)
     {
         return std::unexpected(emitError);
@@ -399,15 +399,15 @@ namespace
         return library;
     }
 
-    CookError EmitLibraryArtifacts(const CookedLibrary& library, OutputSink& sink)
+    CookError EmitLibraryArtifacts(const CookedLibrary& library, OutputSink& sink, DiagnosticSink& diagnostics)
     {
-        CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library);
+        CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library, diagnostics);
         if (!manifest)
         {
             return manifest.error();
         }
 
-        const CookError roundTripError = VerifyManifestRoundTrip(library, *manifest);
+        const CookError roundTripError = VerifyManifestRoundTrip(library, *manifest, diagnostics);
         if (!roundTripError)
         {
             return roundTripError;
@@ -419,7 +419,7 @@ namespace
             return manifestWriteError;
         }
 
-        const CookResult<ResourceReport> resourceReport = BuildResourceReport(*manifest);
+        const CookResult<ResourceReport> resourceReport = BuildResourceReport(*manifest, diagnostics);
         if (!resourceReport)
         {
             return resourceReport.error();

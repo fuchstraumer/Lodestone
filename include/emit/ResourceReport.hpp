@@ -16,6 +16,8 @@
 namespace lodestone
 {
 
+class DiagnosticSink;
+
 inline constexpr std::string_view k_ResourceReportFileName = "ShaderLibrary.resources.txt";
 
 /** One scope and name, joined over every variant and entry point that reads it. */
@@ -48,7 +50,7 @@ struct ResourceReport
     std::vector<ResourceReportEnvironment> Environments;
 };
 
-CookResult<ResourceReport> BuildResourceReport(std::span<const std::byte> manifest_bytes);
+CookResult<ResourceReport> BuildResourceReport(std::span<const std::byte> manifest_bytes, DiagnosticSink& sink);
 
 std::string FormatResourceReport(const ResourceReport& report);
 

@@ -12,6 +12,7 @@
 #include "permute/PermutationTypes.hpp"
 #include "permute/PermutationValue.hpp"
 #include "ManifestFixtures.hpp"
+#include "Diagnostics.hpp"
 #include "TestHarness.hpp"
 
 #include <algorithm>
@@ -222,7 +223,8 @@ bool ShadeActiveWhenDither(const std::array<uint32_t, 4>& digits, uint32_t axis_
 // can go once this returns. An emit failure returns no bytes, and the open that follows reports it.
 std::vector<std::byte> EmitBytes(const lodestone::CookedLibrary& library)
 {
-    lodestone::CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library);
+    lodestone::StderrDiagnosticSink manifestDiagnostics;
+    lodestone::CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library, manifestDiagnostics);
     if (!manifest.has_value())
     {
         return {};
@@ -784,6 +786,7 @@ void CheckDeviceFilter(lodestone::tests::TestRunner& runner)
 
 void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
 {
+    lodestone::StderrDiagnosticSink manifestDiagnostics;
     runner.BeginSection("the axis relevance validator reads the written manifest");
 
     // a stored mask that the written instances contradict
@@ -793,7 +796,7 @@ void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
     relevanceLibrary.Profiles = { MakeProfile("wgsl") };
     relevanceLibrary.Environments.emplace_back(BuildRelevanceModule(relevanceSpace, true));
     const std::vector<std::byte> bytes = EmitBytes(relevanceLibrary);
-    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(relevanceLibrary, bytes), lodestone::CookError::Success,
+    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(relevanceLibrary, bytes, manifestDiagnostics), lodestone::CookError::Success,
                       "the relevance module passes the validator");
 
     lodestone::manifest::Header header;
@@ -808,7 +811,7 @@ void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
     std::memcpy(&word, damaged.data() + fogWordOffset, sizeof(word));
     word &= ~uint64_t{ 1u }; // FOG, for FogCS
     std::memcpy(damaged.data() + fogWordOffset, &word, sizeof(word));
-    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(relevanceLibrary, damaged),
+    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(relevanceLibrary, damaged, manifestDiagnostics),
                       lodestone::CookError::ManifestAxisRelevanceMismatch,
                       "a stored mask that calls a code-changing axis irrelevant fails the validator");
 
@@ -824,7 +827,7 @@ void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
     runner.Check(chainView.has_value() && chainView->IsAxisRelevant(0u, 0u) && chainView->IsAxisRelevant(0u, 1u) &&
                      chainView->IsAxisRelevant(0u, 2u),
                  "the closing pass marks every axis that varies in a class with two instances");
-    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(chainLibrary, chainBytes), lodestone::CookError::Success,
+    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(chainLibrary, chainBytes, manifestDiagnostics), lodestone::CookError::Success,
                       "the closed mask passes the validator");
     if (chainView.has_value())
     {
@@ -855,7 +858,7 @@ void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
     const uint64_t noAxes = 0u;
     std::memcpy(unclosed.data() + chainEntry.ExtentOffset + chainEnvironment.AxisRelevanceTableOffset, &noAxes,
                 sizeof(noAxes));
-    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(chainLibrary, unclosed),
+    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(chainLibrary, unclosed, manifestDiagnostics),
                       lodestone::CookError::ManifestAxisRelevanceMismatch,
                       "a stored mask that the per-axis pass alone would accept fails the validator");
 }

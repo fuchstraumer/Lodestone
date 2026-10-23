@@ -223,8 +223,8 @@ it. `lodestone` itself stays a static library: the tool parses a command line, b
 `FileOutputSink`, and calls `RunCook`. `CookTest.cpp` drives the same three calls with a command line
 that `tests/CMakeLists.txt` supplies. `RunCook` has a second form that takes a `DiagnosticSink&`, so an embedding host
 or a test receives every record of the cook instead of the console text. The two-argument form reports to stderr.
-Not every message reaches the sink yet: the validators in `src/emit/` and a few reflection paths still print to stderr
-directly.
+Every message of a cook reaches the sink. Only `ParseCommandLine`, which runs before a sink exists, prints to stderr
+itself. A function in the cooker library that can report takes a `DiagnosticSink&` and does not call `std::println`.
 
 `ParseCommandLine` in `src/driver/CookerOptions.cpp` parses the flags, and `GetUsageText` prints them:
 `--output/-o`, `--cache-dir`, `--include-dir/-I <path>` (repeatable),
