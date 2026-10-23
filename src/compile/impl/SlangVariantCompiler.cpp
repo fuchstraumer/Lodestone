@@ -96,7 +96,11 @@ CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext&
                                                              DiagnosticSink& sink)
 {
     std::vector<slang::IComponentType*> components = context.BaseComponents();
-    components.reserve(context.BaseComponents().size() + descriptor.Active.size());
+    components.reserve(context.BaseComponents().size() + descriptor.Active.size() + 1u);
+    if (context.ShimLinkModule() != nullptr)
+    {
+        components.push_back(context.ShimLinkModule());
+    }
 
     for (const PermutationBinding& binding : descriptor.Active)
     {

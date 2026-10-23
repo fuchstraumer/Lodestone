@@ -35,6 +35,7 @@ CookResult<PreparedCompiler> PrepareModuleStep::operator()(const SharedCookState
     createInfo.Language = targetProfileResult->Language;
     createInfo.SlangProfileName = targetProfileResult->SlangProfileName;
     createInfo.AccessModel = PlacementKindFromAccessModel(targetProfileResult->Access);
+    createInfo.TargetName = target_name;
 
     PreparedCompiler result{ std::make_unique<SlangCompiler>() };
     DiagnosticSink& diagnostics = *shared_state.Diagnostics;

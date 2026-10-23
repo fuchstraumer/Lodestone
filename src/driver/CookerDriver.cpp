@@ -113,7 +113,14 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                     dependencyPaths.push_back(NormalizeDependencyPath(dependencyPath));
                 }
             }
-            std::vector<RawAxisDeclaration> rawAxes = preparedModule.Compiler->BuildAxisDeclarations();
+
+            CookResult<std::vector<RawAxisDeclaration>> rawAxesResult = preparedModule.Compiler->BuildAxisDeclarations();
+            if (!rawAxesResult)
+            {
+                return std::unexpected(rawAxesResult.error());
+            }
+            
+            std::vector<RawAxisDeclaration> rawAxes = std::move(rawAxesResult.value());
             const std::string_view moduleName = cookState.AllModuleNames[static_cast<size_t>(moduleIdx)];
             const SymbolTable& symbolTable = preparedModule.Compiler->GetSymbolTable();
             CookResult<PreparedPermutationSpace> spaceResult = PreparePermutationSpace(cookState,

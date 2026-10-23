@@ -299,6 +299,28 @@ namespace
     }
 }
 
+CookError SlangModuleContext::LoadShimLinkModule(std::string_view source)
+{
+    if (source.empty())
+    {
+        return CookError::Success;
+    }
+
+    // one module for the whole context: the implementations follow the profile, which never changes between variants
+    const std::string name = std::format("LodestoneShimLinks_{}", moduleName);
+    const std::string path = name + ".slang";
+    const std::string sourceText{ source };
+    Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+    shimLinkModule = session->loadModuleFromSourceString(name.c_str(), path.c_str(), sourceText.c_str(), diagnosticsBlob.writeRef());
+    ReportDiagnostics(*diagnosticSink, "SlangModuleContext::LoadShimLinkModule", diagnosticsBlob);
+    return shimLinkModule != nullptr ? CookError::Success : CookError::ModuleLoadFailed;
+}
+
+slang::IModule* SlangModuleContext::ShimLinkModule() const noexcept
+{
+    return shimLinkModule;
+}
+
 std::vector<std::string> SlangModuleContext::BuildModuleScopeVariableNames() const
 {
     return BuildModuleScopeNames(session, slang::DeclReflection::Kind::Variable);

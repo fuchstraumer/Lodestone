@@ -120,6 +120,8 @@ std::span<const std::string_view> GetTargetProfileNames() noexcept;
 
 PlacementKind PlacementKindFromAccessModel(AccessModel model) noexcept;
 
+AccessModel AccessModelFromPlacementKind(PlacementKind kind) noexcept;
+
 ShaderCodeFormat CodeFormatFromLanguage(TargetLanguage language) noexcept;
 
 } // namespace lodestone

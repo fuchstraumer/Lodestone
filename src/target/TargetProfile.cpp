@@ -140,6 +140,21 @@ PlacementKind PlacementKindFromAccessModel(AccessModel model) noexcept
     }
 }
 
+AccessModel AccessModelFromPlacementKind(PlacementKind kind) noexcept
+{
+    switch (kind)
+    {
+    case PlacementKind::Bound:
+        return AccessModel::Bound;
+    case PlacementKind::Indexed:
+        return AccessModel::Indexed;
+    case PlacementKind::Pointer:
+        return AccessModel::Pointer;
+    default:
+        return AccessModel::Invalid;
+    }
+}
+
 ShaderCodeFormat CodeFormatFromLanguage(TargetLanguage language) noexcept
 {
     switch (language)

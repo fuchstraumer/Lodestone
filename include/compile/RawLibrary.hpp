@@ -137,6 +137,8 @@ struct RawShimExtern
     std::string Interface;
     /** @brief The type argument of the interface, as written. Empty for an interface with none. */
     std::string TypeArguments;
+    /** @brief Source module that declares the type. */
+    std::vector<std::string> ArgumentModules;
     ShimResourceClass Class{ ShimResourceClass::Invalid };
     std::string SourceFile;
     uint32_t SourceLine{ 0u };

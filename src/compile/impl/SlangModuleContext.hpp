@@ -36,6 +36,9 @@ public:
     [[nodiscard]] std::vector<std::string> BuildModuleScopeVariableNames() const;
     /** @brief Sorted module-scope struct names, including `__include` fragments. Confirms what the symbol table read. */
     [[nodiscard]] std::vector<std::string> BuildModuleScopeStructNames() const;
+    [[nodiscard]] std::optional<std::string> FindTypeDeclaringModule(std::string_view type_name) const;
+    [[nodiscard]] CookError LoadShimLinkModule(std::string_view source);
+    [[nodiscard]] slang::IModule* ShimLinkModule() const noexcept;
     [[nodiscard]] slang::IGlobalSession* GlobalSession() const noexcept;
     [[nodiscard]] slang::ISession* Session() const noexcept;
     [[nodiscard]] std::vector<slang::IComponentType*> BaseComponents() const noexcept;
@@ -93,6 +96,7 @@ private:
     Slang::ComPtr<slang::IGlobalSession> globalSession;
     Slang::ComPtr<slang::ISession> session;
     slang::IModule* rootModule{ nullptr };
+    slang::IModule* shimLinkModule{ nullptr };
     std::vector<slang::IComponentType*> baseComponents;
     std::vector<Slang::ComPtr<slang::IEntryPoint>> entryPoints;
     std::vector<std::string> entryPointNames;

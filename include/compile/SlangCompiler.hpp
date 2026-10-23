@@ -39,6 +39,7 @@ struct SlangCompilerCreateInfo
     TargetLanguage Language{ TargetLanguage::Invalid };
     std::string_view SlangProfileName;
     PlacementKind AccessModel;
+    std::string_view TargetName;
 };
 
 class ThreadPool;
@@ -65,12 +66,16 @@ public:
     [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
     /** @brief The file paths for the depfile, excluding embedded builtins. */
     [[nodiscard]] const std::vector<std::string>& DependencyFilePaths() const noexcept;
-    [[nodiscard]] std::vector<RawAxisDeclaration> BuildAxisDeclarations() const noexcept;
+    /** @brief Fails when a declaration is invalid. The error is also reported, and the cook must not go on without the axes. */
+    [[nodiscard]] CookResult<std::vector<RawAxisDeclaration>> BuildAxisDeclarations() const;
     [[nodiscard]] const SymbolTable& GetSymbolTable() const noexcept;
 
 private:
     DiagnosticSink* diagnosticSink{ nullptr };
     SymbolTable symbolTable;
+    std::string shimLinkSource;
+    std::string targetName;
+    ::lodestone::AccessModel shimAccessModel{ ::lodestone::AccessModel::Invalid };
     std::unique_ptr<ThreadPool> compilePool{ nullptr };
     std::unique_ptr<SlangModuleContext> bootstrapContext{ nullptr };
 };

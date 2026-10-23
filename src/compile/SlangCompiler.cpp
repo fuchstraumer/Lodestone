@@ -2,6 +2,7 @@
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
+#include "compile/ShimLinkSource.hpp"
 #include "compile/SlangDiagnosticParser.hpp"
 #include "compile/SymbolTable.hpp"
 #include "impl/SlangCompilerTypes.hpp"
@@ -16,6 +17,7 @@
 #include <cstddef>
 #include <expected>
 #include <format>
+#include <optional>
 #include <memory>
 #include <ranges>
 #include <slang.h>
@@ -40,6 +42,8 @@ SlangCompiler::~SlangCompiler() = default;
 CookError SlangCompiler::Initialize(SlangCompilerCreateInfo create_info, DiagnosticSink& sink)
 {
     diagnosticSink = &sink;
+    targetName = std::string{ create_info.TargetName };
+    shimAccessModel = AccessModelFromPlacementKind(create_info.AccessModel);
     compilePool = std::make_unique<ThreadPool>();
     bootstrapContext = std::make_unique<SlangModuleContext>();
     if (create_info.InheritedSymbolTable)
@@ -136,19 +140,53 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
                                                            declaration.Interface)));
         }
 
-        module.ShimExterns.push_back(RawShimExtern{ .Name = std::string{ declaration.Name },
-                                                    .Interface = std::string{ declaration.Interface },
-                                                    .TypeArguments = std::string{ declaration.TypeArguments },
-                                                    .Class = shimInterface->Class,
-                                                    .SourceFile = std::string{ declaration.SourcePath },
-                                                    .SourceLine = declaration.SourceLine });
+        RawShimExtern shimExtern{ .Name = std::string{ declaration.Name },
+                                  .Interface = std::string{ declaration.Interface },
+                                  .TypeArguments = std::string{ declaration.TypeArguments },
+                                  .ArgumentModules = {},
+                                  .Class = shimInterface->Class,
+                                  .SourceFile = std::string{ declaration.SourcePath },
+                                  .SourceLine = declaration.SourceLine };
+
+        // a count that differs from the interface is reported with the link source, which knows the table
+        const std::vector<std::string_view> arguments = SplitShimTypeArguments(declaration.TypeArguments);
+        if (arguments.size() == shimInterface->TypeParameterCount)
+        {
+            for (const std::string_view argument : arguments)
+            {
+                const std::optional<std::string> declaringModule = bootstrapContext->FindTypeDeclaringModule(argument);
+                if (!declaringModule.has_value())
+                {
+                    return std::unexpected(ReportError(*diagnosticSink,
+                                                       CookError::ShimExternInvalid,
+                                                       std::format("{}({}): type argument '{}' of extern '{}' is not a type that "
+                                                                   "the module can see",
+                                                                   declaration.SourcePath,
+                                                                   declaration.SourceLine,
+                                                                   argument,
+                                                                   declaration.Name)));
+                }
+                shimExtern.ArgumentModules.push_back(*declaringModule);
+            }
+        }
+
+        module.ShimExterns.push_back(std::move(shimExtern));
     }
+
+    CookResult<std::string> linkSource =
+        MakeShimLinkSource(module.ShimExterns, shimAccessModel, module.Name, targetName, *diagnosticSink);
+    if (!linkSource)
+    {
+        return std::unexpected(linkSource.error());
+    }
+    
+    shimLinkSource = std::move(linkSource.value());
     return module;
 }
 
 SlangCompiler::CompileResultList SlangCompiler::Compile(const std::vector<VariantDescriptor>& variants, DiagnosticSink& sink) const
 {
-    return compilePool->Compile(variants, sink);
+    return compilePool->Compile(variants, shimLinkSource, sink);
 }
 
 std::string_view SlangCompiler::ModuleName() const noexcept
@@ -181,17 +219,9 @@ std::vector<std::string_view> SlangCompiler::ModuleSourceStringViews() const noe
     return bootstrapContext->ModuleSourceStringViews();
 }
 
-std::vector<RawAxisDeclaration> SlangCompiler::BuildAxisDeclarations() const noexcept
+CookResult<std::vector<RawAxisDeclaration>> SlangCompiler::BuildAxisDeclarations() const
 {
-    CookResult<std::vector<RawAxisDeclaration>> result = bootstrapContext->BuildDeclaredAxes();
-    if (result)
-    {
-        return std::move(*result);
-    }
-    else
-    {
-        return std::vector<RawAxisDeclaration>{};
-    }
+    return bootstrapContext->BuildDeclaredAxes();
 }
 
 const SymbolTable& SlangCompiler::GetSymbolTable() const noexcept

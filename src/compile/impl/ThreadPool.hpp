@@ -17,6 +17,7 @@
 #include <latch>
 #include <mutex>
 #include <span>
+#include <string_view>
 #include <stop_token>
 #include <thread>
 #include <vector>
@@ -43,6 +44,7 @@ public:
     [[nodiscard]] CookError Initialize(SlangCompilerCreateInfo create_info,
                                        std::vector<SerializedModule> serialized_modules);
     [[nodiscard]] SlangCompiler::CompileResultList Compile(const std::vector<VariantDescriptor>& variants,
+                                                           std::string_view shim_link_source,
                                                            DiagnosticSink& diagnostic_sink);
     /** @brief Read the blobs only: copying a `ComPtr` changes the reference count while workers use it. */
     [[nodiscard]] std::span<const SerializedModule> SerializedModules() const noexcept;
@@ -52,6 +54,8 @@ private:
     struct CompileBatch
     {
         std::span<const VariantDescriptor> Variants;
+        /** Every context loads it once. Empty without shim externs. */
+        std::string_view ShimLinkSource;
         std::span<CookResult<RawVariant>> Results;
         std::atomic<int32_t> NextJobIndex{ 0u };
         std::latch* DoneLatch{ nullptr };

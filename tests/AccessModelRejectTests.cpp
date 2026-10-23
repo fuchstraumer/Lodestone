@@ -31,7 +31,7 @@ struct RejectionCase
     std::string_view Claim;
 };
 
-constexpr std::array<RejectionCase, 4u> k_Cases
+constexpr std::array<RejectionCase, 5u> k_Cases
 {
     RejectionCase{ .ModuleFile = "PointerMember.slang",
                    .TargetName = "wgsl",
@@ -52,6 +52,11 @@ constexpr std::array<RejectionCase, 4u> k_Cases
                    .TargetName = "wgsl",
                    .Expected = CookError::Success,
                    .Claim = "a module with no pointer still cooks" },
+    // the rule that a shim extern (phase F step F2) is exempt from: an interface axis is a local, so it holds no resource
+    RejectionCase{ .ModuleFile = "InterfaceAxisResourceMember.slang",
+                   .TargetName = "wgsl",
+                   .Expected = CookError::SlangInterfaceHasResourceMember,
+                   .Claim = "an implementation of an interface axis that holds a resource fails the cook" },
 };
 
 /** Cooks one module into a `MemoryOutputSink`, so that rows write no files and cannot collide. */

@@ -25,17 +25,19 @@ struct ExpectedExtern
     std::string_view Name;
     std::string_view Interface;
     std::string_view TypeArguments;
+    /** The module that declares the type argument. Empty for a builtin type, and for an interface with no argument. */
+    std::string_view ArgumentModule;
     ShimResourceClass Class;
     uint32_t SourceLine;
 };
 
 // source order; the commented-out Ghost and the extern of IUnrelated are not shim externs
 constexpr std::array<ExpectedExtern, 5u> k_Expected{ {
-    { "Points", "IReadBuffer", "PointLight", ShimResourceClass::Buffer, 23u },
-    { "Tints", "IReadBuffer", "float4", ShimResourceClass::Buffer, 24u },
-    { "Albedo", "ITexture2DRef", "", ShimResourceClass::Texture, 25u },
-    { "Linear", "ISamplerRef", "", ShimResourceClass::Sampler, 26u },
-    { "Scratch", "IReadWriteBuffer", "float4", ShimResourceClass::Buffer, 27u },
+    { "Points", "IReadBuffer", "PointLight", "ShimExterns", ShimResourceClass::Buffer, 23u },
+    { "Tints", "IReadBuffer", "float4", "", ShimResourceClass::Buffer, 24u },
+    { "Albedo", "ITexture2DRef", "", "", ShimResourceClass::Texture, 25u },
+    { "Linear", "ISamplerRef", "", "", ShimResourceClass::Sampler, 26u },
+    { "Scratch", "IReadWriteBuffer", "float4", "", ShimResourceClass::Buffer, 27u },
 } };
 
 /** Starts the bootstrap compile of one module, the way the driver does for the `spirv` profile. */
@@ -84,10 +86,15 @@ int main(int argc, char** argv)
                                  found.TypeArguments == expected.TypeArguments && found.Class == expected.Class &&
                                  found.SourceLine == expected.SourceLine,
                              "each extern has its name, interface, type argument, resource class, and line");
+                const bool hasArgument = !expected.TypeArguments.empty();
+                runner.Check(found.ArgumentModules.size() == (hasArgument ? 1u : 0u) &&
+                                 (!hasArgument || found.ArgumentModules[0] == expected.ArgumentModule),
+                             "each type argument has the module that declares it, and a builtin type has none");
             }
         }
 
-        const std::vector<RawAxisDeclaration> axes = compiler.BuildAxisDeclarations();
+        const CookResult<std::vector<RawAxisDeclaration>> axesResult = compiler.BuildAxisDeclarations();
+        const std::vector<RawAxisDeclaration> axes = axesResult.has_value() ? *axesResult : std::vector<RawAxisDeclaration>{};
         runner.BeginSection("a shim extern is not an axis");
         runner.Check(axes.size() == 1u && axes[0].Name == "FOG",
                      "the only axis is the one the module declares, so the variant count does not change");

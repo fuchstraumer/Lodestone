@@ -45,6 +45,8 @@ enum class CookError : uint16_t
     CapabilityAxisInert = 54, // an axis of kind capability changes no capability name of any entry point
     CapabilityAxisInverted = 55, // the off value of a boolean capability axis needs a name that its on value does not
     ShimExternNotReflected = 56, // the source declares an extern struct of a shim interface that reflection does not find
+    ShimFormUnavailable = 57, // the shim table has no implementation for the profile of the cook
+    ShimExternInvalid = 58, // the type arguments of a shim extern are not plain type names, or do not match the interface
 
     NoModulesSpecified = 60,
     NoOutputSpecified = 61,

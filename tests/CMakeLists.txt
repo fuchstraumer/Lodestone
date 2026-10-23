@@ -158,6 +158,14 @@ add_lodestone_unit_test(ShimTableTest ShimTableTests.cpp)
 add_lodestone_unit_test(ShimExternTest ShimExternTests.cpp)
 target_compile_definitions(ShimExternTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/Shims")
+# The source of the module that links the shim implementations (phase F step F2.5a): imports, exports, and the errors for an empty
+# cell and for type arguments that are not plain names. It needs no Slang.
+add_lodestone_unit_test(ShimLinkSourceTest ShimLinkSourceTests.cpp)
+# Shim externs end to end (phase F steps F2.5 and F2.6): a material written with shims is compared with the same shader written with the
+# resource types, for both targets, and a shim used as a local must fail. It cooks through Slang, so it takes about three seconds.
+add_lodestone_unit_test(ShimCookTest ShimCookTests.cpp)
+target_compile_definitions(ShimCookTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/Shims")
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)

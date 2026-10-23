@@ -187,6 +187,25 @@ namespace
     }
 }
 
+std::optional<std::string> SlangModuleContext::FindTypeDeclaringModule(std::string_view type_name) const
+{
+    Slang::ComPtr<slang::IBlob> diagBlob;
+    slang::ProgramLayout* programLayout = rootModule->getLayout(0, diagBlob.writeRef());
+    if (programLayout == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    const std::string name{ type_name };
+    slang::TypeReflection* type = programLayout->findTypeByName(name.c_str());
+    if (type == nullptr)
+    {
+        return std::nullopt;
+    }
+    
+    return std::string{ FindDeclaringModule(session, type) };
+}
+
 CookResult<std::vector<RawAxisDeclaration>> SlangModuleContext::BuildDeclaredAxes() const
 {
     AxesBuildContext axesBuildContext;

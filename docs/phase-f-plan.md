@@ -123,9 +123,9 @@ The Bound form works on WGSL, so this slice needs no SPIR-V. It can run beside F
 | F2.1 | **Done 2026-10-22.** Add the shim module to `builtins/`, beside `LodestoneAttributes.slang`. | `ShimModuleTest` cooks `ShimDirect.slang` for both targets. |
 | F2.2 | **Done 2026-10-22.** Add the shim table in `target/`. The profile form table waits for F4.1: every profile is Bound, so `TargetProfile::Access` is enough. | `ShimTableTest`, the agreement test of D6. |
 | F2.3 | **Done 2026-10-22.** Recognize an extern whose interface is in the shim table. Keep it out of the axis space. | `ShimExternTest`: the axis list of a shim module is unchanged. |
-| F2.4 | Allow a resource member in a shim impl, which the spike (F2.0) found works for a parameter type. Keep `rejectResourceMembers` for a technique axis, and reject a shim extern used as a local. | The technique-axis rejection test still fails the cook. |
-| F2.5 | Build the impl name from the extern (`IReadBuffer<PointLight>` gives `BoundReadBuffer<PointLight>`). Import the module that declares the element type. | `FindDeclaringModule` gives the import. `todo.md` holds the related import item. |
-| F2.6 | A cook test asset: a material that uses buffer, texture, and sampler shims in a `ParameterBlock` and in an entry point `uniform` parameter. | The cross-check agrees. Check the binding numbers: no global may move down a set (vocabulary §9e, measurement notes). |
+| F2.4 | **Done 2026-10-22.** Allow a resource member in a shim impl, which the spike (F2.0) found works for a parameter type. Keep `rejectResourceMembers` for a technique axis. A shim extern used as a local fails the cook, but through Slang and not through a check of ours. | The technique-axis rejection test still fails the cook. |
+| F2.5 | **Done 2026-10-22.** Build the impl name from the extern (`IReadBuffer<PointLight>` gives `BoundReadBuffer<PointLight>`). Import the module that declares the element type. | `FindDeclaringModule` gives the import. `todo.md` holds the related import item. |
+| F2.6 | **Done 2026-10-22.** A cook test asset: a material that uses buffer, texture, and sampler shims in a `ParameterBlock` and in an entry point `uniform` parameter. | The cross-check agrees. Check the binding numbers: no global may move down a set (vocabulary §9e, measurement notes). |
 | F2.7 | **Done by rendergraph task L14 (2026-10-19):** the container is the `entryPointParams` binding on WGSL and entry point constants on SPIR-V, and the mismatch row is now `EntryPointUnusedResource.slang`. Fix the cross-check for an entry point `uniform` container. Today it expects an empty name for `entryPointParams`. | F2.6 passes with F0.1 in place. `AccessModelRejectTest` uses `EntryPointResourceStruct.slang` as its mismatch row, so replace that row with another mismatch in the same step. |
 
 ### F3 — The capability set and the device limits
@@ -521,3 +521,20 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
     extern in a namespace fails with the new error. A shim interface that also carries `ls_axis_interface` is not checked
     yet.
   - Next: F2.5 (link the implementation).
+- 2026-10-22. **F2.4 to F2.6 done**, not committed. 39 of 39 tests, 60 of 60 known-good dumps.
+  - `compile/ShimLinkSource` (`MakeShimLinkSource`, `SplitShimTypeArguments`): the link module text, from the externs, the
+    profile's access model (`AccessModelFromPlacementKind` is new), and the declaring module of each type argument. New errors
+    `ShimFormUnavailable` = 57 (empty cell) and `ShimExternInvalid` = 58. `PrepareRawModule` resolves each type argument
+    with `SlangModuleContext::FindTypeDeclaringModule` and keeps the source in `SlangCompiler`. `Compile` passes it to the
+    thread pool, each worker context loads it once (`LoadShimLinkModule`), and `LinkVariant` adds it to the components.
+    Nothing is mutated between batches.
+  - **Measured (F2.6):** the shim material and its hand-written control give identical resources at identical places for
+    both targets (the Bound form of §9e, now through the cooker). One cook of two targets takes about 800 ms for the shim
+    and about 770 ms for the control, so the extra module and the extra code cost about 4 percent on a one-variant cook.
+  - **Found, fixed:** `SlangCompiler::BuildAxisDeclarations` returned an empty list when `BuildDeclaredAxes` failed, so a
+    cook reported the error and then exited 0 with every axis missing (an interface axis whose implementation holds a
+    resource, a conformance to two interfaces, an invalid attribute). It returns the `CookResult` now and the driver stops.
+    No test covered `SlangInterfaceHasResourceMember`; `AccessModelRejectTest` has a row for it now.
+  - Not covered: a type argument that is not `public` in its module (Slang reports it as an undefined identifier in the link
+    module), a shim extern in an array, and a shim interface that carries `ls_axis_interface`.
+  - Next: C11 (`ls_format` per variant) on this machinery, planned first. Then F4.
