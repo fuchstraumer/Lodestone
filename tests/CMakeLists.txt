@@ -145,6 +145,11 @@ target_compile_definitions(BindingArrayTest PRIVATE
 add_lodestone_unit_test(CapabilityAxisTest CapabilityAxisTests.cpp)
 target_compile_definitions(CapabilityAxisTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/CapabilityAxes")
+# The shim module (phase F step F2.1): the Bound implementations cook for both targets, and each resource reads back with
+# the kind and placement of the resource it holds. It cooks through Slang, so it takes about one second.
+add_lodestone_unit_test(ShimModuleTest ShimModuleTests.cpp)
+target_compile_definitions(ShimModuleTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/Shims")
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)

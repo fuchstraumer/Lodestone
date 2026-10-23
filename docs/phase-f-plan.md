@@ -96,14 +96,34 @@ control row that must cook.
 
 ### F2 — The shim module and the two tables, proved on WGSL
 
+**F2.0, the spike (done 2026-10-22).** Handoff section 4 said an interface conformance cannot carry a resource (E56003),
+and vocabulary §9e had a shim impl hold a `StructuredBuffer` and pass. Both are true. Probe: a shim module with
+`IReadBuf` and impls `NullBuf` (no member), `BoundBuf` (`StructuredBuffer<float>`), and `PtrBuf` (`Ptr<float, Access.Read>`);
+an app module with `extern struct Buf : IReadBuf = <default>`; a link module `export struct Buf : IReadBuf = BoundBuf`
+compiled to a `.slang-module`; `slangc app.slang link.slang-module`, for `spirv` and `wgsl`.
+
+| Use of `Buf` in the app | Result |
+|---|---|
+| Field of a `ParameterBlock` (default `NullBuf`, `BoundBuf`, or none) | Links on both targets. WGSL gets `@group(1) @binding(1) var<storage, read>`. The `PtrBuf` link also emits for `spirv`. |
+| A global (`Buf gBuf;`) | Links. The resource takes the declaration order (`gBuf` binding 0, `Output` binding 1). |
+| Entry point `uniform Buf b` | Links. WGSL names it `entryPointParams_b_data_0`. |
+| Reflection (`-reflection-json`) of the linked program | Reports `buf` at descriptor slot 1. The unlinked program reports no slot. The cooker reflects the linked program, so the cross-check sees the binding. |
+| Function-local (`Buf b = {}`), default `NullBuf`, linked `BoundBuf` | Unusable. slangc emits a local `var<storage, read> _S1` with no binding. The 2026-09 spike got E56003 from the cooker. |
+| Function-local with a default that holds a resource | Front-end error E30513: no initializer list for the type. |
+
+The rule: a resource-bearing impl works where the extern is a parameter type, and fails where it is a local. The default
+does not decide the layout; the linked impl does. So the shim externs of F2 are parameter types, and an interface axis
+(a technique, used as a local) stays behaviour only. Not measured: the Handle form (F4), a shim extern in an array, and
+`ConstantBuffer<Mat>` with a shim field.
+
 The Bound form works on WGSL, so this slice needs no SPIR-V. It can run beside F1.
 
 | Step | Work | Proof |
 |---|---|---|
-| F2.1 | Add the shim module to `builtins/`, beside `LodestoneAttributes.slang`. | It compiles for both targets. |
+| F2.1 | **Done 2026-10-22.** Add the shim module to `builtins/`, beside `LodestoneAttributes.slang`. | `ShimModuleTest` cooks `ShimDirect.slang` for both targets. |
 | F2.2 | Add the shim table and the profile form table in `target/`. | The agreement test of D6. |
 | F2.3 | Recognize an extern whose interface is in the shim table. Keep it out of the axis space. | The variant count of a shim module does not change. |
-| F2.4 | Allow a resource member in a shim impl. Keep `rejectResourceMembers` for a technique axis. | The technique-axis rejection test still fails the cook. |
+| F2.4 | Allow a resource member in a shim impl, which the spike (F2.0) found works for a parameter type. Keep `rejectResourceMembers` for a technique axis, and reject a shim extern used as a local. | The technique-axis rejection test still fails the cook. |
 | F2.5 | Build the impl name from the extern (`IReadBuffer<PointLight>` gives `BoundReadBuffer<PointLight>`). Import the module that declares the element type. | `FindDeclaringModule` gives the import. `todo.md` holds the related import item. |
 | F2.6 | A cook test asset: a material that uses buffer, texture, and sampler shims in a `ParameterBlock` and in an entry point `uniform` parameter. | The cross-check agrees. Check the binding numbers: no global may move down a set (vocabulary §9e, measurement notes). |
 | F2.7 | **Done by rendergraph task L14 (2026-10-19):** the container is the `entryPointParams` binding on WGSL and entry point constants on SPIR-V, and the mismatch row is now `EntryPointUnusedResource.slang`. Fix the cross-check for an entry point `uniform` container. Today it expects an empty name for `entryPointParams`. | F2.6 passes with F0.1 in place. `AccessModelRejectTest` uses `EntryPointResourceStruct.slang` as its mismatch row, so replace that row with another mismatch in the same step. |
@@ -467,3 +487,17 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
   - Known gap: an axis that controls two capabilities and leaves one in the off path passes. Only a declaration could
     catch it.
   - Next: F2.0, a spike on E56003 against the vocabulary §9e probe, then F2.
+- 2026-10-22. **F2.0 done** (a spike, no code). See the F2 section for the table. A resource impl links as a parameter type
+  on both targets, and fails as a local. F2.4 stands, with one added rule: reject a shim extern that the shader uses as a
+  local. Next: F2.1.
+- 2026-10-22. **F2.1 done**, not committed. `builtins/LodestoneShims.slang`: `IReadBuffer<T>` (`Load`), `IReadWriteBuffer<T>`
+  (`Load`, `Store`), `ITexture2DRef` and `ISamplerRef` (`Get`), and the four Bound implementations (O17 as recommended).
+  35 of 35 tests. No known-good dump can change: no existing module imports the new builtin.
+  - Found: the embedded builtin list in `cmake/LodestoneCooker.cmake` was one file, not the glob the comment and CLAUDE.md
+    described, so a new file in `builtins/` was never embedded. It is now `file(GLOB ... CONFIGURE_DEPENDS)`.
+  - Measured for O16: a shim resource is identified by a scope and a name. The scope is the path to the shim
+    (`material_Points`, `entryPointParams_Scratch`) and the name is the member the shim holds (`data`, `texture`,
+    `sampler`). Two shims of one block therefore do not collide, and no renaming is needed. Both targets agree, and the
+    block's ordinary data is the uniform buffer `material` at binding 0 with the resources after it. Recommendation stands:
+    no renaming in F2.
+  - Next: F2.2 (the shim table and its agreement test).

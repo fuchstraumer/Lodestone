@@ -14,15 +14,15 @@ fixed, remove it; when a task is done, add one line to section 7 and remove its 
 
 ## 1. State on 2026-10-22
 
-- RelWithDebInfo, `ninja-msvc`: build green, 34 of 34 tests (after F3.5; F3.5 is not committed). Known-good dumps: 60 of 60
+- RelWithDebInfo, `ninja-msvc`: build green, 35 of 35 tests (after F2.1; F2.1 is not committed). Known-good dumps: 60 of 60
   (checked 2026-10-22).
 - Debug: do not run it unattended (section 2, item 2).
 - Manifest format version 15. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
-- Phases D and E are complete. Phase F has F0, F1, F3.1 to F3.4c, and F3.5 done; F2, F4, F5, and F6 are open.
+- Phases D and E are complete. Phase F has F0, F1, F3.1 to F3.4c, F3.5, and F2.0 to F2.1 done; the rest of F2, F4, F5, and F6 are open.
 - **Phase F is the current work.** The VeloxRhi rendergraph tasks (`docs/rendergraph-integration-tasks.md`) are done
   except L11 (optional dispatch extent) and a JSON writer for the resource report. L5 and L6 became phase F slice F3:
-  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: F2**, starting
-  with F2.0, a spike on E56003 against the vocabulary §9e probe. F3.4d (bindings per stage and
+  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: F2.2**
+  (the shim table and its agreement test), then F2.3, F2.5, F2.6 (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
   bind groups) waits for a consumer to name its limits. After F3: F2 (the shim module and the two tables), F4 (Pointer and
   Handle placements, and unbounded binding arrays), F5 (binding-time lowering), and F6. `docs/phase-f-plan.md` has the
   slices and a progress log. The author calls phase F the last major feature work.
@@ -96,8 +96,13 @@ and `phase-e-interface-spike.md`).
   children. Do not call `getType` on it: it crashes. `getDeclSourceLocation` fails inside a fragment.
 - Link-time specialization fills an `extern struct` of interface type. No API lists the types that conform to an
   interface: walk the decls and test each struct.
-- **An interface conformance cannot carry a resource.** Codegen fails with E56003 at the use site. An interface
-  axis carries behaviour only, and resource presence stays a constant axis. Phase F step F2 must respect this.
+- **Where an interface conformance can carry a resource** (F2.0 spike, 2026-10-22, slangc 2026.18.1). Only where the
+  `extern struct` is the type of a parameter: a field of a `ParameterBlock`, a global, or an entry point `uniform`.
+  The linked impl then supplies the binding on both targets, also over a default with no resource, and reflection of the
+  linked program agrees with the emitted code. As a function-local (`Buf b = {}`) a resource impl is unusable: the
+  2026-09 spike got E56003, and slangc now emits a local `var<storage>` with no binding. An interface axis (a technique)
+  is used as a local, so it carries behaviour only, and resource presence stays a constant axis. A shim extern (F2) is
+  a parameter type, and carries a resource.
 - A synthetic axis module must be a component, because an imported module is a requirement.
 - A user attribute cannot take a type argument, and it has no optional or variadic parameters. Reflection reads
   only int, float, and string arguments. A list goes in one string.
@@ -212,3 +217,7 @@ One line for each step. Git history holds the full text.
 - **2026-10-22 (F3.5).** `VerifyCapabilityAxes`: an ungated axis of kind `capability` must change the capability names of
   some entry point, and a boolean axis must not need more when off than when on. No attribute: the author refused a
   declaration of names. `CapabilityAxisTest`. Next: F2.0.
+- **2026-10-22 (F2.0).** Spike: a resource-bearing impl links as a parameter type (block field, global, entry point
+  uniform) on both targets, and fails as a local. No code change.
+- **2026-10-22 (F2.1).** `builtins/LodestoneShims.slang` and `ShimModuleTest`. The builtin list in CMake is a glob now: a new
+  file in `builtins/` needs `scripts\configure.bat`.

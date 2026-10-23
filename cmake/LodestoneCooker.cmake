@@ -166,7 +166,7 @@ configure_file(
 
 # The builtin Slang modules are compiled into the library. The cooker serves them from memory, so a cook
 # needs no path to find them. CONFIGURE_DEPENDS checks the glob again at each build.
-set(LODESTONE_BUILTIN_MODULES "${CMAKE_CURRENT_SOURCE_DIR}/builtins/LodestoneAttributes.slang")
+file(GLOB LODESTONE_BUILTIN_MODULES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/builtins/*.slang")
 set(LODESTONE_EMBEDDED_BUILTINS_HEADER
     "${CMAKE_CURRENT_BINARY_DIR}/generated/include/compile/EmbeddedBuiltinModules.hpp")
 string(REPLACE ";" "|" LODESTONE_BUILTIN_MODULES_ARG "${LODESTONE_BUILTIN_MODULES}")
