@@ -178,6 +178,8 @@ target_compile_definitions(StorageFormatAxisTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/StorageFormatAxis")
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
+# The harness itself: each helper can fail, and a section that runs no check fails.
+add_lodestone_unit_test(TestHarnessTest TestHarnessTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)
 add_lodestone_unit_test(PermutationIndexTest PermutationIndexTests.cpp)
 add_lodestone_unit_test(ShaderManifestRejectTest ShaderManifestRejectTests.cpp)
