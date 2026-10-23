@@ -146,7 +146,7 @@ void CheckRejection(TestRunner& runner,
                     DiagnosticSink& sink)
 {
     const auto derived = ResolveOneAttribute(std::move(attribute), sink);
-    runner.Check(!derived.has_value() && derived.error() == expected, description);
+    runner.CheckError(derived, expected, description);
 }
 
 void TestSymbolTable(TestRunner& runner, DiagnosticSink& sink)
@@ -154,13 +154,14 @@ void TestSymbolTable(TestRunner& runner, DiagnosticSink& sink)
     runner.BeginSection("symbol table");
 
     const ResolveContext context = MakeContext();
-    runner.Check(context.Symbols.size() == 3u, "one symbol for each extern default and each axis");
+    runner.CheckEqual(context.Symbols.size(), 3u, "one symbol for each extern default and each axis");
 
     // The axis value wins over nothing here, but the order is the contract: the defaults come first,
     // so an axis of the same name would shadow one.
-    runner.Check(context.Symbols.front().Name == "IFFT_NUM_WAVE_CASCADES" &&
-                     context.Symbols.front().Value == 4,
-                 "the undriven extern default comes first, with its declared value");
+    runner.CheckEqual(context.Symbols.front().Name, "IFFT_NUM_WAVE_CASCADES",
+                      "the undriven extern default comes first, with its declared value");
+    runner.CheckEqual(context.Symbols.front().Value, 4,
+                      "the undriven extern default comes first, with its declared value");
 
     CheckElementCount(runner, "IFFT_SIZE", 512u, "an axis value reaches the evaluator", sink);
     CheckElementCount(runner, "IFFT_NUM_WAVE_CASCADES", 4u, "an extern default reaches the evaluator", sink);
@@ -227,9 +228,7 @@ void TestNoAnnotation(TestRunner& runner, DiagnosticSink& sink)
     // size that defaults to zero and a size nobody declared are different facts.
     const CookResult<CompiledVariant> resolved =
         ResolveVariant(MakeVariantWithOneBuffer(), MakeContext(), sink);
-    runner.Check(resolved.has_value(), "a binding with no annotation is not an error");
-
-    if (!resolved)
+    if (!runner.CheckOk(resolved, "a binding with no annotation is not an error"))
     {
         return;
     }
@@ -285,8 +284,8 @@ void TestRejections(TestRunner& runner, DiagnosticSink& sink)
     bothExtents.SizeAttributes.push_back(
         MakeAttribute(RawSizeAttributeKind::Extent3d, { "IFFT_SIZE", "IFFT_SIZE", "2" }));
     const CookResult<CompiledVariant> conflict = ResolveVariant(bothExtents, MakeContext(), sink);
-    runner.Check(!conflict.has_value() && conflict.error() == CookError::ReflectionSizeUnresolved,
-                 "one resource cannot carry both a 2d and a 3d extent");
+    runner.CheckError(conflict, CookError::ReflectionSizeUnresolved,
+                      "one resource cannot carry both a 2d and a 3d extent");
 }
 
 void TestAttributeTargeting(TestRunner& runner, DiagnosticSink& sink)
@@ -307,9 +306,7 @@ void TestAttributeTargeting(TestRunner& runner, DiagnosticSink& sink)
     variant.SizeAttributes.push_back(std::move(attribute));
 
     const CookResult<CompiledVariant> resolved = ResolveVariant(variant, MakeContext(), sink);
-    runner.Check(resolved.has_value(), "a two binding variant resolves");
-
-    if (!resolved)
+    if (!runner.CheckOk(resolved, "a two binding variant resolves"))
     {
         return;
     }
@@ -335,22 +332,20 @@ void TestPlacementAndPassthrough(TestRunner& runner, DiagnosticSink& sink)
     variant.Bindings.push_back(std::move(unplaced));
 
     const CookResult<CompiledVariant> resolved = ResolveVariant(variant, MakeContext(), sink);
-    runner.Check(resolved.has_value(), "a variant with an unplaced resource resolves");
-
-    if (!resolved)
+    if (!runner.CheckOk(resolved, "a variant with an unplaced resource resolves"))
     {
         return;
     }
 
     const CompiledVariant& value = resolved.value();
-    runner.Check(value.Bindings[0].Placement == ResourcePlacement{ BoundPlacement{ 2u, 3u } },
-                 "a bound placement reaches the resource unflattened");
+    runner.CheckEqual(value.Bindings[0].Placement, ResourcePlacement{ BoundPlacement{ 2u, 3u } },
+                      "a bound placement reaches the resource unflattened");
     // A resource with no placement is not a resource at group 0 binding 0, and the sum says so.
     runner.Check(std::holds_alternative<std::monostate>(value.Bindings[1].Placement),
                  "an unplaced resource holds no placement at all");
-    runner.Check(value.Bindings[1].ByteSize == 64u, "the declared byte size passes through");
-    runner.Check(value.VariantSuffix == "_S512_W1" && value.VariantIndex == 3u,
-                 "the variant identity passes through");
+    runner.CheckEqual(value.Bindings[1].ByteSize, 64u, "the declared byte size passes through");
+    runner.CheckEqual(value.VariantSuffix, "_S512_W1", "the variant identity passes through");
+    runner.CheckEqual(value.VariantIndex, 3u, "the variant identity passes through");
 }
 
 void TestEntryPoints(TestRunner& runner, DiagnosticSink& sink)
@@ -369,8 +364,11 @@ void TestEntryPoints(TestRunner& runner, DiagnosticSink& sink)
     variant.EntryPoints.push_back(std::move(raw));
 
     const CookResult<CompiledVariant> resolved = ResolveVariant(variant, MakeContext(), sink);
-    runner.Check(resolved.has_value() && resolved.value().EntryPoints.size() == 1u,
-                 "one raw entry point gives one compiled entry point");
+    if (runner.CheckOk(resolved, "one raw entry point gives one compiled entry point"))
+    {
+        runner.CheckEqual(resolved.value().EntryPoints.size(), 1u,
+                          "one raw entry point gives one compiled entry point");
+    }
 
     if (!resolved || resolved.value().EntryPoints.empty())
     {
@@ -378,17 +376,22 @@ void TestEntryPoints(TestRunner& runner, DiagnosticSink& sink)
     }
 
     const auto& entryPoint = resolved.value().EntryPoints.front();
-    runner.Check(entryPoint.Code == lodestone::tests::BytesOf("@compute fn SpectrumUpdate() {}"),
-                 "the target text becomes the code, unread and unchanged");
-    runner.Check(entryPoint.Name == "SpectrumUpdate" && entryPoint.Reflection.Name == "SpectrumUpdate",
-                 "the entry point name reaches both the record and its reflection");
-    runner.Check(entryPoint.Reflection.Stage == ShaderStageKind::Compute, "the stage passes through");
-    runner.Check(entryPoint.Reflection.Workgroup.X == 8u && entryPoint.Reflection.Workgroup.Y == 8u &&
-                     entryPoint.Reflection.Workgroup.Z == 1u,
-                 "the workgroup size passes through");
-    runner.Check(entryPoint.Reflection.UsedBindingIndices.size() == 1u &&
-                     entryPoint.Reflection.UsedBindingIndices.front() == 0u,
-                 "visibility passes through as indices into the shared binding list");
+    runner.CheckEqual(entryPoint.Code, lodestone::tests::BytesOf("@compute fn SpectrumUpdate() {}"),
+                      "the target text becomes the code, unread and unchanged");
+    runner.CheckEqual(entryPoint.Name, "SpectrumUpdate",
+                      "the entry point name reaches both the record and its reflection");
+    runner.CheckEqual(entryPoint.Reflection.Name, "SpectrumUpdate",
+                      "the entry point name reaches both the record and its reflection");
+    runner.CheckEqual(entryPoint.Reflection.Stage, ShaderStageKind::Compute, "the stage passes through");
+    runner.CheckEqual(entryPoint.Reflection.Workgroup.X, 8u, "the workgroup size passes through");
+    runner.CheckEqual(entryPoint.Reflection.Workgroup.Y, 8u, "the workgroup size passes through");
+    runner.CheckEqual(entryPoint.Reflection.Workgroup.Z, 1u, "the workgroup size passes through");
+    if (runner.CheckEqual(entryPoint.Reflection.UsedBindingIndices.size(), 1u,
+                          "visibility passes through as indices into the shared binding list"))
+    {
+        runner.CheckEqual(entryPoint.Reflection.UsedBindingIndices.front(), 0u,
+                          "visibility passes through as indices into the shared binding list");
+    }
 }
 
 RawDerivedConstant MakeDerived(std::string name, std::string expression, uint32_t line)
@@ -439,7 +442,10 @@ void CheckDerivedCount(TestRunner& runner,
                        DiagnosticSink& sink)
 {
     const CookResult<uint64_t> count = ResolveDerivedCount(constants, std::move(expression), sink);
-    runner.Check(count.has_value() && count.value() == expected, description);
+    if (runner.CheckOk(count, description))
+    {
+        runner.CheckEqual(count.value(), expected, description);
+    }
 }
 
 void CheckDerivedRejection(TestRunner& runner,
@@ -450,7 +456,7 @@ void CheckDerivedRejection(TestRunner& runner,
                            DiagnosticSink& sink)
 {
     const CookResult<uint64_t> count = ResolveDerivedCount(constants, std::move(expression), sink);
-    runner.Check(!count.has_value() && count.error() == expected, description);
+    runner.CheckError(count, expected, description);
 }
 
 /** Returns how many entries of the symbol table of `TOP` in the diamond below have the name `BASE`. */
@@ -501,8 +507,8 @@ void TestDerivedConstants(TestRunner& runner, DiagnosticSink& sink)
                               MakeDerived("RIGHT", "BASE + 1u", 3u),
                               MakeDerived("BASE", "IFFT_SIZE", 4u) };
     CheckDerivedCount(runner, diamond, "TOP", 1537u, "a diamond: two constants use one base", sink);
-    runner.Check(CountDiamondBaseSymbols(diamond, sink) == 1u,
-                 "the base of a diamond is evaluated once, though two paths reach it");
+    runner.CheckEqual(CountDiamondBaseSymbols(diamond, sink), 1u,
+                      "the base of a diamond is evaluated once, though two paths reach it");
 
     const std::array sameTwice{ MakeDerived("N", "4u", 1u), MakeDerived("N", "4u", 9u) };
     CheckDerivedCount(runner, sameTwice, "N", 4u, "two declarations with one expression are one constant", sink);

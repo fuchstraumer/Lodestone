@@ -132,32 +132,22 @@ int main(int argc, char** argv)
         MemoryOutputSink sink;
         const CookResult<CookStatistics> result = CookIntoMemory(assetDirectory / testCase.ModuleFile, sink);
         const CookError actual = result ? CookError::Success : result.error();
-        if (actual != testCase.Expected)
-        {
-            std::println(stderr,
-                         "[DerivedConstant] {}: expected {}, and the cook returned {}",
-                         testCase.ModuleFile,
-                         ToString(testCase.Expected),
-                         ToString(actual));
-        }
-        runner.Check(actual == testCase.Expected, testCase.Claim);
+        runner.CheckEqual(actual, testCase.Expected, std::format("{}: {}", testCase.ModuleFile, testCase.Claim));
     }
 
     runner.BeginSection("each variant sizes gLightIndices with its own value of LIGHT_SLOTS");
     MemoryOutputSink sink;
     const CookResult<CookStatistics> cooked = CookIntoMemory(assetDirectory / "DerivedConstants.slang", sink);
-    runner.Check(cooked.has_value(), "the module with derived constants cooks");
+    runner.CheckOk(cooked, "the module with derived constants cooks");
     const std::vector<std::byte> bytes = ManifestBytes(sink);
     const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(bytes);
-    runner.Check(bundle.has_value(), "the manifest opens");
-    if (!bundle.has_value())
+    if (!runner.CheckOk(bundle, "the manifest opens"))
     {
         return runner.Report();
     }
 
     const manifest::ManifestResult<manifest::EnvironmentView> environment = bundle->OpenEnvironment(0u, 0u);
-    runner.Check(environment.has_value(), "the environment opens");
-    if (!environment.has_value())
+    if (!runner.CheckOk(environment, "the environment opens"))
     {
         return runner.Report();
     }
@@ -169,16 +159,9 @@ int main(int argc, char** argv)
             FindResource(environment.value(), index, expected, "gLightIndices");
         const std::optional<uint64_t> count =
             lightIndices.has_value() ? std::optional<uint64_t>{ lightIndices->ElementCount() } : std::nullopt;
-        if (count != expected.LightSlots)
-        {
-            std::println(stderr,
-                         "[DerivedConstant] GRID_X {} GRID_Y {}: expected {}, and the manifest has {}",
-                         expected.GridX,
-                         expected.GridY,
-                         expected.LightSlots,
-                         count.has_value() ? std::to_string(*count) : std::string{ "nothing" });
-        }
-        runner.Check(count == expected.LightSlots, "the element count equals GRID_X * GRID_Y * 16");
+        runner.CheckEqual(count, expected.LightSlots,
+                          std::format("GRID_X {} GRID_Y {}: the element count equals GRID_X * GRID_Y * 16",
+                                      expected.GridX, expected.GridY));
 
         // ls_extent_1d: the width follows the axes, and the two axes it does not set are 1
         const std::optional<manifest::ResolvedResource> ramp =
@@ -211,10 +194,10 @@ int main(int argc, char** argv)
         return names;
     };
     const std::vector<std::string_view> k_GridAxes{ "GRID_X", "GRID_Y" };
-    runner.Check(footprintAxisNames("gLightIndices") == k_GridAxes,
-                 "the element count changes with GRID_X and GRID_Y, through two derived constants");
-    runner.Check(footprintAxisNames("gClusterRamp") == k_GridAxes,
-                 "the 1d extent changes with GRID_X and GRID_Y, through one derived constant");
+    runner.CheckEqual(footprintAxisNames("gLightIndices"), k_GridAxes,
+                      "the element count changes with GRID_X and GRID_Y, through two derived constants");
+    runner.CheckEqual(footprintAxisNames("gClusterRamp"), k_GridAxes,
+                      "the 1d extent changes with GRID_X and GRID_Y, through one derived constant");
 
     return runner.Report();
 }

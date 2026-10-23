@@ -195,7 +195,7 @@ int main()
     const std::vector<ReflectedBinding> agreeing = MakeAgreeingReflection();
     std::vector<const ReflectedBinding*> agreeingPointers = PointersTo(agreeing);
     const CookResult<BindingComparison> match = validator.ValidateEntryPoint(std::as_bytes(std::span{ k_Wgsl }), agreeingPointers, sink);
-    runner.Check(match.has_value(), "valid WGSL and agreeing reflection produce a result, not an error");
+    runner.CheckOk(match, "valid WGSL and agreeing reflection produce a result, not an error");
     runner.Check(match.has_value() && match->Matches, "reflection that agrees with the emitted text passes");
     runner.Check(match.has_value() && match->Report.empty(), "a passing comparison reports nothing");
 
@@ -212,12 +212,19 @@ int main()
         });
         return pairs;
     };
-    runner.Check(match.has_value() && sortedPairs(match->Emitted.SamplerTexturePairs) == expectedPairs,
-                 "the validate path reads each texture with the sampler it is sampled with, a comparison sampler too");
+    if (runner.CheckOk(match,
+                       "the validate path reads each texture with the sampler it is sampled with, a comparison sampler too"))
+    {
+        runner.CheckEqual(sortedPairs(match->Emitted.SamplerTexturePairs), expectedPairs,
+                          "the validate path reads each texture with the sampler it is sampled with, a comparison sampler too");
+    }
     const CookResult<EmittedCodeFacts> readFacts =
         validator.ReadEmittedCodeFacts(std::as_bytes(std::span{ k_Wgsl }), sink);
-    runner.Check(readFacts.has_value() && sortedPairs(readFacts->SamplerTexturePairs) == expectedPairs,
-                 "the read path gives the same pairs, and compares nothing");
+    if (runner.CheckOk(readFacts, "the read path gives the same pairs, and compares nothing"))
+    {
+        runner.CheckEqual(sortedPairs(readFacts->SamplerTexturePairs), expectedPairs,
+                          "the read path gives the same pairs, and compares nothing");
+    }
 
     runner.BeginSection("the capability names and the workgroup memory come from Tint");
     runner.Check(readFacts.has_value() && readFacts->CapabilityNames.empty() && readFacts->WorkgroupMemoryBytes == 0u,
@@ -226,11 +233,18 @@ int main()
                  "the validate path reads the same names as the read path");
     const CookResult<EmittedCodeFacts> workgroupFacts =
         validator.ReadEmittedCodeFacts(std::as_bytes(std::span{ k_WgslWorkgroup }), sink);
-    runner.Check(workgroupFacts.has_value(), "the read path reads the workgroup WGSL");
-    runner.Check(workgroupFacts.has_value() && workgroupFacts->CapabilityNames == std::vector<std::string>{ "f16" },
-                 "each enable directive reads back as a name");
-    runner.Check(workgroupFacts.has_value() && workgroupFacts->WorkgroupMemoryBytes == 144u,
-                 "the workgroup memory is Dawn's sum, and equals the SPIR-V reader's sum for the same variables");
+    runner.CheckOk(workgroupFacts, "the read path reads the workgroup WGSL");
+    if (runner.CheckOk(workgroupFacts, "each enable directive reads back as a name"))
+    {
+        runner.CheckEqual(workgroupFacts->CapabilityNames, std::vector<std::string>{ "f16" },
+                          "each enable directive reads back as a name");
+    }
+    if (runner.CheckOk(workgroupFacts,
+                       "the workgroup memory is Dawn's sum, and equals the SPIR-V reader's sum for the same variables"))
+    {
+        runner.CheckEqual(workgroupFacts->WorkgroupMemoryBytes, 144u,
+                          "the workgroup memory is Dawn's sum, and equals the SPIR-V reader's sum for the same variables");
+    }
 
     runner.BeginSection("a kind mismatch fails the cross-check");
     // A uniform block that reflection calls a storage buffer still emits valid WGSL. WebGPU rejects
@@ -330,14 +344,17 @@ int main()
     constexpr std::string_view k_Broken = "this is not valid wgsl @group";
     const CookResult<BindingComparison> broken = validator.ValidateEntryPoint(std::as_bytes(std::span{ k_Broken }), agreeingPointers, sink);
     runner.Check(!broken.has_value(), "source Tint cannot parse produces an error");
-    runner.Check(!broken.has_value() && broken.error() == lodestone::CookError::TargetValidationEntryPointParseFailed,
-                 "the error names the parse failure");
+    runner.CheckError(broken, lodestone::CookError::TargetValidationEntryPointParseFailed,
+                      "the error names the parse failure");
 
     runner.BeginSection("the target profile supplies a working validator");
     const CookResult<TargetProfile> wgslProfile = lodestone::FindTargetProfile("wgsl");
-    runner.Check(wgslProfile.has_value(), "the build has a wgsl profile");
-    runner.Check(wgslProfile.has_value() && wgslProfile->Access == lodestone::AccessModel::Bound,
-                 "wgsl places a resource by group and binding");
+    runner.CheckOk(wgslProfile, "the build has a wgsl profile");
+    if (runner.CheckOk(wgslProfile, "wgsl places a resource by group and binding"))
+    {
+        runner.CheckEqual(wgslProfile->Access, lodestone::AccessModel::Bound,
+                          "wgsl places a resource by group and binding");
+    }
     runner.Check(wgslProfile.has_value() && wgslProfile->Validator != nullptr,
                  "wgsl can read its own output, so it supplies a validator");
     runner.Check(!lodestone::FindTargetProfile("hlsl"),

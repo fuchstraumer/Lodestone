@@ -50,8 +50,8 @@ uint FFF = 2;
     SymbolTable table;
     table.AddSource("decls", k_TestSourcePath, k_Source);
 
-    runner.Check(Missing(table, { "decls" }, { "AAA", "BBB", "CCC" }).size() == 3u,
-                 "every arrangement of extern static const is stripped");
+    runner.CheckEqual(Missing(table, { "decls" }, { "AAA", "BBB", "CCC" }).size(), 3u,
+                      "every arrangement of extern static const is stripped");
     runner.Check(Missing(table, { "decls" }, { "DDD", "EEE", "FFF" }).empty(),
                  "a declaration with only one of the three keywords keeps its name");
 }
@@ -101,8 +101,8 @@ void doWork(uint count)
     SymbolTable table;
     table.AddSource("kernel", k_TestSourcePath, k_Source);
 
-    runner.Check(Missing(table, { "kernel" }, { "RWStructuredBuffer", "float", "void", "uint", "for" }).size() == 5u,
-                 "reserved words and built-in type names are stripped");
+    runner.CheckEqual(Missing(table, { "kernel" }, { "RWStructuredBuffer", "float", "void", "uint", "for" }).size(), 5u,
+                      "reserved words and built-in type names are stripped");
     runner.Check(Missing(table, { "kernel" }, { "gBuffer", "doWork", "count", "i" }).empty(),
                  "ordinary identifiers stay tokens");
 }
@@ -139,16 +139,18 @@ void csMain(uint3 tid : SV_DispatchThreadID)
 
     const std::vector<std::string_view> missing =
         Missing(table, { "common", "main" }, { "USE_WAVE_OPS", "FFT_SIZE", "UNUSED_TILE" });
-    runner.Check(missing.size() == 1u && missing[0] == "UNUSED_TILE",
-                 "the used axes are found and only the unused axis is missing");
+    if (runner.CheckEqual(missing.size(), 1u, "the used axes are found and only the unused axis is missing"))
+    {
+        runner.CheckEqual(missing[0], "UNUSED_TILE", "the used axes are found and only the unused axis is missing");
+    }
 
     runner.Check(Missing(table, { "main" }, { "USE_WAVE_OPS", "FFT_SIZE" }).empty(),
                  "an axis used in a module is found when that module is in scope");
 
     // The crux: the declaring module contains only its own tokens, and the declaration line was skipped, so
     // the axis is NOT a use in the module that declares it. Without this, every axis would read as used.
-    runner.Check(Missing(table, { "common" }, { "USE_WAVE_OPS" }).size() == 1u,
-                 "a declaration alone does not count as a use in the declaring module");
+    runner.CheckEqual(Missing(table, { "common" }, { "USE_WAVE_OPS" }).size(), 1u,
+                      "a declaration alone does not count as a use in the declaring module");
 }
 
 // A module can be fed several sources, which pool under its name (a root plus its __include'd
@@ -164,8 +166,8 @@ void TestAccumulationAndUnknownModule(TestRunner& runner)
     runner.Check(Missing(table, { "mod" }, { "alpha", "gamma" }).empty(),
                  "a second AddSource for the same module pools its tokens in");
 
-    runner.Check(Missing(table, { "nonexistent" }, { "alpha" }).size() == 1u,
-                 "an unknown module holds no tokens, so the token is missing");
+    runner.CheckEqual(Missing(table, { "nonexistent" }, { "alpha" }).size(), 1u,
+                      "an unknown module holds no tokens, so the token is missing");
 }
 
 void TestDerivedConstantExtraction(TestRunner& runner)
@@ -191,17 +193,17 @@ void TestDerivedConstantExtraction(TestRunner& runner)
         return iter == derived.end() ? nullptr : &*iter;
     };
 
-    runner.Check(derived.size() == 3u, "three static const lines with an initializer are captured");
+    runner.CheckEqual(derived.size(), 3u, "three static const lines with an initializer are captured");
     const DerivedConstantDeclaration* clusterCount = find("CLUSTER_COUNT");
     runner.Check(clusterCount != nullptr && clusterCount->Expression == "GRID_X * GRID_Y",
                  "the expression is kept as written, not evaluated");
     runner.Check(clusterCount != nullptr && clusterCount->SourcePath == "Lighting.slang" && clusterCount->SourceLine == 3u,
                  "the source path and the line number are recorded");
     runner.Check(find("LIGHT_SLOTS") != nullptr, "the keyword order does not matter");
-    runner.Check(find("GRID_X") == nullptr, "an extern constant is not a derived constant");
-    runner.Check(find("SUBSTRING_ONLY") == nullptr, "`static` and `const` must be whole tokens, not parts of a type name");
+    runner.CheckEqual(find("GRID_X"), nullptr, "an extern constant is not a derived constant");
+    runner.CheckEqual(find("SUBSTRING_ONLY"), nullptr, "`static` and `const` must be whole tokens, not parts of a type name");
     runner.Check(find("LOCAL_ONLY") != nullptr, "a function-local constant is captured, for the scope filter to remove");
-    runner.Check(find("SIZES") == nullptr, "an array declaration is skipped, because its name is not before the `=`");
+    runner.CheckEqual(find("SIZES"), nullptr, "an array declaration is skipped, because its name is not before the `=`");
     runner.Check(Missing(table, { "Lighting" }, { "GRID_Y" }).empty(),
                  "the names in a derived expression still count as tokens");
 }
@@ -244,7 +246,7 @@ void TestExternTypeDefaultExtraction(TestRunner& runner)
     table.AddSource("Shading", k_TestSourcePath, k_Source);
 
     const std::vector<ExternConstantDeclaration> types = table.ExternTypeDefaultsForModule("Shading");
-    runner.Check(types.size() == 2u, "only extern struct declarations with an initializer are recognized");
+    runner.CheckEqual(types.size(), 2u, "only extern struct declarations with an initializer are recognized");
     runner.Check(DeclarationMatches(types, "SHADE_MODE", "Passthrough"),
                  "the struct name comes from after `struct`, not from before `=`");
     runner.Check(DeclarationMatches(types, "BRDF", "Shading::Lambert"), "a qualified default keeps its qualifier");
@@ -280,7 +282,7 @@ void TestExternConstExtraction(TestRunner& runner)
     table.AddSource("OceanFft", k_TestSourcePath, k_Source);
 
     const std::vector<ExternConstantDeclaration> externs = table.ExternConstantsForModule("OceanFft");
-    runner.Check(externs.size() == 4u, "A line needs extern static const and = to be recognized.");
+    runner.CheckEqual(externs.size(), 4u, "A line needs extern static const and = to be recognized.");
     runner.Check(DeclarationMatches(externs, "IFFT_SIZE", "256"), "an integer default reads back");
     runner.Check(DeclarationMatches(externs, "IFFT_USE_WAVE_OPS", "false"), "a bool default reads back");
     runner.Check(DeclarationMatches(externs, "IFFT_NUM_WAVE_CASCADES", "IFFT_SIZE * 4"),
@@ -290,7 +292,7 @@ void TestExternConstExtraction(TestRunner& runner)
     constexpr std::string_view k_IdentifierExtractionSrc = "extern static const uint SPACED    =   42 ; \n";
     table.AddSource("Identifiers", k_TestSourcePath, k_IdentifierExtractionSrc);
     const std::vector<ExternConstantDeclaration> identifiersExterns = table.ExternConstantsForModule("Identifiers");
-    runner.Check(identifiersExterns.size() == 1u, "Should extract the single extern static const declaration.");
+    runner.CheckEqual(identifiersExterns.size(), 1u, "Should extract the single extern static const declaration.");
     runner.Check(DeclarationMatches(identifiersExterns, "SPACED", "42"), "The extracted declaration should match the source.");
 }
 

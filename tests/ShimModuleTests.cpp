@@ -78,7 +78,7 @@ int main(int argc, char** argv)
     options.OutputPath = "ShimModule";
     MemoryOutputSink sink;
     const CookResult<CookStatistics> cooked = RunCook(options, sink);
-    runner.Check(cooked.has_value(), "buffer, texture, and sampler shims in a block, and a shim in an entry point uniform");
+    runner.CheckOk(cooked, "buffer, texture, and sampler shims in a block, and a shim in an entry point uniform");
 
     const std::map<std::string, std::string>& artifacts = sink.GetArtifacts();
     const auto manifestArtifact = artifacts.find(std::string{ k_ManifestFileName });
@@ -90,8 +90,7 @@ int main(int argc, char** argv)
     std::vector<std::byte> bytes(manifestArtifact->second.size());
     std::memcpy(bytes.data(), manifestArtifact->second.data(), bytes.size());
     const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(bytes);
-    runner.Check(bundle.has_value(), "the manifest opens");
-    if (!bundle.has_value())
+    if (!runner.CheckOk(bundle, "the manifest opens"))
     {
         return runner.Report();
     }
@@ -100,8 +99,7 @@ int main(int argc, char** argv)
     {
         runner.BeginSection(std::format("the bindings of profile {} read back as the shim implementations declare them", profile));
         const manifest::ManifestResult<manifest::EnvironmentView> environment = bundle->OpenEnvironment(profile, 0u);
-        runner.Check(environment.has_value(), "the environment opens");
-        if (!environment.has_value())
+        if (!runner.CheckOk(environment, "the environment opens"))
         {
             continue;
         }

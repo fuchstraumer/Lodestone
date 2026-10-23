@@ -110,12 +110,12 @@ void CheckEnvironment(tests::TestRunner& runner, const manifest::EnvironmentView
     for (const ExpectedRoles& expected : k_Expected)
     {
         const std::optional<manifest::ResolvedResource> resource = FindResource(layout, expected.Name);
-        runner.Check(resource.has_value(), "each buffer with a role is in the layout");
-        if (resource.has_value())
+        if (runner.Check(resource.has_value(), std::format("{}: each buffer with a role is in the layout", expected.Name)))
         {
-            runner.Check(resource->Roles() == expected.Roles, "the roles read back as the shader declares them");
-            runner.Check(resource->RequiredBufferUsage() == expected.Usage,
-                         "the creation usage joins the binding's usage and the roles' usage");
+            runner.CheckEqual(resource->Roles(), expected.Roles,
+                              std::format("{}: the roles read back as the shader declares them", expected.Name));
+            runner.CheckEqual(resource->RequiredBufferUsage(), expected.Usage,
+                              std::format("{}: the creation usage joins the binding's usage and the roles' usage", expected.Name));
         }
     }
 
@@ -146,17 +146,15 @@ int main(int argc, char** argv)
     constexpr std::array<std::string_view, 2u> k_BothTargets{ "wgsl", "spirv" };
     MemoryOutputSink sink;
     const CookResult<CookStatistics> cooked = CookIntoMemory(assetDirectory / "ResourceRoles.slang", k_BothTargets, sink);
-    runner.Check(cooked.has_value(), "the module cooks for both targets");
+    runner.CheckOk(cooked, "the module cooks for both targets");
     const std::vector<std::byte> bytes = ManifestBytes(sink);
     const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(bytes);
-    runner.Check(bundle.has_value(), "the manifest opens");
-    if (bundle.has_value())
+    if (runner.CheckOk(bundle, "the manifest opens"))
     {
         for (uint32_t profile = 0u; profile < k_BothTargets.size(); ++profile)
         {
             const manifest::ManifestResult<manifest::EnvironmentView> environment = bundle->OpenEnvironment(profile, 0u);
-            runner.Check(environment.has_value(), "the environment opens");
-            if (environment.has_value())
+            if (runner.CheckOk(environment, std::format("profile {}: the environment opens", profile)))
             {
                 CheckEnvironment(runner, environment.value());
             }
@@ -185,7 +183,7 @@ int main(int argc, char** argv)
     {
         MemoryOutputSink rejectSink;
         const CookResult<CookStatistics> result = CookIntoMemory(assetDirectory / rejection.File, k_Wgsl, rejectSink);
-        runner.Check(!result.has_value() && result.error() == rejection.Error, rejection.Description);
+        runner.CheckError(result, rejection.Error, rejection.Description);
     }
 
     return runner.Report();

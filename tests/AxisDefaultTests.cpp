@@ -78,7 +78,10 @@ void CheckIntegralDefault(tests::TestRunner& runner,
                           std::string_view claim)
 {
     const QueryResult<QueryAxisValue> value = index.AxisDefault(axis_name);
-    runner.Check(value.has_value() && value->IntegralValue == expected, claim);
+    if (runner.CheckOk(value, claim))
+    {
+        runner.CheckEqual(value->IntegralValue, expected, claim);
+    }
 }
 
 void CheckNamedDefault(tests::TestRunner& runner,
@@ -88,7 +91,10 @@ void CheckNamedDefault(tests::TestRunner& runner,
                        std::string_view claim)
 {
     const QueryResult<QueryAxisValue> value = index.AxisDefault(axis_name);
-    runner.Check(value.has_value() && value->Name == expected, claim);
+    if (runner.CheckOk(value, claim))
+    {
+        runner.CheckEqual(value->Name, expected, claim);
+    }
 }
 
 } // namespace
@@ -106,15 +112,7 @@ int main(int argc, char** argv)
         const CookResult<CookStatistics> result =
             CookIntoMemory(assetDirectory / testCase.ModuleFile, std::nullopt, sink);
         const CookError actual = result ? CookError::Success : result.error();
-        if (actual != testCase.Expected)
-        {
-            std::println(stderr,
-                         "[AxisDefault] {}: expected {}, and the cook returned {}",
-                         testCase.ModuleFile,
-                         ToString(testCase.Expected),
-                         ToString(actual));
-        }
-        runner.Check(actual == testCase.Expected, testCase.Claim);
+        runner.CheckEqual(actual, testCase.Expected, std::format("{}: {}", testCase.ModuleFile, testCase.Claim));
     }
 
     runner.BeginSection("an enum axis that no code reads is pruned, and its initializer is not read as a value");
@@ -122,12 +120,12 @@ int main(int argc, char** argv)
         MemoryOutputSink unreadSink;
         const CookResult<CookStatistics> unreadCook =
             CookIntoMemory(assetDirectory / "AxisDefaultUnread.slang", std::nullopt, unreadSink);
-        runner.Check(unreadCook.has_value(), "the module cooks");
+        runner.CheckOk(unreadCook, "the module cooks");
         const std::vector<std::byte> unreadBytes = ManifestBytes(unreadSink);
         const manifest::ManifestResult<manifest::BundleView> unreadBundle = manifest::BundleView::Open(unreadBytes);
         const manifest::ManifestResult<manifest::EnvironmentView> unreadEnvironment =
             unreadBundle.has_value() ? unreadBundle->OpenEnvironment(0u, 0u) : std::unexpected(unreadBundle.error());
-        runner.Check(unreadEnvironment.has_value(), "the environment opens");
+        runner.CheckOk(unreadEnvironment, "the environment opens");
         if (unreadEnvironment.has_value())
         {
             const ManifestIndex unreadIndex{ unreadEnvironment.value() };
@@ -139,18 +137,16 @@ int main(int argc, char** argv)
     runner.BeginSection("every declared default reaches the client, and none of them is the first value");
     MemoryOutputSink sink;
     const CookResult<CookStatistics> cooked = CookIntoMemory(assetDirectory / "AxisDefaults.slang", std::nullopt, sink);
-    runner.Check(cooked.has_value(), "the module with non-first defaults cooks");
+    runner.CheckOk(cooked, "the module with non-first defaults cooks");
     const std::vector<std::byte> bytes = ManifestBytes(sink);
     const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(bytes);
-    runner.Check(bundle.has_value(), "the manifest opens");
-    if (!bundle.has_value())
+    if (!runner.CheckOk(bundle, "the manifest opens"))
     {
         return runner.Report();
     }
 
     const manifest::ManifestResult<manifest::EnvironmentView> environment = bundle->OpenEnvironment(0u, 0u);
-    runner.Check(environment.has_value(), "the environment opens");
-    if (!environment.has_value())
+    if (!runner.CheckOk(environment, "the environment opens"))
     {
         return runner.Report();
     }
@@ -169,18 +165,16 @@ int main(int argc, char** argv)
     MemoryOutputSink policySink;
     const CookResult<CookStatistics> policyCook =
         CookIntoMemory(assetDirectory / "AxisDefaults.slang", assetDirectory / "AxisDefaults.toml", policySink);
-    runner.Check(policyCook.has_value(), "the cook succeeds when the policy drops IFFT_SIZE = 512");
+    runner.CheckOk(policyCook, "the cook succeeds when the policy drops IFFT_SIZE = 512");
     const std::vector<std::byte> policyBytes = ManifestBytes(policySink);
     const manifest::ManifestResult<manifest::BundleView> policyBundle = manifest::BundleView::Open(policyBytes);
-    runner.Check(policyBundle.has_value(), "the manifest opens");
-    if (!policyBundle.has_value())
+    if (!runner.CheckOk(policyBundle, "the manifest opens"))
     {
         return runner.Report();
     }
 
     const manifest::ManifestResult<manifest::EnvironmentView> policyEnvironment = policyBundle->OpenEnvironment(0u, 0u);
-    runner.Check(policyEnvironment.has_value(), "the environment opens");
-    if (!policyEnvironment.has_value())
+    if (!runner.CheckOk(policyEnvironment, "the environment opens"))
     {
         return runner.Report();
     }

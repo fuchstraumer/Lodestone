@@ -4,6 +4,7 @@
 #include "TestHarness.hpp"
 
 #include <cstdint>
+#include <format>
 #include <string_view>
 
 // read shapes with `GetBaseShape`, never `==`: `Texture2D | ArrayFlag` is not `Texture2D`
@@ -27,12 +28,12 @@ int main()
     lodestone::tests::TestRunner runner{ "ReflectionSchemaTests" };
 
     runner.BeginSection("GetBaseShape masks the flags away");
-    runner.Check(GetBaseShape(ResourceShape::Texture2D | ResourceShape::ArrayFlag | ResourceShape::ShadowFlag) ==
-                     ResourceShape::Texture2D,
+    runner.CheckEqual(GetBaseShape(ResourceShape::Texture2D | ResourceShape::ArrayFlag | ResourceShape::ShadowFlag),
+                          ResourceShape::Texture2D,
                  "an array shadow texture has base Texture2D");
-    runner.Check(GetBaseShape(ResourceShape::StructuredBuffer) == ResourceShape::StructuredBuffer,
+    runner.CheckEqual(GetBaseShape(ResourceShape::StructuredBuffer), ResourceShape::StructuredBuffer,
                  "a shape with no flags is its own base");
-    runner.Check(GetBaseShape(ResourceShape::Invalid) == ResourceShape::Invalid,
+    runner.CheckEqual(GetBaseShape(ResourceShape::Invalid), ResourceShape::Invalid,
                  "the base of Invalid is Invalid");
 
     runner.BeginSection("the flag predicates read the high bits");
@@ -49,68 +50,68 @@ int main()
     runner.BeginSection("ToString(ResourceShape) composes base then flags in order");
     // The suffix order is fixed: Multisample, then Array, then Shadow, then Feedback. A reader that
     // reorders them changes the emitted name, so these strings are the contract.
-    runner.Check(ToString(ResourceShape::Texture2D) == "Texture2D", "a bare base is just its name");
-    runner.Check(ToString(ResourceShape::StructuredBuffer) == "StructuredBuffer", "a buffer base has no flags");
-    runner.Check(ToString(ResourceShape::Texture2D | ResourceShape::ArrayFlag) == "Texture2DArray",
+    runner.CheckEqual(ToString(ResourceShape::Texture2D), "Texture2D", "a bare base is just its name");
+    runner.CheckEqual(ToString(ResourceShape::StructuredBuffer), "StructuredBuffer", "a buffer base has no flags");
+    runner.CheckEqual(ToString(ResourceShape::Texture2D | ResourceShape::ArrayFlag), "Texture2DArray",
                  "the array flag appends Array");
-    runner.Check(ToString(ResourceShape::Texture2D | ResourceShape::ShadowFlag) == "Texture2DShadow",
+    runner.CheckEqual(ToString(ResourceShape::Texture2D | ResourceShape::ShadowFlag), "Texture2DShadow",
                  "the shadow flag appends Shadow");
-    runner.Check(ToString(ResourceShape::Texture2D | ResourceShape::MultisampleFlag) == "Texture2DMultisample",
+    runner.CheckEqual(ToString(ResourceShape::Texture2D | ResourceShape::MultisampleFlag), "Texture2DMultisample",
                  "the multisample flag appends Multisample");
-    runner.Check(ToString(ResourceShape::Texture2D | ResourceShape::ArrayFlag | ResourceShape::ShadowFlag) ==
-                     "Texture2DArrayShadow",
+    runner.CheckEqual(ToString(ResourceShape::Texture2D | ResourceShape::ArrayFlag | ResourceShape::ShadowFlag),
+                          "Texture2DArrayShadow",
                  "array before shadow, whatever order the bits were set");
-    runner.Check(ToString(ResourceShape::Texture2D | ResourceShape::MultisampleFlag | ResourceShape::ArrayFlag |
-                          ResourceShape::ShadowFlag | ResourceShape::FeedbackFlag) ==
-                     "Texture2DMultisampleArrayShadowFeedback",
+    runner.CheckEqual(ToString(ResourceShape::Texture2D | ResourceShape::MultisampleFlag | ResourceShape::ArrayFlag |
+                               ResourceShape::ShadowFlag | ResourceShape::FeedbackFlag),
+                          "Texture2DMultisampleArrayShadowFeedback",
                  "every flag appends in the fixed order");
 
     runner.BeginSection("ToString(ResourceShape) names an unknown base Invalid");
-    runner.Check(ToString(ResourceShape::Invalid) == "Invalid", "the zero shape is Invalid");
+    runner.CheckEqual(ToString(ResourceShape::Invalid), "Invalid", "the zero shape is Invalid");
     // 0x05 was the TextureBuffer slot, now dropped. A value in the base nibble with no enumerator
     // must read as Invalid, not as a stale name or an out-of-range table read.
-    runner.Check(ToString(static_cast<ResourceShape>(0x05u)) == "Invalid",
+    runner.CheckEqual(ToString(static_cast<ResourceShape>(0x05u)), "Invalid",
                  "a base with no enumerator is Invalid");
 
     runner.BeginSection("ToString(BindingKind) names every kind");
     // A new enumerator with no case falls through to "Invalid". Walking the contiguous range catches
     // that: every real kind must give its own name, and only Invalid may be "Invalid".
-    runner.Check(ToString(BindingKind::Invalid) == "Invalid", "Invalid names itself");
-    runner.Check(ToString(BindingKind::UniformBuffer) == "UniformBuffer", "a spot check on the spelling");
-    runner.Check(ToString(BindingKind::PushConstant) == "PushConstant", "the last kind has its own name");
+    runner.CheckEqual(ToString(BindingKind::Invalid), "Invalid", "Invalid names itself");
+    runner.CheckEqual(ToString(BindingKind::UniformBuffer), "UniformBuffer", "a spot check on the spelling");
+    runner.CheckEqual(ToString(BindingKind::PushConstant), "PushConstant", "the last kind has its own name");
     for (uint8_t value = static_cast<uint8_t>(BindingKind::Sampler);
          value <= static_cast<uint8_t>(BindingKind::PushConstant);
          ++value)
     {
         runner.Check(ToString(static_cast<BindingKind>(value)) != "Invalid",
-                     "a valid binding kind has a name of its own");
+                     std::format("{}: a valid binding kind has a name of its own", static_cast<int>(value)));
     }
 
     runner.BeginSection("ToString(TextureSampleType) names every type");
-    runner.Check(ToString(TextureSampleType::Invalid) == "Invalid", "Invalid names itself");
-    runner.Check(ToString(TextureSampleType::Depth) == "Depth", "a spot check on the spelling");
+    runner.CheckEqual(ToString(TextureSampleType::Invalid), "Invalid", "Invalid names itself");
+    runner.CheckEqual(ToString(TextureSampleType::Depth), "Depth", "a spot check on the spelling");
     for (uint8_t value = static_cast<uint8_t>(TextureSampleType::Float);
          value <= static_cast<uint8_t>(TextureSampleType::UnsignedInteger);
          ++value)
     {
         runner.Check(ToString(static_cast<TextureSampleType>(value)) != "Invalid",
-                     "a valid sample type has a name of its own");
+                     std::format("{}: a valid sample type has a name of its own", static_cast<int>(value)));
     }
 
     runner.BeginSection("ToString(CookError) names an error above 127");
     // magic_enum reads names only up to 127 by default. Each error in the bands below printed as an
     // empty string until the range was widened.
-    runner.Check(ToString(CookError::ReflectionMismatch) == "ReflectionMismatch", "a low error names itself");
-    runner.Check(ToString(CookError::PolicyAxisNotDeclared) == "PolicyAxisNotDeclared", "the policy band has names");
-    runner.Check(ToString(CookError::AxisDefaultNotDeclared) == "AxisDefaultNotDeclared",
+    runner.CheckEqual(ToString(CookError::ReflectionMismatch), "ReflectionMismatch", "a low error names itself");
+    runner.CheckEqual(ToString(CookError::PolicyAxisNotDeclared), "PolicyAxisNotDeclared", "the policy band has names");
+    runner.CheckEqual(ToString(CookError::AxisDefaultNotDeclared), "AxisDefaultNotDeclared",
                  "the axis default band has names");
-    runner.Check(ToString(CookError::DerivedConstantCycle) == "DerivedConstantCycle",
+    runner.CheckEqual(ToString(CookError::DerivedConstantCycle), "DerivedConstantCycle",
                  "the derived constant band has names");
-    runner.Check(ToString(CookError::FileNotFound) == "FileNotFound", "the system band has names");
-    runner.Check(ToString(CookError::SlangCachedModuleWriteFailed) == "SlangCachedModuleWriteFailed",
+    runner.CheckEqual(ToString(CookError::FileNotFound), "FileNotFound", "the system band has names");
+    runner.CheckEqual(ToString(CookError::SlangCachedModuleWriteFailed), "SlangCachedModuleWriteFailed",
                  "the Slang band has names");
-    runner.Check(ToString(CookError::TargetValidationEntryPointParseFailed) ==
-                     "TargetValidationEntryPointParseFailed",
+    runner.CheckEqual(ToString(CookError::TargetValidationEntryPointParseFailed),
+                          "TargetValidationEntryPointParseFailed",
                  "the highest error has a name");
 
     runner.BeginSection("a uniform member's layout and stride take part in equality");
@@ -124,7 +125,7 @@ int main()
     base.Data.MatrixLayout = MatrixLayout::RowMajor;
 
     ReflectedUniformMember same = base;
-    runner.Check(same == base, "two members with identical fields are equal");
+    runner.CheckEqual(same, base, "two members with identical fields are equal");
 
     ReflectedUniformMember otherLayout = base;
     otherLayout.Data.MatrixLayout = MatrixLayout::ColumnMajor;
@@ -144,8 +145,8 @@ int main()
     texture.Shape = ResourceShape::Texture2D | ResourceShape::ArrayFlag;
     texture.SampleType = TextureSampleType::Float;
     texture.ArrayCount = 4u;
-    runner.Check(lodestone::DescribeBinding(texture) ==
-                     "@group(1) @binding(2) albedo : Texture Texture2DArray sample=Float array=4",
+    runner.CheckEqual(lodestone::DescribeBinding(texture),
+                          "@group(1) @binding(2) albedo : Texture Texture2DArray sample=Float array=4",
                  "a texture description carries shape, sample type, and array count");
 
     ReflectedBinding buffer;
@@ -155,8 +156,8 @@ int main()
     buffer.Shape = ResourceShape::StructuredBuffer;
     buffer.ElementStride = 32u;
     buffer.ByteSize = 320u;
-    runner.Check(lodestone::DescribeBinding(buffer) ==
-                     "@group(0) @binding(3) lights : StorageBuffer StructuredBuffer stride=32 bytes=320",
+    runner.CheckEqual(lodestone::DescribeBinding(buffer),
+                          "@group(0) @binding(3) lights : StorageBuffer StructuredBuffer stride=32 bytes=320",
                  "a structured buffer description carries the stride and the byte size");
 
     return runner.Report();

@@ -73,23 +73,24 @@ int main(int argc, char** argv)
     {
         RecordingDiagnosticSink sink;
         SlangCompiler compiler;
-        runner.Check(Prepare(assetDirectory / "ShimExterns.slang", cacheDirectory, sink, compiler) == CookError::Success,
-                     "a module with externs and no export loads");
+        runner.CheckEqual(Prepare(assetDirectory / "ShimExterns.slang", cacheDirectory, sink, compiler), CookError::Success,
+                          "a module with externs and no export loads");
         const PermutationSpace emptySpace{ std::vector<PermutationAxis>{} };
         const CookResult<RawModule> raw = compiler.PrepareRawModule(emptySpace);
-        runner.Check(raw.has_value(), "the raw module prepares");
-        if (raw.has_value())
+        if (runner.CheckOk(raw, "the raw module prepares"))
         {
-            runner.Check(raw->ShimExterns.size() == k_Expected.size(),
-                         "five shim externs: not the commented one, and not the extern of another interface");
+            runner.CheckEqual(raw->ShimExterns.size(), k_Expected.size(),
+                              "five shim externs: not the commented one, and not the extern of another interface");
             for (size_t i = 0u; i < raw->ShimExterns.size() && i < k_Expected.size(); ++i)
             {
                 const RawShimExtern& found = raw->ShimExterns[i];
                 const ExpectedExtern& expected = k_Expected[i];
-                runner.Check(found.Name == expected.Name && found.Interface == expected.Interface &&
-                                 found.TypeArguments == expected.TypeArguments && found.Class == expected.Class &&
-                                 found.SourceLine == expected.SourceLine,
-                             "each extern has its name, interface, type argument, resource class, and line");
+                const std::string claim = std::format("{}: each extern has its name, interface, type argument, resource class, and line", expected.Name);
+                runner.CheckEqual(found.Name, expected.Name, claim);
+                runner.CheckEqual(found.Interface, expected.Interface, claim);
+                runner.CheckEqual(found.TypeArguments, expected.TypeArguments, claim);
+                runner.CheckEqual(found.Class, expected.Class, claim);
+                runner.CheckEqual(found.SourceLine, expected.SourceLine, claim);
                 const bool hasArgument = !expected.TypeArguments.empty();
                 runner.Check(found.ArgumentModules.size() == (hasArgument ? 1u : 0u) &&
                                  (!hasArgument || found.ArgumentModules[0] == expected.ArgumentModule),
@@ -100,28 +101,31 @@ int main(int argc, char** argv)
         const CookResult<std::vector<RawAxisDeclaration>> axesResult = compiler.BuildAxisDeclarations();
         const std::vector<RawAxisDeclaration> axes = axesResult.has_value() ? *axesResult : std::vector<RawAxisDeclaration>{};
         runner.BeginSection("a shim extern is not an axis");
-        runner.Check(axes.size() == 1u && axes[0].Name == "FOG",
-                     "the only axis is the one the module declares, so the variant count does not change");
+        const char* axisClaim = "the only axis is the one the module declares, so the variant count does not change";
+        if (runner.CheckEqual(axes.size(), 1u, axisClaim))
+        {
+            runner.CheckEqual(axes[0].Name, "FOG", axisClaim);
+        }
     }
 
     runner.BeginSection("a shim extern that reflection does not find fails the cook, naming the line");
     {
         RecordingDiagnosticSink sink;
         SlangCompiler compiler;
-        runner.Check(Prepare(assetDirectory / "ShimExternHidden.slang", cacheDirectory, sink, compiler) == CookError::Success,
-                     "the module loads");
+        runner.CheckEqual(Prepare(assetDirectory / "ShimExternHidden.slang", cacheDirectory, sink, compiler), CookError::Success,
+                          "the module loads");
         const PermutationSpace emptySpace{ std::vector<PermutationAxis>{} };
         const CookResult<RawModule> raw = compiler.PrepareRawModule(emptySpace);
-        runner.Check(!raw.has_value() && raw.error() == CookError::ShimExternNotReflected,
-                     "an extern inside a namespace is seen by the text reader only");
+        runner.CheckError(raw, CookError::ShimExternNotReflected,
+                          "an extern inside a namespace is seen by the text reader only");
     }
 
     runner.BeginSection("reflection reads ls_storage_format on the line before an extern with no default");
     {
         RecordingDiagnosticSink sink;
         SlangCompiler compiler;
-        runner.Check(Prepare(assetDirectory / "ShimStorageAxis.slang", cacheDirectory, sink, compiler) == CookError::Success,
-                     "the module loads");
+        runner.CheckEqual(Prepare(assetDirectory / "ShimStorageAxis.slang", cacheDirectory, sink, compiler), CookError::Success,
+                          "the module loads");
         std::vector<RawEnumCase> cases;
         std::vector<PermutationValue> values;
         for (const StorageFormatInfo& format : GetStorageFormats())
@@ -141,11 +145,15 @@ int main(int argc, char** argv)
                           std::move(cases));
         const PermutationSpace formatSpace{ std::move(axes) };
         const CookResult<RawModule> raw = compiler.PrepareRawModule(formatSpace);
-        runner.Check(raw.has_value() && raw->ShimExterns.size() == 2u, "the storage extern and the buffer extern");
+        if (runner.CheckOk(raw, "the storage extern and the buffer extern"))
+        {
+            runner.CheckEqual(raw->ShimExterns.size(), 2u, "the storage extern and the buffer extern");
+        }
         if (raw.has_value() && raw->ShimExterns.size() == 2u)
         {
-            runner.Check(raw->ShimExterns[0].Name == "Destination" && raw->ShimExterns[0].FormatAxis == "LEVEL_FORMAT",
-                         "the storage extern has the axis of its attribute");
+            const char* formatClaim = "the storage extern has the axis of its attribute";
+            runner.CheckEqual(raw->ShimExterns[0].Name, "Destination", formatClaim);
+            runner.CheckEqual(raw->ShimExterns[0].FormatAxis, "LEVEL_FORMAT", formatClaim);
             runner.Check(raw->ShimExterns[1].Name == "Weights" && raw->ShimExterns[1].FormatAxis.empty(),
                          "an extern with no attribute has no axis");
         }

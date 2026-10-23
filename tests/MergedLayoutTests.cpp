@@ -239,17 +239,16 @@ void TestMerge(lodestone::tests::TestRunner& runner, const EnvironmentView& envi
     const EntryPointInstanceView fragment = caseZero.EntryPoint(k_FragmentEntryPoint);
     const EntryPointInstanceView compute = caseZero.EntryPoint(k_ComputeEntryPoint);
 
-    runner.Check(vertex.Stage() == ShaderStageKind::Vertex && fragment.Stage() == ShaderStageKind::Fragment &&
-                     compute.Stage() == ShaderStageKind::Compute,
-                 "an entry point instance reports the stage of its entry point");
+    runner.CheckEqual(vertex.Stage(), ShaderStageKind::Vertex, "an entry point instance reports the stage of its entry point");
+    runner.CheckEqual(fragment.Stage(), ShaderStageKind::Fragment, "an entry point instance reports the stage of its entry point");
+    runner.CheckEqual(compute.Stage(), ShaderStageKind::Compute, "an entry point instance reports the stage of its entry point");
 
     const std::array raster{ vertex, fragment };
     const ManifestResult<MergedLayoutView> merged = MergedLayoutView::Merge(raster);
-    runner.Check(merged.has_value(), "a vertex and a fragment instance of one variant merge");
-    if (merged.has_value())
+    if (runner.CheckOk(merged, "a vertex and a fragment instance of one variant merge"))
     {
         const std::vector<MergedResource> resources = Collect(*merged);
-        runner.Check(resources.size() == 4u, "the merge holds each of the four placements once");
+        runner.CheckEqual(resources.size(), 4u, "the merge holds each of the four placements once");
         if (resources.size() == 4u)
         {
             const ShaderStageKind both = ShaderStageKind::Vertex | ShaderStageKind::Fragment;
@@ -260,22 +259,23 @@ void TestMerge(lodestone::tests::TestRunner& runner, const EnvironmentView& envi
             runner.Check(IsAt(resources[2], 1u, 0u) && resources[2].Stages == ShaderStageKind::Fragment &&
                              IsAt(resources[3], 1u, 1u) && resources[3].Stages == ShaderStageKind::Fragment,
                          "the fragment-only resources follow, in group and binding order");
-            runner.Check(resources[0].Resource.Name() == "Scene" && resources[2].Resource.Name() == "Albedo",
-                         "each merged resource is a full view of its binding record");
+            runner.CheckEqual(resources[0].Resource.Name(), "Scene", "each merged resource is a full view of its binding record");
+            runner.CheckEqual(resources[2].Resource.Name(), "Albedo", "each merged resource is a full view of its binding record");
         }
-        runner.Check(merged->StageCount() == 2u, "the merge counts its stages");
+        runner.CheckEqual(merged->StageCount(), 2u, "the merge counts its stages");
     }
 
     // the order of the instances changes the reported view, not the result
     const std::array reversed{ fragment, vertex };
     const ManifestResult<MergedLayoutView> reversedMerge = MergedLayoutView::Merge(reversed);
-    runner.Check(reversedMerge.has_value() && Collect(*reversedMerge).size() == 4u,
-                 "the merge does not depend on the order of the instances");
+    if (runner.CheckOk(reversedMerge, "the merge does not depend on the order of the instances"))
+    {
+        runner.CheckEqual(Collect(*reversedMerge).size(), 4u, "the merge does not depend on the order of the instances");
+    }
 
     const std::array computeOnly{ compute };
     const ManifestResult<MergedLayoutView> computeMerge = MergedLayoutView::Merge(computeOnly);
-    runner.Check(computeMerge.has_value(), "one compute instance merges on its own");
-    if (computeMerge.has_value())
+    if (runner.CheckOk(computeMerge, "one compute instance merges on its own"))
     {
         const std::vector<MergedResource> resources = Collect(*computeMerge);
         runner.Check(resources.size() == 1u && IsAt(resources[0], 0u, 1u) &&
@@ -284,15 +284,19 @@ void TestMerge(lodestone::tests::TestRunner& runner, const EnvironmentView& envi
     }
 
     const ManifestResult<MergedLayoutView> emptyMerge = MergedLayoutView::Merge({});
-    runner.Check(emptyMerge.has_value() && emptyMerge->begin() == emptyMerge->end(),
-                 "a merge of no instances is an empty layout");
+    if (runner.CheckOk(emptyMerge, "a merge of no instances is an empty layout"))
+    {
+        runner.Check(emptyMerge->begin() == emptyMerge->end(), "a merge of no instances is an empty layout");
+    }
 
     // two variants of one module: case 1 VS reads the same Scene record as case 0
     const VariantView caseOne = environment.VariantAt(1u);
     const std::array acrossVariants{ caseOne.EntryPoint(k_VertexEntryPoint), fragment };
     const ManifestResult<MergedLayoutView> acrossMerge = MergedLayoutView::Merge(acrossVariants);
-    runner.Check(acrossMerge.has_value() && Collect(*acrossMerge).size() == 3u,
-                 "instances from two variants merge when their shared placement agrees");
+    if (runner.CheckOk(acrossMerge, "instances from two variants merge when their shared placement agrees"))
+    {
+        runner.CheckEqual(Collect(*acrossMerge).size(), 3u, "instances from two variants merge when their shared placement agrees");
+    }
 }
 
 void TestRejections(lodestone::tests::TestRunner& runner, const EnvironmentView& environment)
@@ -304,12 +308,12 @@ void TestRejections(lodestone::tests::TestRunner& runner, const EnvironmentView&
     const VariantView caseTwo = environment.VariantAt(2u);
 
     const std::array kindConflict{ caseOne.EntryPoint(k_VertexEntryPoint), caseOne.EntryPoint(k_FragmentEntryPoint) };
-    runner.Check(MergeError(kindConflict) == ErrorCode::MergedLayoutConflict,
-                 "a uniform buffer and a texture at one placement are a conflict");
+    runner.CheckEqual(MergeError(kindConflict), ErrorCode::MergedLayoutConflict,
+                      "a uniform buffer and a texture at one placement are a conflict");
 
     const std::array sizeConflict{ caseTwo.EntryPoint(k_VertexEntryPoint), caseTwo.EntryPoint(k_FragmentEntryPoint) };
-    runner.Check(MergeError(sizeConflict) == ErrorCode::MergedLayoutConflict,
-                 "two uniform buffers of different sizes at one placement are a conflict");
+    runner.CheckEqual(MergeError(sizeConflict), ErrorCode::MergedLayoutConflict,
+                      "two uniform buffers of different sizes at one placement are a conflict");
 
     const ManifestResult<MergedLayoutView> named = MergedLayoutView::Merge(sizeConflict);
     const EntryPointInstanceView conflictingFragment = caseTwo.EntryPoint(k_FragmentEntryPoint);
@@ -321,14 +325,14 @@ void TestRejections(lodestone::tests::TestRunner& runner, const EnvironmentView&
 
     const EntryPointInstanceView vertex = caseZero.EntryPoint(k_VertexEntryPoint);
     const std::array duplicate{ vertex, caseOne.EntryPoint(k_VertexEntryPoint) };
-    runner.Check(MergeError(duplicate) == ErrorCode::MergedLayoutDuplicateStage,
-                 "two instances of one stage are rejected");
+    runner.CheckEqual(MergeError(duplicate), ErrorCode::MergedLayoutDuplicateStage,
+                      "two instances of one stage are rejected");
 
     std::array<EntryPointInstanceView, MergedLayoutView::k_MaxPipelineStages + 1u> tooMany{
         vertex, vertex, vertex, vertex, vertex, vertex, vertex, vertex, vertex
     };
-    runner.Check(MergeError(tooMany) == ErrorCode::MergedLayoutTooManyStages,
-                 "more instances than k_MaxPipelineStages are rejected before anything else");
+    runner.CheckEqual(MergeError(tooMany), ErrorCode::MergedLayoutTooManyStages,
+                      "more instances than k_MaxPipelineStages are rejected before anything else");
 }
 
 void TestOpenRejectsOrder(lodestone::tests::TestRunner& runner, const PermutationSpace& space)
@@ -340,16 +344,16 @@ void TestOpenRejectsOrder(lodestone::tests::TestRunner& runner, const Permutatio
     lists[1] = lodestone::VisibilityList{ 2u, 0u, 3u };
     const std::vector<std::byte> bytes = EmitBytes(space, std::move(lists), k_GoodVisibility);
     const ManifestResult<EnvironmentView> opened = OpenEnvironment(bytes);
-    runner.Check(!opened.has_value() && opened.error().Code == ErrorCode::InvalidVisibilityListOrder,
-                 "a visibility list out of placement order fails the open");
+    runner.CheckError(opened, ErrorCode::InvalidVisibilityListOrder,
+                      "a visibility list out of placement order fails the open");
 
     // a placement read twice by one entry point is not strictly ascending
     std::vector<lodestone::VisibilityList> repeated = GoodVisibilityLists();
     repeated[0] = lodestone::VisibilityList{ 0u, 0u };
     const std::vector<std::byte> repeatedBytes = EmitBytes(space, std::move(repeated), k_GoodVisibility);
     const ManifestResult<EnvironmentView> repeatedOpen = OpenEnvironment(repeatedBytes);
-    runner.Check(!repeatedOpen.has_value() && repeatedOpen.error().Code == ErrorCode::InvalidVisibilityListOrder,
-                 "one placement twice in one visibility list fails the open");
+    runner.CheckError(repeatedOpen, ErrorCode::InvalidVisibilityListOrder,
+                      "one placement twice in one visibility list fails the open");
 }
 
 } // namespace
@@ -376,8 +380,7 @@ void TestSamplerPairs(lodestone::tests::TestRunner& runner, const PermutationSpa
     const lodestone::CookResult<std::vector<std::byte>> manifest = lodestone::EmitShaderManifest(library);
     const ManifestResult<EnvironmentView> opened =
         manifest.has_value() ? OpenEnvironment(*manifest) : ManifestResult<EnvironmentView>{ std::unexpected(lodestone::manifest::ErrorState{}) };
-    runner.Check(opened.has_value(), "a module with pairs in two stages emits and opens");
-    if (!opened.has_value())
+    if (!runner.CheckOk(opened, "a module with pairs in two stages emits and opens"))
     {
         return;
     }
@@ -393,11 +396,17 @@ void TestSamplerPairs(lodestone::tests::TestRunner& runner, const PermutationSpa
         {
             pairs.push_back(pair);
         }
-        runner.Check(pairs.size() == 1u, "a pair that two stages sample appears once");
-        runner.Check(pairs.size() == 1u && pairs[0].Texture.Name() == "Albedo" && pairs[0].Sampler.Name() == "LinearSampler",
-                     "the pair resolves to the texture and the sampler");
-        runner.Check(pairs.size() == 1u && pairs[0].Stages == (ShaderStageKind::Vertex | ShaderStageKind::Fragment),
-                     "the pair names both stages that sample it");
+        runner.CheckEqual(pairs.size(), 1u, "a pair that two stages sample appears once");
+        if (runner.CheckEqual(pairs.size(), 1u, "the pair resolves to the texture and the sampler"))
+        {
+            runner.CheckEqual(pairs[0].Texture.Name(), "Albedo", "the pair resolves to the texture and the sampler");
+            runner.CheckEqual(pairs[0].Sampler.Name(), "LinearSampler", "the pair resolves to the texture and the sampler");
+        }
+        if (runner.CheckEqual(pairs.size(), 1u, "the pair names both stages that sample it"))
+        {
+            runner.CheckEqual(pairs[0].Stages, (ShaderStageKind::Vertex | ShaderStageKind::Fragment),
+                              "the pair names both stages that sample it");
+        }
     }
 
     const std::array vertexAndCompute{ caseZero.EntryPoint(k_VertexEntryPoint), caseZero.EntryPoint(k_ComputeEntryPoint) };
@@ -411,14 +420,17 @@ void TestSamplerPairs(lodestone::tests::TestRunner& runner, const PermutationSpa
             ++count;
             stages = pair.Stages;
         }
-        runner.Check(count == 1u && stages == ShaderStageKind::Vertex,
-                     "a stage with no pairs adds nothing, and does not appear in the stage mask");
+        runner.CheckEqual(count, 1u, "a stage with no pairs adds nothing, and does not appear in the stage mask");
+        runner.CheckEqual(stages, ShaderStageKind::Vertex, "a stage with no pairs adds nothing, and does not appear in the stage mask");
     }
 
     const std::array computeOnly{ caseZero.EntryPoint(k_ComputeEntryPoint) };
     const ManifestResult<MergedLayoutView> none = MergedLayoutView::Merge(computeOnly);
-    runner.Check(none.has_value() && none->SamplerTexturePairs().begin() == none->SamplerTexturePairs().end(),
-                 "a pipeline that samples nothing has no pairs");
+    if (runner.CheckOk(none, "a pipeline that samples nothing has no pairs"))
+    {
+        runner.Check(none->SamplerTexturePairs().begin() == none->SamplerTexturePairs().end(),
+                     "a pipeline that samples nothing has no pairs");
+    }
 }
 
 // The push constant blocks of a pipeline. Entry 1 is a 64-byte block with one matrix, entry 2 adds a float4
@@ -466,8 +478,7 @@ void TestPushConstants(lodestone::tests::TestRunner& runner, const PermutationSp
     const lodestone::CookResult<std::vector<std::byte>> manifest = lodestone::EmitShaderManifest(library);
     const ManifestResult<EnvironmentView> opened =
         manifest.has_value() ? OpenEnvironment(*manifest) : ManifestResult<EnvironmentView>{ std::unexpected(lodestone::manifest::ErrorState{}) };
-    runner.Check(opened.has_value(), "a module with push constant blocks emits and opens");
-    if (!opened.has_value())
+    if (!runner.CheckOk(opened, "a module with push constant blocks emits and opens"))
     {
         return;
     }
@@ -480,10 +491,9 @@ void TestPushConstants(lodestone::tests::TestRunner& runner, const PermutationSp
     if (merged.has_value() && merged->PushConstants().has_value())
     {
         const lodestone::manifest::MergedPushConstants block = *merged->PushConstants();
-        runner.Check(block.Constants.ByteSize() == 80u && block.Constants.Members().Size() == 2u,
-                     "the merged block is the block with the largest byte size");
-        runner.Check(block.Stages == (ShaderStageKind::Vertex | ShaderStageKind::Fragment),
-                     "the merged block names both stages");
+        runner.CheckEqual(block.Constants.ByteSize(), 80u, "the merged block is the block with the largest byte size");
+        runner.CheckEqual(block.Constants.Members().Size(), 2u, "the merged block is the block with the largest byte size");
+        runner.CheckEqual(block.Stages, (ShaderStageKind::Vertex | ShaderStageKind::Fragment), "the merged block names both stages");
     }
 
     const std::array reversed{ caseZero.EntryPoint(k_FragmentEntryPoint), caseZero.EntryPoint(k_VertexEntryPoint) };
@@ -535,16 +545,15 @@ void TestTagConflict(lodestone::tests::TestRunner& runner, const PermutationSpac
     const lodestone::CookResult<std::vector<std::byte>> manifest = lodestone::EmitShaderManifest(library);
     const ManifestResult<EnvironmentView> opened =
         manifest.has_value() ? OpenEnvironment(*manifest) : ManifestResult<EnvironmentView>{ std::unexpected(lodestone::manifest::ErrorState{}) };
-    runner.Check(opened.has_value(), "a module with a tagged resource emits and opens");
-    if (!opened.has_value())
+    if (!runner.CheckOk(opened, "a module with a tagged resource emits and opens"))
     {
         return;
     }
 
     const VariantView caseTwo = opened->VariantAt(2u);
     const std::array raster{ caseTwo.EntryPoint(k_VertexEntryPoint), caseTwo.EntryPoint(k_FragmentEntryPoint) };
-    runner.Check(MergeError(raster) == ErrorCode::MergedLayoutConflict,
-                 "two resources at one placement that differ only in their tags conflict");
+    runner.CheckEqual(MergeError(raster), ErrorCode::MergedLayoutConflict,
+                      "two resources at one placement that differ only in their tags conflict");
 }
 
 int main()
@@ -554,8 +563,7 @@ int main()
     const PermutationSpace space = MakeSpace();
     const std::vector<std::byte> bytes = EmitBytes(space, GoodVisibilityLists(), k_GoodVisibility);
     const ManifestResult<EnvironmentView> opened = OpenEnvironment(bytes);
-    runner.Check(opened.has_value(), "the emitter produces a manifest the reader accepts");
-    if (opened.has_value())
+    if (runner.CheckOk(opened, "the emitter produces a manifest the reader accepts"))
     {
         // the views point at this environment, so it stays here, unmoved, for every check
         const EnvironmentView& environment = *opened;

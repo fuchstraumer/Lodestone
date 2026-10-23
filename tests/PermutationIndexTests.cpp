@@ -91,19 +91,18 @@ int main()
     lodestone::StderrDiagnosticSink sink;
 
     const CookResult<VariantSet> enumerated = k_TestSpace.EnumerateVariants(k_UnboundedTargetPolicy, sink);
-    if (!enumerated)
+    if (!runner.CheckOk(enumerated, "the test space enumerates"))
     {
-        runner.Check(false, "the test space enumerates");
         return runner.Report();
     }
 
     const VariantSet& variants = enumerated.value();
 
     runner.BeginSection("the space expands to the shape the axes describe");
-    runner.Check(variants.SpaceSize == k_ExpectedSpaceSize,
-                 "the dense index range counts every axis, holes included");
-    runner.Check(variants.Variants.size() == k_ExpectedVariantCount,
-                 "a disabled dependent axis removes the variants it would have produced");
+    runner.CheckEqual(variants.SpaceSize, k_ExpectedSpaceSize,
+                      "the dense index range counts every axis, holes included");
+    runner.CheckEqual(variants.Variants.size(), k_ExpectedVariantCount,
+                      "a disabled dependent axis removes the variants it would have produced");
 
     runner.BeginSection("every index is unique and inside the range");
     std::vector<bool> seen(static_cast<size_t>(variants.SpaceSize), false);
@@ -157,11 +156,11 @@ int main()
     runner.Check(waveOpsOff != nullptr, "the space produces a variant with wave ops off");
     if (waveOpsOff != nullptr)
     {
-        runner.Check(FindBinding(waveOpsOff->Active, &k_WaveSizeAxis) == nullptr,
-                     "a disabled axis is absent from Active, so it cannot reach the linker");
-        runner.Check(waveOpsOff->Active.size() == 2u, "Active holds only the axes the variant uses");
-        runner.Check(waveOpsOff->Canonical.size() == k_TestSpace.AxisCount(),
-                     "Canonical holds every axis in the space");
+        runner.CheckEqual(FindBinding(waveOpsOff->Active, &k_WaveSizeAxis), nullptr,
+                          "a disabled axis is absent from Active, so it cannot reach the linker");
+        runner.CheckEqual(waveOpsOff->Active.size(), 2u, "Active holds only the axes the variant uses");
+        runner.CheckEqual(waveOpsOff->Canonical.size(), k_TestSpace.AxisCount(),
+                          "Canonical holds every axis in the space");
 
         const lodestone::PermutationBinding* canonicalWaveSize =
             FindBinding(waveOpsOff->Canonical, &k_WaveSizeAxis);
@@ -176,8 +175,8 @@ int main()
     partial.push_back(PermutationBinding{ .Axis = &k_SizeAxis, .Value = PermutationValue{ 512u } });
 
     const CanonicalAssignment filled = k_TestSpace.CanonicalizeAssignment(partial);
-    runner.Check(filled.size() == k_TestSpace.AxisCount(),
-                 "a partial assignment canonicalizes to every axis");
+    runner.CheckEqual(filled.size(), k_TestSpace.AxisCount(),
+                      "a partial assignment canonicalizes to every axis");
 
     const VariantKey partialKey = k_TestSpace.ComputeVariantKey(filled);
 
@@ -213,12 +212,11 @@ int main()
     const PermutationSpace emptySpace{ {} };
     const CookResult<VariantSet> emptyVariants = emptySpace.EnumerateVariants(k_UnboundedTargetPolicy, sink);
 
-    runner.Check(emptyVariants.has_value(), "an empty space enumerates rather than fails");
-    if (emptyVariants)
+    if (runner.CheckOk(emptyVariants, "an empty space enumerates rather than fails"))
     {
-        runner.Check(emptyVariants.value().Variants.size() == 1u, "an empty space gives exactly one variant");
-        runner.Check(emptyVariants.value().SpaceSize == 1, "an empty space has an index range of one");
-        runner.Check(emptyVariants.value().Variants.front().Index == 0, "that one variant takes index zero");
+        runner.CheckEqual(emptyVariants.value().Variants.size(), 1u, "an empty space gives exactly one variant");
+        runner.CheckEqual(emptyVariants.value().SpaceSize, 1, "an empty space has an index range of one");
+        runner.CheckEqual(emptyVariants.value().Variants.front().Index, 0, "that one variant takes index zero");
     }
 
     return runner.Report();

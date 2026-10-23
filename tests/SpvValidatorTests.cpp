@@ -396,7 +396,7 @@ int main()
 
     runner.BeginSection("agreeing reflection passes the cross-check");
     const CookResult<BindingComparison> match = validator.ValidateEntryPoint(shadeCs, agreeingPointers, sink);
-    runner.Check(match.has_value(), "valid SPIR-V and agreeing reflection produce a result, not an error");
+    runner.CheckOk(match, "valid SPIR-V and agreeing reflection produce a result, not an error");
     runner.Check(match.has_value() && match->Matches, "reflection that agrees with the module passes");
     runner.Check(match.has_value() && match->Report.empty(), "a passing comparison reports nothing");
     runner.Check(match.has_value() && std::ranges::contains(match->Emitted.CapabilityNames, std::string{ "Shader" }),
@@ -409,11 +409,18 @@ int main()
     {
         SamplerTexturePlacement{ .TextureGroup = 0u, .TextureBinding = 1u, .SamplerGroup = 0u, .SamplerBinding = 2u },
     };
-    runner.Check(match.has_value() && match->Emitted.SamplerTexturePairs == expectedPairs,
-                 "the validate path traces the image and the sampler of OpSampledImage to their bindings");
+    if (runner.CheckOk(match,
+                       "the validate path traces the image and the sampler of OpSampledImage to their bindings"))
+    {
+        runner.CheckEqual(match->Emitted.SamplerTexturePairs, expectedPairs,
+                          "the validate path traces the image and the sampler of OpSampledImage to their bindings");
+    }
     const CookResult<EmittedCodeFacts> readFacts = validator.ReadEmittedCodeFacts(shadeCs, sink);
-    runner.Check(readFacts.has_value() && readFacts->SamplerTexturePairs == expectedPairs,
-                 "the read path gives the same pairs, and compares nothing");
+    if (runner.CheckOk(readFacts, "the read path gives the same pairs, and compares nothing"))
+    {
+        runner.CheckEqual(readFacts->SamplerTexturePairs, expectedPairs,
+                          "the read path gives the same pairs, and compares nothing");
+    }
 
     // An image that does not come from a resource variable cannot name a binding. Dropping the pair would make
     // the sampler look unpaired, so the read fails.
@@ -423,8 +430,8 @@ int main()
     const std::vector<std::byte> undefImage = Assemble(undefText);
     runner.Check(!undefImage.empty(), "the fixture with an undefined image assembles");
     const CookResult<EmittedCodeFacts> unresolved = validator.ReadEmittedCodeFacts(undefImage, sink);
-    runner.Check(!unresolved.has_value() && unresolved.error() == CookError::ReflectionSamplerPairUnresolved,
-                 "a sampled image that does not trace back to a variable fails with ReflectionSamplerPairUnresolved");
+    runner.CheckError(unresolved, CookError::ReflectionSamplerPairUnresolved,
+                      "a sampled image that does not trace back to a variable fails with ReflectionSamplerPairUnresolved");
 
     runner.BeginSection("the module decides the set and the binding");
     const std::vector<std::byte> movedTexture =
@@ -531,13 +538,13 @@ int main()
     const std::vector<std::byte> noMemoryModel = Assemble(Replace(k_ShadeCs, "OpMemoryModel Logical GLSL450", ""));
     runner.Check(!noMemoryModel.empty(), "the illegal fixture assembles");
     const CookResult<BindingComparison> illegal = validator.ValidateEntryPoint(noMemoryModel, agreeingPointers, sink);
-    runner.Check(!illegal.has_value() && (illegal.error() == CookError::TargetValidationEntryPointInvalid),
-                 "spirv-val rejects the module and the validator returns TargetValidationEntryPointInvalid");
+    runner.CheckError(illegal, CookError::TargetValidationEntryPointInvalid,
+                      "spirv-val rejects the module and the validator returns TargetValidationEntryPointInvalid");
 
     const std::vector<std::byte> partialWord(shadeCs.begin(), shadeCs.end() - 1);
     const CookResult<BindingComparison> partial = validator.ValidateEntryPoint(partialWord, agreeingPointers, sink);
-    runner.Check(!partial.has_value() && (partial.error() == CookError::TargetValidationEntryPointParseFailed),
-                 "code that is not whole words is a parse failure");
+    runner.CheckError(partial, CookError::TargetValidationEntryPointParseFailed,
+                      "code that is not whole words is a parse failure");
 
     runner.BeginSection("the push constant extent is the end of the last member, from the decorations");
     const CookResult<EmittedCodeFacts> noPush = validator.ReadEmittedCodeFacts(shadeCs, sink);
@@ -551,39 +558,51 @@ int main()
         return facts.has_value() ? facts->PushConstantExtent : std::nullopt;
     };
     const std::string large{ k_LargeCs };
-    runner.Check(extentOf(large) == 144u, "Slang's block of two float4x4 and a float4 covers 144 bytes");
-    runner.Check(extentOf(Replace(large, "%EntryPointParams_std430 2 Offset 128", "%EntryPointParams_std430 2 Offset 200")) ==
-                     216u,
-                 "the extent reads the member offsets, so a gap before the last member counts");
+    runner.CheckEqual(extentOf(large), 144u, "Slang's block of two float4x4 and a float4 covers 144 bytes");
+    runner.CheckEqual(extentOf(Replace(large, "%EntryPointParams_std430 2 Offset 128", "%EntryPointParams_std430 2 Offset 200")),
+                      216u,
+                      "the extent reads the member offsets, so a gap before the last member counts");
     // 2 columns of float4: RowMajor 3 * 16 + 2 * 4 = 56, ColMajor 1 * 16 + 4 * 4 = 32
     const std::string twoColumns = Replace(Replace(large, "%mat4v4float = OpTypeMatrix %v4float 4", "%mat4v4float = OpTypeMatrix %v4float 2"),
                                            "%EntryPointParams_std430 2 Offset 128",
                                            "%EntryPointParams_std430 2 Offset 0");
-    runner.Check(extentOf(twoColumns) == 64u + 56u, "a RowMajor matrix strides its rows");
-    runner.Check(extentOf(Replace(twoColumns, "%EntryPointParams_std430 1 RowMajor", "%EntryPointParams_std430 1 ColMajor")) ==
-                     64u + 32u,
-                 "a ColMajor matrix strides its columns");
+    runner.CheckEqual(extentOf(twoColumns), 64u + 56u, "a RowMajor matrix strides its rows");
+    runner.CheckEqual(extentOf(Replace(twoColumns, "%EntryPointParams_std430 1 RowMajor", "%EntryPointParams_std430 1 ColMajor")),
+                      64u + 32u,
+                      "a ColMajor matrix strides its columns");
 
     runner.BeginSection("the capability names and the workgroup memory come from the module");
     const std::vector<std::byte> workgroupCs = Assemble(k_WorkgroupCs);
     runner.Check(!workgroupCs.empty(), "the workgroup fixture assembles");
     const CookResult<EmittedCodeFacts> workgroupFacts = validator.ReadEmittedCodeFacts(workgroupCs, sink);
-    runner.Check(workgroupFacts.has_value(), "the read path reads the workgroup fixture");
-    runner.Check(workgroupFacts.has_value() &&
-                     workgroupFacts->CapabilityNames ==
-                         std::vector<std::string>{ "Float16", "SPV_KHR_16bit_storage", "Shader", "UniformAndStorageBuffer16BitAccess" },
-                 "each OpCapability and OpExtension reads back as a name, sorted, an alias by its primary name");
-    runner.Check(workgroupFacts.has_value() && workgroupFacts->WorkgroupMemoryBytes == 144u,
-                 "each workgroup variable counts RoundUp(16, std430 size): 64 + 32 + 16 + 32 bytes");
-    runner.Check(noPush.has_value() && noPush->WorkgroupMemoryBytes == 0u,
-                 "a module with no workgroup variable uses no workgroup memory");
+    runner.CheckOk(workgroupFacts, "the read path reads the workgroup fixture");
+    if (runner.CheckOk(workgroupFacts,
+                       "each OpCapability and OpExtension reads back as a name, sorted, an alias by its primary name"))
+    {
+        runner.CheckEqual(workgroupFacts->CapabilityNames,
+                          std::vector<std::string>{ "Float16", "SPV_KHR_16bit_storage", "Shader", "UniformAndStorageBuffer16BitAccess" },
+                          "each OpCapability and OpExtension reads back as a name, sorted, an alias by its primary name");
+    }
+    if (runner.CheckOk(workgroupFacts,
+                       "each workgroup variable counts RoundUp(16, std430 size): 64 + 32 + 16 + 32 bytes"))
+    {
+        runner.CheckEqual(workgroupFacts->WorkgroupMemoryBytes, 144u,
+                          "each workgroup variable counts RoundUp(16, std430 size): 64 + 32 + 16 + 32 bytes");
+    }
+    if (runner.CheckOk(noPush, "a module with no workgroup variable uses no workgroup memory"))
+    {
+        runner.CheckEqual(noPush->WorkgroupMemoryBytes, 0u,
+                          "a module with no workgroup variable uses no workgroup memory");
+    }
 
     runner.BeginSection("a dynamic index into a binding array states the device feature it needs");
     const CookResult<EmittedCodeFacts> constantIndex = validator.ReadEmittedCodeFacts(imageArray, sink);
-    runner.Check(constantIndex.has_value() &&
-                     std::ranges::find(constantIndex->CapabilityNames, "StorageImageArrayDynamicIndexing") ==
-                         constantIndex->CapabilityNames.end(),
-                 "a constant index into the array needs no dynamic indexing feature");
+    if (runner.CheckOk(constantIndex, "a constant index into the array needs no dynamic indexing feature"))
+    {
+        runner.CheckEqual(std::ranges::find(constantIndex->CapabilityNames, "StorageImageArrayDynamicIndexing"),
+                          constantIndex->CapabilityNames.end(),
+                          "a constant index into the array needs no dynamic indexing feature");
+    }
     const std::vector<std::byte> dynamicArray =
         Assemble(Replace(k_ImageArrayCs, "OpAccessChain %ptrImage %Levels %uint_0", "OpAccessChain %ptrImage %Levels %index"));
     runner.Check(!dynamicArray.empty(), "the dynamic index fixture assembles");

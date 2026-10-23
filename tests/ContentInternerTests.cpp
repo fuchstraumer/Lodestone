@@ -66,7 +66,7 @@ int main()
 
     runner.Check(everyIndexIsNew, "ten distinct payloads each report a new entry");
     runner.Check(everyIndexIsDense, "ten distinct payloads take ten dense indices");
-    runner.Check(interner.UniqueEntries().size() == k_PayloadCount,
+    runner.CheckEqual(interner.UniqueEntries().size(), k_PayloadCount,
                  "the table holds one entry for each distinct payload");
 
     runner.BeginSection("the counters describe the work the comparison did");
@@ -74,23 +74,29 @@ int main()
     // Insert number k compares against the k-1 entries already in the bucket, and none of them match.
     // Ten inserts therefore force 0+1+2+...+9 comparisons, and each one is a real hash collision.
     constexpr uint32_t k_ExpectedComparisons = (k_PayloadCount * (k_PayloadCount - 1u)) / 2u;
-    runner.Check(afterDistinct.ArtifactsSeen == k_PayloadCount, "every intern counts as an artifact");
-    runner.Check(afterDistinct.UniqueEntries == k_PayloadCount, "no payload collapsed onto another");
-    runner.Check(afterDistinct.HashCollisions == k_ExpectedComparisons,
+    runner.CheckEqual(afterDistinct.ArtifactsSeen, k_PayloadCount, "every intern counts as an artifact");
+    runner.CheckEqual(afterDistinct.UniqueEntries, k_PayloadCount, "no payload collapsed onto another");
+    runner.CheckEqual(afterDistinct.HashCollisions, k_ExpectedComparisons,
                  "each equal hash with unequal bytes counts as a collision");
-    runner.Check(afterDistinct.ByteComparisons == k_ExpectedComparisons,
+    runner.CheckEqual(afterDistinct.ByteComparisons, k_ExpectedComparisons,
                  "each hash hit forces one byte comparison");
 
     runner.BeginSection("an equal payload collapses and keeps both origins");
     const InternResult repeated = interner.Intern(MakePayload(0u), MakeOrigin(99u));
     runner.Check(!repeated.WasNew, "an equal payload reports no new entry");
-    runner.Check(repeated.Index == 0u, "an equal payload returns the index of the first copy");
-    runner.Check(interner.UniqueEntries().size() == k_PayloadCount, "the table did not grow");
+    runner.CheckEqual(repeated.Index, 0u, "an equal payload returns the index of the first copy");
+    runner.CheckEqual(interner.UniqueEntries().size(), k_PayloadCount, "the table did not grow");
 
     const std::span<const ProvenanceRecord> origins = interner.OriginsOf(0u);
-    runner.Check(origins.size() == 2u, "the entry records both artifacts that mapped onto it");
-    runner.Check(origins.size() == 2u && origins[0].VariantIndex == 0u && origins[1].VariantIndex == 99u,
-                 "provenance keeps the origins in the order they arrived");
+    runner.CheckEqual(origins.size(), 2u, "the entry records both artifacts that mapped onto it");
+    if (runner.CheckEqual(origins.size(), 2u, "provenance keeps the origins in the order they arrived"))
+    {
+        runner.CheckEqual(origins[0].VariantIndex, 0u, "provenance keeps the origins in the order they arrived");
+        runner.CheckEqual(origins[1].VariantIndex, 99u, "provenance keeps the origins in the order they arrived");
+    }
+
+
+
 
     runner.BeginSection("the identity path stays correct");
     ContentInterner<std::string> disabled{ &HashToOneBucket, "constant-for-test" };
@@ -99,14 +105,16 @@ int main()
 
     const InternResult first = disabled.Intern(MakePayload(0u), MakeOrigin(0u));
     const InternResult second = disabled.Intern(MakePayload(0u), MakeOrigin(1u));
-    runner.Check(first.Index == 0u && second.Index == 1u,
-                 "with dedupe off, two equal payloads take two indices");
+    runner.CheckEqual(first.Index, 0u, "with dedupe off, two equal payloads take two indices");
+    runner.CheckEqual(second.Index, 1u, "with dedupe off, two equal payloads take two indices");
+
+
     runner.Check(second.WasNew, "with dedupe off, every artifact is a new entry");
-    runner.Check(disabled.Statistics().ByteComparisons == 0u,
+    runner.CheckEqual(disabled.Statistics().ByteComparisons, 0u,
                  "with dedupe off, no byte comparison runs at all");
 
     runner.BeginSection("the hash name reaches the report");
-    runner.Check(interner.HashName() == "constant-for-test", "the interner reports the hash it used");
+    runner.CheckEqual(interner.HashName(), "constant-for-test", "the interner reports the hash it used");
 
     return runner.Report();
 }

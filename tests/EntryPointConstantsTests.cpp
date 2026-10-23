@@ -123,7 +123,7 @@ void CheckEnvironment(tests::TestRunner& runner, const manifest::EnvironmentView
     {
         const manifest::ManifestResult<uint32_t> entryPointIndex =
             environment.Module().FindEntryPointIndex(expected.EntryPoint);
-        runner.Check(entryPointIndex.has_value(), "the entry point is in the module");
+        runner.CheckOk(entryPointIndex, std::format("{}: the entry point is in the module", expected.EntryPoint));
         if (!entryPointIndex)
         {
             continue;
@@ -137,17 +137,10 @@ void CheckEnvironment(tests::TestRunner& runner, const manifest::EnvironmentView
                                : (is_wgsl ? EntryPointConstantsDelivery::UniformBuffer
                                           : EntryPointConstantsDelivery::PushConstant);
 
-        if (constants.Delivery() != expectedDelivery || constants.ByteSize() != expectedSize)
-        {
-            std::println(stderr,
-                         "[EntryPointConstants] {} {}: expected {} bytes, and the manifest has {} bytes",
-                         is_wgsl ? "wgsl" : "spirv",
-                         expected.EntryPoint,
-                         expectedSize,
-                         constants.ByteSize());
-        }
-        runner.Check(constants.Delivery() == expectedDelivery, "the delivery follows the target and the use");
-        runner.Check(constants.ByteSize() == expectedSize, "the byte size follows the target's layout rules");
+        runner.CheckEqual(constants.Delivery(), expectedDelivery,
+                          std::format("{}: the delivery follows the target and the use", expected.EntryPoint));
+        runner.CheckEqual(constants.ByteSize(), expectedSize,
+                          std::format("{}: the byte size follows the target's layout rules", expected.EntryPoint));
         runner.Check(MembersMatch(constants.Members(), expected.Members), "each member has its name, offset, and size");
 
         bool containerInLayout = false;
@@ -158,9 +151,11 @@ void CheckEnvironment(tests::TestRunner& runner, const manifest::EnvironmentView
         if (expectedDelivery == EntryPointConstantsDelivery::UniformBuffer)
         {
             const manifest::ResolvedResource container = instance.Layout()[constants.BindingPosition()];
-            runner.Check(container.Name() == "entryPointParams" && container.Kind() == BindingKind::UniformBuffer &&
-                             container.ByteSize() == expectedSize,
-                         "the WGSL constants resolve to the entryPointParams uniform buffer in the layout");
+            const std::string containerClaim =
+                std::format("{}: the WGSL constants resolve to the entryPointParams uniform buffer in the layout", expected.EntryPoint);
+            runner.CheckEqual(container.Name(), "entryPointParams", containerClaim);
+            runner.CheckEqual(container.Kind(), BindingKind::UniformBuffer, containerClaim);
+            runner.CheckEqual(container.ByteSize(), expectedSize, containerClaim);
         }
         else
         {
@@ -195,11 +190,10 @@ int main(int argc, char** argv)
     MemoryOutputSink sink;
     const CookResult<CookStatistics> cooked =
         CookIntoMemory(assetDirectory / "EntryPointConstants.slang", k_BothTargets, sink);
-    runner.Check(cooked.has_value(), "the module cooks for both targets");
+    runner.CheckOk(cooked, "the module cooks for both targets");
     const std::vector<std::byte> bytes = ManifestBytes(sink);
     const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(bytes);
-    runner.Check(bundle.has_value(), "the manifest opens");
-    if (!bundle.has_value())
+    if (!runner.CheckOk(bundle, "the manifest opens"))
     {
         return runner.Report();
     }
@@ -207,7 +201,7 @@ int main(int argc, char** argv)
     for (uint32_t profile = 0u; profile < k_BothTargets.size(); ++profile)
     {
         const manifest::ManifestResult<manifest::EnvironmentView> environment = bundle->OpenEnvironment(profile, 0u);
-        runner.Check(environment.has_value(), "the environment opens");
+        runner.CheckOk(environment, std::format("profile {}: the environment opens", profile));
         if (environment.has_value())
         {
             CheckEnvironment(runner, environment.value(), environment->CodeFormat() == ShaderCodeFormat::Wgsl);
@@ -220,12 +214,12 @@ int main(int argc, char** argv)
     MemoryOutputSink spirvSink;
     const CookResult<CookStatistics> spirvLarge =
         CookIntoMemory(assetDirectory / "EntryPointConstantsTooLarge.slang", k_Spirv, spirvSink);
-    runner.Check(!spirvLarge.has_value() && spirvLarge.error() == CookError::EntryPointConstantsTooLarge,
-                 "144 bytes of push constants fail with EntryPointConstantsTooLarge");
+    runner.CheckError(spirvLarge, CookError::EntryPointConstantsTooLarge,
+                      "144 bytes of push constants fail with EntryPointConstantsTooLarge");
     MemoryOutputSink wgslSink;
     const CookResult<CookStatistics> wgslLarge =
         CookIntoMemory(assetDirectory / "EntryPointConstantsTooLarge.slang", k_Wgsl, wgslSink);
-    runner.Check(wgslLarge.has_value(), "the same data cooks for WGSL, which delivers it in a uniform buffer");
+    runner.CheckOk(wgslLarge, "the same data cooks for WGSL, which delivers it in a uniform buffer");
 
     return runner.Report();
 }

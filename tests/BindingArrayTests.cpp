@@ -88,15 +88,13 @@ int main(int argc, char** argv)
     runner.BeginSection("a fixed-size binding array cooks for SPIR-V, and its length reaches the manifest");
     MemoryOutputSink sink;
     const CookResult<CookStatistics> cooked = CookIntoMemory(assetDirectory / "BindingArrays.slang", "spirv", sink);
-    runner.Check(cooked.has_value(), "the module with one array of each resource kind cooks");
+    runner.CheckOk(cooked, "the module with one array of each resource kind cooks");
     const std::vector<std::byte> bytes = ManifestBytes(sink);
     const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(bytes);
-    runner.Check(bundle.has_value(), "the manifest opens");
-    if (bundle.has_value())
+    if (runner.CheckOk(bundle, "the manifest opens"))
     {
         const manifest::ManifestResult<manifest::EnvironmentView> environment = bundle->OpenEnvironment(0u, 0u);
-        runner.Check(environment.has_value(), "the environment opens");
-        if (environment.has_value())
+        if (runner.CheckOk(environment, "the environment opens"))
         {
             const manifest::EntryPointInstanceView instance = environment->VariantAt(0u).EntryPoint(0u);
             const manifest::LayoutRange layout = instance.Layout();
@@ -124,23 +122,26 @@ int main(int argc, char** argv)
             }
 
             const std::span<const manifest::SamplerTexturePair> pairs = instance.SamplerTexturePairs();
-            runner.Check(pairs.size() == 1u && layout[pairs[0].Texture].Name() == "Views" &&
-                             layout[pairs[0].Sampler].Name() == "Samp",
-                         "the sampler pairs with the texture array through a dynamic index");
+            const char* pairClaim = "the sampler pairs with the texture array through a dynamic index";
+            if (runner.CheckEqual(pairs.size(), 1u, pairClaim))
+            {
+                runner.CheckEqual(layout[pairs[0].Texture].Name(), "Views", pairClaim);
+                runner.CheckEqual(layout[pairs[0].Sampler].Name(), "Samp", pairClaim);
+            }
         }
     }
 
     runner.BeginSection("the forms that are not read yet fail with their own errors");
     MemoryOutputSink wgslSink;
     const CookResult<CookStatistics> wgsl = CookIntoMemory(assetDirectory / "BindingArrays.slang", "wgsl", wgslSink);
-    runner.Check(!wgsl.has_value() && wgsl.error() == CookError::CodeGenerationFailed,
-                 "WGSL has no array of resources, and Slang rejects it");
+    runner.CheckError(wgsl, CookError::CodeGenerationFailed,
+                      "WGSL has no array of resources, and Slang rejects it");
 
     MemoryOutputSink unboundedSink;
     const CookResult<CookStatistics> unbounded =
         CookIntoMemory(assetDirectory / "UnboundedArray.slang", "spirv", unboundedSink);
-    runner.Check(!unbounded.has_value() && unbounded.error() == CookError::ReflectionMismatch,
-                 "an unbounded array fails the SPIR-V cross-check until the Indexed access model reads it");
+    runner.CheckError(unbounded, CookError::ReflectionMismatch,
+                      "an unbounded array fails the SPIR-V cross-check until the Indexed access model reads it");
 
     return runner.Report();
 }

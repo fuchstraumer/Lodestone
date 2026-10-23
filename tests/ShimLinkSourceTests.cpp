@@ -105,47 +105,50 @@ int main()
         MakeExtern("Scratch", "IReadWriteBuffer", " Light ", { "Lighting" }),
     };
     const CookResult<std::string> source = MakeShimLinkSource(externs, AccessModel::Bound, "Probe", "bound", sink);
-    runner.Check(source.has_value(), "a table with every Bound cell links");
-    runner.Check(source.has_value() && *source ==
-                     "import LodestoneShims;\n"
-                     "import Lighting;\n"
-                     "export struct Points : IReadBuffer<PointLight> = BoundReadBuffer<PointLight>;\n"
-                     "export struct Tints : IReadBuffer<float4> = BoundReadBuffer<float4>;\n"
-                     "export struct Albedo : ITexture2DRef = BoundTexture2D;\n"
-                     "export struct Linear : ISamplerRef = BoundSampler;\n"
-                     "export struct Scratch : IReadWriteBuffer<Light> = BoundReadWriteBuffer<Light>;\n",
-                 "one import for each distinct module, none for a builtin type, and the exports in source order");
+    runner.CheckOk(source, "a table with every Bound cell links");
+    if (runner.CheckOk(source, "one import for each distinct module, none for a builtin type, and the exports in source order"))
+    {
+        runner.CheckEqual(*source,
+                          "import LodestoneShims;\n"
+                          "import Lighting;\n"
+                          "export struct Points : IReadBuffer<PointLight> = BoundReadBuffer<PointLight>;\n"
+                          "export struct Tints : IReadBuffer<float4> = BoundReadBuffer<float4>;\n"
+                          "export struct Albedo : ITexture2DRef = BoundTexture2D;\n"
+                          "export struct Linear : ISamplerRef = BoundSampler;\n"
+                          "export struct Scratch : IReadWriteBuffer<Light> = BoundReadWriteBuffer<Light>;\n",
+                          "one import for each distinct module, none for a builtin type, and the exports in source order");
+    }
 
     const CookResult<std::string> none = MakeShimLinkSource({}, AccessModel::Bound, "Probe", "bound", sink);
     runner.Check(none.has_value() && none->empty(), "a module with no shim externs has no link source");
 
     runner.BeginSection("an empty cell and malformed type arguments fail, each with its own error");
-    runner.Check(ErrorOf(externs, AccessModel::Pointer) == CookError::ShimFormUnavailable,
-                 "the Pointer cell of the table is empty");
-    runner.Check(ErrorOf(externs, AccessModel::Invalid) == CookError::ShimFormUnavailable,
-                 "an invalid access model has no cell");
-    runner.Check(ErrorOf({ MakeExtern("Points", "IReadBuffer", "", {}) }, AccessModel::Bound) == CookError::ShimExternInvalid,
-                 "a buffer with no type argument");
-    runner.Check(ErrorOf({ MakeExtern("Albedo", "ITexture2DRef", "float4", { "" }) }, AccessModel::Bound) ==
-                     CookError::ShimExternInvalid,
-                 "a texture with a type argument");
-    runner.Check(ErrorOf({ MakeExtern("Points", "IReadBuffer", "Foo<Bar>", { "" }) }, AccessModel::Bound) ==
-                     CookError::ShimExternInvalid,
-                 "a nested generic is not a plain name");
-    runner.Check(ErrorOf({ MakeExtern("Points", "IReadBuffer", "A, B", { "", "" }) }, AccessModel::Bound) ==
-                     CookError::ShimExternInvalid,
-                 "two type arguments for one type parameter");
-    runner.Check(ErrorOf({ MakeExtern("Points", "IReadBuffer", "Light", {}) }, AccessModel::Bound) == CookError::ShimExternInvalid,
-                 "a type argument with no module entry");
-    runner.Check(ErrorOf({ MakeExtern("Points", "IUnrelated", "Light", { "" }) }, AccessModel::Bound) == CookError::ShimExternInvalid,
-                 "an interface that is not in the table");
-    runner.Check(ErrorOf({ MakeExtern("Dst", "IWriteStorageTexture2D", "", {}) }, AccessModel::Bound) ==
-                     CookError::ShimStorageFormatMissing,
-                 "a storage texture with no [ls_storage_format]");
+    runner.CheckEqual(ErrorOf(externs, AccessModel::Pointer), CookError::ShimFormUnavailable,
+                      "the Pointer cell of the table is empty");
+    runner.CheckEqual(ErrorOf(externs, AccessModel::Invalid), CookError::ShimFormUnavailable,
+                      "an invalid access model has no cell");
+    runner.CheckEqual(ErrorOf({ MakeExtern("Points", "IReadBuffer", "", {}) }, AccessModel::Bound), CookError::ShimExternInvalid,
+                      "a buffer with no type argument");
+    runner.CheckEqual(ErrorOf({ MakeExtern("Albedo", "ITexture2DRef", "float4", { "" }) }, AccessModel::Bound),
+                      CookError::ShimExternInvalid,
+                      "a texture with a type argument");
+    runner.CheckEqual(ErrorOf({ MakeExtern("Points", "IReadBuffer", "Foo<Bar>", { "" }) }, AccessModel::Bound),
+                      CookError::ShimExternInvalid,
+                      "a nested generic is not a plain name");
+    runner.CheckEqual(ErrorOf({ MakeExtern("Points", "IReadBuffer", "A, B", { "", "" }) }, AccessModel::Bound),
+                      CookError::ShimExternInvalid,
+                      "two type arguments for one type parameter");
+    runner.CheckEqual(ErrorOf({ MakeExtern("Points", "IReadBuffer", "Light", {}) }, AccessModel::Bound), CookError::ShimExternInvalid,
+                      "a type argument with no module entry");
+    runner.CheckEqual(ErrorOf({ MakeExtern("Points", "IUnrelated", "Light", { "" }) }, AccessModel::Bound), CookError::ShimExternInvalid,
+                      "an interface that is not in the table");
+    runner.CheckEqual(ErrorOf({ MakeExtern("Dst", "IWriteStorageTexture2D", "", {}) }, AccessModel::Bound),
+                      CookError::ShimStorageFormatMissing,
+                      "a storage texture with no [ls_storage_format]");
     RawShimExtern formattedBuffer = MakeExtern("Points", "IReadBuffer", "float4", { "" });
     formattedBuffer.FormatAxis = "LEVEL_FORMAT";
-    runner.Check(ErrorOf({ formattedBuffer }, AccessModel::Bound) == CookError::ShimExternInvalid,
-                 "[ls_storage_format] on a buffer, which takes no format");
+    runner.CheckEqual(ErrorOf({ formattedBuffer }, AccessModel::Bound), CookError::ShimExternInvalid,
+                      "[ls_storage_format] on a buffer, which takes no format");
 
     runner.BeginSection("a storage extern links once for each value of its format axis, and not in the fixed module");
     std::vector<RawShimExtern> withFormats = externs;
@@ -164,26 +167,34 @@ int main()
     const PermutationSpace formatSpace{ std::move(formatAxes) };
     const CookResult<std::vector<ShimFormatLinkSource>> formatSources =
         MakeShimFormatLinkSources(withFormats, formatSpace, AccessModel::Bound, "Probe", sink);
-    runner.Check(formatSources.has_value() && formatSources->size() == 2u, "one link module for each value of the axis");
+    if (runner.CheckOk(formatSources, "one link module for each value of the axis"))
+    {
+        runner.CheckEqual(formatSources->size(), 2u, "one link module for each value of the axis");
+    }
     if (formatSources.has_value() && formatSources->size() == 2u)
     {
         const ShimFormatLinkSource& half = (*formatSources)[0];
         const ShimFormatLinkSource& single = (*formatSources)[1];
-        runner.Check(half.AxisName == "LEVEL_FORMAT" && half.CaseOrdinal == 2u &&
-                         half.Source == "import LodestoneShims;\n"
-                                        "export struct Dst : IWriteStorageTexture2D = BoundWriteStorageTexture2D<RGBA16F>;\n"
-                                        "export struct Half : IWriteStorageTexture2D = BoundWriteStorageTexture2D<RGBA16F>;\n",
-                     "Rgba16Float links both externs of the axis to RGBA16F, in source order");
-        runner.Check(single.CaseOrdinal == 3u &&
-                         single.Source == "import LodestoneShims;\n"
-                                          "export struct Dst : IWriteStorageTexture2D = BoundWriteStorageTexture2D<R32F>;\n"
-                                          "export struct Half : IWriteStorageTexture2D = BoundWriteStorageTexture2D<R32F>;\n",
-                     "R32Float links both to R32F");
+        const char* halfClaim = "Rgba16Float links both externs of the axis to RGBA16F, in source order";
+        runner.CheckEqual(half.AxisName, "LEVEL_FORMAT", halfClaim);
+        runner.CheckEqual(half.CaseOrdinal, 2u, halfClaim);
+        runner.CheckEqual(half.Source,
+                          "import LodestoneShims;\n"
+                          "export struct Dst : IWriteStorageTexture2D = BoundWriteStorageTexture2D<RGBA16F>;\n"
+                          "export struct Half : IWriteStorageTexture2D = BoundWriteStorageTexture2D<RGBA16F>;\n",
+                          halfClaim);
+        const char* singleClaim = "R32Float links both to R32F";
+        runner.CheckEqual(single.CaseOrdinal, 3u, singleClaim);
+        runner.CheckEqual(single.Source,
+                          "import LodestoneShims;\n"
+                          "export struct Dst : IWriteStorageTexture2D = BoundWriteStorageTexture2D<R32F>;\n"
+                          "export struct Half : IWriteStorageTexture2D = BoundWriteStorageTexture2D<R32F>;\n",
+                          singleClaim);
     }
 
     runner.BeginSection("the format axis must exist, and be an ungated enum axis over StorageFormat");
-    runner.Check(FormatErrorOf({ MakeFormatExtern("Dst", "MISSING") }, formatSpace) == CookError::ShimStorageFormatAxisUnknown,
-                 "an axis the module does not declare");
+    runner.CheckEqual(FormatErrorOf({ MakeFormatExtern("Dst", "MISSING") }, formatSpace), CookError::ShimStorageFormatAxisUnknown,
+                      "an axis the module does not declare");
     std::vector<PermutationAxis> otherAxes;
     otherAxes.push_back(MakeEnumAxis("OTHER_ENUM", "Quality", "LodestoneShims", "", { 0u, 1u }));
     otherAxes.push_back(MakeEnumAxis("FOREIGN_FORMAT", "StorageFormat", "Elsewhere", "", { 0u, 1u }));
@@ -196,15 +207,15 @@ int main()
     const PermutationSpace otherSpace{ std::move(otherAxes) };
     for (const std::string_view axisName : { "OTHER_ENUM", "FOREIGN_FORMAT", "FOG", "GATED_FORMAT" })
     {
-        runner.Check(FormatErrorOf({ MakeFormatExtern("Dst", std::string{ axisName }) }, otherSpace) ==
-                         CookError::ShimStorageFormatAxisInvalid,
-                     std::format("{} is not an ungated StorageFormat axis", axisName));
+        runner.CheckEqual(FormatErrorOf({ MakeFormatExtern("Dst", std::string{ axisName }) }, otherSpace),
+                          CookError::ShimStorageFormatAxisInvalid,
+                          std::format("{} is not an ungated StorageFormat axis", axisName));
     }
 
-    runner.Check(AccessModelFromPlacementKind(PlacementKindFromAccessModel(AccessModel::Bound)) == AccessModel::Bound &&
-                     AccessModelFromPlacementKind(PlacementKindFromAccessModel(AccessModel::Pointer)) == AccessModel::Pointer &&
-                     AccessModelFromPlacementKind(PlacementKind::None) == AccessModel::Invalid,
-                 "the access model and the placement kind convert both ways");
+    const char* convertClaim = "the access model and the placement kind convert both ways";
+    runner.CheckEqual(AccessModelFromPlacementKind(PlacementKindFromAccessModel(AccessModel::Bound)), AccessModel::Bound, convertClaim);
+    runner.CheckEqual(AccessModelFromPlacementKind(PlacementKindFromAccessModel(AccessModel::Pointer)), AccessModel::Pointer, convertClaim);
+    runner.CheckEqual(AccessModelFromPlacementKind(PlacementKind::None), AccessModel::Invalid, convertClaim);
 
     return runner.Report();
 }

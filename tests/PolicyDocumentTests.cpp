@@ -50,26 +50,32 @@ void TestParseAndQuery(TestRunner& runner)
     runner.BeginSection("parse and query");
 
     const auto parsed = PolicyDocument::Parse(k_ValidPolicy);
-    runner.Check(parsed.has_value(), "a well-formed file parses");
-    if (!parsed)
+    if (!runner.CheckOk(parsed, "a well-formed file parses"))
     {
         return;
     }
     const PolicyDocument& document = *parsed;
 
-    runner.Check(document.ModuleCount() == 1u, "the file holds one module");
+    runner.CheckEqual(document.ModuleCount(), 1u, "the file holds one module");
     runner.Check(document.FindModule("OceanFft") != nullptr, "the named module is found");
-    runner.Check(document.FindModule("Nope") == nullptr, "an absent module is not found");
+    runner.CheckEqual(document.FindModule("Nope"), nullptr, "an absent module is not found");
 
     const auto& wgsl = document.FindTargetPolicy("OceanFft", "wgsl");
-    runner.Check(wgsl.MaxVariants == 64u, "MaxVariants reads back");
-    runner.Check(wgsl.CookIf == "IFFT_USE_WAVE_OPS == 1", "CookIf reads back");
-    runner.Check(wgsl.CookValues.size() == 1u, "the target holds one CookValues axis");
-    runner.Check(wgsl.CookValues.size() == 1u && wgsl.CookValues[0].Axis == "IFFT_SIZE",
-                 "the CookValues axis is named");
-    runner.Check(wgsl.CookValues.size() == 1u && wgsl.CookValues[0].Values.size() == 2u
-                     && wgsl.CookValues[0].Values[0].AsUInt() == 256u && wgsl.CookValues[0].Values[1].AsUInt() == 512u,
-                 "the CookValues integers read back in order");
+    runner.CheckEqual(wgsl.MaxVariants, 64u, "MaxVariants reads back");
+    runner.CheckEqual(wgsl.CookIf, "IFFT_USE_WAVE_OPS == 1", "CookIf reads back");
+    runner.CheckEqual(wgsl.CookValues.size(), 1u, "the target holds one CookValues axis");
+    if (runner.CheckEqual(wgsl.CookValues.size(), 1u, "the CookValues axis is named"))
+    {
+        runner.CheckEqual(wgsl.CookValues[0].Axis, "IFFT_SIZE", "the CookValues axis is named");
+    }
+    if (runner.CheckEqual(wgsl.CookValues.size(), 1u, "the CookValues integers read back in order"))
+    {
+        if (runner.CheckEqual(wgsl.CookValues[0].Values.size(), 2u, "the CookValues integers read back in order"))
+        {
+            runner.CheckEqual(wgsl.CookValues[0].Values[0].AsUInt(), 256u, "the CookValues integers read back in order");
+            runner.CheckEqual(wgsl.CookValues[0].Values[1].AsUInt(), 512u, "the CookValues integers read back in order");
+        }
+    }
 
     const auto& spirv = document.FindTargetPolicy("OceanFft", "spirv");
     runner.Check(spirv.CookValues.size() == 1u && spirv.CookValues[0].Values.size() == 2u
@@ -80,11 +86,14 @@ void TestParseAndQuery(TestRunner& runner)
     runner.Check(absentTarget.MaxVariants == 0u && absentTarget.CookValues.empty() && absentTarget.CookIf.empty(),
                  "an absent target returns the empty policy");
     const auto& absentModule = document.FindTargetPolicy("Nope", "wgsl");
-    runner.Check(absentModule.MaxVariants == 0u, "an absent module returns the empty policy");
+    runner.CheckEqual(absentModule.MaxVariants, 0u, "an absent module returns the empty policy");
 
     const auto inertAxes = document.InertAxesForEntryPoint("OceanFft", "IfftPermuteCS");
-    runner.Check(inertAxes.size() == 2u && (inertAxes[0] == "IFFT_USE_WAVE_OPS") && (inertAxes[1] == "IFFT_WAVE_SIZE"),
-                 "InertAxes are preserved, and contain both axes disabled");
+    if (runner.CheckEqual(inertAxes.size(), 2u, "InertAxes are preserved, and contain both axes disabled"))
+    {
+        runner.CheckEqual(inertAxes[0], "IFFT_USE_WAVE_OPS", "InertAxes are preserved, and contain both axes disabled");
+        runner.CheckEqual(inertAxes[1], "IFFT_WAVE_SIZE", "InertAxes are preserved, and contain both axes disabled");
+    }
     runner.Check(document.InertAxesForEntryPoint("Nope", "IfftPermuteCS").empty(), "an absent module has no influence");
 }
 
@@ -142,25 +151,25 @@ void TestValidationAgainstSpace(TestRunner& runner)
         return document->ValidateAgainstSpace("OceanFft", space, sink);
     };
 
-    runner.Check(validateAndPrint(k_ValidPolicy) == CookError::Success, "a policy that names real axes and values validates");
+    runner.CheckEqual(validateAndPrint(k_ValidPolicy), CookError::Success, "a policy that names real axes and values validates");
 
     const CookError unknownCookAxis = validateAndCache("[OceanFft.targets.wgsl.CookValues]\nIFFT_SZ = [256]\n");
-    runner.Check(unknownCookAxis == CookError::PolicyAxisNotDeclared, "CookValues on an undeclared axis fails");
+    runner.CheckEqual(unknownCookAxis, CookError::PolicyAxisNotDeclared, "CookValues on an undeclared axis fails");
 
     const CookError valueNotInAxis = validateAndCache("[OceanFft.targets.wgsl.CookValues]\nIFFT_SIZE = [999]\n");
-    runner.Check(valueNotInAxis == CookError::PolicyValueNotInAxis, "a CookValues value the axis lacks fails");
+    runner.CheckEqual(valueNotInAxis, CookError::PolicyValueNotInAxis, "a CookValues value the axis lacks fails");
 
     const CookError cookWhenUnknownAxis =
         validateAndCache("[OceanFft.targets.wgsl]\nCookIf = \"NOPE == 1\"\n");
-    runner.Check(cookWhenUnknownAxis == CookError::PolicyAxisNotDeclared, "CookIf naming an undeclared axis fails");
+    runner.CheckEqual(cookWhenUnknownAxis, CookError::PolicyAxisNotDeclared, "CookIf naming an undeclared axis fails");
 
     const CookError cookIfMalformed = validateAndCache("[OceanFft.targets.wgsl]\nCookIf = \"== 1\"\n");
-    runner.Check(cookIfMalformed == CookError::PolicyCookIfInvalid, "a malformed CookIf fails");
+    runner.CheckEqual(cookIfMalformed, CookError::PolicyCookIfInvalid, "a malformed CookIf fails");
 
     const CookError inertAxisUnknownAxis =
         validateAndCache("[OceanFft.InertAxesForEntryPoints]\ncs = [\"GHOST\"]\n");
-    runner.Check(inertAxisUnknownAxis == CookError::PolicyAxisNotDeclared,
-                 "InertAxesForEntryPoints on an undeclared axis fails");
+    runner.CheckEqual(inertAxisUnknownAxis, CookError::PolicyAxisNotDeclared,
+                      "InertAxesForEntryPoints on an undeclared axis fails");
 
     const CookError absentModuleValidates = [&space]
     {
@@ -168,7 +177,7 @@ void TestValidationAgainstSpace(TestRunner& runner)
         const auto document = PolicyDocument::Parse(k_ValidPolicy);
         return document ? document->ValidateAgainstSpace("SomeOtherModule", space, sink) : CookError::Invalid;
     }();
-    runner.Check(absentModuleValidates == CookError::Success, "a module the file does not name is not an error");
+    runner.CheckEqual(absentModuleValidates, CookError::Success, "a module the file does not name is not an error");
 }
 
 } // namespace
@@ -207,8 +216,11 @@ void TestEnumCaseNames(TestRunner& runner)
 
     const auto document = PolicyDocument::Parse("[Probe.targets.spirv.CookValues]\nQUALITY = [\"High\"]\n");
     RecordingDiagnosticSink sink;
-    runner.Check(document.has_value() && document->ValidateAgainstSpace("Probe", space, sink) == CookError::Success,
-                 "a case that the axis takes validates");
+    if (runner.CheckOk(document, "a case that the axis takes validates"))
+    {
+        runner.CheckEqual(document->ValidateAgainstSpace("Probe", space, sink), CookError::Success,
+                          "a case that the axis takes validates");
+    }
     if (document.has_value())
     {
         const lodestone::CookResult<lodestone::VariantSet> variants =
@@ -221,12 +233,12 @@ void TestEnumCaseNames(TestRunner& runner)
         runner.Check(onlyHigh, "the cook takes High alone, crossed with both FOG values");
     }
 
-    runner.Check(validate("[Probe.targets.spirv.CookValues]\nQUALITY = [\"Hihg\"]\n") == CookError::PolicyValueNotInAxis,
-                 "a misspelled case fails");
-    runner.Check(validate("[Probe.targets.spirv.CookValues]\nQUALITY = [\"Medium\"]\n") == CookError::PolicyValueNotInAxis,
-                 "a case of the enum that the axis does not take fails");
-    runner.Check(validate("[Probe.targets.spirv.CookValues]\nFOG = [\"true\"]\n") == CookError::PolicyValueNotInAxis,
-                 "a name on an axis that is not an enum fails");
+    runner.CheckEqual(validate("[Probe.targets.spirv.CookValues]\nQUALITY = [\"Hihg\"]\n"), CookError::PolicyValueNotInAxis,
+                      "a misspelled case fails");
+    runner.CheckEqual(validate("[Probe.targets.spirv.CookValues]\nQUALITY = [\"Medium\"]\n"), CookError::PolicyValueNotInAxis,
+                      "a case of the enum that the axis does not take fails");
+    runner.CheckEqual(validate("[Probe.targets.spirv.CookValues]\nFOG = [\"true\"]\n"), CookError::PolicyValueNotInAxis,
+                      "a name on an axis that is not an enum fails");
 }
 
 void TestTargetCoverage(TestRunner& runner)
@@ -242,21 +254,20 @@ MaxVariants = 64
 )toml";
 
     const auto parsed = PolicyDocument::Parse(k_CoveragePolicy);
-    runner.Check(parsed.has_value(), "the coverage file parses");
-    if (!parsed)
+    if (!runner.CheckOk(parsed, "the coverage file parses"))
     {
         return;
     }
     const PolicyDocument& document = *parsed;
 
-    runner.Check(document.FindTargetCoverage("Absent", "spirv") == TargetPolicyCoverage::NoModuleEntry,
-                 "a module the file does not name has no entry");
-    runner.Check(document.FindTargetCoverage("InertOnly", "spirv") == TargetPolicyCoverage::NoTargetSections,
-                 "a module with influence statements only has no target sections");
-    runner.Check(document.FindTargetCoverage("WgslOnly", "wgsl") == TargetPolicyCoverage::Present,
-                 "a target with its own section is present");
-    runner.Check(document.FindTargetCoverage("WgslOnly", "spirv") == TargetPolicyCoverage::OtherTargetsOnly,
-                 "a target with no section, beside one that has a section, is the suspicious case");
+    runner.CheckEqual(document.FindTargetCoverage("Absent", "spirv"), TargetPolicyCoverage::NoModuleEntry,
+                      "a module the file does not name has no entry");
+    runner.CheckEqual(document.FindTargetCoverage("InertOnly", "spirv"), TargetPolicyCoverage::NoTargetSections,
+                      "a module with influence statements only has no target sections");
+    runner.CheckEqual(document.FindTargetCoverage("WgslOnly", "wgsl"), TargetPolicyCoverage::Present,
+                      "a target with its own section is present");
+    runner.CheckEqual(document.FindTargetCoverage("WgslOnly", "spirv"), TargetPolicyCoverage::OtherTargetsOnly,
+                      "a target with no section, beside one that has a section, is the suspicious case");
 }
 
 // A target key the build does not know is a misspelling until proven otherwise, as an unknown --target is.
@@ -267,29 +278,27 @@ void TestTargetNames(TestRunner& runner)
     constexpr std::array<std::string_view, 2u> k_KnownTargets{ "wgsl", "spirv" };
 
     const auto known = PolicyDocument::Parse(k_ValidPolicy);
-    runner.Check(known.has_value(), "the valid file parses");
-    if (known)
+    if (runner.CheckOk(known, "the valid file parses"))
     {
         RecordingDiagnosticSink sink;
-        runner.Check(known->ValidateTargetNames(k_KnownTargets, sink) == CookError::Success,
-                     "sections for known targets are accepted");
+        runner.CheckEqual(known->ValidateTargetNames(k_KnownTargets, sink), CookError::Success,
+                          "sections for known targets are accepted");
     }
 
     const auto misspelled = PolicyDocument::Parse("[OceanFft.targets.spriv]\nMaxVariants = 8\n");
-    runner.Check(misspelled.has_value(), "a misspelled target still parses");
-    if (misspelled)
+    if (runner.CheckOk(misspelled, "a misspelled target still parses"))
     {
         RecordingDiagnosticSink sink;
-        runner.Check(misspelled->ValidateTargetNames(k_KnownTargets, sink) == CookError::PolicyUnknownTargetName,
-                     "a section for an unknown target is rejected by name");
+        runner.CheckEqual(misspelled->ValidateTargetNames(k_KnownTargets, sink), CookError::PolicyUnknownTargetName,
+                          "a section for an unknown target is rejected by name");
     }
 
     const auto noTargets = PolicyDocument::Parse("[OceanFft.InertAxesForEntryPoints]\nMainCS = [\"A\"]\n");
     if (noTargets)
     {
         RecordingDiagnosticSink sink;
-        runner.Check(noTargets->ValidateTargetNames(k_KnownTargets, sink) == CookError::Success,
-                     "a file with no target sections has nothing to reject");
+        runner.CheckEqual(noTargets->ValidateTargetNames(k_KnownTargets, sink), CookError::Success,
+                          "a file with no target sections has nothing to reject");
     }
 }
 

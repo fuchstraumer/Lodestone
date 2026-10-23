@@ -130,28 +130,28 @@ void TestHandBuilt(tests::TestRunner& runner)
 
     {
         const PermutationSpace space = MakeSpace(AxisKind::Capability, {});
-        runner.Check(VerifyCapabilityAxes(MakeLibrary(space, none, subgroups, true)) == CookError::Success,
-                     "an axis that turns names on passes");
-        runner.Check(VerifyCapabilityAxes(MakeLibrary(space, float16, both, true)) == CookError::Success,
-                     "an off path that needs a subset of the on path passes");
-        runner.Check(VerifyCapabilityAxes(MakeLibrary(space, subgroups, subgroups, true)) == CookError::CapabilityAxisInert,
-                     "an axis whose two values need the same names fails");
-        runner.Check(VerifyCapabilityAxes(MakeLibrary(space, subgroups, none, true)) == CookError::CapabilityAxisInverted,
-                     "an off path that needs more than the on path fails");
-        runner.Check(VerifyCapabilityAxes(MakeLibrary(space, float16, subgroups, true)) == CookError::CapabilityAxisInverted,
-                     "an off path that needs a name the on path lacks fails, though the sets differ");
-        runner.Check(VerifyCapabilityAxes(MakeLibrary(space, subgroups, subgroups, false)) == CookError::Success,
-                     "a profile with no reader is not checked");
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, none, subgroups, true)), CookError::Success,
+                          "an axis that turns names on passes");
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, float16, both, true)), CookError::Success,
+                          "an off path that needs a subset of the on path passes");
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, subgroups, subgroups, true)), CookError::CapabilityAxisInert,
+                          "an axis whose two values need the same names fails");
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, subgroups, none, true)), CookError::CapabilityAxisInverted,
+                          "an off path that needs more than the on path fails");
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, float16, subgroups, true)), CookError::CapabilityAxisInverted,
+                          "an off path that needs a name the on path lacks fails, though the sets differ");
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, subgroups, subgroups, false)), CookError::Success,
+                          "a profile with no reader is not checked");
     }
     {
         const PermutationSpace gated = MakeSpace(AxisKind::Capability, "OTHER == 1");
-        runner.Check(VerifyCapabilityAxes(MakeLibrary(gated, subgroups, subgroups, true)) == CookError::Success,
-                     "a gated capability axis is not checked");
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(gated, subgroups, subgroups, true)), CookError::Success,
+                          "a gated capability axis is not checked");
     }
     {
         const PermutationSpace technique = MakeSpace(AxisKind::Technique, {});
-        runner.Check(VerifyCapabilityAxes(MakeLibrary(technique, subgroups, subgroups, true)) == CookError::Success,
-                     "an axis of another kind is not checked");
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(technique, subgroups, subgroups, true)), CookError::Success,
+                          "an axis of another kind is not checked");
     }
 }
 
@@ -177,16 +177,7 @@ int main(int argc, char** argv)
             }
 
             const CookError actual = CookOneModule(modulePath, target);
-            if (actual != testCase.Expected)
-            {
-                std::println(stderr,
-                             "[CapabilityAxis] {} ({}): expected {}, and the cook returned {}",
-                             testCase.ModuleFile,
-                             target,
-                             ToString(testCase.Expected),
-                             ToString(actual));
-            }
-            runner.Check(actual == testCase.Expected, testCase.Claim);
+            runner.CheckEqual(actual, testCase.Expected, std::format("{} ({}): {}", testCase.ModuleFile, target, testCase.Claim));
         }
     }
 

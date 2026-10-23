@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <cstring>
 #include <expected>
+#include <format>
 #include <numeric>
 #include <optional>
 #include <span>
@@ -377,7 +378,7 @@ void CheckAxisRelevance(lodestone::tests::TestRunner& runner)
         library.Environments.emplace_back(BuildRelevanceModule(space, keepDebugOn));
         const std::vector<std::byte> bytes = EmitBytes(library);
         const ManifestResult<EnvironmentView> opened = OpenEnvironment(bytes, 0u, 0u);
-        runner.Check(opened.has_value(), "the relevance module opens");
+        runner.CheckOk(opened, std::format("keepDebugOn = {}: the relevance module opens", keepDebugOn));
         if (!opened.has_value())
         {
             return;
@@ -397,56 +398,77 @@ void CheckAxisRelevance(lodestone::tests::TestRunner& runner)
             const std::array<std::string_view, 1u> plain{ "PlainCS" };
             const std::array<std::string_view, 2u> pipeline{ "FogCS", "PlainCS" };
             const std::expected<VariantKey, lodestone::QueryError> allAxes = index.Query().Where("FOG", true).Single();
-            runner.Check(!allAxes.has_value() && allAxes.error().Code == lodestone::QueryErrorCode::AmbiguousVariant &&
-                             allAxes.error().AxisName == "DEBUG",
-                         "Single still counts an axis that changes nothing");
+            const std::string allAxesClaim = std::format("keepDebugOn = {}: Single still counts an axis that changes nothing", keepDebugOn);
+            if (runner.CheckError(allAxes, lodestone::QueryErrorCode::AmbiguousVariant, allAxesClaim))
+            {
+                runner.CheckEqual(allAxes.error().AxisName, "DEBUG", allAxesClaim);
+            }
             const std::expected<VariantKey, lodestone::QueryError> fogPinned = index.Query().Where("FOG", true).SingleFor(fog);
             const lodestone::QueryResult<std::vector<VariantKey>> fogKeys = index.Query().Where("FOG", true).Keys();
-            runner.Check(fogPinned.has_value() && fogKeys.has_value() && fogPinned.value() == std::ranges::min(*fogKeys),
-                         "SingleFor ignores an irrelevant axis and returns the smallest matching key");
+            const std::string fogPinnedClaim =
+                std::format("keepDebugOn = {}: SingleFor ignores an irrelevant axis and returns the smallest matching key", keepDebugOn);
+            if (runner.CheckOk(fogPinned, fogPinnedClaim) && runner.CheckOk(fogKeys, fogPinnedClaim))
+            {
+                runner.CheckEqual(fogPinned.value(), std::ranges::min(*fogKeys), fogPinnedClaim);
+            }
             const std::expected<VariantKey, lodestone::QueryError> fogUnpinned = index.Query().SingleFor(fog);
-            runner.Check(!fogUnpinned.has_value() &&
-                             fogUnpinned.error().Code == lodestone::QueryErrorCode::AmbiguousVariant &&
-                             fogUnpinned.error().AxisName == "FOG" && fogUnpinned.error().Detail == 4u,
-                         "SingleFor names only the relevant axes that still vary");
-            runner.Check(index.Query().SingleFor(plain).has_value(),
-                         "an entry point that no axis changes needs no pin at all");
+            const std::string fogUnpinnedClaim = std::format("keepDebugOn = {}: SingleFor names only the relevant axes that still vary", keepDebugOn);
+            if (runner.CheckError(fogUnpinned, lodestone::QueryErrorCode::AmbiguousVariant, fogUnpinnedClaim))
+            {
+                runner.CheckEqual(fogUnpinned.error().AxisName, "FOG", fogUnpinnedClaim);
+                runner.CheckEqual(fogUnpinned.error().Detail, 4u, fogUnpinnedClaim);
+            }
+            runner.CheckOk(index.Query().SingleFor(plain),
+                           std::format("keepDebugOn = {}: an entry point that no axis changes needs no pin at all", keepDebugOn));
 
             // NotesFor names each pin that cannot change the named entry points. DEBUG changes nothing, and
             // FOG changes FogCS only
             const ManifestQueryBuilder bothPinned = index.Query().Where("FOG", true).Where("DEBUG", true);
             const std::expected<std::vector<lodestone::QueryNote>, lodestone::QueryError> fogNotes =
                 bothPinned.NotesFor(fog);
-            runner.Check(fogNotes.has_value() && fogNotes->size() == 1u &&
-                             fogNotes->front().Code == lodestone::QueryNoteCode::PinAxisIrrelevant &&
-                             fogNotes->front().AxisName == "DEBUG",
-                         "NotesFor names a pin that cannot change the entry point");
+            const std::string fogNotesClaim = std::format("keepDebugOn = {}: NotesFor names a pin that cannot change the entry point", keepDebugOn);
+            if (runner.CheckOk(fogNotes, fogNotesClaim) && runner.CheckEqual(fogNotes->size(), 1u, fogNotesClaim))
+            {
+                runner.CheckEqual(fogNotes->front().Code, lodestone::QueryNoteCode::PinAxisIrrelevant, fogNotesClaim);
+                runner.CheckEqual(fogNotes->front().AxisName, "DEBUG", fogNotesClaim);
+            }
             const std::expected<std::vector<lodestone::QueryNote>, lodestone::QueryError> plainNotes =
                 bothPinned.NotesFor(plain);
-            runner.Check(plainNotes.has_value() && plainNotes->size() == 2u,
-                         "NotesFor names every pin when no pinned axis changes the entry point");
+            const std::string plainNotesClaim = std::format("keepDebugOn = {}: NotesFor names every pin when no pinned axis changes the entry point", keepDebugOn);
+            if (runner.CheckOk(plainNotes, plainNotesClaim))
+            {
+                runner.CheckEqual(plainNotes->size(), 2u, plainNotesClaim);
+            }
             const std::expected<std::vector<lodestone::QueryNote>, lodestone::QueryError> pipelineNotes =
                 bothPinned.NotesFor(pipeline);
-            runner.Check(pipelineNotes.has_value() && pipelineNotes->size() == 1u,
-                         "NotesFor joins the masks of a pipeline, as SingleFor does");
+            const std::string pipelineNotesClaim = std::format("keepDebugOn = {}: NotesFor joins the masks of a pipeline, as SingleFor does", keepDebugOn);
+            if (runner.CheckOk(pipelineNotes, pipelineNotesClaim))
+            {
+                runner.CheckEqual(pipelineNotes->size(), 1u, pipelineNotesClaim);
+            }
             const std::span<const std::string_view> noStages{};
             const std::expected<std::vector<lodestone::QueryNote>, lodestone::QueryError> noStageNotes =
                 bothPinned.NotesFor(noStages);
-            runner.Check(!noStageNotes.has_value() &&
-                             noStageNotes.error().Code == lodestone::QueryErrorCode::EmptyEntryPointSet,
-                         "NotesFor with no entry point is an error");
+            const std::string noStageNotesClaim = std::format("keepDebugOn = {}: NotesFor with no entry point is an error", keepDebugOn);
+            runner.CheckError(noStageNotes, lodestone::QueryErrorCode::EmptyEntryPointSet, noStageNotesClaim);
             const std::expected<VariantKey, lodestone::QueryError> joined = index.Query().SingleFor(pipeline);
-            runner.Check(!joined.has_value() && joined.error().AxisName == "FOG",
-                         "a pipeline counts every axis that any of its entry points reads");
+            const std::string joinedClaim = std::format("keepDebugOn = {}: a pipeline counts every axis that any of its entry points reads", keepDebugOn);
+            if (runner.Check(!joined.has_value(), joinedClaim))
+            {
+                runner.CheckEqual(joined.error().AxisName, "FOG", joinedClaim);
+            }
             const std::array<std::string_view, 1u> typo{ "FogC" };
             const std::expected<VariantKey, lodestone::QueryError> unknown = index.Query().SingleFor(typo);
-            runner.Check(!unknown.has_value() && unknown.error().Code == lodestone::QueryErrorCode::UnknownEntryPoint &&
-                             unknown.error().AxisName == "FogC" && unknown.error().Suggestion == "FogCS",
-                         "an unknown entry point name is an error with a suggestion");
+            const std::string unknownClaim = std::format("keepDebugOn = {}: an unknown entry point name is an error with a suggestion", keepDebugOn);
+            if (runner.CheckError(unknown, lodestone::QueryErrorCode::UnknownEntryPoint, unknownClaim))
+            {
+                runner.CheckEqual(unknown.error().AxisName, "FogC", unknownClaim);
+                runner.CheckEqual(unknown.error().Suggestion, "FogCS", unknownClaim);
+            }
             const std::expected<VariantKey, lodestone::QueryError> empty =
                 index.Query().SingleFor(std::span<const std::string_view>{});
-            runner.Check(!empty.has_value() && empty.error().Code == lodestone::QueryErrorCode::EmptyEntryPointSet,
-                         "SingleFor with no entry point is an error");
+            const std::string emptyClaim = std::format("keepDebugOn = {}: SingleFor with no entry point is an error", keepDebugOn);
+            runner.CheckError(empty, lodestone::QueryErrorCode::EmptyEntryPointSet, emptyClaim);
 
             // a bit past the module's two axes is damage, and the reader rejects it when the environment opens
             lodestone::manifest::Header header;
@@ -463,9 +485,9 @@ void CheckAxisRelevance(lodestone::tests::TestRunner& runner)
             word |= uint64_t{ 1u } << 63u;
             std::memcpy(damaged.data() + wordOffset, &word, sizeof(word));
             const ManifestResult<EnvironmentView> damagedOpen = OpenEnvironment(damaged, 0u, 0u);
-            runner.Check(!damagedOpen.has_value() &&
-                             damagedOpen.error().Code == lodestone::manifest::ErrorCode::InvalidAxisRelevance,
-                         "a relevance bit past the module's axes is rejected when the environment opens");
+            runner.CheckError(damagedOpen,
+                              lodestone::manifest::ErrorCode::InvalidAxisRelevance,
+                              std::format("keepDebugOn = {}: a relevance bit past the module's axes is rejected when the environment opens", keepDebugOn));
         }
         else
         {
@@ -654,63 +676,79 @@ void CheckDeviceFilter(lodestone::tests::TestRunner& runner)
     TestDevice plain{ .Subgroups = false };
     TestDevice waves{ .Subgroups = true };
 
-    runner.Check(index.Query().Keys()->size() == 4u, "with no device, the module has four variants");
-    runner.Check(index.Query().ForDevice(&TestDeviceSupports, &waves, roomy).Keys()->size() == 4u,
-                 "a device that runs everything removes nothing");
-    runner.Check(index.Query().ForDevice(&TestDeviceSupports, &plain, roomy).Keys()->size() == 2u,
-                 "a device without subgroups loses the wave variants");
+    runner.CheckEqual(index.Query().Keys()->size(), 4u, "with no device, the module has four variants");
+    runner.CheckEqual(index.Query().ForDevice(&TestDeviceSupports, &waves, roomy).Keys()->size(), 4u,
+                      "a device that runs everything removes nothing");
+    runner.CheckEqual(index.Query().ForDevice(&TestDeviceSupports, &plain, roomy).Keys()->size(), 2u,
+                      "a device without subgroups loses the wave variants");
 
     const std::array<std::string_view, 1u> generate{ "GenerateCS" };
     const std::array<std::string_view, 1u> blur{ "BlurCS" };
     const ManifestQueryBuilder smallOnly = index.Query().Where("BIG", false);
-    runner.Check(!smallOnly.SingleFor(generate).has_value() &&
-                     smallOnly.SingleFor(generate).error().Code == lodestone::QueryErrorCode::AmbiguousVariant,
-                 "without a device, GenerateCS is ambiguous on WAVE");
+    runner.CheckError(smallOnly.SingleFor(generate), lodestone::QueryErrorCode::AmbiguousVariant,
+                      "without a device, GenerateCS is ambiguous on WAVE");
     const std::expected<VariantKey, lodestone::QueryError> scalarOnly =
         smallOnly.ForDevice(&TestDeviceSupports, &plain, roomy).SingleFor(generate);
-    runner.Check(scalarOnly.has_value() && index.Decode(*scalarOnly)[0].IntegralValue == 0u,
-                 "a device without subgroups gets the scalar instance of GenerateCS");
-    runner.Check(index.Query().ForDevice(&TestDeviceSupports, &plain, roomy).SingleFor(blur).has_value(),
-                 "the same device still gets BlurCS, which no axis changes");
+    if (runner.CheckOk(scalarOnly, "a device without subgroups gets the scalar instance of GenerateCS"))
+    {
+        runner.CheckEqual(index.Decode(*scalarOnly)[0].IntegralValue, 0u,
+                          "a device without subgroups gets the scalar instance of GenerateCS");
+    }
+    runner.CheckOk(index.Query().ForDevice(&TestDeviceSupports, &plain, roomy).SingleFor(blur),
+                   "the same device still gets BlurCS, which no axis changes");
 
     const std::expected<VariantKey, lodestone::QueryError> noWave =
         index.Query().Where("WAVE", true).Where("BIG", false).ForDevice(&TestDeviceSupports, &plain, roomy).SingleFor(generate);
-    runner.Check(!noWave.has_value() && noWave.error().Code == lodestone::QueryErrorCode::NoVariantFitsDevice &&
-                     noWave.error().Detail == static_cast<uint32_t>(DeviceMismatch::MissingCapability) &&
-                     noWave.error().AxisName == "GroupNonUniform",
-                 "a query that only wave instances match names the missing capability");
+    if (runner.CheckError(noWave, lodestone::QueryErrorCode::NoVariantFitsDevice, "a query that only wave instances match names the missing capability"))
+    {
+        runner.CheckEqual(noWave.error().Detail, static_cast<uint32_t>(DeviceMismatch::MissingCapability),
+                          "a query that only wave instances match names the missing capability");
+        runner.CheckEqual(noWave.error().AxisName, "GroupNonUniform",
+                          "a query that only wave instances match names the missing capability");
+    }
 
     DeviceLimits small = roomy;
     small.MaxWorkgroupMemoryBytes = 16384u;
     const ManifestQueryBuilder bigOnly = index.Query().Where("BIG", true).Where("WAVE", false);
     const std::expected<VariantKey, lodestone::QueryError> tooMuchMemory =
         bigOnly.ForDevice(&TestDeviceSupports, &waves, small).SingleFor(generate);
-    runner.Check(!tooMuchMemory.has_value() && tooMuchMemory.error().Code == lodestone::QueryErrorCode::NoVariantFitsDevice &&
-                     tooMuchMemory.error().Detail == static_cast<uint32_t>(DeviceMismatch::WorkgroupMemory),
-                 "a device below the workgroup memory loses the big instances");
+    if (runner.CheckError(tooMuchMemory, lodestone::QueryErrorCode::NoVariantFitsDevice, "a device below the workgroup memory loses the big instances"))
+    {
+        runner.CheckEqual(tooMuchMemory.error().Detail, static_cast<uint32_t>(DeviceMismatch::WorkgroupMemory),
+                          "a device below the workgroup memory loses the big instances");
+    }
 
     DeviceLimits fewInvocations = roomy;
     fewInvocations.MaxInvocationsPerWorkgroup = 256u;
     const std::expected<VariantKey, lodestone::QueryError> tooManyInvocations =
         bigOnly.ForDevice(&TestDeviceSupports, &waves, fewInvocations).SingleFor(generate);
-    runner.Check(!tooManyInvocations.has_value() &&
-                     tooManyInvocations.error().Detail == static_cast<uint32_t>(DeviceMismatch::Invocations),
-                 "a device below the invocation limit loses the 1024 invocation workgroup");
+    if (runner.Check(!tooManyInvocations.has_value(),
+                     "a device below the invocation limit loses the 1024 invocation workgroup"))
+    {
+        runner.CheckEqual(tooManyInvocations.error().Detail, static_cast<uint32_t>(DeviceMismatch::Invocations),
+                          "a device below the invocation limit loses the 1024 invocation workgroup");
+    }
 
     DeviceLimits narrow = roomy;
     narrow.MaxWorkgroupSizeX = 32u;
     const std::expected<VariantKey, lodestone::QueryError> tooWide =
         smallOnly.ForDevice(&TestDeviceSupports, &waves, narrow).SingleFor(generate);
-    runner.Check(!tooWide.has_value() && tooWide.error().Detail == static_cast<uint32_t>(DeviceMismatch::WorkgroupSize),
-                 "a device below the size limit on one side loses the instance");
+    if (runner.Check(!tooWide.has_value(), "a device below the size limit on one side loses the instance"))
+    {
+        runner.CheckEqual(tooWide.error().Detail, static_cast<uint32_t>(DeviceMismatch::WorkgroupSize),
+                          "a device below the size limit on one side loses the instance");
+    }
 
     DeviceLimits noPush = roomy;
     noPush.MaxPushConstantBytes = 128u;
     const std::expected<VariantKey, lodestone::QueryError> tooManyPushBytes =
         index.Query().Where("WAVE", true).Where("BIG", true).ForDevice(&TestDeviceSupports, &waves, noPush).SingleFor(generate);
-    runner.Check(!tooManyPushBytes.has_value() &&
-                     tooManyPushBytes.error().Detail == static_cast<uint32_t>(DeviceMismatch::PushConstants),
-                 "a device below the push constant bytes loses the instance with a 144 byte block");
+    if (runner.Check(!tooManyPushBytes.has_value(),
+                     "a device below the push constant bytes loses the instance with a 144 byte block"))
+    {
+        runner.CheckEqual(tooManyPushBytes.error().Detail, static_cast<uint32_t>(DeviceMismatch::PushConstants),
+                          "a device below the push constant bytes loses the instance with a 144 byte block");
+    }
 
     runner.Check(index.Query().ForDevice(&TestDeviceSupports, &waves, DeviceLimits{}).Keys()->empty(),
                  "limits left at 0 reject every instance with a size, and the query stays valid");
@@ -743,8 +781,8 @@ void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
     relevanceLibrary.Profiles = { MakeProfile("wgsl") };
     relevanceLibrary.Environments.emplace_back(BuildRelevanceModule(relevanceSpace, true));
     const std::vector<std::byte> bytes = EmitBytes(relevanceLibrary);
-    runner.Check(lodestone::VerifyManifestRoundTrip(relevanceLibrary, bytes) == lodestone::CookError::Success,
-                 "the relevance module passes the validator");
+    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(relevanceLibrary, bytes), lodestone::CookError::Success,
+                      "the relevance module passes the validator");
 
     lodestone::manifest::Header header;
     std::memcpy(&header, bytes.data(), sizeof(header));
@@ -758,9 +796,9 @@ void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
     std::memcpy(&word, damaged.data() + fogWordOffset, sizeof(word));
     word &= ~uint64_t{ 1u }; // FOG, for FogCS
     std::memcpy(damaged.data() + fogWordOffset, &word, sizeof(word));
-    runner.Check(lodestone::VerifyManifestRoundTrip(relevanceLibrary, damaged) ==
-                     lodestone::CookError::ManifestAxisRelevanceMismatch,
-                 "a stored mask that calls a code-changing axis irrelevant fails the validator");
+    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(relevanceLibrary, damaged),
+                      lodestone::CookError::ManifestAxisRelevanceMismatch,
+                      "a stored mask that calls a code-changing axis irrelevant fails the validator");
 
     // the broken chain: every axis is Inert in the per-axis pass, and the closing pass must mark all three,
     // because (0,0,0) and (1,1,0) hold different code and the whole cook is one class of the empty mask
@@ -774,8 +812,8 @@ void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
     runner.Check(chainView.has_value() && chainView->IsAxisRelevant(0u, 0u) && chainView->IsAxisRelevant(0u, 1u) &&
                      chainView->IsAxisRelevant(0u, 2u),
                  "the closing pass marks every axis that varies in a class with two instances");
-    runner.Check(lodestone::VerifyManifestRoundTrip(chainLibrary, chainBytes) == lodestone::CookError::Success,
-                 "the closed mask passes the validator");
+    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(chainLibrary, chainBytes), lodestone::CookError::Success,
+                      "the closed mask passes the validator");
     if (chainView.has_value())
     {
         const ManifestIndex chainIndex{ *chainView };
@@ -783,10 +821,11 @@ void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
         // C = false matches (0,0,0) and (1,1,0), which hold different code, so this must not pick one of them
         const std::expected<VariantKey, lodestone::QueryError> highQuality =
             chainIndex.Query().Where("C", false).SingleFor(mainCS);
-        runner.Check(!highQuality.has_value() &&
-                         highQuality.error().Code == lodestone::QueryErrorCode::AmbiguousVariant &&
-                         highQuality.error().AxisName == "A, B",
-                     "SingleFor does not choose between the two code paths of the broken chain");
+        const char* const highQualityClaim = "SingleFor does not choose between the two code paths of the broken chain";
+        if (runner.CheckError(highQuality, QueryErrorCode::AmbiguousVariant, highQualityClaim))
+        {
+            runner.CheckEqual(highQuality.error().AxisName, "A, B", highQualityClaim);
+        }
     }
 
     // the per-axis pass alone derives an empty mask here, so only a validator that closes the mask too can see
@@ -804,9 +843,9 @@ void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
     const uint64_t noAxes = 0u;
     std::memcpy(unclosed.data() + chainEntry.ExtentOffset + chainEnvironment.AxisRelevanceTableOffset, &noAxes,
                 sizeof(noAxes));
-    runner.Check(lodestone::VerifyManifestRoundTrip(chainLibrary, unclosed) ==
-                     lodestone::CookError::ManifestAxisRelevanceMismatch,
-                 "a stored mask that the per-axis pass alone would accept fails the validator");
+    runner.CheckEqual(lodestone::VerifyManifestRoundTrip(chainLibrary, unclosed),
+                      lodestone::CookError::ManifestAxisRelevanceMismatch,
+                      "a stored mask that the per-axis pass alone would accept fails the validator");
 }
 
 // Counts the keys of a query, or returns SIZE_MAX when the query is in an error state.
@@ -824,7 +863,7 @@ int main()
 
     const std::vector<std::byte> bytes = BuildManifestBytes();
     const ManifestResult<EnvironmentView> opened = OpenEnvironment(bytes, 0u, 0u);
-    runner.Check(opened.has_value(), "the emitter produces a manifest the reader accepts");
+    runner.CheckOk(opened, "the emitter produces a manifest the reader accepts");
     if (!opened.has_value())
     {
         return runner.Report();
@@ -833,57 +872,68 @@ int main()
     const ManifestIndex index{ opened.value() };
 
     runner.BeginSection("the index enumerates and decodes every variant");
-    runner.Check(index.Enumerate().size() == k_TotalVariants, "Enumerate returns every variant");
-    runner.Check(index.View().Module().AxisCount() == 4u, "the module carries four axes");
+    runner.CheckEqual(index.Enumerate().size(), k_TotalVariants, "Enumerate returns every variant");
+    runner.CheckEqual(index.View().Module().AxisCount(), 4u, "the module carries four axes");
 
     // Decode a known key: digits [dither=1, quality=2 (Medium), tile=1 (16), shade=0 (Lambert)].
     const std::array<uint32_t, 4> knownDigits{ 1u, 2u, 1u, 0u };
     const VariantKey knownKey = PackVariantKey(knownDigits, k_Radices);
     const std::vector<lodestone::QueryAxisValue> decoded = index.Decode(knownKey);
-    runner.Check(decoded.size() == 4u, "Decode returns one value per axis");
+    runner.CheckEqual(decoded.size(), 4u, "Decode returns one value per axis");
     if (decoded.size() == 4u)
     {
-        runner.Check(decoded[k_DitherAxis].Type == AxisValueDomain::Boolean &&
-                     decoded[k_DitherAxis].IntegralValue == 1u, "the boolean axis decodes to true");
-        runner.Check(decoded[k_QualityAxis].Type == AxisValueDomain::Enum &&
-                     decoded[k_QualityAxis].Name == "Medium", "the enum axis decodes to the case name");
-        runner.Check(decoded[k_TileAxis].Type == AxisValueDomain::Integral &&
-                     decoded[k_TileAxis].IntegralValue == 16u, "the integral axis decodes to its value");
-        runner.Check(decoded[k_ShadeAxis].Type == AxisValueDomain::Type &&
-                     decoded[k_ShadeAxis].Name == "Lambert", "the type axis decodes to the impl name");
+        runner.CheckEqual(decoded[k_DitherAxis].Type, AxisValueDomain::Boolean, "the boolean axis decodes to true");
+        runner.CheckEqual(decoded[k_DitherAxis].IntegralValue, 1u, "the boolean axis decodes to true");
+        runner.CheckEqual(decoded[k_QualityAxis].Type, AxisValueDomain::Enum, "the enum axis decodes to the case name");
+        runner.CheckEqual(decoded[k_QualityAxis].Name, "Medium", "the enum axis decodes to the case name");
+        runner.CheckEqual(decoded[k_TileAxis].Type, AxisValueDomain::Integral, "the integral axis decodes to its value");
+        runner.CheckEqual(decoded[k_TileAxis].IntegralValue, 16u, "the integral axis decodes to its value");
+        runner.CheckEqual(decoded[k_ShadeAxis].Type, AxisValueDomain::Type, "the type axis decodes to the impl name");
+        runner.CheckEqual(decoded[k_ShadeAxis].Name, "Lambert", "the type axis decodes to the impl name");
     }
 
     runner.BeginSection("the index names its axes and their values");
     {
         const std::vector<std::string_view> names = index.AxisNames();
-        runner.Check(names.size() == 4u && names[k_DitherAxis] == "DITHER" && names[k_QualityAxis] == "QUALITY" &&
-                         names[k_TileAxis] == "TILE" && names[k_ShadeAxis] == "SHADE",
-                     "AxisNames lists every axis in axis order");
+        if (runner.CheckEqual(names.size(), 4u, "AxisNames lists every axis in axis order"))
+        {
+            runner.CheckEqual(names[k_DitherAxis], "DITHER", "AxisNames lists every axis in axis order");
+            runner.CheckEqual(names[k_QualityAxis], "QUALITY", "AxisNames lists every axis in axis order");
+            runner.CheckEqual(names[k_TileAxis], "TILE", "AxisNames lists every axis in axis order");
+            runner.CheckEqual(names[k_ShadeAxis], "SHADE", "AxisNames lists every axis in axis order");
+        }
         const lodestone::QueryResult<std::vector<lodestone::QueryAxisValue>> quality = index.AxisValues("QUALITY");
-        runner.Check(quality.has_value() && quality->size() == 3u && (*quality)[0].Name == "Low" &&
-                         (*quality)[1].Name == "High" && (*quality)[2].Name == "Medium",
-                     "AxisValues lists an enum axis by case name, in digit order");
+        const char* const qualityClaim = "AxisValues lists an enum axis by case name, in digit order";
+        if (runner.CheckOk(quality, qualityClaim) && runner.CheckEqual(quality->size(), 3u, qualityClaim))
+        {
+            runner.CheckEqual((*quality)[0].Name, "Low", qualityClaim);
+            runner.CheckEqual((*quality)[1].Name, "High", qualityClaim);
+            runner.CheckEqual((*quality)[2].Name, "Medium", qualityClaim);
+        }
         const lodestone::QueryResult<std::vector<lodestone::QueryAxisValue>> tile = index.AxisValues("TILE");
-        runner.Check(tile.has_value() && tile->size() == 3u && (*tile)[2].IntegralValue == 32u,
-                     "AxisValues lists an integral axis by value");
-        runner.Check(!index.AxisValues("TIEL").has_value() &&
-                         index.AxisValues("TIEL").error() == QueryErrorCode::UnknownAxis,
-                     "AxisValues reports an unknown axis");
+        if (runner.CheckOk(tile, "AxisValues lists an integral axis by value") &&
+            runner.CheckEqual(tile->size(), 3u, "AxisValues lists an integral axis by value"))
+        {
+            runner.CheckEqual((*tile)[2].IntegralValue, 32u, "AxisValues lists an integral axis by value");
+        }
+        runner.CheckError(index.AxisValues("TIEL"), QueryErrorCode::UnknownAxis, "AxisValues reports an unknown axis");
     }
 
     runner.BeginSection("the index reads the declared default of each axis");
     {
-        runner.Check(index.View().Module().AxisDefaultDigit(k_TileAxis) == 1u,
-                     "the module stores the default as a digit of its own key");
+        runner.CheckEqual(index.View().Module().AxisDefaultDigit(k_TileAxis), 1u,
+                          "the module stores the default as a digit of its own key");
         const lodestone::QueryResult<lodestone::QueryAxisValue> tileDefault = index.AxisDefault("TILE");
-        runner.Check(tileDefault.has_value() && tileDefault->IntegralValue == 16u,
-                     "AxisDefault returns the declared default, not the first value");
+        if (runner.CheckOk(tileDefault, "AxisDefault returns the declared default, not the first value"))
+        {
+            runner.CheckEqual(tileDefault->IntegralValue, 16u, "AxisDefault returns the declared default, not the first value");
+        }
         const lodestone::QueryResult<lodestone::QueryAxisValue> qualityDefault = index.AxisDefault("QUALITY");
-        runner.Check(qualityDefault.has_value() && qualityDefault->Name == "Low",
-                     "an axis declared with its first value as the default reads that value");
-        runner.Check(!index.AxisDefault("TIEL").has_value() &&
-                         index.AxisDefault("TIEL").error() == QueryErrorCode::UnknownAxis,
-                     "AxisDefault reports an unknown axis");
+        if (runner.CheckOk(qualityDefault, "an axis declared with its first value as the default reads that value"))
+        {
+            runner.CheckEqual(qualityDefault->Name, "Low", "an axis declared with its first value as the default reads that value");
+        }
+        runner.CheckError(index.AxisDefault("TIEL"), QueryErrorCode::UnknownAxis, "AxisDefault reports an unknown axis");
 
         // damage the default digit of TILE so that it reaches past the axis radix
         const ManifestResult<BundleView> bundle = BundleView::Open(bytes);
@@ -899,32 +949,31 @@ int main()
                         &pastRadix,
                         sizeof(pastRadix));
             const ManifestResult<BundleView> damaged = BundleView::Open(badDefault);
-            runner.Check(!damaged.has_value() &&
-                             damaged.error().Code == lodestone::manifest::ErrorCode::InvalidModuleAxisDefault,
-                         "a default digit at or past the radix is rejected when the bundle opens");
+            runner.CheckError(damaged,
+                              lodestone::manifest::ErrorCode::InvalidModuleAxisDefault,
+                              "a default digit at or past the radix is rejected when the bundle opens");
         }
     }
 
     runner.BeginSection("an empty query matches every variant");
-    runner.Check(KeyCount(index.Query()) == k_TotalVariants, "no constraint leaves every variant");
+    runner.CheckEqual(KeyCount(index.Query()), k_TotalVariants, "no constraint leaves every variant");
 
     runner.BeginSection("a single Where narrows one axis");
-    runner.Check(KeyCount(index.Query().Where("DITHER", true)) == 18u, "one boolean value halves the set");
-    runner.Check(KeyCount(index.Query().Where("QUALITY", AxisValueDomain::Enum, "Low")) == 12u,
-                 "one enum case is a third of the set");
-    runner.Check(KeyCount(index.Query().Where("TILE", 16u)) == 12u, "one integral value is a third");
-    runner.Check(KeyCount(index.Query().Where("SHADE", AxisValueDomain::Type, "Phong")) == 18u,
-                 "one type impl halves the set");
+    runner.CheckEqual(KeyCount(index.Query().Where("DITHER", true)), 18u, "one boolean value halves the set");
+    runner.CheckEqual(KeyCount(index.Query().Where("QUALITY", AxisValueDomain::Enum, "Low")), 12u,
+                      "one enum case is a third of the set");
+    runner.CheckEqual(KeyCount(index.Query().Where("TILE", 16u)), 12u, "one integral value is a third");
+    runner.CheckEqual(KeyCount(index.Query().Where("SHADE", AxisValueDomain::Type, "Phong")), 18u,
+                      "one type impl halves the set");
 
     runner.BeginSection("constraints on two axes intersect");
-    runner.Check(KeyCount(index.Query().Where("DITHER", true).Where("TILE", 16u)) == 6u,
-                 "two axes constrained is the product of the fractions");
+    runner.CheckEqual(KeyCount(index.Query().Where("DITHER", true).Where("TILE", 16u)), 6u,
+                      "two axes constrained is the product of the fractions");
 
     runner.BeginSection("a filtered query decodes to the value it asked for");
     const lodestone::QueryResult<std::vector<DecodedVariant>> ditherOn =
         index.Query().Where("DITHER", true).Variants();
-    runner.Check(ditherOn.has_value(), "the query resolves");
-    if (ditherOn.has_value())
+    if (runner.CheckOk(ditherOn, "the query resolves"))
     {
         bool allTrue = true;
         for (const DecodedVariant& variant : *ditherOn)
@@ -936,27 +985,27 @@ int main()
 
     runner.BeginSection("WhereAnyOf unions values within one axis");
     const std::array<uint32_t, 2> tilePair{ 8u, 32u };
-    runner.Check(KeyCount(index.Query().WhereAnyOf("TILE", tilePair)) == 24u,
-                 "two of three integral values is two thirds");
+    runner.CheckEqual(KeyCount(index.Query().WhereAnyOf("TILE", tilePair)), 24u,
+                      "two of three integral values is two thirds");
     const std::array<std::string_view, 2> qualityPair{ "Low", "Medium" };
-    runner.Check(KeyCount(index.Query().WhereAnyOf("QUALITY", AxisValueDomain::Enum, qualityPair)) == 24u,
-                 "two of three enum cases is two thirds");
-    runner.Check(KeyCount(index.Query().WhereAnyOfBoolean("DITHER")) == k_TotalVariants,
-                 "both boolean values leave every variant");
+    runner.CheckEqual(KeyCount(index.Query().WhereAnyOf("QUALITY", AxisValueDomain::Enum, qualityPair)), 24u,
+                      "two of three enum cases is two thirds");
+    runner.CheckEqual(KeyCount(index.Query().WhereAnyOfBoolean("DITHER")), k_TotalVariants,
+                      "both boolean values leave every variant");
 
     runner.BeginSection("WhereNoneOf keeps the complement");
     const std::array<uint32_t, 1> tileEight{ 8u };
-    runner.Check(KeyCount(index.Query().WhereNoneOf("TILE", tileEight)) == 24u,
-                 "excluding one integral value keeps the other two");
+    runner.CheckEqual(KeyCount(index.Query().WhereNoneOf("TILE", tileEight)), 24u,
+                      "excluding one integral value keeps the other two");
     const std::array<std::string_view, 1> qualityHigh{ "High" };
-    runner.Check(KeyCount(index.Query().WhereNoneOf("QUALITY", AxisValueDomain::Enum, qualityHigh)) == 24u,
-                 "excluding one enum case keeps the other two");
-    runner.Check(KeyCount(index.Query().WhereNoneOf("DITHER", true)) == 18u,
-                 "excluding one boolean value keeps the other");
+    runner.CheckEqual(KeyCount(index.Query().WhereNoneOf("QUALITY", AxisValueDomain::Enum, qualityHigh)), 24u,
+                      "excluding one enum case keeps the other two");
+    runner.CheckEqual(KeyCount(index.Query().WhereNoneOf("DITHER", true)), 18u,
+                      "excluding one boolean value keeps the other");
 
     runner.BeginSection("two Wheres on one axis coalesce into a union");
-    runner.Check(KeyCount(index.Query().Where("TILE", 8u).Where("TILE", 16u)) == 24u,
-                 "a second Where on the same axis widens the constraint");
+    runner.CheckEqual(KeyCount(index.Query().Where("TILE", 8u).Where("TILE", 16u)), 24u,
+                      "a second Where on the same axis widens the constraint");
 
     runner.BeginSection("VariantsFromKeys agrees with Variants");
     const ManifestQueryBuilder tileQuery = index.Query().Where("TILE", 16u);
@@ -965,8 +1014,10 @@ int main()
     {
         const std::vector<DecodedVariant> fromKeys = tileQuery.VariantsFromKeys(*tileKeys);
         const lodestone::QueryResult<std::vector<DecodedVariant>> direct = tileQuery.Variants();
-        runner.Check(direct.has_value() && direct->size() == fromKeys.size(),
-                     "the two paths return the same count");
+        if (runner.CheckOk(direct, "the two paths return the same count"))
+        {
+            runner.CheckEqual(direct->size(), fromKeys.size(), "the two paths return the same count");
+        }
     }
 
     runner.BeginSection("a valid query reports no error");
@@ -982,11 +1033,9 @@ int main()
                  "the error names the unknown axis");
     if (!unknownAxis.Errors().empty())
     {
-        runner.Check(unknownAxis.Errors().front().Suggestion == "DITHER", "the nearest axis name is suggested");
+        runner.CheckEqual(unknownAxis.Errors().front().Suggestion, "DITHER", "the nearest axis name is suggested");
     }
-    runner.Check(!unknownAxis.Keys().has_value() &&
-                 unknownAxis.Keys().error() == QueryErrorCode::UnknownAxis,
-                 "the terminal returns the error code");
+    runner.CheckError(unknownAxis.Keys(), QueryErrorCode::UnknownAxis, "the terminal returns the error code");
 
     runner.BeginSection("a value in the wrong domain reports IncorrectValueDomain");
     const ManifestQueryBuilder wrongDomain = index.Query().Where("DITHER", 5u);
@@ -1003,15 +1052,13 @@ int main()
                  "an enum case the axis does not hold is rejected");
     if (!badEnum.Errors().empty())
     {
-        runner.Check(badEnum.Errors().front().Suggestion == "Low", "the nearest case name is suggested");
+        runner.CheckEqual(badEnum.Errors().front().Suggestion, "Low", "the nearest case name is suggested");
     }
 
     runner.BeginSection("errors accumulate and the terminal reports the first");
     const ManifestQueryBuilder twoErrors = index.Query().Where("NOPE", true).Where("ALSONOPE", 1u);
-    runner.Check(twoErrors.Errors().size() == 2u, "each bad Where adds one error");
-    runner.Check(!twoErrors.Keys().has_value() &&
-                 twoErrors.Keys().error() == QueryErrorCode::UnknownAxis,
-                 "the terminal returns the first error code");
+    runner.CheckEqual(twoErrors.Errors().size(), 2u, "each bad Where adds one error");
+    runner.CheckError(twoErrors.Keys(), QueryErrorCode::UnknownAxis, "the terminal returns the first error code");
 
     // make sure that empty value sets into constraints report back as expected, but still
     // make sure the unknown axis is reported before the empty set
@@ -1044,40 +1091,45 @@ int main()
                                                                         .Where("TILE", 16u)
                                                                         .Where("SHADE", AxisValueDomain::Type, "Phong")
                                                                         .Single();
-    runner.Check(pinned.has_value() &&
-                 *pinned == PackVariantKey(std::array<uint32_t, 4>{ 1u, 1u, 1u, 1u }, k_Radices),
-                 "four pinned axes give the one matching key");
+    if (runner.CheckOk(pinned, "four pinned axes give the one matching key"))
+    {
+        runner.CheckEqual(*pinned, PackVariantKey(std::array<uint32_t, 4>{ 1u, 1u, 1u, 1u }, k_Radices),
+                          "four pinned axes give the one matching key");
+    }
     const std::expected<VariantKey, lodestone::QueryError> partial =
         index.Query().Where("DITHER", true).Where("TILE", 16u).Single();
-    runner.Check(!partial.has_value() && partial.error().Code == QueryErrorCode::AmbiguousVariant,
-                 "two pinned axes of four are ambiguous");
+    runner.CheckError(partial, QueryErrorCode::AmbiguousVariant, "two pinned axes of four are ambiguous");
     if (!partial.has_value())
     {
-        runner.Check(partial.error().AxisName == "QUALITY, SHADE", "the error names the unpinned axes, in axis order");
-        runner.Check(partial.error().Detail == 6u, "the error counts the matches");
+        runner.CheckEqual(partial.error().AxisName, "QUALITY, SHADE", "the error names the unpinned axes, in axis order");
+        runner.CheckEqual(partial.error().Detail, 6u, "the error counts the matches");
     }
     const std::expected<VariantKey, lodestone::QueryError> badSingle = index.Query().Where("DITHR", true).Single();
-    runner.Check(!badSingle.has_value() && badSingle.error().Code == QueryErrorCode::UnknownAxis &&
-                 badSingle.error().Suggestion == "DITHER",
-                 "a builder error reaches Single whole, with its suggestion");
+    if (runner.CheckError(badSingle, QueryErrorCode::UnknownAxis, "a builder error reaches Single whole, with its suggestion"))
+    {
+        runner.CheckEqual(badSingle.error().Suggestion, "DITHER",
+                          "a builder error reaches Single whole, with its suggestion");
+    }
 
     const std::vector<std::byte> oneVariantBytes = BuildManifest(&KeepFirstOnly, &AllActive);
     const ManifestResult<EnvironmentView> oneVariantOpened = OpenEnvironment(oneVariantBytes, 0u, 0u);
-    runner.Check(oneVariantOpened.has_value(), "the one-variant manifest opens");
-    if (oneVariantOpened.has_value())
+    if (runner.CheckOk(oneVariantOpened, "the one-variant manifest opens"))
     {
         const ManifestIndex oneVariant{ oneVariantOpened.value() };
         const std::expected<VariantKey, lodestone::QueryError> only = oneVariant.Query().Single();
-        runner.Check(only.has_value() && *only == PackVariantKey(std::array<uint32_t, 4>{ 0u, 0u, 0u, 0u }, k_Radices),
-                     "a query with no constraint on a one-variant module gives that variant");
+        if (runner.CheckOk(only, "a query with no constraint on a one-variant module gives that variant"))
+        {
+            runner.CheckEqual(*only, PackVariantKey(std::array<uint32_t, 4>{ 0u, 0u, 0u, 0u }, k_Radices),
+                              "a query with no constraint on a one-variant module gives that variant");
+        }
     }
 
     // The query errors fill Suggestion through NearestName. A renderer calls it the same way for a name
     // of its own, through the client header alone.
     runner.BeginSection("NearestName gives the query's suggestion to any caller");
     const std::vector<std::string_view> axisNames = index.AxisNames();
-    runner.Check(lodestone::NearestName("QUALTY", axisNames) == "QUALITY", "one missing letter finds the axis");
-    runner.Check(lodestone::NearestName("TLIE", axisNames) == "TILE", "a transposition counts as one edit");
+    runner.CheckEqual(lodestone::NearestName("QUALTY", axisNames), "QUALITY", "one missing letter finds the axis");
+    runner.CheckEqual(lodestone::NearestName("TLIE", axisNames), "TILE", "a transposition counts as one edit");
     runner.Check(lodestone::NearestName("BLOOM", axisNames).empty(), "a name far from every candidate gives nothing");
 
     // manifest where one axis value was left out: queries are still valid, because it is an axis value,
@@ -1085,21 +1137,18 @@ int main()
     runner.BeginSection("a valid value with no cooked variant returns an empty result");
     const std::vector<std::byte> sparseBytes = BuildManifest(&KeepSmallTiles, &AllActive);
     const ManifestResult<EnvironmentView> sparseOpened = OpenEnvironment(sparseBytes, 0u, 0u);
-    runner.Check(sparseOpened.has_value(), "the sparse manifest opens");
-    if (sparseOpened.has_value())
+    runner.CheckOk(sparseOpened, "the sparse manifest opens");
     {
         const ManifestIndex sparse{ sparseOpened.value() };
-        runner.Check(sparse.Enumerate().size() == 24u, "only the kept variants exist");
-        runner.Check(sparse.View().Module().AxisValueCount(k_TileAxis) == 3u,
-                     "the axis schema still declares all three TILE values");
-        runner.Check(KeyCount(sparse.Query().Where("TILE", 8u)) == 12u, "a present value still matches");
+        runner.CheckEqual(sparse.Enumerate().size(), 24u, "only the kept variants exist");
+        runner.CheckEqual(sparse.View().Module().AxisValueCount(k_TileAxis), 3u,
+                          "the axis schema still declares all three TILE values");
+        runner.CheckEqual(KeyCount(sparse.Query().Where("TILE", 8u)), 12u, "a present value still matches");
         const ManifestQueryBuilder absentValue = sparse.Query().Where("TILE", 32u);
         runner.Check(absentValue.IsValid(), "a declared value is not an error");
-        runner.Check(KeyCount(absentValue) == 0u, "but it names no cooked variant, so the result is empty");
+        runner.CheckEqual(KeyCount(absentValue), 0u, "but it names no cooked variant, so the result is empty");
         const std::expected<VariantKey, lodestone::QueryError> absentSingle = absentValue.Single();
-        runner.Check(!absentSingle.has_value() &&
-                     absentSingle.error().Code == QueryErrorCode::NoVariantForConstraints,
-                     "Single reports the empty result as NoVariantForConstraints");
+        runner.CheckError(absentSingle, QueryErrorCode::NoVariantForConstraints, "Single reports the empty result as NoVariantForConstraints");
     }
 
     // SHADE is gated on DITHER, so no variant has DITHER false and SHADE Phong
@@ -1109,36 +1158,39 @@ int main()
                       { return digits[k_DitherAxis] != 0u || digits[k_ShadeAxis] == 0u; },
                       &ShadeActiveWhenDither);
     const ManifestResult<EnvironmentView> gatedOpened = OpenEnvironment(gatedBytes, 0u, 0u);
-    runner.Check(gatedOpened.has_value(), "the gated manifest opens");
-    if (gatedOpened.has_value())
+    runner.CheckOk(gatedOpened, "the gated manifest opens");
     {
         const ManifestIndex gated{ gatedOpened.value() };
         // if DITHER is false, SHADE is set to Lambert
         // if DITHER is true, SHADE is allowed to vary fully without restriction
-        runner.Check(gated.Enumerate().size() == 27u, "the gated-off combinations are absent");
+        runner.CheckEqual(gated.Enumerate().size(), 27u, "the gated-off combinations are absent");
         // as noted: the axis values aren't changed. this is important for the query layer
         // to behave consistently between cooks that may gate values (so code doesn't need to respond differently)
-        runner.Check(gated.View().Module().AxisValueCount(k_ShadeAxis) == 2u,
-                     "the gated axis still declares both values in the schema");
-        runner.Check(KeyCount(gated.Query().Where("SHADE", AxisValueDomain::Type, "Phong")) == 9u,
-                     "the gated value exists only where its parent enables it");
+        runner.CheckEqual(gated.View().Module().AxisValueCount(k_ShadeAxis), 2u,
+                          "the gated axis still declares both values in the schema");
+        runner.CheckEqual(KeyCount(gated.Query().Where("SHADE", AxisValueDomain::Type, "Phong")), 9u,
+                          "the gated value exists only where its parent enables it");
         const ManifestQueryBuilder gatedOff =
             gated.Query().Where("DITHER", false).Where("SHADE", AxisValueDomain::Type, "Phong");
         runner.Check(gatedOff.IsValid(), "the gated-off combination uses two valid values");
-        runner.Check(KeyCount(gatedOff) == 0u, "yet it names no variant");
+        runner.CheckEqual(KeyCount(gatedOff), 0u, "yet it names no variant");
 
         // The gated-off variants store SHADE at its default digit (Lambert), but SHADE is inactive there.
         // A digit test alone returns them for a Lambert query. The axis-active mask removes them.
-        runner.Check(KeyCount(gated.Query().Where("SHADE", AxisValueDomain::Type, "Lambert")) == 9u,
-                     "a gated axis at its default value matches only where the axis is active");
+        runner.CheckEqual(KeyCount(gated.Query().Where("SHADE", AxisValueDomain::Type, "Lambert")), 9u,
+                          "a gated axis at its default value matches only where the axis is active");
         const std::array<std::string_view, 1> phong{ "Phong" };
-        runner.Check(KeyCount(gated.Query().WhereNoneOf("SHADE", AxisValueDomain::Type, phong)) == 9u,
-                     "WhereNoneOf on a gated axis also selects only where the axis is active");
-        runner.Check(KeyCount(gated.Query().Where("DITHER", false)) == 9u,
-                     "a query that does not name the gated axis still returns the gated-off variants");
+        runner.CheckEqual(KeyCount(gated.Query().WhereNoneOf("SHADE", AxisValueDomain::Type, phong)), 9u,
+                          "WhereNoneOf on a gated axis also selects only where the axis is active");
+        runner.CheckEqual(KeyCount(gated.Query().Where("DITHER", false)), 9u,
+                          "a query that does not name the gated axis still returns the gated-off variants");
         const std::expected<VariantKey, lodestone::QueryError> gatedSingle = gated.Query().Where("DITHER", false).Single();
-        runner.Check(!gatedSingle.has_value() && gatedSingle.error().AxisName == "QUALITY, TILE",
-                     "an axis that is inactive in every match does not vary, so Single does not name it");
+        if (runner.Check(!gatedSingle.has_value(),
+                         "an axis that is inactive in every match does not vary, so Single does not name it"))
+        {
+            runner.CheckEqual(gatedSingle.error().AxisName, "QUALITY, TILE",
+                              "an axis that is inactive in every match does not vary, so Single does not name it");
+        }
 
         const VariantKey gatedOffKey = PackVariantKey(std::array<uint32_t, 4>{ 0u, 0u, 0u, 0u }, k_Radices);
         const std::vector<lodestone::QueryAxisValue> decoded = gated.Decode(gatedOffKey);
@@ -1159,18 +1211,19 @@ int main()
     {
         const ManifestIndex gated{ gatedOpened.value() };
         const VariantKey gatedOffKey = PackVariantKey(std::array<uint32_t, 4>{ 0u, 0u, 0u, 0u }, k_Radices);
-        runner.Check(KeyCount(gated.Query().Where("SHADE", AxisValueDomain::Type, "Phong")) == 9u,
-                     "a Required pin on a gated axis removes the gated-off variants");
+        runner.CheckEqual(KeyCount(gated.Query().Where("SHADE", AxisValueDomain::Type, "Phong")), 9u,
+                          "a Required pin on a gated axis removes the gated-off variants");
         // Phong is digit 1 and the gated-off variants store digit 0, so this row also proves that filterKeys
         // keeps digit 0 in the key band for a WhenActive constraint
-        runner.Check(KeyCount(gated.Query().WhereWhenActive("SHADE", AxisValueDomain::Type, "Phong")) == 18u,
-                     "a WhenActive pin on a gated axis keeps the 9 gated-off variants and the 9 active Phong variants");
-        runner.Check(KeyCount(gated.Query().WhereWhenActive("SHADE", AxisValueDomain::Type, "Phong").Where("DITHER", true)) == 9u,
-                     "a WhenActive pin and a pin on its gate select only the active Phong variants");
-        runner.Check(KeyCount(gated.Query()
-                                  .Where("SHADE", AxisValueDomain::Type, "Lambert")
-                                  .WhereWhenActive("SHADE", AxisValueDomain::Type, "Phong")) == 27u,
-                     "a Required and a WhenActive pin on one axis merge to WhenActive over both values");
+        runner.CheckEqual(KeyCount(gated.Query().WhereWhenActive("SHADE", AxisValueDomain::Type, "Phong")), 18u,
+                          "a WhenActive pin on a gated axis keeps the 9 gated-off variants and the 9 active Phong variants");
+        runner.CheckEqual(KeyCount(gated.Query().WhereWhenActive("SHADE", AxisValueDomain::Type, "Phong").Where("DITHER", true)), 9u,
+                          "a WhenActive pin and a pin on its gate select only the active Phong variants");
+        runner.CheckEqual(KeyCount(gated.Query()
+                                      .Where("SHADE", AxisValueDomain::Type, "Lambert")
+                                      .WhereWhenActive("SHADE", AxisValueDomain::Type, "Phong")),
+                          27u,
+                          "a Required and a WhenActive pin on one axis merge to WhenActive over both values");
 
         QueryPreset preset;
         preset.Pin("DITHER", false, PinMode::Required);
@@ -1180,17 +1233,25 @@ int main()
         preset.Pin("FOG", true, PinMode::Required);
         const ManifestQueryBuilder applied = gated.Query().Apply(preset);
         runner.Check(applied.IsValid(), "a pin on an undeclared axis is not an error");
-        runner.Check(applied.Notes().size() == 1u &&
-                         applied.Notes().front().Code == lodestone::QueryNoteCode::PinAxisNotDeclared &&
-                         applied.Notes().front().AxisName == "FOG",
-                     "a pin on an undeclared axis gives one note that names the axis");
+        if (runner.CheckEqual(applied.Notes().size(), 1u, "a pin on an undeclared axis gives one note that names the axis"))
+        {
+            runner.CheckEqual(applied.Notes().front().Code, lodestone::QueryNoteCode::PinAxisNotDeclared,
+                              "a pin on an undeclared axis gives one note that names the axis");
+            runner.CheckEqual(applied.Notes().front().AxisName, "FOG",
+                              "a pin on an undeclared axis gives one note that names the axis");
+        }
         const std::expected<VariantKey, lodestone::QueryError> presetSingle = applied.Single();
-        runner.Check(presetSingle.has_value() && presetSingle.value() == gatedOffKey,
-                     "a WhenActive pin does not stop Single from returning a gated-off variant");
+        if (runner.CheckOk(presetSingle, "a WhenActive pin does not stop Single from returning a gated-off variant"))
+        {
+            runner.CheckEqual(presetSingle.value(), gatedOffKey,
+                              "a WhenActive pin does not stop Single from returning a gated-off variant");
+        }
         const std::array<std::string_view, 1> mainStage{ "MainCS" };
         const std::expected<VariantKey, lodestone::QueryError> presetSingleFor = applied.SingleFor(mainStage);
-        runner.Check(presetSingleFor.has_value() && presetSingleFor.value() == gatedOffKey,
-                     "SingleFor takes the same preset");
+        if (runner.CheckOk(presetSingleFor, "SingleFor takes the same preset"))
+        {
+            runner.CheckEqual(presetSingleFor.value(), gatedOffKey, "SingleFor takes the same preset");
+        }
 
         const ManifestQueryBuilder repeated = gated.Query().Where("TILE", 8u).Where("TILE", 8u);
         runner.Check(repeated.IsValid() && repeated.Notes().size() == 1u &&
@@ -1198,8 +1259,8 @@ int main()
                          repeated.Notes().front().AxisName == "TILE",
                      "a value that the axis constraint already names gives one note");
         const std::array<uint32_t, 2> eightTwice{ 8u, 8u };
-        runner.Check(gated.Query().WhereAnyOf("TILE", eightTwice).Notes().size() == 1u,
-                     "a value repeated within one call gives one note");
+        runner.CheckEqual(gated.Query().WhereAnyOf("TILE", eightTwice).Notes().size(), 1u,
+                          "a value repeated within one call gives one note");
         const std::array<uint32_t, 1> eight{ 8u };
         const std::array<uint32_t, 1> sixteen{ 16u };
         runner.Check(gated.Query().WhereNoneOf("TILE", eight).WhereNoneOf("TILE", sixteen).Notes().empty(),
@@ -1228,19 +1289,19 @@ int main()
 
         const ManifestResult<EnvironmentView> full = OpenEnvironment(twoProfileBytes, 0u, 0u);
         const ManifestResult<EnvironmentView> pruned = OpenEnvironment(twoProfileBytes, 1u, 0u);
-        runner.Check(full.has_value() && pruned.has_value(), "both environments open");
+        runner.CheckOk(full, "both environments open");
+        runner.CheckOk(pruned, "both environments open");
         if (full.has_value() && pruned.has_value())
         {
             const ManifestIndex fullIndex{ *full };
             const ManifestIndex prunedIndex{ *pruned };
-            runner.Check(fullIndex.Enumerate().size() == k_TotalVariants, "the first profile holds every variant");
-            runner.Check(prunedIndex.Enumerate().size() == 24u, "the second profile holds only its subset");
-            runner.Check(KeyCount(fullIndex.Query().Where("TILE", 32u)) == 12u &&
-                         KeyCount(prunedIndex.Query().Where("TILE", 32u)) == 0u,
-                         "one query gives each profile its own answer");
-            runner.Check(fullIndex.Decode(knownKey)[k_TileAxis].IntegralValue ==
-                             prunedIndex.Decode(knownKey)[k_TileAxis].IntegralValue,
-                         "one key decodes the same way in both profiles");
+            runner.CheckEqual(fullIndex.Enumerate().size(), k_TotalVariants, "the first profile holds every variant");
+            runner.CheckEqual(prunedIndex.Enumerate().size(), 24u, "the second profile holds only its subset");
+            runner.CheckEqual(KeyCount(fullIndex.Query().Where("TILE", 32u)), 12u, "one query gives each profile its own answer");
+            runner.CheckEqual(KeyCount(prunedIndex.Query().Where("TILE", 32u)), 0u, "one query gives each profile its own answer");
+            runner.CheckEqual(fullIndex.Decode(knownKey)[k_TileAxis].IntegralValue,
+                              prunedIndex.Decode(knownKey)[k_TileAxis].IntegralValue,
+                              "one key decodes the same way in both profiles");
         }
     }
 
@@ -1264,32 +1325,33 @@ int main()
         const std::vector<std::byte> sharedBytes = EmitBytes(library);
 
         const ManifestResult<BundleView> bundle = BundleView::Open(sharedBytes);
-        runner.Check(bundle.has_value(), "the three-module bundle opens");
-        if (bundle.has_value())
+        runner.CheckOk(bundle, "the three-module bundle opens");
         {
-            runner.Check(bundle->Axes().size() == 2u,
-                         "the two ordered modules share one root axis, and the reversed one gets its own");
-            runner.Check(bundle->Module(0u).ModuleAxes()[0].AxisIndex == bundle->Module(1u).ModuleAxes()[0].AxisIndex,
-                         "the small and large modules name the same root axis");
-            runner.Check(bundle->AxisValues(bundle->Module(1u).ModuleAxes()[0].AxisIndex).size() == 4u,
-                         "the shared root axis holds the union of the values");
+            runner.CheckEqual(bundle->Axes().size(), 2u,
+                              "the two ordered modules share one root axis, and the reversed one gets its own");
+            runner.CheckEqual(bundle->Module(0u).ModuleAxes()[0].AxisIndex, bundle->Module(1u).ModuleAxes()[0].AxisIndex,
+                              "the small and large modules name the same root axis");
+            runner.CheckEqual(bundle->AxisValues(bundle->Module(1u).ModuleAxes()[0].AxisIndex).size(), 4u,
+                              "the shared root axis holds the union of the values");
         }
 
         const ManifestResult<EnvironmentView> large = OpenEnvironment(sharedBytes, 0u, 1u);
         const ManifestResult<EnvironmentView> reversed = OpenEnvironment(sharedBytes, 0u, 2u);
-        runner.Check(large.has_value() && reversed.has_value(), "the module environments open");
+        runner.CheckOk(large, "the module environments open");
+        runner.CheckOk(reversed, "the module environments open");
         if (large.has_value() && reversed.has_value())
         {
             const ManifestIndex largeIndex{ *large };
             const ManifestIndex reversedIndex{ *reversed };
-            runner.Check(largeIndex.Decode(VariantKey{ 0u })[0].IntegralValue == 16u &&
-                             largeIndex.Decode(VariantKey{ 2u })[0].IntegralValue == 64u,
-                         "a digit of the large module decodes to the large module's value");
-            runner.Check(KeyCount(largeIndex.Query().Where("TILE", 64u)) == 1u, "a value only one module has resolves");
+            runner.CheckEqual(largeIndex.Decode(VariantKey{ 0u })[0].IntegralValue, 16u,
+                              "a digit of the large module decodes to the large module's value");
+            runner.CheckEqual(largeIndex.Decode(VariantKey{ 2u })[0].IntegralValue, 64u,
+                              "a digit of the large module decodes to the large module's value");
+            runner.CheckEqual(KeyCount(largeIndex.Query().Where("TILE", 64u)), 1u, "a value only one module has resolves");
             runner.Check(!largeIndex.Query().Where("TILE", 8u).IsValid(),
                          "a value only the other module has is not in this module's axis");
-            runner.Check(reversedIndex.Decode(VariantKey{ 0u })[0].IntegralValue == 32u,
-                         "the reversed module keeps its own value order");
+            runner.CheckEqual(reversedIndex.Decode(VariantKey{ 0u })[0].IntegralValue, 32u,
+                              "the reversed module keeps its own value order");
         }
     }
 

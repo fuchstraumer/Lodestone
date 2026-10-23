@@ -48,7 +48,8 @@ int main(int argc, char** argv)
             runner.BeginSection(std::format("profile {}: a shim resource sits where the resource type itself sits", profile));
             const manifest::ManifestResult<manifest::EnvironmentView> shimEnvironment = shimBundle->OpenEnvironment(profile, 0u);
             const manifest::ManifestResult<manifest::EnvironmentView> controlEnvironment = controlBundle->OpenEnvironment(profile, 0u);
-            runner.Check(shimEnvironment.has_value() && controlEnvironment.has_value(), "both environments open");
+            runner.CheckOk(shimEnvironment, "both environments open");
+            runner.CheckOk(controlEnvironment, "both environments open");
             if (!shimEnvironment.has_value() || !controlEnvironment.has_value())
             {
                 continue;

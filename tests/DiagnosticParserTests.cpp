@@ -44,32 +44,32 @@ void TestRealCapture(TestRunner& runner)
 
     // Six lines in, four records out. Two of the six are spans, and a span is detail about the
     // message above it rather than a problem of its own.
-    runner.Check(records.size() == 4u, "a span does not become a record of its own");
+    runner.CheckEqual(records.size(), 4u, "a span does not become a record of its own");
 
     if (records.size() != 4u)
     {
         return;
     }
 
-    runner.Check(records[0].Severity == DiagnosticSeverity::Error, "the primary message is an error");
-    runner.Check(records[0].Code == "E30015", "the code keeps the E prefix the compiler wrote");
-    runner.Check(records[0].File == k_ModulePath, "the file reaches the record");
-    runner.Check(records[0].Range.StartLine == 10 && records[0].Range.StartColumn == 25,
-                 "the range starts where the compiler said");
-    runner.Check(records[0].Range.EndLine == 10 && records[0].Range.EndColumn == 51,
-                 "the range ends where the compiler said");
-    runner.Check(records[0].Message == "undefined identifier", "the message reaches the record");
-    runner.Check(records[0].Context == "loadModule", "the calling context reaches every record");
+    runner.CheckEqual(records[0].Severity, DiagnosticSeverity::Error, "the primary message is an error");
+    runner.CheckEqual(records[0].Code, "E30015", "the code keeps the E prefix the compiler wrote");
+    runner.CheckEqual(records[0].File, k_ModulePath, "the file reaches the record");
+    runner.CheckEqual(records[0].Range.StartLine, 10, "the range starts where the compiler said");
+    runner.CheckEqual(records[0].Range.StartColumn, 25, "the range starts where the compiler said");
+    runner.CheckEqual(records[0].Range.EndLine, 10, "the range ends where the compiler said");
+    runner.CheckEqual(records[0].Range.EndColumn, 51, "the range ends where the compiler said");
+    runner.CheckEqual(records[0].Message, "undefined identifier", "the message reaches the record");
+    runner.CheckEqual(records[0].Context, "loadModule", "the calling context reaches every record");
 
-    runner.Check(records[0].Related.size() == 1u, "the span attaches to the message above it");
-    runner.Check(records[0].Related.front().Message == "undefined identifier 'this_symbol_does_not_exist'.",
-                 "the span carries the detailed wording, so it must not be dropped");
+    runner.CheckEqual(records[0].Related.size(), 1u, "the span attaches to the message above it");
+    runner.CheckEqual(records[0].Related.front().Message, "undefined identifier 'this_symbol_does_not_exist'.",
+                      "the span carries the detailed wording, so it must not be dropped");
 
     runner.Check(records[1].File.empty() && records[1].Range == lodestone::SourceRange{},
                  "a message about no place in particular keeps no place in particular");
-    runner.Check(records[2].Severity == DiagnosticSeverity::Fatal, "a fatal error is not an error");
-    runner.Check(records[3].Message == "compilation ceased",
-                 "the aborting line is parsed rather than kept as raw text");
+    runner.CheckEqual(records[2].Severity, DiagnosticSeverity::Fatal, "a fatal error is not an error");
+    runner.CheckEqual(records[3].Message, "compilation ceased",
+                      "the aborting line is parsed rather than kept as raw text");
 }
 
 void TestSeverities(TestRunner& runner)
@@ -81,21 +81,21 @@ void TestSeverities(TestRunner& runner)
                                                   "E3\tinternal error\tf\t1\t1\t1\t2\ti\n"
                                                   "E4\tsomething slang added later\tf\t1\t1\t1\t2\tu\n");
 
-    runner.Check(records.size() == 4u, "each line gives one record");
+    runner.CheckEqual(records.size(), 4u, "each line gives one record");
 
     if (records.size() != 4u)
     {
         return;
     }
 
-    runner.Check(records[0].Severity == DiagnosticSeverity::Warning, "warning");
-    runner.Check(records[1].Severity == DiagnosticSeverity::Note, "note");
-    runner.Check(records[2].Severity == DiagnosticSeverity::Fatal,
-                 "an internal error stopped the compiler, so it is fatal");
+    runner.CheckEqual(records[0].Severity, DiagnosticSeverity::Warning, "warning");
+    runner.CheckEqual(records[1].Severity, DiagnosticSeverity::Note, "note");
+    runner.CheckEqual(records[2].Severity, DiagnosticSeverity::Fatal,
+                      "an internal error stopped the compiler, so it is fatal");
     // The safe direction is the only direction. A name nobody predicted must not quietly become a
     // note that the cook then ignores.
-    runner.Check(records[3].Severity == DiagnosticSeverity::Error,
-                 "a severity name this parser does not know becomes an error, never a note");
+    runner.CheckEqual(records[3].Severity, DiagnosticSeverity::Error,
+                      "a severity name this parser does not know becomes an error, never a note");
 }
 
 void TestFailureCount(TestRunner& runner)
@@ -111,12 +111,12 @@ void TestFailureCount(TestRunner& runner)
                                                    "test",
                                                    sink);
 
-    runner.Check(failures == 2, "the count holds the fatal record and the error record, and no other");
-    runner.Check(sink.Records().size() == 4u, "the count changes nothing that reaches the sink");
+    runner.CheckEqual(failures, 2, "the count holds the fatal record and the error record, and no other");
+    runner.CheckEqual(sink.Records().size(), 4u, "the count changes nothing that reaches the sink");
 
     RecordingDiagnosticSink quietSink;
-    runner.Check(ParseSlangDiagnostics("E1\twarning\tf\t1\t1\t1\t2\tw\n", "test", quietSink) == 0,
-                 "a warning alone gives a count of zero");
+    runner.CheckEqual(ParseSlangDiagnostics("E1\twarning\tf\t1\t1\t1\t2\tw\n", "test", quietSink), 0,
+                      "a warning alone gives a count of zero");
 }
 
 void TestNothingIsLost(TestRunner& runner)
@@ -126,19 +126,22 @@ void TestNothingIsLost(TestRunner& runner)
     // Losing a line would turn a failed compile into a silent success, so a line that does not parse
     // is still reported, with its own text as the message.
     const std::vector<Diagnostic> unreadable = Parse("this line is not tab separated at all");
-    runner.Check(unreadable.size() == 1u, "an unreadable line still produces a record");
+    runner.CheckEqual(unreadable.size(), 1u, "an unreadable line still produces a record");
     runner.Check(!unreadable.empty() && unreadable.front().Severity == DiagnosticSeverity::Error,
                  "an unreadable line is an error, because nobody can say it was not");
     runner.Check(!unreadable.empty() && unreadable.front().Message == "this line is not tab separated at all",
                  "an unreadable line keeps its own text");
 
     const std::vector<Diagnostic> tooFewFields = Parse("E1\terror\tfile\t1\t2\n");
-    runner.Check(tooFewFields.size() == 1u && tooFewFields.front().Message == "E1\terror\tfile\t1\t2",
-                 "a truncated record is kept whole rather than half read");
+    if (runner.CheckEqual(tooFewFields.size(), 1u, "a truncated record is kept whole rather than half read"))
+    {
+        runner.CheckEqual(tooFewFields.front().Message, "E1\terror\tfile\t1\t2",
+                          "a truncated record is kept whole rather than half read");
+    }
 
     // A span with nothing above it has nothing to attach to.
     const std::vector<Diagnostic> orphan = Parse("E1\tspan\tf\t1\t1\t1\t2\tdetail\n");
-    runner.Check(orphan.size() == 1u, "a span with no message above it becomes a record");
+    runner.CheckEqual(orphan.size(), 1u, "a span with no message above it becomes a record");
 }
 
 void TestLineHandling(TestRunner& runner)
@@ -147,20 +150,26 @@ void TestLineHandling(TestRunner& runner)
 
     const std::vector<Diagnostic> crlf =
         Parse("E1\terror\tf\t1\t1\t1\t2\tm\r\nE2\terror\tf\t2\t1\t2\t2\tn\r\n");
-    runner.Check(crlf.size() == 2u && crlf.front().Message == "m",
-                 "a carriage return does not reach the message");
+    if (runner.CheckEqual(crlf.size(), 2u, "a carriage return does not reach the message"))
+    {
+        runner.CheckEqual(crlf.front().Message, "m",
+                          "a carriage return does not reach the message");
+    }
 
     const std::vector<Diagnostic> blanks = Parse("\n\nE1\terror\tf\t1\t1\t1\t2\tm\n\n");
-    runner.Check(blanks.size() == 1u, "a blank line produces nothing");
+    runner.CheckEqual(blanks.size(), 1u, "a blank line produces nothing");
 
     const std::vector<Diagnostic> noTrailingNewline = Parse("E1\terror\tf\t1\t1\t1\t2\tm");
-    runner.Check(noTrailingNewline.size() == 1u, "a last line with no newline is still read");
+    runner.CheckEqual(noTrailingNewline.size(), 1u, "a last line with no newline is still read");
 
     // The message is the last field, so it takes the rest of the line. A tab inside it must not shift
     // every column to the left.
     const std::vector<Diagnostic> tabbed = Parse("E1\terror\tf\t1\t1\t1\t2\tone\ttwo\n");
-    runner.Check(tabbed.size() == 1u && tabbed.front().Message == "one\ttwo",
-                 "a tab inside the message stays in the message");
+    if (runner.CheckEqual(tabbed.size(), 1u, "a tab inside the message stays in the message"))
+    {
+        runner.CheckEqual(tabbed.front().Message, "one\ttwo",
+                          "a tab inside the message stays in the message");
+    }
     runner.Check(!tabbed.empty() && tabbed.front().Range.StartLine == 1,
                  "a tab inside the message does not move the range");
 }
@@ -175,8 +184,11 @@ void TestCodes(TestRunner& runner)
     runner.Check(bare.size() == 1u && bare.front().Code.empty(), "a bare E is no code");
 
     const std::vector<Diagnostic> padded = Parse("E00042\terror\tf\t1\t1\t1\t2\tm\n");
-    runner.Check(padded.size() == 1u && padded.front().Code == "E00042",
-                 "the code keeps the padding the compiler wrote");
+    if (runner.CheckEqual(padded.size(), 1u, "the code keeps the padding the compiler wrote"))
+    {
+        runner.CheckEqual(padded.front().Code, "E00042",
+                          "the code keeps the padding the compiler wrote");
+    }
 }
 
 void TestEmptyInput(TestRunner& runner)

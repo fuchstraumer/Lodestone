@@ -2,6 +2,7 @@
 #ifndef LODESTONE_TESTS_TEST_HARNESS_HPP
 #define LODESTONE_TESTS_TEST_HARNESS_HPP
 #include "ShaderManifestFormat.hpp"
+#include "ShaderManifestIndex.hpp"
 
 #include <concepts>
 #include <cstddef>
@@ -24,11 +25,11 @@ namespace lodestone::tests
 /** @brief text of a check and the place that wrote it */
 struct Claim
 {
-    explicit Claim(const char* text,
-                   std::source_location location = std::source_location::current()) noexcept;
+    Claim(const char* text,
+          std::source_location location = std::source_location::current()) noexcept;
 
-    explicit Claim(std::string_view text,
-                   std::source_location location = std::source_location::current()) noexcept;
+    Claim(std::string_view text,
+          std::source_location location = std::source_location::current()) noexcept;
 
     Claim(const std::string& text,
           std::source_location location = std::source_location::current()) noexcept;
@@ -68,6 +69,12 @@ public:
 private:
     TestRunner& runner;
 };
+
+/** @brief Returns the code of a query error, so that `CheckError` compares codes. */
+QueryErrorCode ErrorCodeOf(const QueryError& error) noexcept;
+
+/** @brief Returns the code, axis name, detail, and suggestion of a query error. */
+std::string FormatForTest(const QueryError& error);
 
 /** @brief Returns the error code of a manifest error, so that `CheckError` compares codes. */
 manifest::ErrorCode ErrorCodeOf(const manifest::ErrorState& error) noexcept;

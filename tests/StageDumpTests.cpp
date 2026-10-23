@@ -167,27 +167,27 @@ void CheckStageNames(lodestone::tests::TestRunner& runner)
 {
     runner.BeginSection("stage names");
 
-    runner.Check(ParseStageDumpKind("space") == StageDumpKind::Space, "space parses");
-    runner.Check(ParseStageDumpKind("variants") == StageDumpKind::Variants, "variants parses");
-    runner.Check(ParseStageDumpKind("raw") == StageDumpKind::Raw, "raw parses");
-    runner.Check(ParseStageDumpKind("resolved") == StageDumpKind::Resolved, "resolved parses");
-    runner.Check(ParseStageDumpKind("interned") == StageDumpKind::Interned, "interned parses");
-    runner.Check(ParseStageDumpKind("cooked") == StageDumpKind::Cooked, "cooked parses");
-    runner.Check(ParseStageDumpKind("all") == StageDumpKind::Invalid,
-                 "all is not a kind, it is a shorthand the parser expands");
-    runner.Check(ParseStageDumpKind("Cooked") == StageDumpKind::Invalid, "a name is case sensitive");
-    runner.Check(ParseStageDumpKind("") == StageDumpKind::Invalid, "an empty name is rejected");
+    runner.CheckEqual(ParseStageDumpKind("space"), StageDumpKind::Space, "space parses");
+    runner.CheckEqual(ParseStageDumpKind("variants"), StageDumpKind::Variants, "variants parses");
+    runner.CheckEqual(ParseStageDumpKind("raw"), StageDumpKind::Raw, "raw parses");
+    runner.CheckEqual(ParseStageDumpKind("resolved"), StageDumpKind::Resolved, "resolved parses");
+    runner.CheckEqual(ParseStageDumpKind("interned"), StageDumpKind::Interned, "interned parses");
+    runner.CheckEqual(ParseStageDumpKind("cooked"), StageDumpKind::Cooked, "cooked parses");
+    runner.CheckEqual(ParseStageDumpKind("all"), StageDumpKind::Invalid,
+                      "all is not a kind, it is a shorthand the parser expands");
+    runner.CheckEqual(ParseStageDumpKind("Cooked"), StageDumpKind::Invalid, "a name is case sensitive");
+    runner.CheckEqual(ParseStageDumpKind(""), StageDumpKind::Invalid, "an empty name is rejected");
 
-    runner.Check(ToString(StageDumpKind::Cooked) == "cooked", "a kind names itself the way it parses");
-    runner.Check(MakeStageDumpFileName("OceanFft", StageDumpKind::Cooked) == "OceanFft.stage-cooked.json",
-                 "the artifact name carries the module and the stage");
+    runner.CheckEqual(ToString(StageDumpKind::Cooked), "cooked", "a kind names itself the way it parses");
+    runner.CheckEqual(MakeStageDumpFileName("OceanFft", StageDumpKind::Cooked), "OceanFft.stage-cooked.json",
+                      "the artifact name carries the module and the stage");
 }
 
 void CheckStageBits(lodestone::tests::TestRunner& runner)
 {
     runner.BeginSection("stage bits");
 
-    runner.Check(StageDumpBit(StageDumpKind::Invalid) == 0u, "the invalid kind claims no bit");
+    runner.CheckEqual(StageDumpBit(StageDumpKind::Invalid), 0u, "the invalid kind claims no bit");
     runner.Check(StageDumpBit(StageDumpKind::Space) != StageDumpBit(StageDumpKind::Cooked),
                  "two kinds take two bits");
 
@@ -212,8 +212,7 @@ void CheckCommandLine(lodestone::tests::TestRunner& runner)
 
     const std::array<std::string_view, 5u> accepted{ "-o", "out", "--target=wgsl", "--dump-stage=cooked", "a.slang" };
     const CookResult<CookerOptions> parsed = ParseCommandLine(accepted);
-    runner.Check(parsed.has_value(), "--dump-stage=cooked parses");
-    if (parsed)
+    if (runner.CheckOk(parsed, "--dump-stage=cooked parses"))
     {
         runner.Check(IsStageDumpRequested(parsed.value(), StageDumpKind::Cooked),
                      "--dump-stage=cooked requests the cooked dump");
@@ -225,8 +224,7 @@ void CheckCommandLine(lodestone::tests::TestRunner& runner)
         "-o", "out", "--target=wgsl", "--dump-stage=space", "--dump-stage=variants", "a.slang"
     };
     const CookResult<CookerOptions> twice = ParseCommandLine(repeated);
-    runner.Check(twice.has_value(), "the flag repeats");
-    if (twice)
+    if (runner.CheckOk(twice, "the flag repeats"))
     {
         runner.Check(IsStageDumpRequested(twice.value(), StageDumpKind::Space) &&
                          IsStageDumpRequested(twice.value(), StageDumpKind::Variants),
@@ -235,18 +233,21 @@ void CheckCommandLine(lodestone::tests::TestRunner& runner)
 
     const std::array<std::string_view, 5u> everything{ "-o", "out", "--target=wgsl", "--dump-stage=all", "a.slang" };
     const CookResult<CookerOptions> all = ParseCommandLine(everything);
-    runner.Check(all.has_value() && all.value().DumpStageMask == AllStageDumpBits(),
-                 "--dump-stage=all sets every bit");
+    if (runner.CheckOk(all, "--dump-stage=all sets every bit"))
+    {
+        runner.CheckEqual(all.value().DumpStageMask, AllStageDumpBits(),
+                          "--dump-stage=all sets every bit");
+    }
 
     const std::array<std::string_view, 5u> bogus{ "-o", "out", "--target=wgsl", "--dump-stage=nonsense", "a.slang" };
     const CookResult<CookerOptions> rejected = ParseCommandLine(bogus);
-    runner.Check(!rejected.has_value() && rejected.error() == CookError::MalformedArgument,
-                 "an unknown stage name fails the command line");
+    runner.CheckError(rejected, CookError::MalformedArgument,
+                      "an unknown stage name fails the command line");
 
     const std::array<std::string_view, 3u> noTarget{ "-o", "out", "a.slang" };
     const CookResult<CookerOptions> untargeted = ParseCommandLine(noTarget);
-    runner.Check(!untargeted.has_value() && untargeted.error() == CookError::NoTargetSpecified,
-                 "a command line with no target fails");
+    runner.CheckError(untargeted, CookError::NoTargetSpecified,
+                      "a command line with no target fails");
 }
 
 /** The one golden literal in this file. It pins the JSON shape, the key names, the key order, and the
@@ -280,11 +281,7 @@ void CheckSpaceDump(lodestone::tests::TestRunner& runner)
 })";
 
     const std::string dump = DumpPermutationSpace("TinyModule", space);
-    runner.Check(dump == expected, "the space dump matches the golden text");
-    if (dump != expected)
-    {
-        std::println(stdout, "--- expected ---\n{}\n--- actual ---\n{}", expected, dump);
-    }
+    runner.CheckEqual(dump, expected, "the space dump matches the golden text");
 }
 
 void CheckDependentAxisDump(lodestone::tests::TestRunner& runner)
@@ -309,8 +306,7 @@ void CheckVariantDump(lodestone::tests::TestRunner& runner, DiagnosticSink& sink
     const PermutationSpace space{ { MakeBoolAxis("USE_FOO") } };
 
     const CookResult<VariantSet> variantSet = space.EnumerateVariants(k_UnboundedTargetPolicy, sink);
-    runner.Check(variantSet.has_value(), "the space enumerates");
-    if (!variantSet)
+    if (!runner.CheckOk(variantSet, "the space enumerates"))
     {
         return;
     }
@@ -323,7 +319,7 @@ void CheckVariantDump(lodestone::tests::TestRunner& runner, DiagnosticSink& sink
                  "a variant carries both assignments, because they are two different facts");
 
     const std::string second = DumpVariantSet("TinyModule", variantSet.value());
-    runner.Check(dump == second, "two dumps of one input agree byte for byte");
+    runner.CheckEqual(dump, second, "two dumps of one input agree byte for byte");
 }
 
 void CheckRawPrimitives(lodestone::tests::TestRunner& runner)
@@ -334,8 +330,8 @@ void CheckRawPrimitives(lodestone::tests::TestRunner& runner)
     const RawPlacement first{ BoundPlacement{ .Group = 0u, .Binding = 1u } };
     const RawPlacement second{ BoundPlacement{ .Group = 1u, .Binding = 0u } };
 
-    runner.Check(GetBoundPlacement(unplaced) == nullptr,
-                 "a default placement is not group 0 binding 0, it is no placement at all");
+    runner.CheckEqual(GetBoundPlacement(unplaced), nullptr,
+                      "a default placement is not group 0 binding 0, it is no placement at all");
     runner.Check(GetBoundPlacement(first) != nullptr, "a bound placement reports itself");
 
     runner.Check(PlacementLess(first, second), "group orders before binding");
@@ -343,14 +339,14 @@ void CheckRawPrimitives(lodestone::tests::TestRunner& runner)
     runner.Check(PlacementLess(first, unplaced) && !PlacementLess(unplaced, first),
                  "an unplaced resource sorts after every placed one");
 
-    runner.Check(ArgumentCountOf(RawSizeAttributeKind::ElementCount) == 1u, "element count takes one");
-    runner.Check(ArgumentCountOf(RawSizeAttributeKind::Extent1d) == 1u, "a 1d extent takes one");
-    runner.Check(ArgumentCountOf(RawSizeAttributeKind::Extent2d) == 2u, "a 2d extent takes two");
-    runner.Check(ArgumentCountOf(RawSizeAttributeKind::Extent3d) == 3u, "a 3d extent takes three");
-    runner.Check(ArgumentCountOf(RawSizeAttributeKind::Invalid) == 0u, "the invalid kind takes none");
+    runner.CheckEqual(ArgumentCountOf(RawSizeAttributeKind::ElementCount), 1u, "element count takes one");
+    runner.CheckEqual(ArgumentCountOf(RawSizeAttributeKind::Extent1d), 1u, "a 1d extent takes one");
+    runner.CheckEqual(ArgumentCountOf(RawSizeAttributeKind::Extent2d), 2u, "a 2d extent takes two");
+    runner.CheckEqual(ArgumentCountOf(RawSizeAttributeKind::Extent3d), 3u, "a 3d extent takes three");
+    runner.CheckEqual(ArgumentCountOf(RawSizeAttributeKind::Invalid), 0u, "the invalid kind takes none");
 
-    runner.Check(ToString(RawSizeAttributeKind::ElementCount) == "ls_element_count",
-                 "a kind names the attribute the shader author writes");
+    runner.CheckEqual(ToString(RawSizeAttributeKind::ElementCount), "ls_element_count",
+                      "a kind names the attribute the shader author writes");
 }
 
 void CheckRawDump(lodestone::tests::TestRunner& runner)
@@ -381,7 +377,7 @@ void CheckRawDump(lodestone::tests::TestRunner& runner)
     runner.Check(Contains(dump, R"("targetTextByteLength": 40)"), "the text appears as a length");
 
     const std::string second = DumpRawModule(module);
-    runner.Check(dump == second, "two dumps of one module agree byte for byte");
+    runner.CheckEqual(dump, second, "two dumps of one module agree byte for byte");
 }
 
 void CheckCookedDump(lodestone::tests::TestRunner& runner)
@@ -389,7 +385,7 @@ void CheckCookedDump(lodestone::tests::TestRunner& runner)
     runner.BeginSection("cooked dump");
 
     const CookedModule module = BuildTinyModule();
-    runner.Check(module.Variants.size() == 2u, "both variants reached the tables");
+    runner.CheckEqual(module.Variants.size(), 2u, "both variants reached the tables");
 
     const std::string dump = DumpCookedModule(module);
 
@@ -419,7 +415,7 @@ void CheckCookedDump(lodestone::tests::TestRunner& runner)
     runner.Check(Contains(dump, R"("contentHash")"), "a source appears as a hash");
 
     const std::string second = DumpCookedModule(module);
-    runner.Check(dump == second, "two dumps of one module agree byte for byte");
+    runner.CheckEqual(dump, second, "two dumps of one module agree byte for byte");
 }
 
 /** Stage 6 has its own boundary type (`InternedModule`), so the `interned` dump now writes real data.
@@ -446,7 +442,7 @@ void CheckInternedDump(lodestone::tests::TestRunner& runner)
                  "no target text reaches the dump, for the same reason the cooked dump holds none");
 
     const std::string second = DumpInternedModule(module);
-    runner.Check(dump == second, "two dumps of one module agree byte for byte");
+    runner.CheckEqual(dump, second, "two dumps of one module agree byte for byte");
 }
 
 /** A dump that cannot tell two modules apart is worth nothing as a regression harness, so prove it
@@ -469,7 +465,7 @@ void CheckCookedDumpDetectsChange(lodestone::tests::TestRunner& runner)
                  "one changed byte of source moves the dump");
 
     CookedModule reordered = BuildTinyModule();
-    runner.Check(reordered.Variants.size() == 2u, "the module has two variants to reorder");
+    runner.CheckEqual(reordered.Variants.size(), 2u, "the module has two variants to reorder");
     if (reordered.Variants.size() != 2u)
     {
         return;

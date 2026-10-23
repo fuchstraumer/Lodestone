@@ -106,7 +106,7 @@ int main()
 
     runner.BeginSection("the table holds the interfaces of the shim module, and the Bound form is complete");
     const std::span<const ShimInterface> table = GetShimInterfaces();
-    runner.Check(table.size() == 5u, "five interfaces: two buffers, a texture, a sampler, and a write-only storage texture");
+    runner.CheckEqual(table.size(), 5u, "five interfaces: two buffers, a texture, a sampler, and a write-only storage texture");
     bool boundComplete = true;
     for (const ShimInterface& row : table)
     {
@@ -129,8 +129,9 @@ int main()
                      writeStorage->TypeParameterCount == 0u && writeStorage->ImplementationTakesFormat &&
                      !readBuffer->ImplementationTakesFormat,
                  "the write-only storage texture takes a format as its implementation argument, and no other row does");
-    runner.Check(FindShimInterface("IWriteBuffer") == nullptr && FindShimInterface("") == nullptr,
-                 "a name that is not a shim interface is not found");
+    const char* notFoundClaim = "a name that is not a shim interface is not found";
+    runner.CheckEqual(FindShimInterface("IWriteBuffer"), nullptr, notFoundClaim);
+    runner.CheckEqual(FindShimInterface(""), nullptr, notFoundClaim);
     runner.Check(ShimImplName(*readBuffer, AccessModel::Invalid).empty(), "an invalid access model has no cell");
 
     const std::filesystem::path directory = std::filesystem::temp_directory_path() / "LodestoneShimTableTest";

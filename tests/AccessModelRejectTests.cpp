@@ -138,17 +138,7 @@ int main(int argc, char** argv)
         }
 
         const CookError actual = CookOneModule(modulePath, testCase.TargetName);
-        const bool matched = actual == testCase.Expected;
-        if (!matched)
-        {
-            std::println(stderr,
-                         "[AccessModelReject] {}: expected {}, and the cook returned {}",
-                         testCase.ModuleFile,
-                         ToString(testCase.Expected),
-                         ToString(actual));
-        }
-
-        runner.Check(matched, testCase.Claim);
+        runner.CheckEqual(actual, testCase.Expected, std::format("{}: {}", testCase.ModuleFile, testCase.Claim));
     }
 
     runner.BeginSection("a failed cook leaves no manifest of an earlier cook");
@@ -162,7 +152,7 @@ int main(int argc, char** argv)
         stale << "a manifest of an earlier cook";
     }
     const CookError failed = CookOneModuleToDisk(assetDirectory / k_Cases[0].ModuleFile, k_Cases[0].TargetName, outputDirectory);
-    runner.Check(failed == k_Cases[0].Expected, "the cook fails with the error of its row");
+    runner.CheckEqual(failed, k_Cases[0].Expected, "the cook fails with the error of its row");
     runner.Check(!std::filesystem::exists(manifestPath), "the failed cook removed the old manifest");
 
     const CookError cooked = CookOneModuleToDisk(assetDirectory / k_Cases[3].ModuleFile, k_Cases[3].TargetName, outputDirectory);

@@ -343,19 +343,20 @@ void CheckTheTwoArmsReallyDiffer(lodestone::tests::TestRunner& runner,
 {
     runner.BeginSection("the two arms differ in cost");
 
-    runner.Check(deduped.Variants.size() == 4u && raw.Variants.size() == 4u, "both arms hold every variant");
-    runner.Check(deduped.Sources.size() == 3u, "dedup collapses eight artifacts onto three unique texts");
-    runner.Check(raw.Sources.size() == 8u, "no-dedupe gives each of the eight artifacts its own entry");
+    runner.CheckEqual(deduped.Variants.size(), 4u, "both arms hold every variant");
+    runner.CheckEqual(raw.Variants.size(), 4u, "both arms hold every variant");
+    runner.CheckEqual(deduped.Sources.size(), 3u, "dedup collapses eight artifacts onto three unique texts");
+    runner.CheckEqual(raw.Sources.size(), 8u, "no-dedupe gives each of the eight artifacts its own entry");
     // D8b took the usage mask and the footprint out of the resource key, so one resource at one
     // place is one row however many entry points read it.
-    runner.Check(deduped.Resources.size() == 1u,
-                 "two entry points binding one resource at one place give one resource");
-    runner.Check(deduped.ResourceLists.size() == 1u, "every variant declares the same one resource");
-    runner.Check(deduped.VisibilityLists.size() == 1u,
-                 "both entry points read that resource, so both see the same visibility list");
+    runner.CheckEqual(deduped.Resources.size(), 1u,
+                      "two entry points binding one resource at one place give one resource");
+    runner.CheckEqual(deduped.ResourceLists.size(), 1u, "every variant declares the same one resource");
+    runner.CheckEqual(deduped.VisibilityLists.size(), 1u,
+                      "both entry points read that resource, so both see the same visibility list");
     // four, not eight: resources are interned per variant, and sources per entry point
-    runner.Check(raw.Resources.size() == 4u,
-                 "no-dedupe gives each variant its own resource entry, one for each of the four");
+    runner.CheckEqual(raw.Resources.size(), 4u,
+                      "no-dedupe gives each variant its own resource entry, one for each of the four");
 }
 
 void CheckInfluenceAgrees(lodestone::tests::TestRunner& runner,
@@ -366,34 +367,36 @@ void CheckInfluenceAgrees(lodestone::tests::TestRunner& runner,
 
     const CookResult<ModuleInfluence> dedupedResult = ComputeActualInfluence(deduped);
     const CookResult<ModuleInfluence> rawResult = ComputeActualInfluence(raw);
-    runner.Check(dedupedResult.has_value() && rawResult.has_value(), "both arms measure the influence");
-    if (!dedupedResult || !rawResult)
+    if (!runner.CheckOk(dedupedResult, "both arms measure the influence") ||
+        !runner.CheckOk(rawResult, "both arms measure the influence"))
     {
         return;
     }
     const ModuleInfluence& dedupedInfluence = dedupedResult.value();
     const ModuleInfluence& rawInfluence = rawResult.value();
 
-    runner.Check(InfluenceOf(dedupedInfluence, k_ActiveEntryPoint, 0u) == AxisInfluence::Active,
-                 "with dedup on, the axis the shader reads is Active");
-    runner.Check(InfluenceOf(rawInfluence, k_ActiveEntryPoint, 0u) == AxisInfluence::Active,
-                 "with dedup off, the axis the shader reads is still Active");
+    runner.CheckEqual(InfluenceOf(dedupedInfluence, k_ActiveEntryPoint, 0u), AxisInfluence::Active,
+                      "with dedup on, the axis the shader reads is Active");
+    runner.CheckEqual(InfluenceOf(rawInfluence, k_ActiveEntryPoint, 0u), AxisInfluence::Active,
+                      "with dedup off, the axis the shader reads is still Active");
 
-    runner.Check(InfluenceOf(dedupedInfluence, k_ActiveEntryPoint, 1u) == AxisInfluence::Inert,
-                 "with dedup on, the axis the shader ignores is Inert");
-    runner.Check(InfluenceOf(rawInfluence, k_ActiveEntryPoint, 1u) == AxisInfluence::Inert,
-                 "with dedup off, the axis the shader ignores is still Inert. This is the check that "
-                 "an index comparison fails");
+    runner.CheckEqual(InfluenceOf(dedupedInfluence, k_ActiveEntryPoint, 1u), AxisInfluence::Inert,
+                      "with dedup on, the axis the shader ignores is Inert");
+    runner.CheckEqual(InfluenceOf(rawInfluence, k_ActiveEntryPoint, 1u), AxisInfluence::Inert,
+                      "with dedup off, the axis the shader ignores is still Inert. This is the check that "
+                      "an index comparison fails");
 
-    runner.Check(InfluenceOf(dedupedInfluence, k_InertEntryPoint, 0u) == AxisInfluence::Inert &&
-                     InfluenceOf(dedupedInfluence, k_InertEntryPoint, 1u) == AxisInfluence::Inert,
-                 "with dedup on, an entry point that reads no axis is inert on both");
-    runner.Check(InfluenceOf(rawInfluence, k_InertEntryPoint, 0u) == AxisInfluence::Inert &&
-                     InfluenceOf(rawInfluence, k_InertEntryPoint, 1u) == AxisInfluence::Inert,
-                 "with dedup off, an entry point that reads no axis is inert on both");
+    runner.CheckEqual(InfluenceOf(dedupedInfluence, k_InertEntryPoint, 0u), AxisInfluence::Inert,
+                      "with dedup on, an entry point that reads no axis is inert on both");
+    runner.CheckEqual(InfluenceOf(dedupedInfluence, k_InertEntryPoint, 1u), AxisInfluence::Inert,
+                      "with dedup on, an entry point that reads no axis is inert on both");
+    runner.CheckEqual(InfluenceOf(rawInfluence, k_InertEntryPoint, 0u), AxisInfluence::Inert,
+                      "with dedup off, an entry point that reads no axis is inert on both");
+    runner.CheckEqual(InfluenceOf(rawInfluence, k_InertEntryPoint, 1u), AxisInfluence::Inert,
+                      "with dedup off, an entry point that reads no axis is inert on both");
 
-    runner.Check(dedupedInfluence.EntryPoints.size() == rawInfluence.EntryPoints.size(),
-                 "both arms measure the same entry points");
+    runner.CheckEqual(dedupedInfluence.EntryPoints.size(), rawInfluence.EntryPoints.size(),
+                      "both arms measure the same entry points");
 }
 
 void CheckSharedLayoutAgrees(lodestone::tests::TestRunner& runner, const PermutationSpace& space)
@@ -403,14 +406,24 @@ void CheckSharedLayoutAgrees(lodestone::tests::TestRunner& runner, const Permuta
     const CookedModule deduped = BuildSingleEntryPointModule(space, true);
     const CookedModule raw = BuildSingleEntryPointModule(space, false);
 
-    runner.Check(deduped.Resources.size() == 1u && raw.Resources.size() == 2u,
-                 "the two arms hold the same one resource in a different number of entries");
+    runner.CheckEqual(deduped.Resources.size(), 1u,
+                      "the two arms hold the same one resource in a different number of entries");
+    runner.CheckEqual(raw.Resources.size(), 2u,
+                      "the two arms hold the same one resource in a different number of entries");
     const CookResult<bool> dedupedResult = AllVariantsShareOneLayout(deduped);
-    runner.Check(dedupedResult.has_value() ? dedupedResult.value() : false, "with dedup on, every permutation shares one layout");
+    if (runner.CheckOk(dedupedResult, "with dedup on, every permutation shares one layout"))
+    {
+        runner.CheckEqual(dedupedResult.value(), true, "with dedup on, every permutation shares one layout");
+    }
     const CookResult<bool> rawResult = AllVariantsShareOneLayout(raw);
-    runner.Check(rawResult.has_value() ? rawResult.value() : false,
-                 "with dedup off, every permutation still shares one layout, because the claim is "
-                 "about the content and not about the table size");
+    if (runner.CheckOk(rawResult,
+                       "with dedup off, every permutation still shares one layout, because the claim is "
+                       "about the content and not about the table size"))
+    {
+        runner.CheckEqual(rawResult.value(), true,
+                          "with dedup off, every permutation still shares one layout, because the claim is "
+                          "about the content and not about the table size");
+    }
 }
 
 /** The claim must be false when it is false, or it says nothing when it is true. */
@@ -421,7 +434,10 @@ void CheckSharedLayoutRejectsADifference(lodestone::tests::TestRunner& runner, c
     CookedModule module = BuildSingleEntryPointModule(space, true);
     
     const CookResult<bool> initialResult = AllVariantsShareOneLayout(module);
-    runner.Check(initialResult.has_value() ? initialResult.value() : false, "the module starts with one shared layout");
+    if (runner.CheckOk(initialResult, "the module starts with one shared layout"))
+    {
+        runner.CheckEqual(initialResult.value(), true, "the module starts with one shared layout");
+    }
 
     ReflectedBinding moved = module.Resources.front();
     moved.Placement = BoundPlacement{ .Group = 0u, .Binding = 7u };
@@ -444,17 +460,16 @@ void CheckEveryGroupIsMeasured(lodestone::tests::TestRunner& runner, const Permu
 
     const CookedModule module = BuildConditionalModule(space);
     const CookResult<ModuleInfluence> influenceResult = ComputeActualInfluence(module);
-    runner.Check(influenceResult.has_value(), "the conditional module measures its influence");
-    if (!influenceResult)
+    if (!runner.CheckOk(influenceResult, "the conditional module measures its influence"))
     {
         return;
     }
     const ModuleInfluence& influence = influenceResult.value();
 
-    runner.Check(InfluenceOf(influence, k_ConditionalEntryPoint, 0u) == AxisInfluence::Active,
-                 "the first axis is Active, and only the second group of variants says so");
-    runner.Check(InfluenceOf(influence, k_ConditionalEntryPoint, 1u) == AxisInfluence::Active,
-                 "the second axis decides whether the text changes, so it is Active as well");
+    runner.CheckEqual(InfluenceOf(influence, k_ConditionalEntryPoint, 0u), AxisInfluence::Active,
+                      "the first axis is Active, and only the second group of variants says so");
+    runner.CheckEqual(InfluenceOf(influence, k_ConditionalEntryPoint, 1u), AxisInfluence::Active,
+                      "the second axis decides whether the text changes, so it is Active as well");
 }
 
 void CheckFootprintIsPartOfTheInstance(lodestone::tests::TestRunner& runner, const PermutationSpace& space)
@@ -465,17 +480,16 @@ void CheckFootprintIsPartOfTheInstance(lodestone::tests::TestRunner& runner, con
     {
         const CookedModule module = BuildFootprintModule(space, dedupeEnabled);
         const CookResult<ModuleInfluence> influenceResult = ComputeActualInfluence(module);
-        runner.Check(influenceResult.has_value(), "the footprint module measures its influence");
-        if (!influenceResult)
+        if (!runner.CheckOk(influenceResult, "the footprint module measures its influence"))
         {
             return;
         }
 
         const std::string_view arm = dedupeEnabled ? "with dedup" : "with --no-dedupe";
-        runner.Check(InfluenceOf(influenceResult.value(), k_FootprintEntryPoint, 0u) == AxisInfluence::Active,
-                     std::format("an axis that changes only a buffer size is Active, {}", arm));
-        runner.Check(InfluenceOf(influenceResult.value(), k_FootprintEntryPoint, 1u) == AxisInfluence::Inert,
-                     std::format("an axis that changes nothing is Inert, {}", arm));
+        runner.CheckEqual(InfluenceOf(influenceResult.value(), k_FootprintEntryPoint, 0u), AxisInfluence::Active,
+                          std::format("an axis that changes only a buffer size is Active, {}", arm));
+        runner.CheckEqual(InfluenceOf(influenceResult.value(), k_FootprintEntryPoint, 1u), AxisInfluence::Inert,
+                          std::format("an axis that changes nothing is Inert, {}", arm));
     }
 }
 

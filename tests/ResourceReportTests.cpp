@@ -187,21 +187,21 @@ void CheckValidator(tests::TestRunner& runner, const PermutationSpace& space)
     RecordingDiagnosticSink sink;
     CookedModule declared = BuildModule(space, k_EveryVariant);
     declared.FootprintDeclarations.push_back(FootprintAxisDeclaration{ .ScopeName = "", .Name = "Counts", .Axes = { 0u } });
-    runner.Check(VerifyFootprintAxes(declared, sink) == CookError::Success, "a count that its attribute names passes");
+    runner.CheckEqual(VerifyFootprintAxes(declared, sink), CookError::Success, "a count that its attribute names passes");
 
     const CookedModule undeclared = BuildModule(space, k_EveryVariant);
-    runner.Check(VerifyFootprintAxes(undeclared, sink) == CookError::FootprintAxisUndeclared,
-                 "a count that changes with an axis that no attribute names fails");
+    runner.CheckEqual(VerifyFootprintAxes(undeclared, sink), CookError::FootprintAxisUndeclared,
+                      "a count that changes with an axis that no attribute names fails");
 
     CookedModule wrongAxis = BuildModule(space, k_EveryVariant);
     wrongAxis.FootprintDeclarations.push_back(FootprintAxisDeclaration{ .ScopeName = "", .Name = "Counts", .Axes = { 1u } });
-    runner.Check(VerifyFootprintAxes(wrongAxis, sink) == CookError::FootprintAxisUndeclared,
-                 "a count whose attribute names another axis fails");
+    runner.CheckEqual(VerifyFootprintAxes(wrongAxis, sink), CookError::FootprintAxisUndeclared,
+                      "a count whose attribute names another axis fails");
 
     CookedModule sparse = BuildModule(space, k_Diagonal);
     sparse.FootprintDeclarations.push_back(FootprintAxisDeclaration{ .ScopeName = "", .Name = "Counts", .Axes = { 0u } });
-    runner.Check(VerifyFootprintAxes(sparse, sink) == CookError::Success,
-                 "a sparse cook passes, because only a one-axis pair proves an axis");
+    runner.CheckEqual(VerifyFootprintAxes(sparse, sink), CookError::Success,
+                      "a sparse cook passes, because only a one-axis pair proves an axis");
 }
 
 void CheckManifest(tests::TestRunner& runner, const PermutationSpace& space)
@@ -209,20 +209,18 @@ void CheckManifest(tests::TestRunner& runner, const PermutationSpace& space)
     runner.BeginSection("the footprint axes and the creation fields read back through the manifest");
     const std::vector<std::byte> bytes = EmitBytes(BuildModule(space, k_EveryVariant));
     const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(bytes);
-    runner.Check(bundle.has_value(), "the manifest opens, and its round trip passes");
-    if (!bundle.has_value())
+    if (!runner.CheckOk(bundle, "the manifest opens, and its round trip passes"))
     {
         return;
     }
     const manifest::ManifestResult<manifest::EnvironmentView> environment = bundle->OpenEnvironment(0u, 0u);
-    runner.Check(environment.has_value(), "the environment opens");
-    if (!environment.has_value())
+    if (!runner.CheckOk(environment, "the environment opens"))
     {
         return;
     }
 
     const manifest::LayoutRange layout = environment->VariantAt(0u).EntryPoint(0u).Layout();
-    runner.Check(layout.Size() == 5u, "the entry point reads five resources");
+    runner.CheckEqual(layout.Size(), 5u, "the entry point reads five resources");
     if (layout.Size() != 5u)
     {
         return;
@@ -245,12 +243,12 @@ void CheckManifest(tests::TestRunner& runner, const PermutationSpace& space)
     word |= uint64_t{ 1u } << 63u;
     std::memcpy(damaged.data() + wordOffset, &word, sizeof(word));
     const manifest::ManifestResult<manifest::BundleView> damagedBundle = manifest::BundleView::Open(damaged);
-    runner.Check(damagedBundle.has_value(), "the damage is inside one extent, so the header region still opens");
+    runner.CheckOk(damagedBundle, "the damage is inside one extent, so the header region still opens");
     if (damagedBundle.has_value())
     {
         const manifest::ManifestResult<manifest::EnvironmentView> damagedOpen = damagedBundle->OpenEnvironment(0u, 0u);
-        runner.Check(!damagedOpen.has_value() && damagedOpen.error().Code == manifest::ErrorCode::InvalidFootprintAxes,
-                     "a footprint axis bit past the module's axes is rejected when the environment opens");
+        runner.CheckError(damagedOpen, manifest::ErrorCode::InvalidFootprintAxes,
+                          "a footprint axis bit past the module's axes is rejected when the environment opens");
     }
 
     const CreationFields counts = manifest::DescribeCreation(layout[k_Counts]);
@@ -264,22 +262,29 @@ void CheckManifest(tests::TestRunner& runner, const PermutationSpace& space)
                      lut.MipLevels == CreationSource::Cpu && lut.ArrayLayers == CreationSource::Shader && !lut.IsComplete(),
                  "a sampled texture with an extent still needs a format and mip levels");
     const CreationFields target = manifest::DescribeCreation(layout[k_Target]);
-    runner.Check(target.Format == CreationSource::Shader && target.Extent == CreationSource::Cpu,
-                 "a storage texture states its format, and with no extent attribute the renderer gives the extent");
+    runner.CheckEqual(target.Format, CreationSource::Shader,
+                      "a storage texture states its format, and with no extent attribute the renderer gives the extent");
+    runner.CheckEqual(target.Extent, CreationSource::Cpu,
+                      "a storage texture states its format, and with no extent attribute the renderer gives the extent");
     const CreationFields sampler = manifest::DescribeCreation(layout[k_Sampler]);
-    runner.Check(sampler.SamplerState == CreationSource::Cpu && sampler.Size == CreationSource::NotApplicable,
-                 "a sampler needs its state from the renderer");
+    runner.CheckEqual(sampler.SamplerState, CreationSource::Cpu, "a sampler needs its state from the renderer");
+    runner.CheckEqual(sampler.Size, CreationSource::NotApplicable, "a sampler needs its state from the renderer");
 
     runner.BeginSection("the report reads the written manifest");
     const CookResult<ResourceReport> report = BuildResourceReport(bytes);
-    runner.Check(report.has_value() && report->Environments.size() == 1u, "the report has one environment");
-    if (!report.has_value() || report->Environments.size() != 1u)
+    if (!runner.CheckOk(report, "the report has one environment"))
+    {
+        return;
+    }
+    runner.CheckEqual(report->Environments.size(), 1u, "the report has one environment");
+    if (report->Environments.size() != 1u)
     {
         return;
     }
     const ResourceReportEnvironment& reported = report->Environments.front();
-    runner.Check(reported.ModuleName == "ReportModule" && reported.TargetName == "wgsl" && reported.Resources.size() == 5u,
-                 "the environment names its module and target, and holds each resource once");
+    runner.CheckEqual(reported.ModuleName, "ReportModule", "the environment names its module and target, and holds each resource once");
+    runner.CheckEqual(reported.TargetName, "wgsl", "the environment names its module and target, and holds each resource once");
+    runner.CheckEqual(reported.Resources.size(), 5u, "the environment names its module and target, and holds each resource once");
     const auto findEntry = [&](std::string_view name) -> const ResourceReportEntry*
     {
         for (const ResourceReportEntry& entry : reported.Resources)

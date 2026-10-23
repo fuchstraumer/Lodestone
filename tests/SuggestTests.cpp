@@ -15,15 +15,15 @@ int main()
     lodestone::tests::TestRunner runner{ "SuggestTests" };
 
     runner.BeginSection("the distance counts each edit kind");
-    runner.Check(OptimalStringAlignmentDistance("", "") == 0, "two empty names agree");
-    runner.Check(OptimalStringAlignmentDistance("axis", "axis") == 0, "an exact name costs nothing");
-    runner.Check(OptimalStringAlignmentDistance("", "axis") == 4, "an empty name costs one insert per letter");
-    runner.Check(OptimalStringAlignmentDistance("axes", "axis") == 1, "one substitution costs one");
-    runner.Check(OptimalStringAlignmentDistance("axi", "axis") == 1, "one deletion costs one");
+    runner.CheckEqual(OptimalStringAlignmentDistance("", ""), 0, "two empty names agree");
+    runner.CheckEqual(OptimalStringAlignmentDistance("axis", "axis"), 0, "an exact name costs nothing");
+    runner.CheckEqual(OptimalStringAlignmentDistance("", "axis"), 4, "an empty name costs one insert per letter");
+    runner.CheckEqual(OptimalStringAlignmentDistance("axes", "axis"), 1, "one substitution costs one");
+    runner.CheckEqual(OptimalStringAlignmentDistance("axi", "axis"), 1, "one deletion costs one");
 
     runner.BeginSection("an adjacent transposition costs one, not two");
-    runner.Check(OptimalStringAlignmentDistance("teh", "the") == 1, "a swapped pair is one edit");
-    runner.Check(OptimalStringAlignmentDistance("flaot", "float") == 1, "a swap inside a word is one edit");
+    runner.CheckEqual(OptimalStringAlignmentDistance("teh", "the"), 1, "a swapped pair is one edit");
+    runner.CheckEqual(OptimalStringAlignmentDistance("flaot", "float"), 1, "a swap inside a word is one edit");
 
     runner.BeginSection("a candidate outside the threshold is dropped");
     const std::array<std::string_view, 3> axes{ "ShadeMode", "TileSize", "UseShadows" };
@@ -33,8 +33,8 @@ int main()
     runner.BeginSection("the nearest names come back first");
     const std::vector<Suggestion> matches = FindSuggestions("ShaddeMode", axes, 3);
     runner.Check(!matches.empty(), "a near name yields a suggestion");
-    runner.Check(matches.front().Text == "ShadeMode", "the nearest name leads");
-    runner.Check(matches.front().Distance == 1, "the nearest name is one edit away");
+    runner.CheckEqual(matches.front().Text, "ShadeMode", "the nearest name leads");
+    runner.CheckEqual(matches.front().Distance, 1, "the nearest name is one edit away");
 
     runner.BeginSection("a negative threshold and an empty set yield nothing");
     runner.Check(FindSuggestions("ShadeMode", axes, -1).empty(), "a negative threshold yields nothing");

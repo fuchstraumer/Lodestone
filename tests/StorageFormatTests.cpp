@@ -72,7 +72,7 @@ int main(int argc, char** argv)
 
     runner.BeginSection("the table lists six formats, each once, with a texture format and a WGSL name");
     const std::span<const StorageFormatInfo> table = GetStorageFormats();
-    runner.Check(table.size() == 6u, "six float formats");
+    runner.CheckEqual(table.size(), 6u, "six float formats");
     std::set<std::string_view> cases;
     std::set<TextureFormat> formats;
     bool complete = true;
@@ -106,7 +106,7 @@ int main(int argc, char** argv)
     MemoryOutputSink sink;
     // the cook compares reflection with the emitted code of each target, so a cook that succeeds means the readers agree
     const CookResult<CookStatistics> cooked = RunCook(options, sink);
-    runner.Check(cooked.has_value(), "a texture of each format cooks for both targets, with both cross-checks");
+    runner.CheckOk(cooked, "a texture of each format cooks for both targets, with both cross-checks");
 
     const auto manifestArtifact = sink.GetArtifacts().find(std::string{ k_ManifestFileName });
     if (cooked.has_value() && manifestArtifact != sink.GetArtifacts().end())
@@ -150,7 +150,7 @@ int main(int argc, char** argv)
     shimOptions.OutputPath = "StorageFormatShim";
     MemoryOutputSink shimSink;
     const CookResult<CookStatistics> shimCooked = RunCook(shimOptions, shimSink);
-    runner.Check(shimCooked.has_value(), "a shim texture of each format cooks for both targets, with both cross-checks");
+    runner.CheckOk(shimCooked, "a shim texture of each format cooks for both targets, with both cross-checks");
 
     const auto shimArtifact = shimSink.GetArtifacts().find(std::string{ k_ManifestFileName });
     if (shimCooked.has_value() && shimArtifact != shimSink.GetArtifacts().end())
@@ -193,7 +193,7 @@ int main(int argc, char** argv)
     axisOptions.VerifyDeterministic = true;
     MemoryOutputSink axisSink;
     const CookResult<CookStatistics> axisCooked = RunCook(axisOptions, axisSink);
-    runner.Check(axisCooked.has_value(), "every value of the format axis cooks for both targets, with both cross-checks");
+    runner.CheckOk(axisCooked, "every value of the format axis cooks for both targets, with both cross-checks");
 
     const auto axisArtifact = axisSink.GetArtifacts().find(std::string{ k_ManifestFileName });
     if (axisCooked.has_value() && axisArtifact != axisSink.GetArtifacts().end())
@@ -212,8 +212,8 @@ int main(int argc, char** argv)
             }
 
             // only the attribute names the axis, so a pruned axis would leave one variant
-            runner.Check(environment->VariantKeys().size() == table.size(),
-                         std::format("profile {}: one variant for each format", profile));
+            runner.CheckEqual(environment->VariantKeys().size(), table.size(),
+                              std::format("profile {}: one variant for each format", profile));
             const ManifestIndex index{ environment.value() };
             for (const StorageFormatInfo& info : table)
             {

@@ -40,9 +40,10 @@ void TestActiveWhenGating(TestRunner& runner)
     const PermutationSpace space{ { gateAxis, widthAxis } };
 
     const auto variants = space.EnumerateVariants(k_UnboundedTargetPolicy, sink);
-    runner.Check(variants.has_value(), "Enumeration succeeds.");
-    // check variant count: should be 3 (GATE=false, GATE=true with WIDTH=16, GATE=true with WIDTH=32)
-    runner.Check(variants && variants->Variants.size() == 3, "Correct number of variants.");
+    if (runner.CheckOk(variants, "Enumeration succeeds."))
+    {
+        runner.CheckEqual(variants->Variants.size(), 3u, "Correct number of variants.");
+    }
 }
 
 void TestRequirePruning(TestRunner& runner)
@@ -64,8 +65,14 @@ void TestRequirePruning(TestRunner& runner)
 
     const auto full   = control.EnumerateVariants(k_UnboundedTargetPolicy, sink);
     const auto pruned = gated.EnumerateVariants(k_UnboundedTargetPolicy, sink);
-    runner.Check(full && full->Variants.size() == 9u, "Control cooks the full variant grid");
-    runner.Check(pruned && pruned->Variants.size() == 8u, "Require drops exactly one cell");
+    if (runner.CheckOk(full, "Control cooks the full variant grid"))
+    {
+        runner.CheckEqual(full->Variants.size(), 9u, "Control cooks the full variant grid");
+    }
+    if (runner.CheckOk(pruned, "Require drops exactly one cell"))
+    {
+        runner.CheckEqual(pruned->Variants.size(), 8u, "Require drops exactly one cell");
+    }
 }
 
 void TestValidationRejections(TestRunner& runner)
@@ -80,8 +87,8 @@ void TestValidationRejections(TestRunner& runner)
         const PermutationAxis lateAxis{ "LATE",  { PermutationValue{ false }, PermutationValue{ true } },
                                         AxisKind::Capability, EarliestBindingTime::Cook, AxisValueDomain::Boolean };
         const PermutationSpace space{ { earlyAxis, lateAxis } };
-        runner.Check(space.ValidateConstraints(sink) == CookError::PermutationConstraintForwardReference,
-                     "a forward reference fails at load");
+        runner.CheckEqual(space.ValidateConstraints(sink), CookError::PermutationConstraintForwardReference,
+                          "a forward reference fails at load");
     }
     // Unknown symbol: ActiveWhen names an identifier no axis declares.
     // //   ... "NOPE == 1" -> CookError::PermutationConstraintUnknownSymbol
@@ -90,8 +97,8 @@ void TestValidationRejections(TestRunner& runner)
         const PermutationAxis axis{ "AXIS", { PermutationValue{ false }, PermutationValue{ true } },
                                     AxisKind::Capability, EarliestBindingTime::Cook, AxisValueDomain::Boolean, "NOPE == 1" };
         const PermutationSpace space{ { axis } };
-        runner.Check(space.ValidateConstraints(sink) == CookError::PermutationConstraintUnknownSymbol,
-                     "an unknown symbol fails validation");
+        runner.CheckEqual(space.ValidateConstraints(sink), CookError::PermutationConstraintUnknownSymbol,
+                          "an unknown symbol fails validation");
     }
     // Malformed expression: a syntactically broken ActiveWhen.
     //   ... "== 1" (or "A &&") -> CookError::PermutationConstraintInvalidExpression
@@ -100,8 +107,8 @@ void TestValidationRejections(TestRunner& runner)
         const PermutationAxis axis{ "AXIS", { PermutationValue{ false }, PermutationValue{ true } },
                                     AxisKind::Capability, EarliestBindingTime::Cook, AxisValueDomain::Boolean, "== 1" };
         const PermutationSpace space{ { axis } };
-        runner.Check(space.ValidateConstraints(sink) == CookError::PermutationConstraintInvalidExpression,
-                     "a malformed expression fails validation");
+        runner.CheckEqual(space.ValidateConstraints(sink), CookError::PermutationConstraintInvalidExpression,
+                          "a malformed expression fails validation");
     }
 }
 
@@ -121,7 +128,7 @@ void TestDefaultSubstitutionWarning(TestRunner& runner)
                                    AxisKind::Tuning, EarliestBindingTime::Cook, AxisValueDomain::Integral, "MID == 1" };
     const PermutationSpace space{ { gateAxis, midAxis, leafAxis } };
 
-    runner.Check(space.ValidateConstraints(sink) == CookError::Success, "a conditional chain still validates");
+    runner.CheckEqual(space.ValidateConstraints(sink), CookError::Success, "a conditional chain still validates");
 
     const bool warned = std::ranges::any_of(sink.Records(),
         [](const auto& diag){ return diag.Severity == DiagnosticSeverity::Warning; });
