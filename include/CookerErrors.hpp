@@ -127,6 +127,10 @@ enum class CookError : uint16_t
 
     FootprintAxisUndeclared = 170, // an axis changes a resource's footprint, and no size attribute of it names that axis
 
+    ShimStorageFormatMissing = 180, // a shim extern whose implementation takes a storage format has no `ls_storage_format`
+    ShimStorageFormatAxisUnknown = 181, // `ls_storage_format` names no axis of the module's permutation space
+    ShimStorageFormatAxisInvalid = 182, // the axis of `ls_storage_format` is not an ungated enum axis over `StorageFormat`
+
     SystemError = 200,
     DirectoryDoesNotExist = 201,
     DirectoryCouldNotBeCreated = 202,

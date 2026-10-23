@@ -5,11 +5,13 @@
 #include "SlangCompilerTypes.hpp"
 #include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
+#include "compile/ShimLinkSource.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "slang.h"
 #include "slang-com-ptr.h"
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -18,6 +20,12 @@
 
 namespace lodestone
 {
+
+struct StructStringAttribute
+{
+    std::string StructName;
+    std::string Argument;
+};
 
 /** @brief One thread's Slang sessions and loaded modules. */
 class SlangModuleContext
@@ -36,9 +44,13 @@ public:
     [[nodiscard]] std::vector<std::string> BuildModuleScopeVariableNames() const;
     /** @brief Sorted module-scope struct names, including `__include` fragments. Confirms what the symbol table read. */
     [[nodiscard]] std::vector<std::string> BuildModuleScopeStructNames() const;
+    [[nodiscard]] std::vector<StructStringAttribute> BuildStructStringAttributes(std::string_view attribute_name) const;
     [[nodiscard]] std::optional<std::string> FindTypeDeclaringModule(std::string_view type_name) const;
     [[nodiscard]] CookError LoadShimLinkModule(std::string_view source);
     [[nodiscard]] slang::IModule* ShimLinkModule() const noexcept;
+    [[nodiscard]] CookError LoadShimFormatModules(std::span<const ShimFormatLinkSource> sources);
+    /** @brief Null when no extern names the axis. */
+    [[nodiscard]] slang::IModule* ShimFormatLinkModule(std::string_view axis_name, uint32_t case_ordinal) const noexcept;
     [[nodiscard]] slang::IGlobalSession* GlobalSession() const noexcept;
     [[nodiscard]] slang::ISession* Session() const noexcept;
     [[nodiscard]] std::vector<slang::IComponentType*> BaseComponents() const noexcept;
@@ -97,6 +109,14 @@ private:
     Slang::ComPtr<slang::ISession> session;
     slang::IModule* rootModule{ nullptr };
     slang::IModule* shimLinkModule{ nullptr };
+
+    struct ShimFormatModule
+    {
+        std::string AxisName;
+        uint32_t CaseOrdinal{ 0u };
+        slang::IModule* Module{ nullptr };
+    };
+    std::vector<ShimFormatModule> shimFormatModules;
     std::vector<slang::IComponentType*> baseComponents;
     std::vector<Slang::ComPtr<slang::IEntryPoint>> entryPoints;
     std::vector<std::string> entryPointNames;

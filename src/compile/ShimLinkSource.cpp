@@ -1,14 +1,19 @@
 #include "compile/ShimLinkSource.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
+#include "ShaderLibraryTypes.hpp"
+#include "ShaderManifestIndex.hpp"
 #include "compile/RawLibrary.hpp"
+#include "permute/PermutationSpace.hpp"
 #include "target/ShimTable.hpp"
+#include "target/StorageFormatTable.hpp"
 #include "target/TargetProfile.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <expected>
 #include <format>
+#include <iterator>
 #include <ranges>
 #include <set>
 #include <span>
@@ -22,6 +27,7 @@ namespace lodestone
 namespace
 {
     constexpr std::string_view k_ShimModuleName = "LodestoneShims";
+    constexpr std::string_view k_StorageFormatEnumName = "StorageFormat";
 
     std::string_view Trim(std::string_view text) noexcept
     {
@@ -121,16 +127,26 @@ CookResult<std::string> MakeShimLinkSource(std::span<const RawShimExtern> extern
                                                            profile_name)));
         }
 
-        if (shimInterface->ImplementationTakesFormat)
+        // If this shim interface needs a format, make sure that the externs provide formats!
+        if (shimInterface->ImplementationTakesFormat != !shimExtern.FormatAxis.empty())
         {
+            const bool missing = shimInterface->ImplementationTakesFormat;
             return std::unexpected(ReportError(sink,
-                                               CookError::ShimExternInvalid,
-                                               std::format("{}({}): extern '{}' of '{}' needs a storage format, and nothing "
-                                                           "names one yet",
+                                               missing ? CookError::ShimStorageFormatMissing : CookError::ShimExternInvalid,
+                                               std::format("{}({}): extern '{}' of '{}' {}",
                                                            shimExtern.SourceFile,
                                                            shimExtern.SourceLine,
                                                            shimExtern.Name,
-                                                           shimExtern.Interface)));
+                                                           shimExtern.Interface,
+                                                           missing ? "needs [ls_storage_format(\"AXIS\")] to name the axis "
+                                                                     "of its storage format"
+                                                                   : "takes no storage format, so [ls_storage_format] does "
+                                                                     "not apply")));
+        }
+
+        if (shimInterface->ImplementationTakesFormat)
+        {
+            continue;
         }
 
         const std::vector<std::string_view> arguments = SplitShimTypeArguments(shimExtern.TypeArguments);
@@ -164,6 +180,11 @@ CookResult<std::string> MakeShimLinkSource(std::span<const RawShimExtern> extern
                                Spell(implName, spelledArguments));
     }
 
+    if (exports.empty())
+    {
+        return std::string{};
+    }
+
     std::string source = std::format("import {};\n", k_ShimModuleName);
     for (const std::string& importedModule : imports)
     {
@@ -174,8 +195,93 @@ CookResult<std::string> MakeShimLinkSource(std::span<const RawShimExtern> extern
     }
 
     source += exports;
-    
+
     return source;
+}
+
+CookResult<std::vector<ShimFormatLinkSource>> MakeShimFormatLinkSources(std::span<const RawShimExtern> externs,
+                                                                        const PermutationSpace& space,
+                                                                        AccessModel access,
+                                                                        std::string_view module_name,
+                                                                        DiagnosticSink& sink)
+{
+    std::vector<ShimFormatLinkSource> sources;
+    std::vector<const RawShimExtern*> firstExternOfAxis;
+    for (const RawShimExtern& shimExtern : externs)
+    {
+        if (!shimExtern.FormatAxis.empty() &&
+            std::ranges::none_of(firstExternOfAxis,
+                                 [&](const RawShimExtern* first) { return first->FormatAxis == shimExtern.FormatAxis; }))
+        {
+            firstExternOfAxis.push_back(&shimExtern);
+        }
+    }
+
+    for (const RawShimExtern* first : firstExternOfAxis)
+    {
+        const std::span<const PermutationAxis> axes = space.Axes();
+        const auto axis = std::ranges::find(axes, first->FormatAxis, &PermutationAxis::Name);
+        if (axis == axes.end())
+        {
+            std::vector<std::string_view> axisNames;
+            std::ranges::transform(axes, std::back_inserter(axisNames), [](const PermutationAxis& candidate) -> std::string_view
+                                   { return candidate.Name; });
+            const std::string_view nearest = NearestName(first->FormatAxis, axisNames);
+            return std::unexpected(ReportError(sink,
+                                               CookError::ShimStorageFormatAxisUnknown,
+                                               std::format("{}({}): extern '{}' names the storage format axis '{}', and "
+                                                           "module {} declares no axis of that name{}",
+                                                           first->SourceFile,
+                                                           first->SourceLine,
+                                                           first->Name,
+                                                           first->FormatAxis,
+                                                           module_name,
+                                                           nearest.empty() ? std::string{}
+                                                                           : std::format(". Did you mean '{}'?", nearest))));
+        }
+
+        // a gated axis has no value when the gate is off
+        if (axis->ValueDomain != AxisValueDomain::Enum || axis->EnumTypeName() != k_StorageFormatEnumName ||
+            axis->Module() != k_ShimModuleName || !axis->ActiveWhen.empty())
+        {
+            return std::unexpected(ReportError(sink,
+                                               CookError::ShimStorageFormatAxisInvalid,
+                                               std::format("{}({}): extern '{}' names the axis '{}', which must be an "
+                                                           "[ls_axis_enum] axis of type {}.{} with no ls_axis_active_when",
+                                                           first->SourceFile,
+                                                           first->SourceLine,
+                                                           first->Name,
+                                                           first->FormatAxis,
+                                                           k_ShimModuleName,
+                                                           k_StorageFormatEnumName)));
+        }
+
+        for (const PermutationValue& value : axis->GetValues())
+        {
+            // StorageFormatTest proves that every case has a row
+            const StorageFormatInfo* format = FindStorageFormat(axis->EnumCaseName(value.AsUInt()));
+            std::string source = std::format("import {};\n", k_ShimModuleName);
+            for (const RawShimExtern& shimExtern : externs)
+            {
+                if (shimExtern.FormatAxis != first->FormatAxis)
+                {
+                    continue;
+                }
+
+                const ShimInterface* shimInterface = FindShimInterface(shimExtern.Interface);
+                source += std::format("export struct {} : {} = {}<{}>;\n",
+                                      shimExtern.Name,
+                                      shimExtern.Interface,
+                                      ShimImplName(*shimInterface, access),
+                                      format->SlangType);
+            }
+            sources.push_back(ShimFormatLinkSource{ .AxisName = first->FormatAxis,
+                                                    .CaseOrdinal = value.AsUInt(),
+                                                    .Source = std::move(source) });
+        }
+    }
+
+    return sources;
 }
 
 } // namespace lodestone

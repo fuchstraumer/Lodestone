@@ -79,6 +79,11 @@ CookError ThreadPool::prepareContext(SlangModuleContext& module_context,
         error = module_context.LoadShimLinkModule(batch.ShimLinkSource);
     }
 
+    if (error == CookError::Success)
+    {
+        error = module_context.LoadShimFormatModules(batch.ShimFormatSources);
+    }
+
     if (error != CookError::Success)
     {
         // the usual cause is a module cache from another Slang version
@@ -118,6 +123,7 @@ void ThreadPool::runJobs(SlangModuleContext& module_context, CompileBatch& batch
 
 SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDescriptor>& variants,
                                                      std::string_view shim_link_source,
+                                                     std::span<const ShimFormatLinkSource> shim_format_sources,
                                                      DiagnosticSink& diagnostic_sink)
 {
     std::vector<RecordingDiagnosticSink> diagnosticSinks;
@@ -133,6 +139,7 @@ SlangCompiler::CompileResultList ThreadPool::Compile(const std::vector<VariantDe
     {
         .Variants = variants,
         .ShimLinkSource = shim_link_source,
+        .ShimFormatSources = shim_format_sources,
         .Results = results,
         .NextJobIndex = 0,
         .DoneLatch = &done,

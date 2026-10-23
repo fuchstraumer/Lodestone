@@ -4,6 +4,8 @@
 #include "Diagnostics.hpp"
 #include "ResourceFlags.hpp"
 #include "ShaderManifest.hpp"
+#include "ShaderManifestIndex.hpp"
+#include "VariantKey.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "driver/CookerDriver.hpp"
@@ -15,7 +17,9 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <expected>
 #include <filesystem>
+#include <optional>
 #include <format>
 #include <map>
 #include <set>
@@ -176,6 +180,65 @@ int main(int argc, char** argv)
                                  entry->second.Access() == ResourceAccess::WriteOnly &&
                                  entry->second.StorageFormat() == info.Format,
                              std::format("profile {}: {} is a write-only storage texture of its format", profile, info.EnumCase));
+            }
+        }
+    }
+
+    runner.BeginSection("a storage shim extern takes the format of its axis value, in every variant");
+    CookerOptions axisOptions;
+    axisOptions.ModulePaths.push_back(assetDirectory / "ShimStorageAxis.slang");
+    axisOptions.TargetNames.emplace_back("wgsl");
+    axisOptions.TargetNames.emplace_back("spirv");
+    axisOptions.OutputPath = "StorageFormatAxis";
+    axisOptions.VerifyDeterministic = true;
+    MemoryOutputSink axisSink;
+    const CookResult<CookStatistics> axisCooked = RunCook(axisOptions, axisSink);
+    runner.Check(axisCooked.has_value(), "every value of the format axis cooks for both targets, with both cross-checks");
+
+    const auto axisArtifact = axisSink.GetArtifacts().find(std::string{ k_ManifestFileName });
+    if (axisCooked.has_value() && axisArtifact != axisSink.GetArtifacts().end())
+    {
+        std::vector<std::byte> bytes(axisArtifact->second.size());
+        std::memcpy(bytes.data(), axisArtifact->second.data(), bytes.size());
+        const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(bytes);
+        for (const uint32_t profile : { 0u, 1u })
+        {
+            const manifest::ManifestResult<manifest::EnvironmentView> environment =
+                bundle.has_value() ? bundle->OpenEnvironment(profile, 0u) : std::unexpected(bundle.error());
+            if (!environment.has_value())
+            {
+                runner.Check(false, "the environment opens");
+                continue;
+            }
+
+            // only the attribute names the axis, so a pruned axis would leave one variant
+            runner.Check(environment->VariantKeys().size() == table.size(),
+                         std::format("profile {}: one variant for each format", profile));
+            const ManifestIndex index{ environment.value() };
+            for (const StorageFormatInfo& info : table)
+            {
+                const std::expected<VariantKey, QueryError> key =
+                    index.Query().Where("LEVEL_FORMAT", AxisValueDomain::Enum, info.EnumCase).Single();
+                const std::optional<uint32_t> variantIndex =
+                    key.has_value() ? environment->FindVariant(*key) : std::optional<uint32_t>{};
+                if (!variantIndex.has_value())
+                {
+                    runner.Check(false, std::format("profile {}: the variant of {} is found", profile, info.EnumCase));
+                    continue;
+                }
+
+                uint32_t storageTextures = 0u;
+                bool matches = true;
+                for (const manifest::ResolvedResource resource : environment->VariantAt(*variantIndex).EntryPoint(0u).Layout())
+                {
+                    if (resource.Kind() == BindingKind::StorageTexture)
+                    {
+                        ++storageTextures;
+                        matches = matches && resource.Access() == ResourceAccess::WriteOnly && resource.StorageFormat() == info.Format;
+                    }
+                }
+                runner.Check(storageTextures == 1u && matches,
+                             std::format("profile {}: the variant of {} writes a storage texture of its format", profile, info.EnumCase));
             }
         }
     }

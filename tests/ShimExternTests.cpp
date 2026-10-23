@@ -6,10 +6,14 @@
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "permute/PermutationSpace.hpp"
+#include "permute/PermutationAxis.hpp"
+#include "permute/PermutationValue.hpp"
 #include "target/ShimTable.hpp"
+#include "target/StorageFormatTable.hpp"
 #include "target/TargetProfile.hpp"
 
 #include <array>
+#include <iterator>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -110,6 +114,41 @@ int main(int argc, char** argv)
         const CookResult<RawModule> raw = compiler.PrepareRawModule(emptySpace);
         runner.Check(!raw.has_value() && raw.error() == CookError::ShimExternNotReflected,
                      "an extern inside a namespace is seen by the text reader only");
+    }
+
+    runner.BeginSection("reflection reads ls_storage_format on the line before an extern with no default");
+    {
+        RecordingDiagnosticSink sink;
+        SlangCompiler compiler;
+        runner.Check(Prepare(assetDirectory / "ShimStorageAxis.slang", cacheDirectory, sink, compiler) == CookError::Success,
+                     "the module loads");
+        std::vector<RawEnumCase> cases;
+        std::vector<PermutationValue> values;
+        for (const StorageFormatInfo& format : GetStorageFormats())
+        {
+            values.push_back(PermutationValue::MakeEnum(static_cast<uint32_t>(cases.size())));
+            cases.push_back(RawEnumCase{ .Name = std::string{ format.EnumCase }, .Value = std::ssize(cases) });
+        }
+        std::vector<PermutationAxis> axes;
+        axes.emplace_back("LEVEL_FORMAT",
+                          std::move(values),
+                          AxisKind::Tuning,
+                          EarliestBindingTime::Cook,
+                          AxisValueDomain::Enum,
+                          "",
+                          "StorageFormat",
+                          "LodestoneShims",
+                          std::move(cases));
+        const PermutationSpace formatSpace{ std::move(axes) };
+        const CookResult<RawModule> raw = compiler.PrepareRawModule(formatSpace);
+        runner.Check(raw.has_value() && raw->ShimExterns.size() == 2u, "the storage extern and the buffer extern");
+        if (raw.has_value() && raw->ShimExterns.size() == 2u)
+        {
+            runner.Check(raw->ShimExterns[0].Name == "Destination" && raw->ShimExterns[0].FormatAxis == "LEVEL_FORMAT",
+                         "the storage extern has the axis of its attribute");
+            runner.Check(raw->ShimExterns[1].Name == "Weights" && raw->ShimExterns[1].FormatAxis.empty(),
+                         "an extern with no attribute has no axis");
+        }
     }
 
     std::filesystem::remove_all(cacheDirectory);

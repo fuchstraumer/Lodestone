@@ -3,6 +3,7 @@
 #define LODESTONE_SLANG_COMPILER_HPP
 #include "CookerErrors.hpp"
 #include "compile/RawLibrary.hpp"
+#include "compile/ShimLinkSource.hpp"
 #include "compile/SymbolTable.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "ShaderLibraryTypes.hpp"
@@ -74,6 +75,7 @@ private:
     DiagnosticSink* diagnosticSink{ nullptr };
     SymbolTable symbolTable;
     std::string shimLinkSource;
+    std::vector<ShimFormatLinkSource> shimFormatSources;
     std::string targetName;
     ::lodestone::AccessModel shimAccessModel{ ::lodestone::AccessModel::Invalid };
     std::unique_ptr<ThreadPool> compilePool{ nullptr };

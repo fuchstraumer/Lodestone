@@ -247,9 +247,9 @@ namespace
 {
     // NOLINTBEGIN(misc-no-recursion)
     // only `__include` fragments are walked into: their declarations are still at module scope
-    void CollectModuleScopeNames(slang::DeclReflection* reflection,
-                                 slang::DeclReflection::Kind kind,
-                                 std::vector<std::string>& names)
+    void VisitModuleScopeDecls(slang::DeclReflection* reflection,
+                               slang::DeclReflection::Kind kind,
+                               const std::function<void(slang::DeclReflection*)>& visit)
     {
         const unsigned int childCount = reflection->getChildrenCount();
         for (unsigned int i = 0u; i < childCount; ++i)
@@ -262,40 +262,52 @@ namespace
 
             if (child->getKind() == kind)
             {
-                const char* name = child->getName();
-                if (name != nullptr)
-                {
-                    names.emplace_back(name);
-                }
+                visit(child);
             }
             else if (child->getKind() == slang::DeclReflection::Kind::Unsupported && child->getChildrenCount() > 0u)
             {
-                CollectModuleScopeNames(child, kind, names);
+                VisitModuleScopeDecls(child, kind, visit);
             }
         }
     }
     // NOLINTEND(misc-no-recursion)
-}
 
-namespace
-{
-    std::vector<std::string> BuildModuleScopeNames(slang::ISession* session, slang::DeclReflection::Kind kind)
+    void VisitLoadedModuleScopeDecls(slang::ISession* session,
+                                     slang::DeclReflection::Kind kind,
+                                     const std::function<void(slang::DeclReflection*)>& visit)
     {
-    std::vector<std::string> names;
-    const int64_t loadedModuleCount = static_cast<int64_t>(session->getLoadedModuleCount());
-    for (int64_t i = 0; i < loadedModuleCount; ++i)
-    {
-        slang::DeclReflection* moduleReflection = session->getLoadedModule(i)->getModuleReflection();
-        if (moduleReflection != nullptr)
+        const int64_t loadedModuleCount = static_cast<int64_t>(session->getLoadedModuleCount());
+        for (int64_t i = 0; i < loadedModuleCount; ++i)
         {
-            CollectModuleScopeNames(moduleReflection, kind, names);
+            slang::DeclReflection* moduleReflection = session->getLoadedModule(i)->getModuleReflection();
+            if (moduleReflection != nullptr)
+            {
+                VisitModuleScopeDecls(moduleReflection, kind, visit);
+            }
         }
     }
 
-    std::ranges::sort(names);
-    const auto [duplicatesBegin, duplicatesEnd] = std::ranges::unique(names);
-    names.erase(duplicatesBegin, duplicatesEnd);
-    return names;
+    std::vector<std::string> BuildModuleScopeNames(slang::ISession* session, slang::DeclReflection::Kind kind)
+    {
+        std::vector<std::string> names;
+
+        auto scopeNameVisitor = [&](slang::DeclReflection* decl)
+        {
+            const char* name = decl->getName();
+            if (name != nullptr)
+            {
+                names.emplace_back(name);
+            }
+        };
+
+        VisitLoadedModuleScopeDecls(session,
+                                    kind,
+                                    scopeNameVisitor);
+
+        std::ranges::sort(names);
+        const auto [duplicatesBegin, duplicatesEnd] = std::ranges::unique(names);
+        names.erase(duplicatesBegin, duplicatesEnd);
+        return names;
     }
 }
 
@@ -329,6 +341,66 @@ std::vector<std::string> SlangModuleContext::BuildModuleScopeVariableNames() con
 std::vector<std::string> SlangModuleContext::BuildModuleScopeStructNames() const
 {
     return BuildModuleScopeNames(session, slang::DeclReflection::Kind::Struct);
+}
+
+std::vector<StructStringAttribute> SlangModuleContext::BuildStructStringAttributes(std::string_view attribute_name) const
+{
+    const std::string attributeName{ attribute_name };
+    std::vector<StructStringAttribute> found;
+    auto vistorFn = [&](slang::DeclReflection* decl)
+    {
+        slang::TypeReflection* type = decl->getType();
+        const char* name = decl->getName();
+        slang::UserAttribute* attribute =
+            type != nullptr ? type->findUserAttributeByName(attributeName.c_str()) : nullptr;
+        if (attribute == nullptr || name == nullptr)
+        {
+            return;
+        }
+
+        size_t length = 0u;
+        const char* text = attribute->getArgumentValueString(0u, &length);
+        found.push_back(
+            StructStringAttribute
+            {
+            .StructName = name,
+            .Argument = text != nullptr ? std::string{ text, length } : std::string{}
+            });
+    };
+
+    VisitLoadedModuleScopeDecls(session,
+                                slang::DeclReflection::Kind::Struct,
+                                vistorFn);
+
+    return found;
+}
+
+CookError SlangModuleContext::LoadShimFormatModules(std::span<const ShimFormatLinkSource> sources)
+{
+    for (const ShimFormatLinkSource& source : sources)
+    {
+        const std::string name = std::format("LodestoneShimLinks_{}_{}_{}", moduleName, source.AxisName, source.CaseOrdinal);
+        const std::string path = name + ".slang";
+        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+        slang::IModule* module =
+            session->loadModuleFromSourceString(name.c_str(), path.c_str(), source.Source.c_str(), diagnosticsBlob.writeRef());
+        ReportDiagnostics(*diagnosticSink, "SlangModuleContext::LoadShimFormatModules", diagnosticsBlob);
+        if (module == nullptr)
+        {
+            return CookError::ModuleLoadFailed;
+        }
+
+        shimFormatModules.push_back(ShimFormatModule{ .AxisName = source.AxisName, .CaseOrdinal = source.CaseOrdinal, .Module = module });
+    }
+    return CookError::Success;
+}
+
+slang::IModule* SlangModuleContext::ShimFormatLinkModule(std::string_view axis_name, uint32_t case_ordinal) const noexcept
+{
+    const auto found = std::ranges::find_if(shimFormatModules,
+                                            [&](const ShimFormatModule& module)
+                                            { return module.CaseOrdinal == case_ordinal && module.AxisName == axis_name; });
+    return found != shimFormatModules.end() ? found->Module : nullptr;
 }
 
 

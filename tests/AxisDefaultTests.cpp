@@ -117,6 +117,25 @@ int main(int argc, char** argv)
         runner.Check(actual == testCase.Expected, testCase.Claim);
     }
 
+    runner.BeginSection("an enum axis that no code reads is pruned, and its initializer is not read as a value");
+    {
+        MemoryOutputSink unreadSink;
+        const CookResult<CookStatistics> unreadCook =
+            CookIntoMemory(assetDirectory / "AxisDefaultUnread.slang", std::nullopt, unreadSink);
+        runner.Check(unreadCook.has_value(), "the module cooks");
+        const std::vector<std::byte> unreadBytes = ManifestBytes(unreadSink);
+        const manifest::ManifestResult<manifest::BundleView> unreadBundle = manifest::BundleView::Open(unreadBytes);
+        const manifest::ManifestResult<manifest::EnvironmentView> unreadEnvironment =
+            unreadBundle.has_value() ? unreadBundle->OpenEnvironment(0u, 0u) : std::unexpected(unreadBundle.error());
+        runner.Check(unreadEnvironment.has_value(), "the environment opens");
+        if (unreadEnvironment.has_value())
+        {
+            const ManifestIndex unreadIndex{ unreadEnvironment.value() };
+            runner.Check(!unreadIndex.AxisDefault("DETAIL").has_value() && unreadIndex.AxisDefault("USE_FOG").has_value(),
+                         "DETAIL left the space and USE_FOG stayed");
+        }
+    }
+
     runner.BeginSection("every declared default reaches the client, and none of them is the first value");
     MemoryOutputSink sink;
     const CookResult<CookStatistics> cooked = CookIntoMemory(assetDirectory / "AxisDefaults.slang", std::nullopt, sink);

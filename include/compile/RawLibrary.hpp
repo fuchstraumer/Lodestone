@@ -140,6 +140,8 @@ struct RawShimExtern
     /** @brief Source module that declares the type. */
     std::vector<std::string> ArgumentModules;
     ShimResourceClass Class{ ShimResourceClass::Invalid };
+    /** @brief Empty without `ls_storage_format`. */
+    std::string FormatAxis;
     std::string SourceFile;
     uint32_t SourceLine{ 0u };
 };

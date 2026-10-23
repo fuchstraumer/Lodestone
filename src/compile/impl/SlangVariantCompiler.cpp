@@ -96,7 +96,7 @@ CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext&
                                                              DiagnosticSink& sink)
 {
     std::vector<slang::IComponentType*> components = context.BaseComponents();
-    components.reserve(context.BaseComponents().size() + descriptor.Active.size() + 1u);
+    components.reserve(context.BaseComponents().size() + (descriptor.Active.size() * 2u) + 1u);
     if (context.ShimLinkModule() != nullptr)
     {
         components.push_back(context.ShimLinkModule());
@@ -122,6 +122,11 @@ CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext&
         }
 
         components.push_back(variantModule);
+
+        if (slang::IModule* formatModule = context.ShimFormatLinkModule(binding.Axis->Name, binding.Value.AsUInt()))
+        {
+            components.push_back(formatModule);
+        }
     }
 
     Slang::ComPtr<slang::IBlob> diagnostics;

@@ -5,6 +5,7 @@
 #include "SlangCompilerTypes.hpp"
 #include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
+#include "compile/ShimLinkSource.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "permute/PermutationSpace.hpp"
 
@@ -45,6 +46,7 @@ public:
                                        std::vector<SerializedModule> serialized_modules);
     [[nodiscard]] SlangCompiler::CompileResultList Compile(const std::vector<VariantDescriptor>& variants,
                                                            std::string_view shim_link_source,
+                                                           std::span<const ShimFormatLinkSource> shim_format_sources,
                                                            DiagnosticSink& diagnostic_sink);
     /** @brief Read the blobs only: copying a `ComPtr` changes the reference count while workers use it. */
     [[nodiscard]] std::span<const SerializedModule> SerializedModules() const noexcept;
@@ -56,6 +58,7 @@ private:
         std::span<const VariantDescriptor> Variants;
         /** Every context loads it once. Empty without shim externs. */
         std::string_view ShimLinkSource;
+        std::span<const ShimFormatLinkSource> ShimFormatSources;
         std::span<CookResult<RawVariant>> Results;
         std::atomic<int32_t> NextJobIndex{ 0u };
         std::latch* DoneLatch{ nullptr };

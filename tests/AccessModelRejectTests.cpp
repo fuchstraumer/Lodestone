@@ -31,7 +31,7 @@ struct RejectionCase
     std::string_view Claim;
 };
 
-constexpr std::array<RejectionCase, 5u> k_Cases
+constexpr std::array<RejectionCase, 9u> k_Cases
 {
     RejectionCase{ .ModuleFile = "PointerMember.slang",
                    .TargetName = "wgsl",
@@ -57,6 +57,23 @@ constexpr std::array<RejectionCase, 5u> k_Cases
                    .TargetName = "wgsl",
                    .Expected = CookError::SlangInterfaceHasResourceMember,
                    .Claim = "an implementation of an interface axis that holds a resource fails the cook" },
+    // a storage shim extern links the format of one axis value, so the axis must exist and have a value in every variant
+    RejectionCase{ .ModuleFile = "Shims/ShimStorageNoAttribute.slang",
+                   .TargetName = "wgsl",
+                   .Expected = CookError::ShimStorageFormatMissing,
+                   .Claim = "a storage shim extern with no format axis fails the cook" },
+    RejectionCase{ .ModuleFile = "Shims/ShimStorageUnknownAxis.slang",
+                   .TargetName = "wgsl",
+                   .Expected = CookError::ShimStorageFormatAxisUnknown,
+                   .Claim = "a format axis that the module does not declare fails the cook" },
+    RejectionCase{ .ModuleFile = "Shims/ShimStorageWrongAxis.slang",
+                   .TargetName = "wgsl",
+                   .Expected = CookError::ShimStorageFormatAxisInvalid,
+                   .Claim = "a format axis over another enum fails the cook" },
+    RejectionCase{ .ModuleFile = "Shims/ShimStorageGatedAxis.slang",
+                   .TargetName = "wgsl",
+                   .Expected = CookError::ShimStorageFormatAxisInvalid,
+                   .Claim = "a gated format axis fails the cook" },
 };
 
 /** Cooks one module into a `MemoryOutputSink`, so that rows write no files and cannot collide. */

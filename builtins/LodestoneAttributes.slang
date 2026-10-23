@@ -87,6 +87,13 @@ public struct ls_axis_kindAttribute
     public string kind;
 };
 
+/** The enum axis over `StorageFormat` that selects the storage format of a shim extern, such as `"LEVEL_FORMAT"`. */
+[__AttributeUsage(_AttributeTargets.Struct)]
+public struct ls_storage_formatAttribute
+{
+    public string axis;
+};
+
 [__AttributeUsage(_AttributeTargets.Struct)]
 public struct ls_axis_interfaceAttribute
 {

@@ -120,12 +120,36 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
 
     // the symbol table reads the text and reflection confirms the type exists, so each is a second opinion for the other
     const std::vector<std::string> moduleScopeStructs = bootstrapContext->BuildModuleScopeStructNames();
+    // reflection only: the attribute is usually on the line before the extern
+    const std::vector<StructStringAttribute> formatAttributes = bootstrapContext->BuildStructStringAttributes("ls_storage_format");
     for (const ExternStructDeclaration& declaration : symbolTable.ExternStructsForModule(ModuleName()))
     {
+        const auto formatAttribute = std::ranges::find(formatAttributes, declaration.Name, &StructStringAttribute::StructName);
         const ShimInterface* shimInterface = FindShimInterface(declaration.Interface);
         if (shimInterface == nullptr)
         {
+            if (formatAttribute != formatAttributes.end())
+            {
+                return std::unexpected(ReportError(*diagnosticSink,
+                                                   CookError::ShimExternInvalid,
+                                                   std::format("{}({}): extern struct '{}' has [ls_storage_format], and '{}' "
+                                                               "is not a shim interface",
+                                                               declaration.SourcePath,
+                                                               declaration.SourceLine,
+                                                               declaration.Name,
+                                                               declaration.Interface)));
+            }
             continue;
+        }
+
+        if (formatAttribute != formatAttributes.end() && formatAttribute->Argument.empty())
+        {
+            return std::unexpected(ReportError(*diagnosticSink,
+                                               CookError::ShimStorageFormatAxisUnknown,
+                                               std::format("{}({}): [ls_storage_format] on extern '{}' names no axis",
+                                                           declaration.SourcePath,
+                                                           declaration.SourceLine,
+                                                           declaration.Name)));
         }
 
         if (!std::ranges::binary_search(moduleScopeStructs, declaration.Name))
@@ -145,6 +169,8 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
                                   .TypeArguments = std::string{ declaration.TypeArguments },
                                   .ArgumentModules = {},
                                   .Class = shimInterface->Class,
+                                  .FormatAxis = formatAttribute != formatAttributes.end() ? formatAttribute->Argument
+                                                                                          : std::string{},
                                   .SourceFile = std::string{ declaration.SourcePath },
                                   .SourceLine = declaration.SourceLine };
 
@@ -180,13 +206,21 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
         return std::unexpected(linkSource.error());
     }
     
+    CookResult<std::vector<ShimFormatLinkSource>> formatSources =
+        MakeShimFormatLinkSources(module.ShimExterns, space, shimAccessModel, module.Name, *diagnosticSink);
+    if (!formatSources)
+    {
+        return std::unexpected(formatSources.error());
+    }
+
     shimLinkSource = std::move(linkSource.value());
+    shimFormatSources = std::move(formatSources.value());
     return module;
 }
 
 SlangCompiler::CompileResultList SlangCompiler::Compile(const std::vector<VariantDescriptor>& variants, DiagnosticSink& sink) const
 {
-    return compilePool->Compile(variants, shimLinkSource, sink);
+    return compilePool->Compile(variants, shimLinkSource, shimFormatSources, sink);
 }
 
 std::string_view SlangCompiler::ModuleName() const noexcept

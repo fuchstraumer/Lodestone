@@ -1,8 +1,8 @@
 module ShimStorage;
 import LodestoneShims;
 
-// The write-only storage shim used directly, one texture for each accepted format. The module registers no axis. A format axis
-// that chooses the implementation of an extern is a later step.
+// The write-only storage shim used directly, one texture for each accepted format. The module registers no axis.
+// ShimStorageAxis.slang selects the format of an extern with an axis.
 
 struct Levels
 {
