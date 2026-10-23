@@ -10,6 +10,7 @@
 #include "emit/ShaderManifestVerify.hpp"
 #include "VariantKey.hpp"
 #include "ManifestFixtures.hpp"
+#include "Diagnostics.hpp"
 #include "TestHarness.hpp"
 
 #include <array>
@@ -320,6 +321,7 @@ void TestSourceFacts(lodestone::tests::TestRunner& runner)
  * one target spells (`StorageInputOutput16`) are not compared. */
 void TestSourceFactsAcrossProfiles(lodestone::tests::TestRunner& runner)
 {
+    lodestone::RecordingDiagnosticSink crossProfileDiagnostics;
     runner.BeginSection("two profiles of one variant must read the same workgroup memory and portable capabilities");
     const auto makeLibrary = [](lodestone::SourceCodeFacts wgsl, lodestone::SourceCodeFacts spirv)
     {
@@ -341,31 +343,31 @@ void TestSourceFactsAcrossProfiles(lodestone::tests::TestRunner& runner)
         .CapabilityNames = { "Float16", "GroupNonUniform", "GroupNonUniformArithmetic", "StorageInputOutput16" },
         .WorkgroupMemoryBytes = 144u
     };
-    runner.CheckEqual(lodestone::VerifySourceFactsAcrossProfiles(makeLibrary(wgslFacts, spirvFacts)),
+    runner.CheckEqual(lodestone::VerifySourceFactsAcrossProfiles(makeLibrary(wgslFacts, spirvFacts), crossProfileDiagnostics),
                           lodestone::CookError::Success,
                  "f16 is Float16, subgroups is the GroupNonUniform family, and a SPIR-V only name is not compared");
 
     lodestone::SourceCodeFacts otherBytes = spirvFacts;
     otherBytes.WorkgroupMemoryBytes = 160u;
-    runner.CheckEqual(lodestone::VerifySourceFactsAcrossProfiles(makeLibrary(wgslFacts, otherBytes)),
+    runner.CheckEqual(lodestone::VerifySourceFactsAcrossProfiles(makeLibrary(wgslFacts, otherBytes), crossProfileDiagnostics),
                           lodestone::CookError::SourceFactsTargetMismatch,
                  "workgroup memory that differs fails the cook");
 
     lodestone::SourceCodeFacts noFloat16 = spirvFacts;
     noFloat16.CapabilityNames = { "GroupNonUniform" };
-    runner.CheckEqual(lodestone::VerifySourceFactsAcrossProfiles(makeLibrary(wgslFacts, noFloat16)),
+    runner.CheckEqual(lodestone::VerifySourceFactsAcrossProfiles(makeLibrary(wgslFacts, noFloat16), crossProfileDiagnostics),
                           lodestone::CookError::SourceFactsTargetMismatch,
                  "a 16-bit float that only one profile reads fails the cook");
 
     lodestone::SourceCodeFacts noSubgroups = spirvFacts;
     noSubgroups.CapabilityNames = { "Float16" };
-    runner.CheckEqual(lodestone::VerifySourceFactsAcrossProfiles(makeLibrary(wgslFacts, noSubgroups)),
+    runner.CheckEqual(lodestone::VerifySourceFactsAcrossProfiles(makeLibrary(wgslFacts, noSubgroups), crossProfileDiagnostics),
                           lodestone::CookError::SourceFactsTargetMismatch,
                  "a subgroup operation that only one profile reads fails the cook");
 
     CookedLibrary unread = makeLibrary(wgslFacts, otherBytes);
     unread.Profiles[1].CodeFactsRead = false;
-    runner.CheckEqual(lodestone::VerifySourceFactsAcrossProfiles(unread), lodestone::CookError::Success,
+    runner.CheckEqual(lodestone::VerifySourceFactsAcrossProfiles(unread, crossProfileDiagnostics), lodestone::CookError::Success,
                  "a profile with no reader is not compared");
 }
 
@@ -426,6 +428,7 @@ void TestMemberLookup(lodestone::tests::TestRunner& runner)
 
 int main()
 {
+    lodestone::RecordingDiagnosticSink crossProfileDiagnostics;
     lodestone::tests::TestRunner runner{ "ShaderManifestRejectTests" };
 
     const CookedLibrary library = MakeSmallLibrary();
@@ -628,15 +631,15 @@ int main()
 
     // The cross-target validator: one variant of one module samples the same resources in every profile.
     runner.BeginSection("two profiles of one variant must read the same pairs");
-    runner.CheckEqual(lodestone::VerifySamplerPairsAcrossProfiles(sampledLibrary), lodestone::CookError::Success,
+    runner.CheckEqual(lodestone::VerifySamplerPairsAcrossProfiles(sampledLibrary, crossProfileDiagnostics), lodestone::CookError::Success,
                       "two profiles that read the same pairs agree");
     const CookedLibrary disagreeing = MakeSampledLibrary(onePair, {});
-    runner.CheckEqual(lodestone::VerifySamplerPairsAcrossProfiles(disagreeing),
+    runner.CheckEqual(lodestone::VerifySamplerPairsAcrossProfiles(disagreeing, crossProfileDiagnostics),
                           lodestone::CookError::SamplerPairsTargetMismatch,
                           "a pair that one profile reads and the other does not fails the cook");
     CookedLibrary oneUnrecorded = MakeSampledLibrary(onePair, {});
     oneUnrecorded.Profiles[1].SamplerTexturePairsRecorded = false;
-    runner.CheckEqual(lodestone::VerifySamplerPairsAcrossProfiles(oneUnrecorded), lodestone::CookError::Success,
+    runner.CheckEqual(lodestone::VerifySamplerPairsAcrossProfiles(oneUnrecorded, crossProfileDiagnostics), lodestone::CookError::Success,
                       "a profile that did not record its pairs is not compared");
 
     runner.BeginSection("the entry point constants read back, and a damaged record is rejected");

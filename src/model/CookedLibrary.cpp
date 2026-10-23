@@ -4,6 +4,7 @@
 #include "model/ContentHash.hpp"
 #include "model/ContentInterner.hpp"
 #include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "model/ShaderDataSchema.hpp"
@@ -12,11 +13,10 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
+#include <format>
 #include <expected>
 #include <memory>
 #include <optional>
-#include <print>
 #include <ranges>
 #include <span>
 #include <string>
@@ -223,17 +223,18 @@ void DisableDedupe(InternedModule& module) noexcept
 
 CookError AppendVariantToModule(InternedModule& module,
                                 const CompiledVariant& variant,
-                                const VariantDescriptor& descriptor)
+                                const VariantDescriptor& descriptor,
+                                DiagnosticSink& sink)
 {
     if (variant.EntryPoints.size() != module.EntryPoints.size())
     {
-        std::println(stderr,
-                     "[lodestone] variant [{}] has {} entrypoints, but module {} declares {}",
-                     variant.VariantDescription,
-                     variant.EntryPoints.size(),
-                     module.Name,
-                     module.EntryPoints.size());
-        return CookError::ReflectionMismatch;
+        return ReportError(sink,
+                           CookError::ReflectionMismatch,
+                           std::format("variant [{}] has {} entry points, but module {} declares {}",
+                                       variant.VariantDescription,
+                                       variant.EntryPoints.size(),
+                                       module.Name,
+                                       module.EntryPoints.size()));
     }
 
     const ProvenanceRecord variantOrigin{ .EntryPointName = {},
@@ -443,11 +444,11 @@ CookResult<ShaderLayoutView> ResolveLayoutView(const CookedModule& module,
     return layoutView;
 }
 
-CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library)
+CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library, DiagnosticSink& sink)
 {
     return VisitSharedVariants(library,
                                &CookedProfile::SamplerTexturePairsRecorded,
-                               [&library](const SharedVariant& shared) -> CookError
+                               [&library, &sink](const SharedVariant& shared) -> CookError
                                {
         for (size_t entryPointIndex = 0u; entryPointIndex < shared.Environment.EntryPoints.size(); ++entryPointIndex)
         {
@@ -469,29 +470,28 @@ CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library)
                 continue;
             }
 
-            std::println(stderr,
-                         "[lodestone] SAMPLER PAIRS: module '{}' variant [{}] entry point '{}' samples {} "
-                         "pairs in profile '{}' and {} pairs in profile '{}', or one pair differs",
-                         library.ModuleNames[shared.Module],
-                         shared.Variant.Description,
-                         shared.Environment.EntryPoints[entryPointIndex].Name,
-                         pairs->size(),
-                         library.Profiles[shared.Profile].TargetName,
-                         baselinePairs->size(),
-                         library.Profiles[shared.BaselineProfile].TargetName);
-
-            return CookError::SamplerPairsTargetMismatch;
+            return ReportError(sink,
+                               CookError::SamplerPairsTargetMismatch,
+                               std::format("sampler pairs: module '{}' variant [{}] entry point '{}' samples {} pairs in "
+                                           "profile '{}' and {} pairs in profile '{}', or one pair differs",
+                                           library.ModuleNames[shared.Module],
+                                           shared.Variant.Description,
+                                           shared.Environment.EntryPoints[entryPointIndex].Name,
+                                           pairs->size(),
+                                           library.Profiles[shared.Profile].TargetName,
+                                           baselinePairs->size(),
+                                           library.Profiles[shared.BaselineProfile].TargetName));
         }
         return CookError::Success;
     });
 }
 
-CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library)
+CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library, DiagnosticSink& sink)
 {
     return VisitSharedVariants(
         library,
         &CookedProfile::CodeFactsRead,
-        [&library](const SharedVariant& shared) -> CookError
+        [&library, &sink](const SharedVariant& shared) -> CookError
         {
         const ShaderCodeFormat format = library.Profiles[shared.Profile].CodeFormat;
         const ShaderCodeFormat baselineFormat = library.Profiles[shared.BaselineProfile].CodeFormat;
@@ -508,20 +508,20 @@ CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library)
                 continue;
             }
 
-            std::println(stderr,
-                         "[lodestone] SOURCE FACTS: module '{}' variant [{}] entry point '{}' needs {} bytes of workgroup "
-                         "memory and portable capabilities {:#x} in profile '{}', and {} bytes and {:#x} in profile '{}'",
-                         library.ModuleNames[shared.Module],
-                         shared.Variant.Description,
-                         shared.Environment.EntryPoints[entryPointIndex].Name,
-                         facts.WorkgroupMemoryBytes,
-                         portable,
-                         library.Profiles[shared.Profile].TargetName,
-                         baselineFacts.WorkgroupMemoryBytes,
-                         baselinePortable,
-                         library.Profiles[shared.BaselineProfile].TargetName);
-
-            return CookError::SourceFactsTargetMismatch;
+            return ReportError(sink,
+                               CookError::SourceFactsTargetMismatch,
+                               std::format("source facts: module '{}' variant [{}] entry point '{}' needs {} bytes of workgroup "
+                                           "memory and portable capabilities {:#x} in profile '{}', and {} bytes and {:#x} "
+                                           "in profile '{}'",
+                                           library.ModuleNames[shared.Module],
+                                           shared.Variant.Description,
+                                           shared.Environment.EntryPoints[entryPointIndex].Name,
+                                           facts.WorkgroupMemoryBytes,
+                                           portable,
+                                           library.Profiles[shared.Profile].TargetName,
+                                           baselineFacts.WorkgroupMemoryBytes,
+                                           baselinePortable,
+                                           library.Profiles[shared.BaselineProfile].TargetName));
         }
         return CookError::Success;
     });

@@ -21,7 +21,6 @@
 #include <format>
 #include <functional>
 #include <optional>
-#include <print>
 #include <ranges>
 #include <span>
 #include <string>
@@ -45,7 +44,8 @@ constexpr std::array<RawSizeAttributeKind, 4u> k_SizeAttributeKinds{ RawSizeAttr
                                                                      RawSizeAttributeKind::Extent3d };
 
 /** Returns an error when the argument is not a string literal: an annotation the author wrote must not be skipped. */
-CookResult<std::string> ReadStringArgument(slang::Attribute* attribute,
+CookResult<std::string> ReadStringArgument(DiagnosticSink& sink,
+                                           slang::Attribute* attribute,
                                            uint32_t argument_index,
                                            std::string_view binding_name)
 {
@@ -53,12 +53,12 @@ CookResult<std::string> ReadStringArgument(slang::Attribute* attribute,
     const char* text = attribute->getArgumentValueString(argument_index, &length);
     if (text == nullptr)
     {
-        std::println(stderr,
-                     "[lodestone] argument {} of [{}] on '{}' is not a string literal",
-                     argument_index,
-                     attribute->getName(),
-                     binding_name);
-        return std::unexpected(CookError::AttributeExpressionParseFailed);
+        return std::unexpected(ReportError(sink,
+                                           CookError::AttributeExpressionParseFailed,
+                                           std::format("argument {} of [{}] on '{}' is not a string literal",
+                                                       argument_index,
+                                                       attribute->getName(),
+                                                       binding_name)));
     }
 
     // some paths include the quotes
@@ -270,13 +270,12 @@ std::optional<uint32_t> ReadOffset(slang::VariableLayoutReflection* var_layout,
     return var_layout != nullptr ? ResolvedNumber(var_layout->getOffset(category)) : std::nullopt;
 }
 
-void ReportUnresolvedLocation(std::string_view range_kind, SlangInt range_index)
+void ReportUnresolvedLocation(DiagnosticSink& sink, std::string_view range_kind, SlangInt range_index)
 {
-    std::println(stderr,
-                 "[lodestone] {} range {} has an unresolved location: link-time constants are "
-                 "affecting reflection output",
-                 range_kind,
-                 range_index);
+    ReportWarning(sink,
+                  std::format("{} range {} has an unresolved location: link-time constants are affecting reflection output",
+                              range_kind,
+                              range_index));
 }
 
 /** Joins a scope and a name with an underscore, as Slang does. */
@@ -331,7 +330,8 @@ void CollectScopeNames(slang::TypeLayoutReflection* layout,
 }
 
 /** Reads one sub-object range as a parameter block, or returns no value when the range is not one. */
-std::optional<ParameterBlockInfo> ReadParameterBlock(slang::TypeLayoutReflection* containing_layout,
+std::optional<ParameterBlockInfo> ReadParameterBlock(DiagnosticSink& sink,
+                                                     slang::TypeLayoutReflection* containing_layout,
                                                      SlangInt sub_object_index,
                                                      const BindingScope& scope)
 {
@@ -361,7 +361,7 @@ std::optional<ParameterBlockInfo> ReadParameterBlock(slang::TypeLayoutReflection
         ReadOffset(spaceOffset, SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE);
     if (!space)
     {
-        ReportUnresolvedLocation("parameter block", rangeIndex);
+        ReportUnresolvedLocation(sink, "parameter block", rangeIndex);
         return std::nullopt;
     }
 
@@ -765,7 +765,7 @@ CookError SlangReflector::collectRawSizeAttributes(slang::VariableReflection* le
 
         for (uint32_t i = 0u; i < ArgumentCountOf(kind); ++i)
         {
-            CookResult<std::string> argument = ReadStringArgument(found, i, binding_name);
+            CookResult<std::string> argument = ReadStringArgument(*sink, found, i, binding_name);
             if (!argument)
             {
                 return argument.error();
@@ -797,7 +797,7 @@ CookError SlangReflector::readSingleStringAttribute(slang::VariableReflection* l
         return CookError::Success;
     }
 
-    CookResult<std::string> argument = ReadStringArgument(found, 0u, binding_name);
+    CookResult<std::string> argument = ReadStringArgument(*sink, found, 0u, binding_name);
     if (!argument)
     {
         return argument.error();
@@ -929,7 +929,7 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
                 descriptorSetIndex, descriptorRangeIndex)));
         if (!spaceOffset || !indexOffset)
         {
-            ReportUnresolvedLocation("binding", rangeIndex);
+            ReportUnresolvedLocation(*sink, "binding", rangeIndex);
             continue;
         }
 
@@ -995,12 +995,11 @@ CookResult<RawBindingDraft> SlangReflector::readBlockContainer(const ParameterBl
         ReadOffset(block.Container, SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
     if (!containerBinding)
     {
-        std::println(stderr,
-                     "[lodestone] parameter block '{}' holds {} bytes of data and reports no "
-                     "container binding",
-                     block.Name,
-                     block.UniformSize);
-        return std::unexpected(CookError::ReflectionUnavailable);
+        return std::unexpected(ReportError(*sink,
+                                           CookError::ReflectionUnavailable,
+                                           std::format("parameter block '{}' holds {} bytes of data and reports no container binding",
+                                                       block.Name,
+                                                       block.UniformSize)));
     }
 
     RawBindingDraft draft;
@@ -1028,7 +1027,7 @@ CookError SlangReflector::collectSubObjectDrafts(slang::TypeLayoutReflection* co
     for (SlangInt subObjectIndex = 0; subObjectIndex < subObjectRangeCount; ++subObjectIndex)
     {
         const std::optional<ParameterBlockInfo> block =
-            ReadParameterBlock(containing_layout, subObjectIndex, scope);
+            ReadParameterBlock(*sink, containing_layout, subObjectIndex, scope);
         if (!block)
         {
             continue;
@@ -1240,7 +1239,7 @@ CookResult<slang::TypeLayoutReflection*> SlangReflector::readEntryPointConstants
         ReadOffset(parametersLayout->getContainerVarLayout(), SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
     if (!containerOffset)
     {
-        ReportUnresolvedLocation("entry point constants", 0);
+        ReportUnresolvedLocation(*sink, "entry point constants", 0);
         return std::unexpected(CookError::ReflectionUnavailable);
     }
 
@@ -1287,10 +1286,9 @@ void SlangReflector::extractRasterState(slang::EntryPointReflection* entry_point
         CollectColorTargets(entry_point_layout->getResultVarLayout(), raster);
         CollectDepthWrites(entry_point_layout->getVarLayout(), raster);
         break;
-    case ShaderStageKind::Compute:
-        break;
     default:
-        std::println(stderr, "Unsupported shader stage in extractRasterState: {}", static_cast<int>(stage));
+        // only vertex and fragment stages have raster state. The old print here fired for every other stage (compute,
+        // ray tracing, tessellation) and told the author nothing they could act on
         break;
     }
 }

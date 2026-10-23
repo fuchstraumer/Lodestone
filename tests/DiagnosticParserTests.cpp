@@ -98,6 +98,12 @@ void TestSeverities(TestRunner& runner)
     // note that the cook then ignores.
     runner.CheckEqual(records[3].Severity, DiagnosticSeverity::Error,
                       "a severity name this parser does not know becomes an error, never a note");
+    if (runner.CheckEqual(records[3].Related.size(), 1u, "the unknown severity is kept in a note"))
+    {
+        runner.Check(records[3].Related.front().Message.contains("something slang added later"),
+                     "the note names the severity that Slang wrote");
+    }
+    runner.CheckEqual(records[0].Related.size(), 0u, "a known severity adds no note");
 }
 
 void TestFailureCount(TestRunner& runner)

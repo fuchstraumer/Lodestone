@@ -80,6 +80,7 @@ const PermutationSpace k_EmptySpace{ {} };
  * sources and one layout, which is the collapse the interner performed. */
 InternedModule BuildTinyInternedModule()
 {
+    lodestone::StderrDiagnosticSink appendDiagnostics;
     InternedModule module;
     module.Name = "TinyModule";
     module.SpaceSize = 2u;
@@ -92,7 +93,7 @@ InternedModule BuildTinyInternedModule()
     {
         VariantDescriptor descriptor;
         descriptor.Canonical = k_EmptySpace.CanonicalizeAssignment(PermutationAssignment{});
-        const CookError appended = AppendVariantToModule(module, variant, descriptor);
+        const CookError appended = AppendVariantToModule(module, variant, descriptor, appendDiagnostics);
         if (appended != CookError::Success)
         {
             module.Variants.clear();

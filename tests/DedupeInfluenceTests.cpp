@@ -1,4 +1,5 @@
 #include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
 #include "TestHarness.hpp"
 
 #include "model/CookedLibrary.hpp"
@@ -178,6 +179,7 @@ CompiledVariant MakeFootprintVariant(uint64_t index, bool first_axis_value, bool
 
 CookedModule BuildModule(const PermutationSpace& space, bool dedupe_enabled)
 {
+    lodestone::StderrDiagnosticSink appendDiagnostics;
     InternedModule module;
     module.Name = "InfluenceModule";
     module.Space = &space;
@@ -201,7 +203,7 @@ CookedModule BuildModule(const PermutationSpace& space, bool dedupe_enabled)
             const VariantDescriptor descriptor =
                 MakeAssignment(space, space.Axes()[0], space.Axes()[1], firstAxisValue, secondAxisValue);
 
-            const CookError appended = AppendVariantToModule(module, variant, descriptor);
+            const CookError appended = AppendVariantToModule(module, variant, descriptor, appendDiagnostics);
             if (appended != CookError::Success)
             {
                 module.Variants.clear();
@@ -217,6 +219,7 @@ CookedModule BuildModule(const PermutationSpace& space, bool dedupe_enabled)
 
 CookedModule BuildSingleEntryPointModule(const PermutationSpace& space, bool dedupe_enabled)
 {
+    lodestone::StderrDiagnosticSink appendDiagnostics;
     InternedModule module;
     module.Name = "SharedLayoutModule";
     module.Space = &space;
@@ -239,7 +242,7 @@ CookedModule BuildSingleEntryPointModule(const PermutationSpace& space, bool ded
             PermutationAssignment{
                 PermutationBinding{ .Axis = space.Axes().data(), .Value = PermutationValue{ firstAxisValue } } });
 
-        const CookError appended = AppendVariantToModule(module, variant, descriptor);
+        const CookError appended = AppendVariantToModule(module, variant, descriptor, appendDiagnostics);
         if (appended != CookError::Success)
         {
             module.Variants.clear();
@@ -254,6 +257,7 @@ CookedModule BuildSingleEntryPointModule(const PermutationSpace& space, bool ded
 
 CookedModule BuildConditionalModule(const PermutationSpace& space)
 {
+    lodestone::StderrDiagnosticSink appendDiagnostics;
     InternedModule module;
     module.Name = "ConditionalModule";
     module.Space = &space;
@@ -270,7 +274,7 @@ CookedModule BuildConditionalModule(const PermutationSpace& space)
             const VariantDescriptor descriptor =
                 MakeAssignment(space, space.Axes()[0], space.Axes()[1], firstAxisValue, secondAxisValue);
 
-            const CookError appended = AppendVariantToModule(module, variant, descriptor);
+            const CookError appended = AppendVariantToModule(module, variant, descriptor, appendDiagnostics);
             if (appended != CookError::Success)
             {
                 module.Variants.clear();
@@ -286,6 +290,7 @@ CookedModule BuildConditionalModule(const PermutationSpace& space)
 
 CookedModule BuildFootprintModule(const PermutationSpace& space, bool dedupe_enabled)
 {
+    lodestone::StderrDiagnosticSink appendDiagnostics;
     InternedModule module;
     module.Name = "FootprintModule";
     module.Space = &space;
@@ -307,7 +312,7 @@ CookedModule BuildFootprintModule(const PermutationSpace& space, bool dedupe_ena
             const VariantDescriptor descriptor =
                 MakeAssignment(space, space.Axes()[0], space.Axes()[1], firstAxisValue, secondAxisValue);
 
-            const CookError appended = AppendVariantToModule(module, variant, descriptor);
+            const CookError appended = AppendVariantToModule(module, variant, descriptor, appendDiagnostics);
             if (appended != CookError::Success)
             {
                 module.Variants.clear();

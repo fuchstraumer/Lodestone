@@ -18,7 +18,6 @@
 #include <functional>
 #include <numeric>
 #include <optional>
-#include <print>
 #include <ranges>
 #include <span>
 #include <string>
@@ -613,7 +612,7 @@ CookError VerifyFootprintAxes(const CookedModule& module, DiagnosticSink& sink)
     return result;
 }
 
-CookError VerifyCapabilityAxes(const CookedLibrary& library)
+CookError VerifyCapabilityAxes(const CookedLibrary& library, DiagnosticSink& sink)
 {
     CookError result = CookError::Success;
     const size_t moduleCount = library.ModuleNames.size();
@@ -676,16 +675,17 @@ CookError VerifyCapabilityAxes(const CookedLibrary& library)
                             continue;
                         }
 
-                        std::println(stderr,
-                                     "[lodestone] CAPABILITY AXIS: module '{}' profile '{}' axis '{}' is off in variant [{}] "
-                                     "and entry point '{}' needs a capability that the on variant [{}] does not",
-                                     library.ModuleNames[moduleIndex],
-                                     profile.TargetName,
-                                     axis.Name,
-                                     module.Variants[*offIter].Description,
-                                     module.EntryPoints[entryPointIndex].Name,
-                                     module.Variants[*onIter].Description);
-                        inverted = CookError::CapabilityAxisInverted;
+                        inverted = ReportError(
+                            sink,
+                            CookError::CapabilityAxisInverted,
+                            std::format("capability axis: module '{}' profile '{}' axis '{}' is off in variant [{}] and entry "
+                                        "point '{}' needs a capability that the on variant [{}] does not",
+                                        library.ModuleNames[moduleIndex],
+                                        profile.TargetName,
+                                        axis.Name,
+                                        module.Variants[*offIter].Description,
+                                        module.EntryPoints[entryPointIndex].Name,
+                                        module.Variants[*onIter].Description));
                     }
                 };
 
@@ -696,13 +696,14 @@ CookError VerifyCapabilityAxes(const CookedLibrary& library)
                 }
                 else if (foundPair && !changed && result == CookError::Success)
                 {
-                    std::println(stderr,
-                                 "[lodestone] CAPABILITY AXIS: module '{}' profile '{}' axis '{}' has kind capability, but "
-                                 "no pair of variants that differ in it needs different capabilities in any entry point",
-                                 library.ModuleNames[moduleIndex],
-                                 profile.TargetName,
-                                 axis.Name);
-                    result = CookError::CapabilityAxisInert;
+                    result = ReportError(sink,
+                                         CookError::CapabilityAxisInert,
+                                         std::format("capability axis: module '{}' profile '{}' axis '{}' has kind capability, "
+                                                     "but no pair of variants that differ in it needs different capabilities "
+                                                     "in any entry point",
+                                                     library.ModuleNames[moduleIndex],
+                                                     profile.TargetName,
+                                                     axis.Name));
                 }
             }
         }

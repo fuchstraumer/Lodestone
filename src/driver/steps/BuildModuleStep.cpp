@@ -702,7 +702,7 @@ namespace
             }
 
             const CookError appendResult =
-                AppendVariantToModule(interned_module, variant, currVariant);
+                AppendVariantToModule(interned_module, variant, currVariant, *shared_state.Diagnostics);
             if (appendResult != CookError::Success)
             {
                 return std::unexpected(appendResult);

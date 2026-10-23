@@ -5,9 +5,8 @@
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
+#include <format>
 #include <optional>
-#include <print>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -70,7 +69,7 @@ namespace
     }
 
     /** The names of `getSeverityName` in `slang-diagnostic-sink.h`. */
-    DiagnosticSeverity ToSeverity(std::string_view name) noexcept
+    std::optional<DiagnosticSeverity> ToSeverity(std::string_view name) noexcept
     {
         if (name == "note")
         {
@@ -88,11 +87,7 @@ namespace
         {
             return DiagnosticSeverity::Fatal;
         }
-        else [[unlikely]]
-        {
-            std::println(stderr, "Unknown Slang Error name {} in SlangDiagnosticParser::ToSeverity", name);
-            return DiagnosticSeverity::Error;
-        }
+        return std::nullopt;
     }
 
     bool IsAttachment(std::string_view severity_name) noexcept
@@ -130,13 +125,22 @@ namespace
 
     Diagnostic MakeRecord(const std::array<std::string_view, k_FieldCount>& fields, std::string_view context)
     {
-        return Diagnostic{ .Severity = ToSeverity(fields[k_SeverityField]),
+        const std::optional<DiagnosticSeverity> severity = ToSeverity(fields[k_SeverityField]);
+        Diagnostic record{ .Severity = severity.value_or(DiagnosticSeverity::Error),
                            .Code = ParseCode(fields[k_CodeField]),
                            .File = std::string{ fields[k_FileField] },
                            .Range = ParseRange(fields),
                            .Message = std::string{ fields[k_MessageField] },
                            .Context = std::string{ context },
                            .Related = {} };
+        if (!severity) [[unlikely]]
+        {
+            // the safe direction is an error, and the note keeps the name so that a new Slang severity is visible
+            record.Related.push_back(DiagnosticNote{
+                .Message = std::format("Slang reported the severity '{}', which this parser does not know, so it reads as an error",
+                                       fields[k_SeverityField]) });
+        }
+        return record;
     }
 
     DiagnosticNote MakeNote(const std::array<std::string_view, k_FieldCount>& fields)

@@ -16,14 +16,12 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
 #include <expected>
 #include <format>
 #include <functional>
 #include <iterator>
 #include <limits>
 #include <magic_enum/magic_enum.hpp>
-#include <print>
 #include <ranges>
 #include <span>
 #include <string>
@@ -41,7 +39,7 @@ namespace
 {
 
     std::vector<AttrExprSymbol> AsAttrExprSymbols(const std::vector<ExternConstantDefault>& defaults);
-    [[nodiscard]] CookError VerifyVariantKeysAreUnique(const std::vector<VariantDescriptor>& variants);
+    [[nodiscard]] CookError VerifyVariantKeysAreUnique(const std::vector<VariantDescriptor>& variants, DiagnosticSink& sink);
     [[nodiscard]] std::vector<AttrExprSymbol> SymbolsFromCanonicalAssignment(
         const CanonicalAssignment& assignment);
     [[nodiscard]] CookResult<bool> EvaluateActiveWhen(const PermutationAxis& axis,
@@ -145,7 +143,7 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetCookPolic
 
     std::ranges::sort(variantSet.Variants, std::ranges::less{}, &VariantDescriptor::Key);
 
-    const CookError verifyUnique = VerifyVariantKeysAreUnique(variantSet.Variants);
+    const CookError verifyUnique = VerifyVariantKeysAreUnique(variantSet.Variants, sink);
     if (verifyUnique != CookError::Success)
     {
         return std::unexpected(verifyUnique);
@@ -529,7 +527,7 @@ namespace
         return symbols;
     }
 
-    CookError VerifyVariantKeysAreUnique(const std::vector<VariantDescriptor>& variants)
+    CookError VerifyVariantKeysAreUnique(const std::vector<VariantDescriptor>& variants, DiagnosticSink& sink)
     {
         auto firstDuplicateIter =
             std::ranges::adjacent_find(variants,
@@ -541,12 +539,12 @@ namespace
         if (firstDuplicateIter != variants.end()) [[unlikely]]
         {
             const VariantDescriptor& duplicate = *firstDuplicateIter;
-            std::println(stderr,
-                         "[lodestone] two variants share key {}: [{}] collides. The mixed-radix "
-                         "encoding and the enumerated set disagree.",
-                         static_cast<uint64_t>(duplicate.Key),
-                         DescribeAssignment(duplicate.Canonical));
-            return CookError::PermutationVariantIndexCollision;
+            return ReportError(sink,
+                               CookError::PermutationVariantIndexCollision,
+                               std::format("two variants share key {}: [{}] collides. The mixed-radix encoding and the "
+                                           "enumerated set disagree.",
+                                           static_cast<uint64_t>(duplicate.Key),
+                                           DescribeAssignment(duplicate.Canonical)));
         }
         else [[likely]]
         {

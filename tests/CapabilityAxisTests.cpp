@@ -1,3 +1,4 @@
+#include "Diagnostics.hpp"
 #include "TestHarness.hpp"
 
 #include "CookerErrors.hpp"
@@ -122,6 +123,7 @@ PermutationSpace MakeSpace(AxisKind kind, std::string active_when)
 /** The checks over a library that no cook produced, so that each rule has a row of its own. */
 void TestHandBuilt(tests::TestRunner& runner)
 {
+    lodestone::RecordingDiagnosticSink capabilityDiagnostics;
     runner.BeginSection("a capability axis must change the capabilities, and off must not need more than on");
     const std::vector<std::string> none;
     const std::vector<std::string> subgroups{ "GroupNonUniform", "GroupNonUniformArithmetic" };
@@ -130,27 +132,27 @@ void TestHandBuilt(tests::TestRunner& runner)
 
     {
         const PermutationSpace space = MakeSpace(AxisKind::Capability, {});
-        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, none, subgroups, true)), CookError::Success,
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, none, subgroups, true), capabilityDiagnostics), CookError::Success,
                           "an axis that turns names on passes");
-        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, float16, both, true)), CookError::Success,
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, float16, both, true), capabilityDiagnostics), CookError::Success,
                           "an off path that needs a subset of the on path passes");
-        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, subgroups, subgroups, true)), CookError::CapabilityAxisInert,
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, subgroups, subgroups, true), capabilityDiagnostics), CookError::CapabilityAxisInert,
                           "an axis whose two values need the same names fails");
-        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, subgroups, none, true)), CookError::CapabilityAxisInverted,
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, subgroups, none, true), capabilityDiagnostics), CookError::CapabilityAxisInverted,
                           "an off path that needs more than the on path fails");
-        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, float16, subgroups, true)), CookError::CapabilityAxisInverted,
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, float16, subgroups, true), capabilityDiagnostics), CookError::CapabilityAxisInverted,
                           "an off path that needs a name the on path lacks fails, though the sets differ");
-        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, subgroups, subgroups, false)), CookError::Success,
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(space, subgroups, subgroups, false), capabilityDiagnostics), CookError::Success,
                           "a profile with no reader is not checked");
     }
     {
         const PermutationSpace gated = MakeSpace(AxisKind::Capability, "OTHER == 1");
-        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(gated, subgroups, subgroups, true)), CookError::Success,
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(gated, subgroups, subgroups, true), capabilityDiagnostics), CookError::Success,
                           "a gated capability axis is not checked");
     }
     {
         const PermutationSpace technique = MakeSpace(AxisKind::Technique, {});
-        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(technique, subgroups, subgroups, true)), CookError::Success,
+        runner.CheckEqual(VerifyCapabilityAxes(MakeLibrary(technique, subgroups, subgroups, true), capabilityDiagnostics), CookError::Success,
                           "an axis of another kind is not checked");
     }
 }

@@ -22,6 +22,8 @@
 namespace lodestone
 {
 
+class DiagnosticSink;
+
 struct LibraryEntryPoint
 {
     std::string Name;
@@ -172,15 +174,16 @@ void DisableDedupe(InternedModule& module) noexcept;
 
 CookError AppendVariantToModule(InternedModule& module,
                                 const CompiledVariant& variant,
-                                const VariantDescriptor& descriptor);
+                                const VariantDescriptor& descriptor,
+                                DiagnosticSink& sink);
 
 /** @brief Compares the pairs of each variant that two profiles cooked. Skips profiles that did not record pairs, and
  * entry points with combined texture samplers. */
-CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library);
+CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library, DiagnosticSink& sink);
 
 /** @brief Compares the workgroup memory and the portable capabilities (16-bit floats, subgroups) of each entry point
  * that two profiles cooked for one variant. Skips profiles that did not read their facts. */
-CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library);
+CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library, DiagnosticSink& sink);
 
 /** @brief Consumes the builder, so nothing after the freeze can reach an interner. */
 CookedModule FreezeModuleTables(InternedModule&& interned);

@@ -250,7 +250,7 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
         return std::unexpected(ReportError(diagnostics, CookError::ReflectionMismatch, errStr));
     }
 
-    const CookError pairsError = VerifySamplerPairsAcrossProfiles(library);
+    const CookError pairsError = VerifySamplerPairsAcrossProfiles(library, diagnostics);
     if (pairsError != CookError::Success)
     {
         return std::unexpected(ReportError(diagnostics,
@@ -258,7 +258,7 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                                            "two profiles read different sampler and texture pairs from one variant"));
     }
 
-    const CookError factsError = VerifySourceFactsAcrossProfiles(library);
+    const CookError factsError = VerifySourceFactsAcrossProfiles(library, diagnostics);
     if (factsError != CookError::Success)
     {
         return std::unexpected(ReportError(diagnostics,
@@ -266,7 +266,7 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
                                            "two profiles read different workgroup memory or capabilities from one variant"));
     }
 
-    const CookError capabilityAxisError = VerifyCapabilityAxes(library);
+    const CookError capabilityAxisError = VerifyCapabilityAxes(library, diagnostics);
     if (capabilityAxisError != CookError::Success)
     {
         return std::unexpected(ReportError(diagnostics,
