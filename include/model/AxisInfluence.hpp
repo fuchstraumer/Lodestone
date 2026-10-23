@@ -14,6 +14,7 @@ namespace lodestone
 
 class DiagnosticSink;
 
+struct CookedLibrary;
 struct CookedModule;
 
 enum class AxisInfluence : uint8_t
@@ -57,6 +58,11 @@ std::vector<ResourceFootprintInfluence> ComputeFootprintInfluence(const CookedMo
 
 /** @brief Fails when a proven footprint axis is not named by the resource's size attributes. */
 CookError VerifyFootprintAxes(const CookedModule& module, DiagnosticSink& sink);
+
+/** @brief Checks each axis of kind capability that no other axis gates, in each profile that read its code facts. A
+ * one-axis pair must differ in the capability names of some entry point, and for a boolean axis the off variant's names
+ * must be a subset of the on variant's. Gated axes (a wave size) refine another axis and are not checked. */
+CookError VerifyCapabilityAxes(const CookedLibrary& library);
 
 /** @brief One mask per `CookedModule::Resources` record, `word_count` words each. */
 std::vector<uint64_t> BuildFootprintAxisMasks(const CookedModule& module, size_t word_count);

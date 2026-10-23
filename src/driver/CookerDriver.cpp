@@ -36,6 +36,7 @@
 #include <vector>
 #include "emit/StageDump.hpp"
 #include "magic_enum/magic_enum.hpp"
+#include "model/AxisInfluence.hpp"
 #include "model/CookedLibrary.hpp"
 
 namespace lodestone
@@ -256,6 +257,14 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
         return std::unexpected(ReportError(diagnostics,
                                            factsError,
                                            "two profiles read different workgroup memory or capabilities from one variant"));
+    }
+
+    const CookError capabilityAxisError = VerifyCapabilityAxes(library);
+    if (capabilityAxisError != CookError::Success)
+    {
+        return std::unexpected(ReportError(diagnostics,
+                                           capabilityAxisError,
+                                           "an axis of kind capability does not change the capabilities that the code needs"));
     }
 
     const CookError emitError = EmitLibraryArtifacts(library, sink);

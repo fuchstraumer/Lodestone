@@ -165,7 +165,7 @@ matches which device value. The renderer knows, and it already has the tool: a q
 | F3.2 | Drop the names that the profile guarantees. | The `spirv` cook of KitchenSink stores no `Shader`. |
 | F3.3 | **Done 2026-10-22.** Validators: the workgroup memory bytes and the portable capabilities (16-bit floats, subgroups) agree across the profiles of one variant. | `WorkgroupMemoryCookTest` cooks a probe module with `float3`, struct, `float`, and `half4` workgroup arrays on both targets (144 bytes each). `ShaderManifestRejectTest` rows for each mismatch. |
 | F3.4 | **a to c done 2026-10-22, d deferred (O10).** The device filter. | `ManifestIndexTest` rows: a device without subgroups gets no wave instance of `GenerateCS`, and still gets `BlurCS`. A device below the workgroup memory or invocation limit loses only the instances above it. |
-| F3.5 | Cross-check each axis of kind `capability` against the measured names. A variant with the axis off must not need a capability that the axis turns on. | A must-fail row: an "off" path that still calls a wave operation. |
+| F3.5 | **Done 2026-10-22.** Cross-check each axis of kind `capability` against the measured names. The shader declares nothing beyond the kind (O12 closed). | `CapabilityAxisTest`: a must-fail module whose "off" path still calls a wave operation, on both targets. |
 
 Measured on 2026-10-21, DiamondDogs OceanFft, `spirv`, 62 unique modules:
 
@@ -411,7 +411,7 @@ commit.
     would read as "needs nothing" and pass every device filter.
   - **F3.4 proposal decided the same day** (below, O8 to O11). Next: F3.4a to c, done below.
 
-#### F3.4 proposal (2026-10-22)
+#### F3.4 design (decided and built 2026-10-22)
 
 The consumers are DiamondDogs OceanFft (Vulkan) and VeloxRhi (WebGPU). Both give the client a device description once,
 then query. The shape:
@@ -448,3 +448,22 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
   - Not built, on purpose: a `DeviceRemovedVariants` note with counts (no consumer yet; the first rejection reason is in
     `NoVariantFitsDevice`), and F3.4d.
   - Next: F3.5 (the capability-axis check), or F3.4d when VeloxRhi names the limits it checks.
+- 2026-10-22. **DiamondDogs triage, between F3.4 and F3.5.** Done outside the slices: C13 and C8 (`--include-dir`), C7
+  (`UniformMemberRange::Find`), C9 (diagnostic text), and C12 (fixed-size binding arrays on SPIR-V, with the
+  `...ArrayDynamicIndexing` capabilities that Slang does not state). 33 of 33 tests, 60 of 60 known-good dumps. Placed in
+  the phase: **C11** (`ls_format` per variant) goes with **F2**, because the format must reach the emitted image type, which
+  is a per-variant type choice that link-time specialization (the shim) provides. **Unbounded binding arrays** and
+  WebGPU's `binding_array` go with **F4**. **C6** (generated host layout headers) waits until phase F is complete.
+  Next: F3.5.
+- 2026-10-22. **F3.5 done**, not committed. `VerifyCapabilityAxes` (`model/AxisInfluence.cpp`, run by the driver beside
+  `VerifySourceFactsAcrossProfiles`), errors `CapabilityAxisInert` = 54 and `CapabilityAxisInverted` = 55. 34 of 34 tests.
+  - **Design changed in review.** The first proposal added an attribute that names the capabilities of an axis
+    (`ls_axis_capability`). The author refused: naming capabilities in shader source is renderer knowledge, and she had
+    refused the same idea for L6. The check uses the kind alone. A measurement cannot say what an axis should turn on, but
+    it can say that an axis of kind `capability` turns on nothing, and that an off path needs more than an on path.
+  - Rule: for an ungated axis of kind `capability`, some one-axis pair must differ in the names of some entry point, and a
+    boolean axis must have off names that are a subset of its on names. A gated axis (`IFFT_WAVE_SIZE`) is not checked: it
+    refines its parent and changes no capability. The pair scan is shared with the axis influence (`ForEachOneAxisGroup`).
+  - Known gap: an axis that controls two capabilities and leaves one in the off path passes. Only a declaration could
+    catch it.
+  - Next: F2.0, a spike on E56003 against the vocabulary §9e probe, then F2.

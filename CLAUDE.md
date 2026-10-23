@@ -115,10 +115,10 @@ it exits 1 on `NoOutputSpecified`, which reads like a failure rather than a usag
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, description)`,
 and a nonzero exit code.
 
-Thirty-three test targets exist. Twenty-six are unit tests, and each one proves a claim the repository
+Thirty-four test targets exist. Twenty-seven are unit tests, and each one proves a claim the repository
 makes. Nineteen need no Slang and no asset, and together they run in about half a second.
 `WgslValidatorTest` links Tint to read WGSL. `SpvValidatorTest` links SPIRV-Tools to assemble SPIR-V.
-`AccessModelRejectTest`, `AxisDefaultTest`, `BindingArrayTest`, `DerivedConstantTest`, `EntryPointConstantsTest`, and `ResourceRoleTest` cook small modules
+`AccessModelRejectTest`, `AxisDefaultTest`, `BindingArrayTest`, `CapabilityAxisTest`, `DerivedConstantTest`, `EntryPointConstantsTest`, and `ResourceRoleTest` cook small modules
 through Slang, and each takes about one second. `SlangMetadataCanaryTest` calls Slang directly.
 
 | Target | Proves |
@@ -130,6 +130,7 @@ through Slang, and each takes about one second. `SlangMetadataCanaryTest` calls 
 | `WgslValidatorTest` | The WGSL cross-check on Tint. It parses fixed WGSL, reads the used bindings from Tint's inspector, and compares them against hand-written reflection. It proves a match, and a mismatch of kind, shape, access, or name. It also proves that a comparison sampler and a depth texture read back correctly, that a storage buffer's structured or raw shape does not change the WGSL kind, and that invalid WGSL is a parse error, not a mismatch. It proves that a storage texture whose reflected format is absent or differs from the WGSL format is a mismatch. It proves that the sampler and texture pairs come from Tint, a comparison sampler too, and that the read path (`--no-validate`) gives the same pairs as the validate path. It proves that each `enable` directive reads back as a capability name, and that the workgroup memory of four workgroup variables (a `vec3` array, a struct, a float array, a `vec4<f16>` array) is 144 bytes, the same sum that `SpvValidatorTest` reads from the same variables in SPIR-V. |
 | `SpvValidatorTest` | The SPIR-V cross-check on SPIRV-Tools. It assembles Slang's own output for one entry point from text, and compares it against hand-written reflection. It proves a match, a moved binding, a missing and an extra binding, and a mismatch of kind, access, name, depth shape, and storage image format. It proves that a builtin in the interface list is not read as a binding, that the capabilities read back, and that a module spirv-val rejects, or code that is not whole words, is an error and not a mismatch. It proves that the pairs come from each OpSampledImage, traced back through the loads to the variables, on both read paths, and that an image that does not trace back to a variable fails with `ReflectionSamplerPairUnresolved`. It proves that the push constant extent is the end of the last member, read from the member offsets: a module with no push constant block has none, Slang's block of two `float4x4` and a `float4` covers 144 bytes, a gap before the last member counts, and a non-square matrix strides its rows when `RowMajor` and its columns when `ColMajor`. It proves that each `OpCapability` and `OpExtension` reads back as a name, an alias (`StorageUniform16`) by its primary name, and that the std430 workgroup memory of four variables is 144 bytes. It proves that a binding array reads its length and compares it with reflection (a length of one or three against four is a mismatch), that an unbounded array is reported as unsupported, and that a dynamic index into a binding array adds the matching `...ArrayDynamicIndexing` capability while a constant index adds none. |
 | `BindingArrayTest` | Fixed-size binding arrays on SPIR-V (DiamondDogs request C12), from the shader source to the manifest. `tests/assets/BindingArrays/BindingArrays.slang` declares one array of each kind (storage images, sampled images, structured buffers, uniform buffers) beside a sampler, all indexed by an entry point constant. The test reads each kind and `ArrayCount()` back, proves that the sampler pairs with the texture array through a dynamic index, and proves that each dynamic index states its device feature (`SampledImageArrayDynamicIndexing` and the three others). It proves that the WGSL cook of the same module fails (`CodeGenerationFailed`: Slang rejects an array of resources there), and that an unbounded array fails the SPIR-V cross-check (`ReflectionMismatch`) until phase F step F4. |
+| `CapabilityAxisTest` | The check on axes of kind `capability` (phase F step F3.5, `VerifyCapabilityAxes`). Hand-built rows with no Slang: an axis that turns names on passes, an off path that needs a subset of the on path passes, two values that need the same names fail (`CapabilityAxisInert`), an off path that needs a name the on path lacks fails (`CapabilityAxisInverted`), and a gated axis, an axis of another kind, and a profile with no reader are not checked. Then four modules in `tests/assets/CapabilityAxes/` cooked for `wgsl` and `spirv`: `WaveGuarded` and `GatedWaveSize` must cook, `OffPathStillWaves` (both paths call a wave operation) and `OffPathNeedsMore` must fail. |
 | `ReflectionSchemaTest` | The pure data of the binding schema, with no Slang. The `ResourceShape` flag layout (a base shape in the low nibble plus array, multisample, shadow, and feedback flags, read with `GetBaseShape`), the `ToString` tables for `ResourceShape`, `BindingKind`, and `TextureSampleType`, and the `ReflectedUniformMember` equality that dedup rests on, which includes matrix layout and element stride. It also proves that every `CookError` band has names, above the 127 limit of magic_enum's default range. |
 | `StageDumpTest` | A stage dump holds the model and no target text, it names itself the way `--dump-stage` names it, and two dumps of one input agree byte for byte. |
 | `SymbolTableTest` | The tokenizer that powers axis-reachability pruning: it strips `extern static const` declarations and reserved keywords, and reports the axis names no reachable source uses. |
@@ -306,12 +307,12 @@ records out of the bytes) and `ShaderManifestValidator.hpp` (the checks that `Bu
 `ShaderManifestLayout.cpp`, `ShaderManifestValidator.cpp`, `ShaderManifestIndex.cpp` (the index and its scan), and
 `ShaderManifestQuery.cpp` (the query builder and the presets).
 
-There is no `validate/` folder, and that is worth knowing. Two of the five validators are functions inside
+There is no `validate/` folder, and that is worth knowing. Several validators are functions inside
 the file they check: `VerifyLibraryRoundTrip` and `VerifyLayoutRoundTrip` live in
 `src/driver/CookerDriver.cpp`. `VerifyManifestRoundTrip` lives in `src/emit/ShaderManifestVerify.cpp`,
 beside the writer it checks (`ShaderManifestEmitter.cpp`). The verifier shares no code with the writer: it
 compares each record against the model field by field. Only the reflection cross-check has its own files, one for
-each target: `WgslValidator` and `SpvValidator`. `VerifySamplerPairsAcrossProfiles` lives in
+each target: `WgslValidator` and `SpvValidator`. `VerifySamplerPairsAcrossProfiles` and `VerifySourceFactsAcrossProfiles` live in
 `src/model/CookedLibrary.cpp`. The tree cannot show
 that validators rank beside stages, and no arrangement of the current files would.
 
@@ -448,7 +449,7 @@ step functors, not one long loop: `PrepareCookStep` once, then `PrepareModuleSte
 pair. `include/driver/CookerSteps.hpp` defines the state each step passes on, the step sources sit in
 `src/driver/steps/`, and `SharedCookState` holds the whole-cook data. A cook now takes several modules
 and several targets. The eight numbered stages below still describe the transformation the steps run, in
-the same order. `docs/agent-handoff.md` section 9 holds the detail. Read that and `CookerDriver.cpp` first.
+the same order. Read `CookerDriver.cpp` first.
 
 **A stage transforms. A validator compares.** The pipeline has eight numbered stages, and each one
 takes an input type and gives an output type. A validator reads the output of a stage, compares it
@@ -507,7 +508,7 @@ number would state that every target must supply one. A target supplies a valida
    A cooked module points into its `PermutationSpace`, so the driver moves each space to the heap and
    keeps it until the emit is done.
 
-Seven validators run inside that loop. None of them is a stage.
+Eight validators run inside that loop. None of them is a stage.
 
 - **The reflection cross-check**, after stage 4. `ReadEmittedCode` (in `BuildModuleStep.cpp`) asks the target
   profile for a validator. The WGSL profile parses the emitted text with Tint (`WgslValidator`) and reads the
@@ -553,6 +554,13 @@ Seven validators run inside that loop. None of them is a stage.
   A name that only one target spells (`StorageInputOutput16`, `DrawParameters`) is not compared. A profile with no
   reader (`CookedProfile::CodeFactsRead` false) is skipped, because it stores empty facts. A difference fails the
   cook with `SourceFactsTargetMismatch`. Both cross-profile checks share `VisitSharedVariants`.
+- **The capability axis check**, next to it. `VerifyCapabilityAxes` (in `model/AxisInfluence`) reads the capability
+  names that each profile's reader measured, for each axis of kind `capability` that no other axis gates. A one-axis pair
+  must differ in the names of some entry point, or the cook fails with `CapabilityAxisInert`: the "off" path still needs
+  what the axis claims to turn on. For a boolean axis the off variant's names must be a subset of the on variant's
+  (`CapabilityAxisInverted`). The author declares nothing but the kind. A gated axis (a wave size) refines another axis and
+  is not checked, and a profile with no reader (`CodeFactsRead` false) is skipped. An axis that controls two capabilities
+  and leaves one of them in the off path still passes, because the pair differs in the other one.
 - **The footprint axis cross-check**, after stage 7. `VerifyFootprintAxes` (in `model/AxisInfluence`) compares the
   axes that change each resource's footprint, measured from the cooked tables, with the axes that its size
   attributes name. Stage 4 reads the named axes from the expression text, through the derived constants
@@ -981,11 +989,13 @@ beside them.
   It defines axis kind, binding time, and access model, and it divides the work between Slang's
   capability system and this repository. It is a vocabulary, not a plan. Its §9 holds the measured
   answers that the plan rests on. §9e corrects §9a: link-time specialization selects the access model.
-- `docs/rendergraph-integration-tasks.md` — **the current work (2026-10-14).** The Lodestone tasks that
-  the VeloxRhi rendergraph needs, numbered L1 to L18 as in the Velox note. Phase F is paused until the
-  graph path works on WebGPU. Read its sections 4 and 5 first.
-- `docs/phase-f-plan.md` — **the plan for phase F, paused on 2026-10-14.** Decisions, slices, open decisions,
-  and a progress log. Read its progress section first, and update it at the end of each step.
+- `docs/rendergraph-integration-tasks.md` — the Lodestone tasks that the VeloxRhi rendergraph needs, numbered L1 to L18
+  as in the Velox note. Nearly all are done; L5 and L6 became phase F slice F3. Read its sections 4 and 5 first.
+- `docs/phase-f-plan.md` — **the current work (resumed 2026-10-21).** The plan for phase F: decisions, slices, open
+  decisions, and a progress log. F0, F1, and F3.1 to F3.4c are done. Read its progress section first, and update it at
+  the end of each step.
+- `docs/diamonddogs-requests.md` — what DiamondDogs, the embedding project, needs from Lodestone. Each row has a state,
+  and the notes at the end explain the finished rows for that project's agent.
 
 Two terms from phase F are worth carrying into any discussion of variants:
 

@@ -21,7 +21,7 @@ DiamondDogs needs from Lodestone. Text follows ASD-STE100. Ask the author before
 | C2 | **Done 2026-10-21.** The cook sets Slang's `VulkanUseEntryPointName`, so `OpEntryPoint` has the source name. The cook fails when it differs from the manifest entry point name, so `ModuleView` entry point names are the SPIR-V names. Stop reading `OpEntryPoint`. The SPIR-V entry point name on the entry point record. | Slang names every SPIR-V entry point `main`. | Read from `OpEntryPoint` in the words. |
 | C3 | **Deferred** (2026-10-21) until DiamondDogs needs hot reload. In-process cooks work now through `RunCook` with `MemoryOutputSink` (the Lodestone tests use them), but no public header supports this yet. Open-world interface axes are a separate design. A live cook path: cook one module (or one type expression) in-process or as a subprocess, and return a bundle in memory. | Editor hot reload, and fused noise-graph kernels (L19 in the noise plan: open-world interface axes from client-supplied type expressions). | None. Only build-step cooks. |
 | C4 | **Deferred** to phase F step F4, which resumes after the VeloxRhi rendergraph works on WebGPU. Placement forms beyond Bound on SPIR-V (phase F F4: Pointer buffers, Handle textures). | Buffer device address and bindless in DiamondDogs' RhiResources. | `ShaderLibrary` rejects non-Bound placements (`UnsupportedResourcePlacement`). |
-| C5 | **Mostly done 2026-10-22** (phase F slices F3.1 to F3.4c, format 15). F3.4d (bindings per stage, bind groups) and F3.5 (the capability-axis check) are left. See the notes below. Device capability filter (F3). | Pick variants by device features. | Not used. |
+| C5 | **Mostly done 2026-10-22** (phase F slices F3.1 to F3.4c, format 15). F3.4d (bindings per stage, bind groups) is left. F3.5 is done: see the notes below. See the notes below. Device capability filter (F3). | Pick variants by device features. | Not used. |
 | C6 | Generated host layout headers. The cook writes one C++ header per module. The header has each uniform block, push constant block and struct as a C++ type, with the exact std140/std430 offsets, padding members, `static_assert(sizeof)` and `offsetof` checks. | The host mirrors are written by hand, so they drift from the shader. A generated header removes the mirrors and moves the check from run time to compile time. | OceanFft mirrors `SpectrumParameters`, `CascadeParameters`, `OceanViewParameters` and `OceanGridParameters` by hand, and checks some of them at run time against the manifest (`CheckUniformLayouts`). That check had a name bug (see C7). |
 | C7 | **Done 2026-10-22.** Exact member lookup. `UniformMemberView` lookup by path (for example `FindMember("WindSpeed")`) with exact matching. Document how member names are qualified. Use `UniformMemberRange::Find(path)`: `instance.Constants().Members().Find("Swell.WindSpeed")`, or `resource.Members().Find(...)`. It returns `std::optional<UniformMemberView>`. See the notes below. | Member names in the manifest can be qualified. A client that matches by suffix gets the wrong member. | A hand-written suffix match took `SwellWindSpeed` (offset 52) for `WindSpeed` (offset 8). DiamondDogs now compares the last name component whole. |
 | C8 | **Done 2026-10-22.** Include search paths. `INCLUDE_DIRS` on `lodestone_add_shader_cook`, and `--include-dir <path>` (or `-I <path>`) on the cooker. See the notes below. | Build-generated Slang must be able to stay in the build directory. | The cooker searches only the module's folder, so `OceanFftGenerated.slang` is written into the DiamondDogs source tree (only when its contents change). |
@@ -122,8 +122,14 @@ What exists (format 15, 2026-10-22):
 - `EnvironmentView::MakeDeviceCapabilities` is called twice, as in Vulkan: an empty span returns the word count, and a span
   of that size is filled. The builder does this for you. Use it directly only if you build your own filter on `Fit`.
 
-Not built yet: the limits of bindings per stage and bind groups (F3.4d), and the check that a capability axis does not
-change the capabilities of its "off" path (F3.5).
+Not built yet: the limits of bindings per stage and bind groups (F3.4d).
+
+**Capability axes (F3.5).** An axis with `[ls_axis_kind("capability")]` now has a check, and you declare nothing more.
+When no other axis gates it, a pair of variants that differ only in that axis must need different capability names in some
+entry point. A boolean axis must need no more when off than when on. An `IFFT_USE_WAVE_OPS` whose off path still calls a
+wave operation now fails the cook with `CapabilityAxisInert`, naming the module, the profile, and the axis. A gated axis
+such as `IFFT_WAVE_SIZE` is not checked. If a cook of OceanFft now fails with this error, the axis is declared as a
+capability axis and changes no capability: either its off path still needs the capability, or its kind should be `tuning`.
 
 The format number changes often now. A manifest from an older build fails to open with `VersionMismatch`: recook.
 

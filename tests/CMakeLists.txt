@@ -140,6 +140,11 @@ target_compile_definitions(ResourceRoleTest PRIVATE
 add_lodestone_unit_test(BindingArrayTest BindingArrayTests.cpp)
 target_compile_definitions(BindingArrayTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/BindingArrays")
+# Axes of kind capability (phase F step F3.5): an axis must change the capabilities, and its off value must not need more than its
+# on value. Hand-built rows for each rule, and cooks that must pass or fail on both targets. It takes about two seconds.
+add_lodestone_unit_test(CapabilityAxisTest CapabilityAxisTests.cpp)
+target_compile_definitions(CapabilityAxisTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/CapabilityAxes")
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)

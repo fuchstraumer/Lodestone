@@ -14,16 +14,22 @@ fixed, remove it; when a task is done, add one line to section 7 and remove its 
 
 ## 1. State on 2026-10-22
 
-- RelWithDebInfo, `ninja-msvc`: build green, 31 of 31 tests (after F3.4a to c and DiamondDogs C7, C8, C9, C13). The suite has 33 targets. Known-good dumps: not rerun after F3.3. The change adds a check and moves no cook output.
+- RelWithDebInfo, `ninja-msvc`: build green, 34 of 34 tests (after F3.5; F3.5 is not committed). Known-good dumps: 60 of 60
+  (checked 2026-10-22).
 - Debug: do not run it unattended (section 2, item 2).
 - Manifest format version 15. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
-- Phases D and E are complete. Phase F is paused after F1 (two Bound targets, `wgsl` and `spirv`).
-- **The current work is the VeloxRhi rendergraph tasks**: `docs/rendergraph-integration-tasks.md`. R1 and R2 are
-  done, and L16, L17, and L18 of R3. L6 is closed (presets cover it). L5 is phase F slice F3: F3.1 and F3.2 are done
-  (format 14, committed), and F3.3 and F3.4a to c are done (not committed, format 15). **Next: F3.5** (the
-  capability-axis check). F3.4d (bindings per stage and bind groups) waits for a consumer to name its limits.
-  `docs/phase-f-plan.md` F3 has the design. Also open: L11 (optional dispatch extent)
-  and a JSON writer for the resource report.
+- Phases D and E are complete. Phase F has F0, F1, F3.1 to F3.4c, and F3.5 done; F2, F4, F5, and F6 are open.
+- **Phase F is the current work.** The VeloxRhi rendergraph tasks (`docs/rendergraph-integration-tasks.md`) are done
+  except L11 (optional dispatch extent) and a JSON writer for the resource report. L5 and L6 became phase F slice F3:
+  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: F2**, starting
+  with F2.0, a spike on E56003 against the vocabulary §9e probe. F3.4d (bindings per stage and
+  bind groups) waits for a consumer to name its limits. After F3: F2 (the shim module and the two tables), F4 (Pointer and
+  Handle placements, and unbounded binding arrays), F5 (binding-time lowering), and F6. `docs/phase-f-plan.md` has the
+  slices and a progress log. The author calls phase F the last major feature work.
+- **DiamondDogs requests still open** (`docs/diamonddogs-requests.md`): C11 (`ls_format` per variant, folds into F2:
+  the format must reach the emitted image type, so it is per-variant type selection and not an attribute alone), C6
+  (generated host layout headers, after phase F, as a second writer over the written manifest), C3 (live cook,
+  deferred), C4 (bindless, F4). C1, C2, C5 (all but F3.4d), C7, C8, C9, C12, and C13 are done.
 - **Comments are compressed** (2026-10-21). Write one-line comments by default. Technique explanations go to
   `docs/code-notes.md`, which links to the code. Code never links to `docs/`.
 - **DiamondDogs** embeds Lodestone and sends requests in `docs/diamonddogs-requests.md`. Each row has a state.
@@ -41,11 +47,10 @@ Ordered by what can write wrong output first.
    the Debug tests one at a time, with a timeout, and skip `KitchenSinkCookTest`. The Debug trees in
    `build/ninja-msvc` and `build/ninja-msvc-nowgsl` were built from an old Slang: rebuild them before any Debug
    run, or their cooks poison the shared module cache.
-3. **The device filter exists (F3.4a to c), and the capability-axis check does not (F3.5).** Since format 14 each source states its capability names and workgroup
-   memory (F3.1, F3.2), and since F3.3 the two profiles of a variant must agree on the portable part. Slang warning
-   41012 is off, so the device filter (F3.4) and the capability-axis check (F3.5) are what make a missing device
-   capability fail before a pipeline does. Do not let them slip. Since format 15 the manifest says whether a profile read
-   its facts (`HasCodeFacts`), and `ForDevice` fails with `DeviceFactsUnavailable` when it did not.
+3. **The capability-axis check has a known gap (F3.5).** `VerifyCapabilityAxes` compares the kind `capability` with the
+   measured names, and the author declares no names. An axis that controls two capabilities and leaves one in its off
+   path passes. Slang warning 41012 is off, so nothing else catches it. Slang also states no capability for a dynamic
+   index into a binding array; the SPIR-V reader adds it (C12).
 4. **Specialization constants are reserved, not cooked.** The table is always empty. Push constants are cooked
    since format 11.
 5. **The thread count is not tuned.** Each worker loads its own core module: KitchenSink commits 1.62 GB with 16
@@ -158,9 +163,14 @@ and `phase-e-interface-spike.md`).
 ## 6. Deferred capability areas (do not lose)
 
 - **Bindless (Indexed and Pointer, phase F step F4).** The reflected schema is the invariant, and placement is the
-  variant. Under bindless the schema facts are the only guard a driver would otherwise give. Add unbounded and
-  runtime-array detection then. DiamondDogs request C4 waits for this.
-- **Device capabilities (F3, with rendergraph tasks L5 and L6).** DiamondDogs request C5 waits for this.
+  variant. Under bindless the schema facts are the only guard a driver would otherwise give. An unbounded binding array
+  (`Texture2D A[]`) is the Indexed form: the SPIR-V cross-check reports it as unsupported today, and F4 reads it.
+  DiamondDogs request C4 waits for this.
+- **Device capabilities (F3).** Built, except F3.4d (layout limits).
+- **WGSL binding arrays.** Slang rejects an array of resources for WGSL (E56105). WebGPU's `binding_array` is a separate
+  story, with F4.
+- **Per-variant storage image format (DiamondDogs C11)** and **generated host layout headers (C6)**: see the requests file.
+  Plan C11 with F2.
 - **Specialization constants.** Slang reflects them, and WGSL spells them `override`. The table slot exists.
 - **Push constant members as buffer device addresses.** This ties push constants to the Pointer model.
 - **`IndirectCount` role.** Waits for capabilities: WebGPU has no count buffer.
@@ -186,16 +196,19 @@ One line for each step. Git history holds the full text.
   (embedding) and C2 (`VulkanUseEntryPointName`). `ThreadPool` setup failures report and keep the thread
   (`WorkerSetupFailed`). Atomic artifact writes, and a cook removes the old manifest first. Both validators compare
   the storage texture format.
+- **2026-10-21 (later).** L16 resource report (format 13, `ResourceReportTest`): footprint axis masks, `DescribeCreation`,
+  `ShaderLibrary.resources.txt`, validator `VerifyFootprintAxes`.
 - **2026-10-21 (late).** F3.1 and F3.2 (format 14): capability names and workgroup memory for each source, the
   generated `VulkanCapabilityTable.hpp`, L6 closed without a device-bound axis.
 - **2026-10-22.** F3.3: `VerifySourceFactsAcrossProfiles` (`SourceFactsTargetMismatch` = 53), `VisitSharedVariants` shared with
-  the sampler pair check, `CookedProfile::CodeFactsRead`, `WorkgroupMemoryCookTest` (31st test target). F3.4 proposed.
-- **2026-10-22 (DiamondDogs).** C13 root cause: an import found only through the module cache loads in the first session
-  and not in the workers. C8: `--include-dir` and `INCLUDE_DIRS`, `CrossModuleCookTest`. C7: `UniformMemberRange::Find`.
-  C9: no code location on warnings, `File.cpp:line` on errors. C12, C11, C6 wait (see the requests file).
-- **2026-10-22 (C12).** Binding arrays on SPIR-V: the reader takes the length, `SpvValidator` compares `ArrayCount`,
-  and a dynamic index adds `...ArrayDynamicIndexing` (Slang states none). `BindingArrayTest`. Unbounded arrays wait for F4.
+  the sampler pair check, `CookedProfile::CodeFactsRead`, `WorkgroupMemoryCookTest`.
 - **2026-10-22 (later).** F3.4a to c, format 15: `CodeFactsRead`, `EntryPointInstanceView::Fit`, `ManifestQueryBuilder::ForDevice`
   (C function pointer predicate), `NoVariantFitsDevice`. F3.4d deferred.
-- **2026-10-21 (later).** L16 resource report (format 13, `ResourceReportTest`): footprint axis masks, `DescribeCreation`,
-  `ShaderLibrary.resources.txt`, validator `VerifyFootprintAxes`.
+- **2026-10-22 (DiamondDogs).** C13 root cause: an import found only through the module cache loads in the first session
+  and not in the workers. C8: `--include-dir` and `INCLUDE_DIRS`, `CrossModuleCookTest`. C7: `UniformMemberRange::Find`.
+  C9: no code location on warnings, `File.cpp:line` on errors.
+- **2026-10-22 (C12).** Binding arrays on SPIR-V: the reader takes the length, `SpvValidator` compares `ArrayCount`,
+  and a dynamic index adds `...ArrayDynamicIndexing` (Slang states none). `BindingArrayTest`. Unbounded arrays wait for F4.
+- **2026-10-22 (F3.5).** `VerifyCapabilityAxes`: an ungated axis of kind `capability` must change the capability names of
+  some entry point, and a boolean axis must not need more when off than when on. No attribute: the author refused a
+  declaration of names. `CapabilityAxisTest`. Next: F2.0.

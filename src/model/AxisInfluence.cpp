@@ -17,6 +17,8 @@
 #include <format>
 #include <functional>
 #include <numeric>
+#include <optional>
+#include <print>
 #include <ranges>
 #include <span>
 #include <string>
@@ -300,6 +302,43 @@ namespace
         }
     }
 
+    /** Calls `visit` with each group of two or more variants that agree on every axis except `axis_index`, and returns
+     * whether a group exists. */
+    template<typename VisitGroup>
+    bool ForEachOneAxisGroup(const CookedModule& module, size_t axis_index, const VisitGroup& visit)
+    {
+        const std::vector<uint32_t> orderedIndices = OrderByOtherAxes(module, axis_index);
+        bool foundPair = false;
+        // a while: `begin` already moves to the next group, and a for would skip its first element
+        size_t begin = 0u;
+        while (begin < orderedIndices.size())
+        {
+            const PermutationAssignment& beginCanonical = module.Variants[orderedIndices[begin]].Canonical;
+
+            // read `end` inside the condition: on the last group it is out of range until the range test
+            size_t end = begin + 1u;
+            while (end < orderedIndices.size() &&
+                   !AssignmentComparatorExcludingAxis(beginCanonical,
+                                                      module.Variants[orderedIndices[end]].Canonical,
+                                                      axis_index))
+            {
+                ++end;
+            }
+
+            const std::span<const uint32_t> group{ orderedIndices.data() + begin, end - begin };
+            begin = end;
+
+            if (group.size() < 2u)
+            {
+                continue;
+            }
+
+            foundPair = true;
+            visit(group);
+        }
+        return foundPair;
+    }
+
     /** The first pass: Active where a one-axis pair differs, Undetermined where no pair exists. A subject is anything a
      * variant gives a value for, and `shares_one_value(group, subject)` decides by content. */
     template<typename SharesOneValue>
@@ -313,34 +352,8 @@ namespace
 
         for (size_t k = 0u; k < axisCount; ++k)
         {
-            const std::vector<uint32_t> orderedIndices = OrderByOtherAxes(module, k);
-            bool foundPair = false;
-            // a while: `begin` already moves to the next group, and a for would skip its first element
-            size_t begin = 0u;
-            while (begin < orderedIndices.size())
+            auto markDifferences = [&](std::span<const uint32_t> group)
             {
-                const PermutationAssignment& beginCanonical = module.Variants[orderedIndices[begin]].Canonical;
-
-                // read `end` inside the condition: on the last group it is out of range until the range test
-                size_t end = begin + 1u;
-                while (end < orderedIndices.size() &&
-                       !AssignmentComparatorExcludingAxis(beginCanonical,
-                                                          module.Variants[orderedIndices[end]].Canonical,
-                                                          k))
-                {
-                    ++end;
-                }
-
-                const std::span<const uint32_t> group{ orderedIndices.data() + begin, end - begin };
-                begin = end;
-
-                if (group.size() < 2u)
-                {
-                    continue;
-                }
-
-                foundPair = true;
-
                 for (size_t subjectIndex = 0u; subjectIndex < subject_count; ++subjectIndex)
                 {
                     if (subjects[subjectIndex][k] != AxisInfluence::Active &&
@@ -349,7 +362,9 @@ namespace
                         subjects[subjectIndex][k] = AxisInfluence::Active;
                     }
                 }
-            }
+            };
+            
+            const bool foundPair = ForEachOneAxisGroup(module, k, markDifferences);
 
             if (!foundPair)
             {
@@ -591,6 +606,104 @@ CookError VerifyFootprintAxes(const CookedModule& module, DiagnosticSink& sink)
                                                  resource.ScopeName.empty()
                                                      ? resource.Name
                                                      : std::format("{}.{}", resource.ScopeName, resource.Name)));
+            }
+        }
+    }
+
+    return result;
+}
+
+CookError VerifyCapabilityAxes(const CookedLibrary& library)
+{
+    CookError result = CookError::Success;
+    const size_t moduleCount = library.ModuleNames.size();
+    for (size_t profileIndex = 0u; profileIndex < library.Profiles.size(); ++profileIndex)
+    {
+        const CookedProfile& profile = library.Profiles[profileIndex];
+        if (!profile.CodeFactsRead)
+        {
+            continue;
+        }
+
+        for (size_t moduleIndex = 0u; moduleIndex < moduleCount; ++moduleIndex)
+        {
+            const std::optional<CookedModule>& environment = library.Environments[(profileIndex * moduleCount) + moduleIndex];
+            if (!environment.has_value() || environment->Space == nullptr)
+            {
+                continue;
+            }
+
+            const CookedModule& module = *environment;
+            const std::span<const PermutationAxis> axes = module.Space->Axes();
+            for (size_t k = 0u; k < axes.size(); ++k)
+            {
+                const PermutationAxis& axis = axes[k];
+                if (axis.Kind != AxisKind::Capability || !axis.ActiveWhen.empty())
+                {
+                    continue;
+                }
+
+                const bool isBoolean = axis.ValueDomain == AxisValueDomain::Boolean;
+                bool changed = false;
+                CookError inverted = CookError::Success;
+                auto checkGroup = [&](std::span<const uint32_t> group)
+                {
+                    for (size_t entryPointIndex = 0u; entryPointIndex < module.EntryPoints.size(); ++entryPointIndex)
+                    {
+                        const auto namesOf = [&](uint32_t variant_index) -> const std::vector<std::string>&
+                        {
+                            const LibraryVariant& variant = module.Variants[variant_index];
+                            return module.SourceFacts[variant.SourceIndices[entryPointIndex]].CapabilityNames;
+                        };
+
+                        const std::vector<std::string>& firstNames = namesOf(group.front());
+                        changed = changed || std::ranges::any_of(group.subspan(1u),
+                                                                 [&](uint32_t variant_index)
+                                                                 { return namesOf(variant_index) != firstNames; });
+                        if (!isBoolean || inverted != CookError::Success)
+                        {
+                            continue;
+                        }
+
+                        // the group holds the two values of a boolean axis, and the names are sorted
+                        const auto isOn = [&](uint32_t variant_index)
+                        { return module.Variants[variant_index].Canonical[k].Value.AsBool(); };
+                        const auto offIter = std::ranges::find_if_not(group, isOn);
+                        const auto onIter = std::ranges::find_if(group, isOn);
+                        if (offIter == group.end() || onIter == group.end() ||
+                            std::ranges::includes(namesOf(*onIter), namesOf(*offIter)))
+                        {
+                            continue;
+                        }
+
+                        std::println(stderr,
+                                     "[lodestone] CAPABILITY AXIS: module '{}' profile '{}' axis '{}' is off in variant [{}] "
+                                     "and entry point '{}' needs a capability that the on variant [{}] does not",
+                                     library.ModuleNames[moduleIndex],
+                                     profile.TargetName,
+                                     axis.Name,
+                                     module.Variants[*offIter].Description,
+                                     module.EntryPoints[entryPointIndex].Name,
+                                     module.Variants[*onIter].Description);
+                        inverted = CookError::CapabilityAxisInverted;
+                    }
+                };
+
+                const bool foundPair = ForEachOneAxisGroup(module, k, checkGroup);
+                if (inverted != CookError::Success)
+                {
+                    result = inverted;
+                }
+                else if (foundPair && !changed && result == CookError::Success)
+                {
+                    std::println(stderr,
+                                 "[lodestone] CAPABILITY AXIS: module '{}' profile '{}' axis '{}' has kind capability, but "
+                                 "no pair of variants that differ in it needs different capabilities in any entry point",
+                                 library.ModuleNames[moduleIndex],
+                                 profile.TargetName,
+                                 axis.Name);
+                    result = CookError::CapabilityAxisInert;
+                }
             }
         }
     }

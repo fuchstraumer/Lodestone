@@ -212,6 +212,15 @@ rejects one before the reader runs. Slang states no capability for a dynamic ind
 `CollectDynamicIndexingCapabilities` reads each access chain on a binding array (`ChainAccess`) and adds the capability
 name when the first index is not a constant. Texel buffer arrays are not covered.
 
+**Capability axes** (`VerifyCapabilityAxes`). The check has no declared set of names: a measurement cannot say what an axis
+should turn on, but it can say that an axis of kind `capability` turns on nothing. `ForEachOneAxisGroup` yields the groups of
+variants that agree on every axis but one (the pair scan of the axis influence). In each group the names of an entry point
+are compared as stored, sorted vectors in the target's own spelling, so no portable map is involved. A gated axis is skipped,
+because a wave size refines its parent and changes no capability. For a boolean axis the group holds the two values, and
+`std::ranges::includes` tests that off is a subset of on. The check passes an axis that controls two capabilities and leaves
+one in its off path, because the pair still differs in the other. A declaration of names would catch it, and the author
+refused one.
+
 **Cross-profile facts** (`VerifySourceFactsAcrossProfiles`). Only a portable subset of the capability names can agree:
 `f16` with `Float16`, and `subgroups` with every `GroupNonUniform*` name (Slang emits `GroupNonUniform` for any wave
 operation, plus one name for each operation class). Names with no spelling in the other target, such as

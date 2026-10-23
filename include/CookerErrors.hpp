@@ -42,6 +42,8 @@ enum class CookError : uint16_t
     SamplerPairsTargetMismatch = 51, // two profiles of one variant read different sampler and texture pairs
     EntryPointConstantsTooLarge = 52, // an entry point's push constant block is larger than its profile guarantees
     SourceFactsTargetMismatch = 53, // two profiles of one variant read different workgroup memory or portable capabilities
+    CapabilityAxisInert = 54, // an axis of kind capability changes no capability name of any entry point
+    CapabilityAxisInverted = 55, // the off value of a boolean capability axis needs a name that its on value does not
 
     NoModulesSpecified = 60,
     NoOutputSpecified = 61,
