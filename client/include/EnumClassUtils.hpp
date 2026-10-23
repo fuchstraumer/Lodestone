@@ -76,10 +76,10 @@ constexpr bool HasAnyFlag(T value, T flags) noexcept
 }
 
 #define MAKE_ENUM_CLASS_FLAGS(EnumClass) \
-    consteval bool enable_bitmask_operator_or(EnumClass) { return true; } \
-    consteval bool enable_bitmask_operator_and(EnumClass) { return true; } \
-    consteval bool enable_bitmask_operator_xor(EnumClass) { return true; } \
-    consteval bool enable_bitmask_operator_or_eq(EnumClass) { return true; } \
-    consteval bool enable_bitmask_operator_not(EnumClass) { return true; }
+    [[maybe_unused]] consteval bool enable_bitmask_operator_or(EnumClass) { return true; } \
+    [[maybe_unused]] consteval bool enable_bitmask_operator_and(EnumClass) { return true; } \
+    [[maybe_unused]] consteval bool enable_bitmask_operator_xor(EnumClass) { return true; } \
+    [[maybe_unused]] consteval bool enable_bitmask_operator_or_eq(EnumClass) { return true; } \
+    [[maybe_unused]] consteval bool enable_bitmask_operator_not(EnumClass) { return true; }
 
 #endif // !LODESTONE_UTILITY_ENUM_CLASS_UTILS_HPP
