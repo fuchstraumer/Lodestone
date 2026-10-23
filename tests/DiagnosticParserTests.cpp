@@ -61,9 +61,11 @@ void TestRealCapture(TestRunner& runner)
     runner.CheckEqual(records[0].Message, "undefined identifier", "the message reaches the record");
     runner.CheckEqual(records[0].Context, "loadModule", "the calling context reaches every record");
 
-    runner.CheckEqual(records[0].Related.size(), 1u, "the span attaches to the message above it");
-    runner.CheckEqual(records[0].Related.front().Message, "undefined identifier 'this_symbol_does_not_exist'.",
-                      "the span carries the detailed wording, so it must not be dropped");
+    if (runner.CheckEqual(records[0].Related.size(), 1u, "the span attaches to the message above it"))
+    {
+        runner.CheckEqual(records[0].Related.front().Message, "undefined identifier 'this_symbol_does_not_exist'.",
+                          "the span carries the detailed wording, so it must not be dropped");
+    }
 
     runner.Check(records[1].File.empty() && records[1].Range == lodestone::SourceRange{},
                  "a message about no place in particular keeps no place in particular");

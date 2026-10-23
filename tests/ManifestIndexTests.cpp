@@ -676,11 +676,23 @@ void CheckDeviceFilter(lodestone::tests::TestRunner& runner)
     TestDevice plain{ .Subgroups = false };
     TestDevice waves{ .Subgroups = true };
 
-    runner.CheckEqual(index.Query().Keys()->size(), 4u, "with no device, the module has four variants");
-    runner.CheckEqual(index.Query().ForDevice(&TestDeviceSupports, &waves, roomy).Keys()->size(), 4u,
-                      "a device that runs everything removes nothing");
-    runner.CheckEqual(index.Query().ForDevice(&TestDeviceSupports, &plain, roomy).Keys()->size(), 2u,
-                      "a device without subgroups loses the wave variants");
+    const lodestone::QueryResult<std::vector<VariantKey>> noDevice = index.Query().Keys();
+    if (runner.CheckOk(noDevice, "with no device, the module has four variants"))
+    {
+        runner.CheckEqual(noDevice->size(), 4u, "with no device, the module has four variants");
+    }
+    const lodestone::QueryResult<std::vector<VariantKey>> wavesDevice =
+        index.Query().ForDevice(&TestDeviceSupports, &waves, roomy).Keys();
+    if (runner.CheckOk(wavesDevice, "a device that runs everything removes nothing"))
+    {
+        runner.CheckEqual(wavesDevice->size(), 4u, "a device that runs everything removes nothing");
+    }
+    const lodestone::QueryResult<std::vector<VariantKey>> plainDevice =
+        index.Query().ForDevice(&TestDeviceSupports, &plain, roomy).Keys();
+    if (runner.CheckOk(plainDevice, "a device without subgroups loses the wave variants"))
+    {
+        runner.CheckEqual(plainDevice->size(), 2u, "a device without subgroups loses the wave variants");
+    }
 
     const std::array<std::string_view, 1u> generate{ "GenerateCS" };
     const std::array<std::string_view, 1u> blur{ "BlurCS" };

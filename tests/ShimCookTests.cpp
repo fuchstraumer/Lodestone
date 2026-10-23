@@ -36,8 +36,8 @@ int main(int argc, char** argv)
     runner.BeginSection("a material written with shims cooks for both targets, with both cross-checks and two identical cooks");
     const CookedBundle shim = Cook(assetDirectory / "ShimMaterial.slang");
     const CookedBundle control = Cook(assetDirectory / "ShimControl.slang");
-    runner.Check(shim.Cooked, "the shim material cooks");
-    runner.Check(control.Cooked, "the control cooks");
+    runner.CheckEqual(shim.Result, CookError::Success, "the shim material cooks");
+    runner.CheckEqual(control.Result, CookError::Success, "the control cooks");
 
     const manifest::ManifestResult<manifest::BundleView> shimBundle = manifest::BundleView::Open(shim.Bytes);
     const manifest::ManifestResult<manifest::BundleView> controlBundle = manifest::BundleView::Open(control.Bytes);
@@ -68,7 +68,11 @@ int main(int argc, char** argv)
 
     runner.BeginSection("a shim extern used as a local variable does not cook");
     const CookedBundle local = Cook(assetDirectory / "ShimLocal.slang");
-    runner.Check(!local.Cooked, "a resource cannot be a local, and the cook fails (phase F step F2.0)");
+    // the module must exist, or a missing file would pass this check
+    runner.Check(std::filesystem::exists(assetDirectory / "ShimLocal.slang"), "the local-shim module is on disk");
+    runner.Check(local.Result != CookError::Success,
+                 std::format("a resource cannot be a local, and the cook fails (phase F step F2.0); it returned {}",
+                             tests::FormatForTest(local.Result)));
 
     return runner.Report();
 }

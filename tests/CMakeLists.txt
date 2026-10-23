@@ -1,7 +1,7 @@
 # TEST_ARGS passes a command line to the registered test. A test that takes no argument omits it.
 function(add_lodestone_unit_test NAME)
     cmake_parse_arguments(UNIT_TEST "" "" "TEST_ARGS" ${ARGN})
-    add_executable(${NAME} ${UNIT_TEST_UNPARSED_ARGUMENTS} TestHarness.cpp TestHarness.hpp)
+    add_executable(${NAME} ${UNIT_TEST_UNPARSED_ARGUMENTS} TestHarness.cpp TestHarness.hpp TestFormat.hpp)
 
     set_target_properties(${NAME} PROPERTIES FOLDER "Tests")
     set_target_properties(${NAME} PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED YES)
@@ -13,9 +13,11 @@ function(add_lodestone_unit_test NAME)
 
     # Both paths are here because a test includes a cooker header and a client header by name only,
     # the way the library's own sources do.
+    # magic_enum gives TestFormat.hpp the name of an enumerator that has no ToString
     target_include_directories(${NAME} PRIVATE
         "${PROJECT_SOURCE_DIR}/include"
-        "${PROJECT_SOURCE_DIR}/client/include")
+        "${PROJECT_SOURCE_DIR}/client/include"
+        "${PROJECT_SOURCE_DIR}/third_party/magic_enum/include")
 
     target_link_libraries(${NAME} PRIVATE lodestone slang lodestone::client_library)
     if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")

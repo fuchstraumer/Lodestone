@@ -423,7 +423,7 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
         const VariantKey key = ComputeVariantKey(canonical);
         // the dense index needs the sorted set
         expanded.emplace_back(PermutationAssignment{ partial }, std::move(canonical), key, 0u);
-        if ((policy.MaxVariants > 0) && (expanded.size() >= policy.MaxVariants)) [[unlikely]]
+        if ((policy.MaxVariants > 0) && (expanded.size() > policy.MaxVariants)) [[unlikely]]
         {
             const std::string errorMessage = std::format("Permutation variant budget exceeded (max {} variants)", policy.MaxVariants);
             return ReportError(sink,

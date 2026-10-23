@@ -26,7 +26,8 @@ namespace lodestone::tests
 struct CookedBundle
 {
     std::vector<std::byte> Bytes;
-    bool Cooked{ false };
+    /** `Success` when the cook wrote a manifest, and the error of the cook otherwise. */
+    CookError Result{ CookError::Invalid };
 };
 
 /** Cooks for `wgsl` and `spirv` in one run, twice, so that the two cooks must agree byte for byte. */
@@ -43,7 +44,8 @@ inline CookedBundle CookBothTargets(std::vector<std::filesystem::path> module_pa
 
     MemoryOutputSink sink;
     CookedBundle result;
-    result.Cooked = RunCook(options, sink).has_value();
+    const CookResult<CookStatistics> cooked = RunCook(options, sink);
+    result.Result = cooked.has_value() ? CookError::Success : cooked.error();
     const auto manifest = sink.GetArtifacts().find(std::string{ k_ManifestFileName });
     if (manifest != sink.GetArtifacts().end())
     {

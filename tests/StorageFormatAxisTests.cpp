@@ -100,8 +100,8 @@ int main(int argc, char** argv)
 
     const tests::CookedBundle subject = tests::CookBothTargets({ assetDirectory / "MipDownsample.slang" }, std::nullopt);
     const tests::CookedBundle controls = tests::CookBothTargets(controlPaths, std::nullopt);
-    runner.Check(subject.Cooked, "the subject cooks, with both cross-checks and two identical cooks");
-    runner.Check(controls.Cooked, "the six controls cook");
+    runner.CheckEqual(subject.Result, CookError::Success, "the subject cooks, with both cross-checks and two identical cooks");
+    runner.CheckEqual(controls.Result, CookError::Success, "the six controls cook");
 
     const manifest::ManifestResult<manifest::BundleView> subjectBundle = manifest::BundleView::Open(subject.Bytes);
     const manifest::ManifestResult<manifest::BundleView> controlBundle = manifest::BundleView::Open(controls.Bytes);
@@ -183,7 +183,7 @@ void DownsampleCS(uint3 id : SV_DispatchThreadID)
     runner.BeginSection("a policy that lists two formats cooks those two");
     const tests::CookedBundle subset =
         tests::CookBothTargets({ assetDirectory / "MipDownsample.slang" }, assetDirectory / "MipDownsample.toml");
-    runner.Check(subset.Cooked, "the subset cooks");
+    runner.CheckEqual(subset.Result, CookError::Success, "the subset cooks");
     const manifest::ManifestResult<manifest::BundleView> subsetBundle = manifest::BundleView::Open(subset.Bytes);
     for (const uint32_t profile : { 0u, 1u })
     {
