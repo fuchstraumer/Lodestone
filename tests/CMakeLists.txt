@@ -150,6 +150,9 @@ target_compile_definitions(CapabilityAxisTest PRIVATE
 add_lodestone_unit_test(ShimModuleTest ShimModuleTests.cpp)
 target_compile_definitions(ShimModuleTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/Shims")
+# The shim table agrees with the shim module (decision D6, phase F step F2.2): every cell names a type that exists, takes the
+# right arity, and conforms to its interface, and a table that disagrees fails. It cooks through Slang four times.
+add_lodestone_unit_test(ShimTableTest ShimTableTests.cpp)
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)

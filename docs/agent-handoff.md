@@ -14,15 +14,15 @@ fixed, remove it; when a task is done, add one line to section 7 and remove its 
 
 ## 1. State on 2026-10-22
 
-- RelWithDebInfo, `ninja-msvc`: build green, 35 of 35 tests (after F2.1; F2.1 is not committed). Known-good dumps: 60 of 60
+- RelWithDebInfo, `ninja-msvc`: build green, 36 of 36 tests (after F2.2; F2.1 and F2.2 are not committed). Known-good dumps: 60 of 60
   (checked 2026-10-22).
 - Debug: do not run it unattended (section 2, item 2).
 - Manifest format version 15. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
-- Phases D and E are complete. Phase F has F0, F1, F3.1 to F3.4c, F3.5, and F2.0 to F2.1 done; the rest of F2, F4, F5, and F6 are open.
+- Phases D and E are complete. Phase F has F0, F1, F3.1 to F3.4c, F3.5, and F2.0 to F2.2 done; the rest of F2, F4, F5, and F6 are open.
 - **Phase F is the current work.** The VeloxRhi rendergraph tasks (`docs/rendergraph-integration-tasks.md`) are done
   except L11 (optional dispatch extent) and a JSON writer for the resource report. L5 and L6 became phase F slice F3:
-  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: F2.2**
-  (the shim table and its agreement test), then F2.3, F2.5, F2.6 (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
+  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: F2.3**
+  (recognize shim externs), then F2.5, F2.6 (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
   bind groups) waits for a consumer to name its limits. After F3: F2 (the shim module and the two tables), F4 (Pointer and
   Handle placements, and unbounded binding arrays), F5 (binding-time lowering), and F6. `docs/phase-f-plan.md` has the
   slices and a progress log. The author calls phase F the last major feature work.
@@ -221,3 +221,4 @@ One line for each step. Git history holds the full text.
   uniform) on both targets, and fails as a local. No code change.
 - **2026-10-22 (F2.1).** `builtins/LodestoneShims.slang` and `ShimModuleTest`. The builtin list in CMake is a glob now: a new
   file in `builtins/` needs `scripts\configure.bat`.
+- **2026-10-22 (F2.2).** `target/ShimTable` and `ShimTableTest` (decision D6: the table agrees with the shim module).

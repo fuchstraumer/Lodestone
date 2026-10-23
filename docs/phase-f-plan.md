@@ -121,7 +121,7 @@ The Bound form works on WGSL, so this slice needs no SPIR-V. It can run beside F
 | Step | Work | Proof |
 |---|---|---|
 | F2.1 | **Done 2026-10-22.** Add the shim module to `builtins/`, beside `LodestoneAttributes.slang`. | `ShimModuleTest` cooks `ShimDirect.slang` for both targets. |
-| F2.2 | Add the shim table and the profile form table in `target/`. | The agreement test of D6. |
+| F2.2 | **Done 2026-10-22.** Add the shim table in `target/`. The profile form table waits for F4.1: every profile is Bound, so `TargetProfile::Access` is enough. | `ShimTableTest`, the agreement test of D6. |
 | F2.3 | Recognize an extern whose interface is in the shim table. Keep it out of the axis space. | The variant count of a shim module does not change. |
 | F2.4 | Allow a resource member in a shim impl, which the spike (F2.0) found works for a parameter type. Keep `rejectResourceMembers` for a technique axis, and reject a shim extern used as a local. | The technique-axis rejection test still fails the cook. |
 | F2.5 | Build the impl name from the extern (`IReadBuffer<PointLight>` gives `BoundReadBuffer<PointLight>`). Import the module that declares the element type. | `FindDeclaringModule` gives the import. `todo.md` holds the related import item. |
@@ -501,3 +501,11 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
     block's ordinary data is the uniform buffer `material` at binding 0 with the resources after it. Recommendation stands:
     no renaming in F2.
   - Next: F2.2 (the shim table and its agreement test).
+- 2026-10-22. **F2.2 done**, not committed. `target/ShimTable.hpp` and `.cpp`: `ShimInterface` (name, resource class,
+  type parameter count, and one implementation name for each of Bound, Indexed, Pointer; an empty name is an empty cell),
+  `GetShimInterfaces`, `FindShimInterface`, `ShimImplName`. 36 of 36 tests.
+  - `ShimTableTest` (D6) generates a module from a table: for each non-empty cell, a struct constrained to the cell's
+    interface and an alias that instantiates it with the cell's type. Slang checks the constraint at load, so the module
+    cooks only when the type exists, takes the arity, and conforms. Three modified tables fail, each with its own Slang
+    error (E30015 undefined identifier, E38029 type argument does not conform, E30401 and E30408 for a wrong arity).
+  - Next: F2.3 (recognize an extern whose interface is in the table).
