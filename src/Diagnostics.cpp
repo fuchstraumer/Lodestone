@@ -18,17 +18,20 @@ namespace lodestone
 namespace
 {
 
-    /** `file(line,column): ` when the record names a place, and nothing when it does not. The shape
+    /** `file(line,column): ` or `file(line): ` when the record names a place, and nothing when it does not. The shape
      * follows the compiler convention that an editor already knows how to click on. */
-    std::string FormatLocation(const Diagnostic& diagnostic)
+    std::string FormatLocation(std::string_view file, const SourceRange& range)
     {
-        if (diagnostic.File.empty() || !HasLocation(diagnostic.Range))
+        if (file.empty() || !HasLocation(range))
         {
             return {};
         }
 
-        return std::format(
-            "{}({},{}): ", diagnostic.File, diagnostic.Range.StartLine, diagnostic.Range.StartColumn);
+        if (range.StartColumn == 0)
+        {
+            return std::format("{}({}): ", file, range.StartLine);
+        }
+        return std::format("{}({},{}): ", file, range.StartLine, range.StartColumn);
     }
 
     std::string FormatCode(const Diagnostic& diagnostic)
@@ -72,6 +75,13 @@ bool HasLocation(const SourceRange& range) noexcept
     return range.StartLine != 0 || range.StartColumn != 0;
 }
 
+SourceRange ToSourceRange(const ShaderLocation& location) noexcept
+{
+    const auto line = static_cast<int32_t>(location.Line);
+    const auto column = static_cast<int32_t>(location.Column);
+    return SourceRange{ .StartLine = line, .StartColumn = column, .EndLine = line, .EndColumn = column };
+}
+
 void StderrDiagnosticSink::Report(const Diagnostic& diagnostic)
 {
     if (IsFailure(diagnostic.Severity))
@@ -83,7 +93,7 @@ void StderrDiagnosticSink::Report(const Diagnostic& diagnostic)
     {
         std::println(stderr,
                     "[lodestone] {}{}{}: {} [{}]",
-                    FormatLocation(diagnostic),
+                    FormatLocation(diagnostic.File, diagnostic.Range),
                     ToString(diagnostic.Severity),
                     FormatCode(diagnostic),
                     diagnostic.Message,
@@ -93,7 +103,7 @@ void StderrDiagnosticSink::Report(const Diagnostic& diagnostic)
     {
         std::println(stderr,
                     "[lodestone] {}{}{}: {}",
-                    FormatLocation(diagnostic),
+                    FormatLocation(diagnostic.File, diagnostic.Range),
                     ToString(diagnostic.Severity),
                     FormatCode(diagnostic),
                     diagnostic.Message);
@@ -101,18 +111,7 @@ void StderrDiagnosticSink::Report(const Diagnostic& diagnostic)
 
     for (const DiagnosticNote& note : diagnostic.Related)
     {
-        if (note.File.empty() || !HasLocation(note.Range))
-        {
-            std::println(stderr, "[lodestone]   note: {}", note.Message);
-            continue;
-        }
-
-        std::println(stderr,
-                     "[lodestone]   {}({},{}): note: {}",
-                     note.File,
-                     note.Range.StartLine,
-                     note.Range.StartColumn,
-                     note.Message);
+        std::println(stderr, "[lodestone]   {}note: {}", FormatLocation(note.File, note.Range), note.Message);
     }
 }
 
@@ -164,10 +163,7 @@ void RecordingDiagnosticSink::Reset() noexcept
     records.clear();
 }
 
-void ReportToSink(DiagnosticSink& sink,
-                  DiagnosticSeverity severity,
-                  std::string message,
-                  std::source_location location)
+Diagnostic MakeDiagnostic(DiagnosticSeverity severity, std::string message, std::source_location location)
 {
     Diagnostic diag;
     diag.Severity = severity;
@@ -177,7 +173,15 @@ void ReportToSink(DiagnosticSink& sink,
     {
         diag.Context = std::format("{}:{}", std::filesystem::path{ location.file_name() }.filename().string(), location.line());
     }
-    sink.Report(std::move(diag));
+    return diag;
+}
+
+void ReportToSink(DiagnosticSink& sink,
+                  DiagnosticSeverity severity,
+                  std::string message,
+                  std::source_location location)
+{
+    sink.Report(MakeDiagnostic(severity, std::move(message), location));
 }
 
 CookError ReportError(DiagnosticSink& sink,
@@ -186,6 +190,30 @@ CookError ReportError(DiagnosticSink& sink,
                       std::source_location location)
 {
     ReportToSink(sink, DiagnosticSeverity::Error, std::move(message), location);
+    return error;
+}
+
+CookError ReportError(DiagnosticSink& sink,
+                      CookError error,
+                      const ShaderLocation& where,
+                      std::string message,
+                      std::source_location location)
+{
+    return ReportError(sink, error, where, std::move(message), {}, location);
+}
+
+CookError ReportError(DiagnosticSink& sink,
+                      CookError error,
+                      const ShaderLocation& where,
+                      std::string message,
+                      std::vector<DiagnosticNote> related,
+                      std::source_location location)
+{
+    Diagnostic diag = MakeDiagnostic(DiagnosticSeverity::Error, std::move(message), location);
+    diag.File = std::string{ where.File };
+    diag.Range = ToSourceRange(where);
+    diag.Related = std::move(related);
+    sink.Report(std::move(diag));
     return error;
 }
 

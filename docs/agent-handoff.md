@@ -14,15 +14,15 @@ fixed, remove it; when a task is done, add one line to section 7 and remove its 
 
 ## 1. State on 2026-10-22
 
-- RelWithDebInfo, `ninja-msvc`: build green, 40 of 40 tests (after C11.2; C11.1 and C11.2 are not committed). Known-good dumps: 60 of 60
+- RelWithDebInfo, `ninja-msvc`: build green, 40 of 40 tests (after C11.3; C11.3 is not committed). Known-good dumps: 60 of 60
   (checked 2026-10-22).
 - Debug: do not run it unattended (section 2, item 2).
 - Manifest format version 15. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
 - Phases D and E are complete. Phase F has F0, F1, F3.1 to F3.4c, F3.5, and F2 done; C11, F4, F5, and F6 are open.
 - **Phase F is the current work.** The VeloxRhi rendergraph tasks (`docs/rendergraph-integration-tasks.md`) are done
   except L11 (optional dispatch extent) and a JSON writer for the resource report. L5 and L6 became phase F slice F3:
-  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: C11.3**
-  (the attribute that names the format axis, and the link module for each variant), then C11.4 and F4 (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
+  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: C11.4**
+  (a mip kernel with a format axis against a control for each format), then F4 (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
   bind groups) waits for a consumer to name its limits. After F3: F2 (the shim module and the two tables), F4 (Pointer and
   Handle placements, and unbounded binding arrays), F5 (binding-time lowering), and F6. `docs/phase-f-plan.md` has the
   slices and a progress log. The author calls phase F the last major feature work.
@@ -61,7 +61,10 @@ Ordered by what can write wrong output first.
    hurts a Debug cook. Read it before you measure anything.
 7. **shader-slang/slang#13789 has a workaround in the cook.** `ApplySlangWorkaround13789` (`BuildModuleStep.cpp`).
    `SlangMetadataCanaryTest` fails when Slang fixes the issue, and its header lists what to delete.
-8. **`tests/DeclKindProbe.cpp`** is a throwaway Slang probe. Remove it when it stops earning its place.
+8. **Axis declarations have no source location.** The axis-default errors (`AxisDefaultMissing`, `AxisDefaultNotDeclared`, ...)
+   print none, because `getDeclSourceLocation` fails for the axis `Variable` decl and `RawAxisDeclaration::SourceFile` is
+   `<unknown>`. Not measured why. The symbol table has the line, and could supply it.
+9. **`tests/DeclKindProbe.cpp`** is a throwaway Slang probe. Remove it when it stops earning its place.
 
 `todo.md` holds the rest, grouped by area.
 
@@ -233,3 +236,10 @@ One line for each step. Git history holds the full text.
   `StorageFormatTest`. Fixed: the symbol table read declarations inside comments (`StripComments`).
 - **2026-10-23 (C11.2).** The write-only storage shim (`BoundWriteStorageTexture2D<F>`, table row with
   `ImplementationTakesFormat`) and its checks in `StorageFormatTest` and `ShimTableTest`.
+- **2026-10-23 (C11.3).** `ls_storage_format`: a storage shim extern takes its format from an enum axis over `StorageFormat`, one
+  link module for each value (`MakeShimFormatLinkSources`), errors 180 to 182. Fixed: a pruned enum axis failed the cook,
+  because its initializer was read as an extern constant default.
+- **2026-10-23 (diagnostics).** Shader locations go in the record, not the message: `ShaderLocation` and two `ReportError`
+  overloads (one with `Related` notes), and the sink prints `file(line): ` or `file(line,col): `. The shim, axis-default, and
+  derived-constant errors use it (derived constants list each declaration as a note). `DescribeShimExtern`. Both validators
+  report an unmatched binding through `ReportDeclaredOnly` and `ReportReflectedOnly`.

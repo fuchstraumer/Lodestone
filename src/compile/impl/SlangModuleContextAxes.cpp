@@ -1,38 +1,25 @@
 #include "SlangModuleContext.hpp"
-#include "ShaderLibraryTypes.hpp"
 #include "SlangCompilerTypes.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
-#include "EmbeddedFileSystem.hpp"
-#include "compile/EmbeddedBuiltinModules.hpp"
 #include "compile/EnumTagDecode.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
-#include "permute/PermutationValue.hpp"
 #include "slang-com-ptr.h"
 #include "slang.h"
-#include "target/TargetProfile.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <expected>
-#include <filesystem>
 #include <format>
-#include <fstream>
 #include <functional>
-#include <ios>
-#include <iterator>
 #include <optional>
-#include <random>
-#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -443,16 +430,17 @@ CookResult<std::string> SlangModuleContext::extractSingleAttribute(slang::DeclRe
     if (text == nullptr)
     {
         slang::SourceLocation sourceLoc;
-        std::string errStr = std::format("Failed to read value for attribute {}", attr_name);
-        if (SLANG_SUCCEEDED(session->getDeclSourceLocation(reflection, &sourceLoc)))
+        ShaderLocation where;
+        if (SLANG_SUCCEEDED(session->getDeclSourceLocation(reflection, &sourceLoc)) && sourceLoc.filePath != nullptr)
         {
-            const std::string sourceLocStr =
-                std::format("{} L{}:C{}", sourceLoc.filePath, sourceLoc.line, sourceLoc.column);
-            errStr += " at " + sourceLocStr;
+            where = ShaderLocation{ .File = sourceLoc.filePath,
+                                    .Line = static_cast<uint32_t>(sourceLoc.line),
+                                    .Column = static_cast<uint32_t>(sourceLoc.column) };
         }
         return std::unexpected(ReportError(*diagnosticSink,
                                            CookError::SlangGetAttributeValueStrFailed,
-                                           errStr));
+                                           where,
+                                           std::format("Failed to read value for attribute {}", attr_name)));
     }
 
     return std::string(text, length);

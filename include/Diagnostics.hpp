@@ -40,6 +40,15 @@ struct SourceRange
 
 bool HasLocation(const SourceRange& range) noexcept;
 
+struct ShaderLocation
+{
+    std::string_view File;
+    uint32_t Line{ 0u };
+    uint32_t Column{ 0u }; // column of 0 is not printed
+};
+
+[[nodiscard]] SourceRange ToSourceRange(const ShaderLocation& location) noexcept;
+
 /** LSP `relatedInformation`. Not a diagnostic of its own, so one error is not counted several times. */
 struct DiagnosticNote
 {
@@ -110,6 +119,18 @@ private:
 [[nodiscard]] CookError ReportError(DiagnosticSink& sink,
                                     CookError error,
                                     std::string message,
+                                    std::source_location location = std::source_location::current());
+/** @brief The sink prints `where` in front of the message, so the message must not repeat it. */
+[[nodiscard]] CookError ReportError(DiagnosticSink& sink,
+                                    CookError error,
+                                    const ShaderLocation& where,
+                                    std::string message,
+                                    std::source_location location = std::source_location::current());
+[[nodiscard]] CookError ReportError(DiagnosticSink& sink,
+                                    CookError error,
+                                    const ShaderLocation& where,
+                                    std::string message,
+                                    std::vector<DiagnosticNote> related,
                                     std::source_location location = std::source_location::current());
 void ReportWarning(DiagnosticSink& sink, std::string message, std::source_location location = std::source_location::current());
 void ReportInfo(DiagnosticSink& sink, std::string message);

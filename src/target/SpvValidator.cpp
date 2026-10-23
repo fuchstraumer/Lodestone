@@ -170,6 +170,24 @@ namespace
         }
     }
 
+    void ReportDeclaredOnly(BindingComparison& comparison, const DeclaredBinding& declared)
+    {
+        comparison.Matches = false;
+        comparison.Report += std::format("  spir-v declares set {} binding {} {} : reflection has no binding at that location\n",
+                                         declared.Group,
+                                         declared.Binding,
+                                         declared.Name);
+    }
+
+    void ReportReflectedOnly(BindingComparison& comparison, const ReflectedBinding& reflected)
+    {
+        comparison.Matches = false;
+        comparison.Report += std::format("  reflection has set {} binding {} {} : spir-v has no binding at that location\n",
+                                         GroupOf(reflected),
+                                         BindingOf(reflected),
+                                         reflected.Name);
+    }
+
     BindingComparison CompareBindings(std::span<const DeclaredBinding> declared,
                                       std::span<const ReflectedBinding*> reflected)
     {
@@ -193,45 +211,24 @@ namespace
             }
             else if (declaredTuple < reflectedTuple)
             {
-                comparison.Matches = false;
-                comparison.Report += std::format("  spir-v declares set {} binding {} {} : reflection has no binding "
-                                                 "at that location\n",
-                                                 declaredBinding.Group,
-                                                 declaredBinding.Binding,
-                                                 declaredBinding.Name);
+                ReportDeclaredOnly(comparison, declaredBinding);
                 ++iterDeclared;
             }
             else
             {
-                comparison.Matches = false;
-                comparison.Report += std::format("  reflection has set {} binding {} {} : spir-v has no binding "
-                                                 "at that location\n",
-                                                 std::get<0>(reflectedTuple),
-                                                 std::get<1>(reflectedTuple),
-                                                 reflectedBinding.Name);
+                ReportReflectedOnly(comparison, reflectedBinding);
                 ++iterReflected;
             }
         }
 
         for (; iterDeclared != declared.end(); ++iterDeclared)
         {
-            comparison.Matches = false;
-            comparison.Report += std::format("  spir-v declares set {} binding {} {} : reflection has no binding "
-                                             "at that location\n",
-                                             iterDeclared->Group,
-                                             iterDeclared->Binding,
-                                             iterDeclared->Name);
+            ReportDeclaredOnly(comparison, *iterDeclared);
         }
 
         for (; iterReflected != reflected.end(); ++iterReflected)
         {
-            const ReflectedBinding& reflectedBinding = **iterReflected;
-            comparison.Matches = false;
-            comparison.Report += std::format("  reflection has set {} binding {} {} : spir-v has no binding at that "
-                                             "location\n",
-                                             GroupOf(reflectedBinding),
-                                             BindingOf(reflectedBinding),
-                                             reflectedBinding.Name);
+            ReportReflectedOnly(comparison, **iterReflected);
         }
 
         return comparison;

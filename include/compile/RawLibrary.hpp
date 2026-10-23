@@ -146,6 +146,9 @@ struct RawShimExtern
     uint32_t SourceLine{ 0u };
 };
 
+/** @brief `extern 'Points' of 'IReadBuffer<PointLight>'`, for diagnostics. */
+std::string DescribeShimExtern(const RawShimExtern& shim_extern);
+
 /** Stage 3's module output. `ExternDefaults` carries the undriven extern constants' defaults, which only Slang knows. */
 struct RawModule
 {

@@ -610,3 +610,26 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
   - `MakeShimLinkSource` rejects a format row with `ShimExternInvalid` until step C11.3 supplies a format: no extern can
     link a storage shim yet, so a shader uses the implementation type directly for now.
   - Next: C11.3 (the attribute that names the format axis, and the link module for each variant).
+- 2026-10-23. **C11.3 done**, not committed. 40 of 40 tests, 60 of 60 known-good dumps.
+  - Decisions from the author: reflection is the only reader of `ls_storage_format` (the symbol table reads one line, and the
+    attribute is usually on the line before); a gated format axis is rejected (a variant with the gate off has no value, so
+    the extern has no implementation, or links its default in silence); each worker context loads every value module once;
+    a default on a format extern is allowed and not compared with the axis default.
+  - `ls_storage_format` (struct attribute, one string) in `builtins/LodestoneAttributes.slang`. `SlangModuleContext::
+    BuildStructStringAttributes` reads it through reflection (the module scope walk is now `VisitModuleScopeDecls`), and
+    `PrepareRawModule` puts it in `RawShimExtern::FormatAxis`. The attribute on an extern of another interface fails with
+    `ShimExternInvalid`.
+  - **Measured:** reflection reads a user attribute on an `extern struct` with no default, from the line before.
+  - `MakeShimLinkSource` skips a format extern, fails a storage extern with no axis (`ShimStorageFormatMissing` = 180), and
+    returns no source when nothing is left. `MakeShimFormatLinkSources` checks the axis against the space
+    (`ShimStorageFormatAxisUnknown` = 181, with a "did you mean"; `ShimStorageFormatAxisInvalid` = 182) and gives one source
+    for each value. `SlangCompiler` passes them to the pool, `SlangModuleContext::LoadShimFormatModules` loads them, and
+    `LinkVariant` adds `ShimFormatLinkModule(axis, ordinal)` beside the enum constant module of that binding.
+  - Pruning: the scanner reads identifiers inside strings, so the attribute argument keeps the axis in the space when no code
+    reads it. `StorageFormatTest` proves it (six variants).
+  - **Found, fixed:** an `[ls_axis_enum]` axis that no code reads was pruned, and the cook then failed with "could not read
+    the default of extern constant" for its enum initializer. Two reject assets hit it first. `PermutationSpace::
+    readUndrivenExternConstants` now skips an undriven constant that no source of the module reads, for the default read and
+    for the undriven warning: no size expression can name it, because the scanner reads attribute strings too.
+    `AxisDefaultTest` cooks `AxisDefaultUnread.slang` (an unread enum axis); the row fails without the fix.
+  - Next: C11.4.

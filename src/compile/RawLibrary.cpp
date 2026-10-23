@@ -1,5 +1,7 @@
 #include "compile/RawLibrary.hpp"
 #include <cstdint>
+#include <format>
+#include <string>
 #include <string_view>
 
 namespace lodestone
@@ -40,6 +42,15 @@ uint32_t ArgumentCountOf(RawSizeAttributeKind kind) noexcept
     }
 
     return 0u;
+}
+
+std::string DescribeShimExtern(const RawShimExtern& shim_extern)
+{
+    if (shim_extern.TypeArguments.empty())
+    {
+        return std::format("extern '{}' of '{}'", shim_extern.Name, shim_extern.Interface);
+    }
+    return std::format("extern '{}' of '{}<{}>'", shim_extern.Name, shim_extern.Interface, shim_extern.TypeArguments);
 }
 
 } // namespace lodestone

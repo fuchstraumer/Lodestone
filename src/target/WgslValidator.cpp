@@ -350,6 +350,24 @@ namespace
         }
     }
 
+    void ReportDeclaredOnly(BindingComparison& comparison, const tint::inspector::ResourceBinding& declared)
+    {
+        comparison.Matches = false;
+        comparison.Report += std::format("  wgsl declares @group({}) @binding({}) {} : reflection has no binding at that location\n",
+                                         declared.bind_group,
+                                         declared.binding,
+                                         StripSlangNameMangling(declared.variable_name));
+    }
+
+    void ReportReflectedOnly(BindingComparison& comparison, const ReflectedBinding& reflected)
+    {
+        comparison.Matches = false;
+        comparison.Report += std::format("  reflection has @group({}) @binding({}) {} : wgsl has no binding at that location\n",
+                                         GroupOf(reflected),
+                                         BindingOf(reflected),
+                                         MakeScopedName(reflected));
+    }
+
     BindingComparison CompareBindings(std::span<const tint::inspector::ResourceBinding> wgsl_bindings,
                                       std::span<const ReflectedBinding*> reflected_bindings) noexcept
     {
@@ -368,17 +386,20 @@ namespace
 
             if (declaredTuple == reflectedTuple)
             {
-                std::string_view unmangledName = StripSlangNameMangling(declaredBinding.variable_name);
-                std::string scopedName = MakeScopedName(*reflectedBinding); 
-                if (unmangledName != scopedName)
+                const std::string_view unmangledName = StripSlangNameMangling(declaredBinding.variable_name);
+                const auto report = [&](std::string_view what)
                 {
                     comparison.Matches = false;
-                    comparison.Report += std::format("  wgsl declares @group({}) @binding({}) {} : reflection has "
-                                                    "mismatched name \"{}\"\n",
-                                                    declaredBinding.bind_group,
-                                                    declaredBinding.binding,
-                                                    unmangledName,
-                                                    reflectedBinding->Name);
+                    comparison.Report += std::format("  wgsl declares @group({}) @binding({}) {} : {}\n",
+                                                     declaredBinding.bind_group,
+                                                     declaredBinding.binding,
+                                                     unmangledName,
+                                                     what);
+                };
+
+                if (unmangledName != MakeScopedName(*reflectedBinding))
+                {
+                    report(std::format("reflection has mismatched name \"{}\"", reflectedBinding->Name));
                 }
 
                 if (!TintTypeAgreesWithReflectionKind(declaredBinding.resource_type,
@@ -386,33 +407,22 @@ namespace
                                                       reflectedBinding->Shape,
                                                       reflectedBinding->Access))
                 {
-                    comparison.Matches = false;
-                    const std::string messageFirstHalf = std::format("  wgsl declares @group({}) @binding({}) {} as {}",
-                                                                    declaredBinding.bind_group,
-                                                                    declaredBinding.binding,
-                                                                    unmangledName,
-                                                                    TintTypeToString(declaredBinding.resource_type));
                     const auto tintKind = TintTypeForBindingKind(reflectedBinding->Kind,
                                                                  reflectedBinding->Shape,
                                                                  reflectedBinding->Access);
-                    const std::string messageSecondHalf = std::format(" : reflection has kind {}, which needs {}\n",
-                                                                    ToString(reflectedBinding->Kind),
-                                                                    TintTypeToString(tintKind));
-                    comparison.Report += messageFirstHalf + messageSecondHalf;
+                    report(std::format("declared as {}, reflection has kind {}, which needs {}",
+                                       TintTypeToString(declaredBinding.resource_type),
+                                       ToString(reflectedBinding->Kind),
+                                       TintTypeToString(tintKind)));
                 }
                 else if (reflectedBinding->Kind == BindingKind::StorageTexture)
                 {
                     const TextureFormat declaredFormat = TextureFormatFromTint(declaredBinding.image_format);
                     if (declaredFormat != reflectedBinding->StorageFormat)
                     {
-                        comparison.Matches = false;
-                        comparison.Report += std::format("  wgsl declares @group({}) @binding({}) {} with format {} : "
-                                                         "reflection has format {}\n",
-                                                         declaredBinding.bind_group,
-                                                         declaredBinding.binding,
-                                                         unmangledName,
-                                                         magic_enum::enum_name(declaredFormat),
-                                                         magic_enum::enum_name(reflectedBinding->StorageFormat));
+                        report(std::format("declared with format {}, reflection has format {}",
+                                           magic_enum::enum_name(declaredFormat),
+                                           magic_enum::enum_name(reflectedBinding->StorageFormat)));
                     }
                 }
 
@@ -421,52 +431,24 @@ namespace
             }
             else if (declaredTuple < reflectedTuple)
             {
-                comparison.Matches = false;
-                comparison.Report += std::format("  wgsl declares @group({}) @binding({}) {} : reflection has "
-                                                "no binding at that location\n",
-                                                declaredBinding.bind_group,
-                                                declaredBinding.binding,
-                                                StripSlangNameMangling(declaredBinding.variable_name));
+                ReportDeclaredOnly(comparison, declaredBinding);
                 ++iterSource;
             }
             else
             {
-                comparison.Matches = false;
-                comparison.Report += std::format("  wgsl declares @group({}) @binding({}) {}",
-                                                declaredBinding.bind_group,
-                                                declaredBinding.binding,
-                                                StripSlangNameMangling(declaredBinding.variable_name));
-                comparison.Report += std::format(" : reflection has @group({}) @binding({}) {}\n",
-                                                std::get<0>(reflectedTuple),
-                                                std::get<1>(reflectedTuple),
-                                                MakeScopedName(*reflectedBinding));
+                ReportReflectedOnly(comparison, *reflectedBinding);
                 ++iterReflected;
             }
         }
 
-
-        while (iterSource != wgsl_bindings.end())
+        for (; iterSource != wgsl_bindings.end(); ++iterSource)
         {
-            const ResourceBinding& declaredBinding = *iterSource;
-            comparison.Matches = false;
-            comparison.Report += std::format("  wgsl declares @group({}) @binding({}) {} : reflection has "
-                                            "no binding at that location\n",
-                                            declaredBinding.bind_group,
-                                            declaredBinding.binding,
-                                            StripSlangNameMangling(declaredBinding.variable_name));
-            ++iterSource;
+            ReportDeclaredOnly(comparison, *iterSource);
         }
 
-        while (iterReflected != reflected_bindings.end())
+        for (; iterReflected != reflected_bindings.end(); ++iterReflected)
         {
-            const ReflectedBinding* reflectedBinding = *iterReflected;
-            comparison.Matches = false;
-            comparison.Report += std::format("  reflection has @group({}) @binding({}) {} : wgsl has "
-                                            "no binding at that location\n",
-                                            GroupOf(*reflectedBinding),
-                                            BindingOf(*reflectedBinding),
-                                            MakeScopedName(*reflectedBinding));
-            ++iterReflected;
+            ReportReflectedOnly(comparison, **iterReflected);
         }
 
         return comparison;

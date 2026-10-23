@@ -124,6 +124,7 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
     const std::vector<StructStringAttribute> formatAttributes = bootstrapContext->BuildStructStringAttributes("ls_storage_format");
     for (const ExternStructDeclaration& declaration : symbolTable.ExternStructsForModule(ModuleName()))
     {
+        const ShaderLocation where{ .File = declaration.SourcePath, .Line = declaration.SourceLine };
         const auto formatAttribute = std::ranges::find(formatAttributes, declaration.Name, &StructStringAttribute::StructName);
         const ShimInterface* shimInterface = FindShimInterface(declaration.Interface);
         if (shimInterface == nullptr)
@@ -132,10 +133,9 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
             {
                 return std::unexpected(ReportError(*diagnosticSink,
                                                    CookError::ShimExternInvalid,
-                                                   std::format("{}({}): extern struct '{}' has [ls_storage_format], and '{}' "
-                                                               "is not a shim interface",
-                                                               declaration.SourcePath,
-                                                               declaration.SourceLine,
+                                                   where,
+                                                   std::format("extern struct '{}' has [ls_storage_format], and '{}' is not "
+                                                               "a shim interface",
                                                                declaration.Name,
                                                                declaration.Interface)));
             }
@@ -146,20 +146,17 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
         {
             return std::unexpected(ReportError(*diagnosticSink,
                                                CookError::ShimStorageFormatAxisUnknown,
-                                               std::format("{}({}): [ls_storage_format] on extern '{}' names no axis",
-                                                           declaration.SourcePath,
-                                                           declaration.SourceLine,
-                                                           declaration.Name)));
+                                               where,
+                                               std::format("[ls_storage_format] on extern '{}' names no axis", declaration.Name)));
         }
 
         if (!std::ranges::binary_search(moduleScopeStructs, declaration.Name))
         {
             return std::unexpected(ReportError(*diagnosticSink,
                                                CookError::ShimExternNotReflected,
-                                               std::format("{}({}): extern struct '{}' names the shim interface '{}', but "
+                                               where,
+                                               std::format("extern struct '{}' names the shim interface '{}', but "
                                                            "reflection finds no module scope struct of that name",
-                                                           declaration.SourcePath,
-                                                           declaration.SourceLine,
                                                            declaration.Name,
                                                            declaration.Interface)));
         }
@@ -185,10 +182,9 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
                 {
                     return std::unexpected(ReportError(*diagnosticSink,
                                                        CookError::ShimExternInvalid,
-                                                       std::format("{}({}): type argument '{}' of extern '{}' is not a type that "
+                                                       where,
+                                                       std::format("type argument '{}' of extern '{}' is not a type that "
                                                                    "the module can see",
-                                                                   declaration.SourcePath,
-                                                                   declaration.SourceLine,
                                                                    argument,
                                                                    declaration.Name)));
                 }

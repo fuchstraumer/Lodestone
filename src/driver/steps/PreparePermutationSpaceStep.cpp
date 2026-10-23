@@ -210,6 +210,13 @@ namespace
     }
 
     /** Interface axes are `extern struct`, so their initializers come from a separate table. */
+    ShaderLocation LocationOf(const RawAxisDeclaration& raw_axis) noexcept
+    {
+        return ShaderLocation{ .File = raw_axis.SourceFile,
+                               .Line = static_cast<uint32_t>(raw_axis.SourceLine),
+                               .Column = static_cast<uint32_t>(raw_axis.SourceColumn) };
+    }
+
     CookResult<std::string_view> FindDefaultText(const RawAxisDeclaration& raw_axis,
                                                  const SymbolTable& symbol_table,
                                                  std::string_view module_name,
@@ -233,7 +240,7 @@ namespace
                                 module_name,
                                 found.value(),
                                 declaration.Value);
-                return std::unexpected(ReportError(sink, CookError::AxisDefaultAmbiguous, message));
+                return std::unexpected(ReportError(sink, CookError::AxisDefaultAmbiguous, LocationOf(raw_axis), message));
             }
             found = declaration.Value;
         }
@@ -241,14 +248,12 @@ namespace
         if (!found.has_value() || found.value().empty())
         {
             const std::string message =
-                std::format("axis '{}' in module '{}' has no default that the cooker can read ({}:{}). Add an "
-                            "initializer on the same line as the declaration, for example `= <value>;`. Graph "
-                            "code fills an axis it does not pin with this default.",
+                std::format("axis '{}' in module '{}' has no default that the cooker can read. Add an initializer on "
+                            "the same line as the declaration, for example `= <value>;`. Graph code fills an axis it "
+                            "does not pin with this default.",
                             raw_axis.Name,
-                            module_name,
-                            raw_axis.SourceFile,
-                            raw_axis.SourceLine);
-            return std::unexpected(ReportError(sink, CookError::AxisDefaultMissing, message));
+                            module_name);
+            return std::unexpected(ReportError(sink, CookError::AxisDefaultMissing, LocationOf(raw_axis), message));
         }
         return found.value();
     }
@@ -284,17 +289,17 @@ namespace
     }
 
     CookError ReportUnreadable(DiagnosticSink& sink,
-                               std::string_view axis_name,
+                               const RawAxisDeclaration& raw_axis,
                                std::string_view module_name,
                                std::string_view default_text,
                                std::string_view reason)
     {
         const std::string message = std::format("axis '{}' in module '{}': the default '{}' {}",
-                                                axis_name,
+                                                raw_axis.Name,
                                                 module_name,
                                                 default_text,
                                                 reason);
-        return ReportError(sink, CookError::AxisDefaultUnreadable, message);
+        return ReportError(sink, CookError::AxisDefaultUnreadable, LocationOf(raw_axis), message);
     }
 
     CookResult<uint32_t> ResolveDeclaredDefaultIntegralType(int64_t& comparable_value,
@@ -307,7 +312,7 @@ namespace
         const CookResult<int64_t> evaluated = EvaluateDefaultText(default_text, sink);
         if (!evaluated)
         {
-            return std::unexpected(ReportUnreadable(sink, raw_axis.Name, module_name, default_text, "could not be evaluated"));
+            return std::unexpected(ReportUnreadable(sink, raw_axis, module_name, default_text, "could not be evaluated"));
         }
         comparable_value = axis.ValueDomain == AxisValueDomain::Boolean ? (evaluated.value() != 0 ? 1 : 0)
                                                                         : evaluated.value();
@@ -324,7 +329,7 @@ namespace
                             raw_axis.Name,
                             module_name,
                             comparable_value);
-            return std::unexpected(ReportError(sink, CookError::AxisDefaultNotDeclared, message));
+            return std::unexpected(ReportError(sink, CookError::AxisDefaultNotDeclared, LocationOf(raw_axis), message));
         }
         else
         {
@@ -351,7 +356,7 @@ namespace
         if (!index.has_value())
         {
             return std::unexpected(ReportUnreadable(sink,
-                                                    raw_axis.Name,
+                                                    raw_axis,
                                                     module_name,
                                                     default_text,
                                                     "does not name a case of the enum"));
@@ -383,7 +388,7 @@ namespace
                             raw_axis.Name,
                             module_name,
                             default_text);
-            return std::unexpected(ReportError(sink, CookError::AxisDefaultNotDeclared, message));
+            return std::unexpected(ReportError(sink, CookError::AxisDefaultNotDeclared, LocationOf(raw_axis), message));
         }
         else
         {
@@ -449,7 +454,7 @@ namespace
                             module_name,
                             comparableValue,
                             raw_axis.ReflectedDefault.value());
-            return std::unexpected(ReportError(sink, CookError::AxisDefaultMismatch, message));
+            return std::unexpected(ReportError(sink, CookError::AxisDefaultMismatch, LocationOf(raw_axis), message));
         }
 
         return index.value();

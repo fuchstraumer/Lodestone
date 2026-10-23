@@ -69,7 +69,7 @@ public:
     [[nodiscard]] VariantKey ComputeVariantKey(const CanonicalAssignment& canonical) const;
     [[nodiscard]] uint64_t ComputeVariantSpaceSize() const noexcept;
     [[nodiscard]] CookError ValidateConstraints(DiagnosticSink& sink) const;
-    /** Reports `extern` constants that no axis drives: they keep their default in every variant. */
+    /** Reports `extern` constants that no axis drives and a source reads: they keep their default in every variant. */
     void ReportUndrivenExternConstants(std::string_view module_name,
                                        const SymbolTable& symbol_table,
                                        DiagnosticSink& sink) const;
@@ -77,6 +77,9 @@ public:
         std::string_view module_name, const SymbolTable& symbol_table, DiagnosticSink& sink) const;
 
 private:
+    /** @brief Skips the constants that no source reads, so that no default of theirs is needed. */
+    [[nodiscard]] std::vector<ExternConstantDeclaration> readUndrivenExternConstants(std::string_view module_name,
+                                                                                     const SymbolTable& symbol_table) const;
     CookError validateActiveWhen(const std::vector<std::string_view>& axes_names, DiagnosticSink& sink) const;
     CookError validateRequires(const std::vector<std::string_view>& axes_names, DiagnosticSink& sink) const;
 

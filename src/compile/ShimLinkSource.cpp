@@ -4,7 +4,9 @@
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifestIndex.hpp"
 #include "compile/RawLibrary.hpp"
+#include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
+#include "permute/PermutationValue.hpp"
 #include "target/ShimTable.hpp"
 #include "target/StorageFormatTable.hpp"
 #include "target/TargetProfile.hpp"
@@ -19,6 +21,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace lodestone
@@ -58,6 +61,11 @@ namespace
         return type_arguments.empty() ? std::string{ name } : std::format("{}<{}>", name, type_arguments);
     }
 
+    ShaderLocation LocationOf(const RawShimExtern& shim_extern) noexcept
+    {
+        return ShaderLocation{ .File = shim_extern.SourceFile, .Line = shim_extern.SourceLine };
+    }
+
     std::string Join(const std::vector<std::string_view>& parts)
     {
         std::string joined;
@@ -88,6 +96,7 @@ std::vector<std::string_view> SplitShimTypeArguments(std::string_view type_argum
 
         arguments.push_back(argument);
     }
+
     return arguments;
 }
 
@@ -119,10 +128,9 @@ CookResult<std::string> MakeShimLinkSource(std::span<const RawShimExtern> extern
         {
             return std::unexpected(ReportError(sink,
                                                CookError::ShimFormUnavailable,
-                                               std::format("module {}: extern '{}' of '{}' has no {} implementation for profile '{}'",
-                                                           module_name,
-                                                           shimExtern.Name,
-                                                           shimExtern.Interface,
+                                               LocationOf(shimExtern),
+                                               std::format("{} has no {} implementation for profile '{}'",
+                                                           DescribeShimExtern(shimExtern),
                                                            ToString(access),
                                                            profile_name)));
         }
@@ -133,11 +141,9 @@ CookResult<std::string> MakeShimLinkSource(std::span<const RawShimExtern> extern
             const bool missing = shimInterface->ImplementationTakesFormat;
             return std::unexpected(ReportError(sink,
                                                missing ? CookError::ShimStorageFormatMissing : CookError::ShimExternInvalid,
-                                               std::format("{}({}): extern '{}' of '{}' {}",
-                                                           shimExtern.SourceFile,
-                                                           shimExtern.SourceLine,
-                                                           shimExtern.Name,
-                                                           shimExtern.Interface,
+                                               LocationOf(shimExtern),
+                                               std::format("{} {}",
+                                                           DescribeShimExtern(shimExtern),
                                                            missing ? "needs [ls_storage_format(\"AXIS\")] to name the axis "
                                                                      "of its storage format"
                                                                    : "takes no storage format, so [ls_storage_format] does "
@@ -155,14 +161,10 @@ CookResult<std::string> MakeShimLinkSource(std::span<const RawShimExtern> extern
         {
             return std::unexpected(ReportError(sink,
                                                CookError::ShimExternInvalid,
-                                               std::format("{}({}): extern '{}' of '{}' needs {} plain type name(s) as type "
-                                                           "arguments, and its declaration has '{}'",
-                                                           shimExtern.SourceFile,
-                                                           shimExtern.SourceLine,
-                                                           shimExtern.Name,
-                                                           shimExtern.Interface,
-                                                           shimInterface->TypeParameterCount,
-                                                           shimExtern.TypeArguments)));
+                                               LocationOf(shimExtern),
+                                               std::format("{} needs {} plain type name(s) as type arguments",
+                                                           DescribeShimExtern(shimExtern),
+                                                           shimInterface->TypeParameterCount)));
         }
 
         for (const std::string& argumentModule : shimExtern.ArgumentModules)
@@ -224,16 +226,17 @@ CookResult<std::vector<ShimFormatLinkSource>> MakeShimFormatLinkSources(std::spa
         if (axis == axes.end())
         {
             std::vector<std::string_view> axisNames;
-            std::ranges::transform(axes, std::back_inserter(axisNames), [](const PermutationAxis& candidate) -> std::string_view
-                                   { return candidate.Name; });
+            std::ranges::transform(axes,
+                                   std::back_inserter(axisNames),
+                                   [](const PermutationAxis& candidate) -> std::string_view { return candidate.Name; });
+                                   
             const std::string_view nearest = NearestName(first->FormatAxis, axisNames);
             return std::unexpected(ReportError(sink,
                                                CookError::ShimStorageFormatAxisUnknown,
-                                               std::format("{}({}): extern '{}' names the storage format axis '{}', and "
-                                                           "module {} declares no axis of that name{}",
-                                                           first->SourceFile,
-                                                           first->SourceLine,
-                                                           first->Name,
+                                               LocationOf(*first),
+                                               std::format("{} names the storage format axis '{}', and module {} declares "
+                                                           "no axis of that name{}",
+                                                           DescribeShimExtern(*first),
                                                            first->FormatAxis,
                                                            module_name,
                                                            nearest.empty() ? std::string{}
@@ -246,11 +249,10 @@ CookResult<std::vector<ShimFormatLinkSource>> MakeShimFormatLinkSources(std::spa
         {
             return std::unexpected(ReportError(sink,
                                                CookError::ShimStorageFormatAxisInvalid,
-                                               std::format("{}({}): extern '{}' names the axis '{}', which must be an "
-                                                           "[ls_axis_enum] axis of type {}.{} with no ls_axis_active_when",
-                                                           first->SourceFile,
-                                                           first->SourceLine,
-                                                           first->Name,
+                                               LocationOf(*first),
+                                               std::format("{} names the axis '{}', which must be an [ls_axis_enum] axis "
+                                                           "of type {}.{} with no ls_axis_active_when",
+                                                           DescribeShimExtern(*first),
                                                            first->FormatAxis,
                                                            k_ShimModuleName,
                                                            k_StorageFormatEnumName)));

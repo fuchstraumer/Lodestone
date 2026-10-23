@@ -138,13 +138,16 @@ namespace
         return entryPoint;
     }
 
-    std::string DescribeDerivedConstant(const RawDerivedConstant& constant)
+    ShaderLocation LocationOf(const RawDerivedConstant& constant) noexcept
     {
-        return std::format("'{}' ({}:{}) = '{}'",
-                           constant.Name,
-                           constant.SourceFile,
-                           constant.SourceLine,
-                           constant.Expression);
+        return ShaderLocation{ .File = constant.SourceFile, .Line = static_cast<uint32_t>(constant.SourceLine) };
+    }
+
+    DiagnosticNote NoteOf(const RawDerivedConstant& constant)
+    {
+        return DiagnosticNote{ .File = constant.SourceFile,
+                               .Range = ToSourceRange(LocationOf(constant)),
+                               .Message = std::format("'{}' = '{}'", constant.Name, constant.Expression) };
     }
 
     enum class VisitColor : uint8_t
@@ -197,7 +200,7 @@ namespace
         [[nodiscard]] CookError visitIdentifiers(std::span<const std::string> identifiers);
         [[nodiscard]] CookError visit(uint32_t index);
         [[nodiscard]] std::optional<uint32_t> findByName(std::string_view name) const;
-        [[nodiscard]] std::string describePath(std::span<const uint32_t> nodes) const;
+        [[nodiscard]] std::vector<DiagnosticNote> notesForPath(std::span<const uint32_t> nodes) const;
         [[nodiscard]] CookError reportCycle(uint32_t index) const;
         [[nodiscard]] CookError reportUnreadable(const RawDerivedConstant& constant,
                                                  std::string_view failure) const;
@@ -245,13 +248,17 @@ CookResult<DerivedConstantTable> MakeDerivedConstantTable(std::span<const RawDer
         const bool sameExpression = std::ranges::all_of(run, expressionCompare);
         if (!sameExpression)
         {
-            std::string message =
-                std::format("derived constant '{}' is declared with different expressions:", first.Name);
+            std::vector<DiagnosticNote> declarations;
             for (const uint32_t index : run)
             {
-                message += std::format("\n    {}", DescribeDerivedConstant(derived_constants[index]));
+                declarations.push_back(NoteOf(derived_constants[index]));
             }
-            return std::unexpected(ReportError(sink, CookError::DerivedConstantAmbiguous, std::move(message)));
+            return std::unexpected(ReportError(sink,
+                                               CookError::DerivedConstantAmbiguous,
+                                               LocationOf(first),
+                                               std::format("derived constant '{}' is declared with different expressions",
+                                                           first.Name),
+                                               std::move(declarations)));
         }
 
         table.ByName.push_back(run.front());
@@ -268,12 +275,11 @@ CookResult<DerivedConstantTable> MakeDerivedConstantTable(std::span<const RawDer
             extern_defaults, [&](const ExternConstantDefault& entry) { return entry.Name == constant.Name; });
         if (shadowsAxis || shadowsExtern)
         {
-            const std::string message =
-                std::format("derived constant {} has the name of {} '{}'. Rename one of them",
-                            DescribeDerivedConstant(constant),
-                            shadowsAxis ? "the axis" : "the extern constant",
-                            constant.Name);
-            return std::unexpected(ReportError(sink, CookError::DerivedConstantShadowsSymbol, message));
+            const std::string message = std::format("derived constant '{}' = '{}' has the name of {}. Rename one of them",
+                                                    constant.Name,
+                                                    constant.Expression,
+                                                    shadowsAxis ? "an axis" : "an extern constant");
+            return std::unexpected(ReportError(sink, CookError::DerivedConstantShadowsSymbol, LocationOf(constant), message));
         }
     }
 
@@ -850,14 +856,14 @@ namespace
         return FindDerivedConstant(table, name);
     }
 
-    std::string DerivedConstantWalk::describePath(std::span<const uint32_t> nodes) const
+    std::vector<DiagnosticNote> DerivedConstantWalk::notesForPath(std::span<const uint32_t> nodes) const
     {
-        std::string description;
+        std::vector<DiagnosticNote> notes;
         for (const uint32_t node : nodes)
         {
-            description += std::format("\n    -> {}", DescribeDerivedConstant(table.Constants[node]));
+            notes.push_back(NoteOf(table.Constants[node]));
         }
-        return description;
+        return notes;
     }
 
     CookError DerivedConstantWalk::reportCycle(uint32_t index) const
@@ -865,21 +871,21 @@ namespace
         const auto cycleStart = std::ranges::find(path, index);
         std::vector<uint32_t> cycle(cycleStart, path.end());
         cycle.push_back(index);
-        const std::string message = std::format("derived constants form a cycle, reached from {}:{}",
-                                                rootDescription,
-                                                describePath(cycle));
-        return ReportError(sink, CookError::DerivedConstantCycle, message);
+        return ReportError(sink,
+                           CookError::DerivedConstantCycle,
+                           LocationOf(table.Constants[index]),
+                           std::format("derived constants form a cycle, reached from {}", rootDescription),
+                           notesForPath(cycle));
     }
 
     CookError DerivedConstantWalk::reportUnreadable(const RawDerivedConstant& constant,
                                                     std::string_view failure) const
     {
-        const std::string message = std::format("derived constant '{}' {}, reached from {}:{}",
-                                                constant.Name,
-                                                failure,
-                                                rootDescription,
-                                                describePath(path));
-        return ReportError(sink, CookError::DerivedConstantUnreadable, message);
+        return ReportError(sink,
+                           CookError::DerivedConstantUnreadable,
+                           LocationOf(constant),
+                           std::format("derived constant '{}' {}, reached from {}", constant.Name, failure, rootDescription),
+                           notesForPath(path));
     }
 
 } // namespace

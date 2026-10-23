@@ -12,6 +12,7 @@
 #include "permute/PolicyDocument.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -216,23 +217,31 @@ CookError PermutationSpace::ValidateConstraints(DiagnosticSink& sink) const
     return CookError::Success;
 }
 
+std::vector<ExternConstantDeclaration> PermutationSpace::readUndrivenExternConstants(std::string_view module_name,
+                                                                                    const SymbolTable& symbol_table) const
+{
+    auto axesView = axes | std::views::transform(&PermutationAxis::Name);
+    std::unordered_set<std::string_view> axesNames(axesView.begin(), axesView.end());
+
+    std::vector<ExternConstantDeclaration> undriven;
+    std::ranges::copy_if(symbol_table.ExternConstantsForModule(module_name),
+                         std::back_inserter(undriven),
+                         [&axesNames](const ExternConstantDeclaration& decl) { return !axesNames.contains(decl.Name); });
+
+    // fixed: a pruned enum axis failed the cook here, because its initializer is not an integer expression
+    const std::array<std::string, 1u> moduleNames{ std::string{ module_name } };
+    std::vector<std::string_view> names;
+    std::ranges::transform(undriven, std::back_inserter(names), &ExternConstantDeclaration::Name);
+    const std::vector<std::string_view> unread = symbol_table.MissingTokens(moduleNames, names);
+    std::erase_if(undriven, [&unread](const ExternConstantDeclaration& decl) { return std::ranges::contains(unread, decl.Name); });
+    return undriven;
+}
+
 void PermutationSpace::ReportUndrivenExternConstants(std::string_view module_name,
                                                      const SymbolTable& symbol_table,
                                                      DiagnosticSink& sink) const
 {
-    auto axesView = axes | std::views::transform(&PermutationAxis::Name);
-    std::unordered_set<std::string_view> axesNames(axesView.begin(), axesView.end());
-    
-    auto filterUndriven = [&axesNames](const ExternConstantDeclaration& decl)
-    {
-        return !axesNames.contains(decl.Name);
-    };
-
-    std::vector<ExternConstantDeclaration> externConstants = symbol_table.ExternConstantsForModule(module_name);
-    auto undriven = externConstants | std::views::filter(filterUndriven);
-
-    std::string report;
-    for (const ExternConstantDeclaration& decl : undriven)
+    for (const ExternConstantDeclaration& decl : readUndrivenExternConstants(module_name, symbol_table))
     {
         const std::string warningStr =
             std::format("extern constant '{}' in module {} is declared extern but no axis "
@@ -247,20 +256,7 @@ CookResult<std::vector<ExternConstantDefault>> PermutationSpace::CollectUndriven
     std::string_view module_name, const SymbolTable& symbol_table, DiagnosticSink& sink) const
 {
     std::vector<ExternConstantDefault> defaults;
-
-    auto axesView = axes | std::views::transform(&PermutationAxis::Name);
-    std::unordered_set<std::string_view> axesNames(axesView.begin(), axesView.end());
-
-    std::vector<ExternConstantDeclaration> undriven;
-    auto filterUndriven = [&axesNames](const ExternConstantDeclaration& decl)
-    {
-        return !axesNames.contains(decl.Name);
-    };
-
-    undriven = symbol_table.ExternConstantsForModule(module_name) |
-               std::views::filter(filterUndriven) |
-               std::ranges::to<std::vector<ExternConstantDeclaration>>();
-
+    const std::vector<ExternConstantDeclaration> undriven = readUndrivenExternConstants(module_name, symbol_table);
     defaults.reserve(undriven.size());
 
     for (const auto& [constName, valueText] : undriven)
