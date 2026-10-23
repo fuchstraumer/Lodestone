@@ -1,6 +1,13 @@
 #include "TestHarness.hpp"
 #include "CookerErrors.hpp"
 #include "ShaderManifestFormat.hpp"
+#include "ShaderLibraryTypes.hpp"
+#include "model/ShaderDataSchema.hpp"
+
+#include <cstddef>
+#include <format>
+#include <optional>
+#include <tuple>
 
 #include <cstdint>
 #include <expected>
@@ -70,6 +77,27 @@ int main()
     runner.CheckEqual(FormatForTest(true), std::string{ "true" }, "a bool prints as a word");
     const lodestone::manifest::ErrorState manifestError{ .Code = lodestone::manifest::ErrorCode::BadMagic };
     runner.Check(FormatForTest(manifestError).contains("BadMagic"), "a manifest error prints its code");
+
+    runner.BeginSection("values that std::format cannot print still print their contents");
+    runner.CheckEqual(FormatForTest(lodestone::QueryErrorCode::UnknownAxis), std::string{ "UnknownAxis" },
+                      "an enum with no ToString prints its name through magic_enum");
+    const std::string stages = FormatForTest(lodestone::ShaderStageKind::Vertex | lodestone::ShaderStageKind::Fragment);
+    runner.Check(stages.contains("Vertex") && stages.contains("Fragment"), std::format("a flag set prints each bit: {}", stages));
+    runner.CheckEqual(FormatForTest(std::byte{ 0x41 }), std::string{ "0x41" }, "an enum with no named value prints in hex");
+    runner.CheckEqual(FormatForTest(std::vector<CookError>{ CookError::FileNotFound, CookError::Success }),
+                      std::string{ "[FileNotFound, Success]" },
+                      "a range of enums prints each name");
+    runner.CheckEqual(FormatForTest(std::optional<uint32_t>{ 7u }), std::string{ "7" }, "an optional prints its value");
+    runner.CheckEqual(FormatForTest(std::optional<uint32_t>{}), std::string{ "nullopt" }, "an empty optional says so");
+    const lodestone::ResourcePlacement placement{ lodestone::BoundPlacement{ .Group = 1u, .Binding = 2u } };
+    runner.CheckEqual(FormatForTest(placement), std::string{ "{1, 2}" }, "a variant prints its alternative, and an aggregate its fields");
+    runner.CheckEqual(FormatForTest(lodestone::ResourcePlacement{}), std::string{ "monostate" }, "an empty variant says so");
+    runner.CheckEqual(FormatForTest(std::tuple{ CookError::Success, 3 }), std::string{ "{Success, 3}" },
+                      "a tuple with an enum prints each element");
+    const int32_t* nothing = nullptr;
+    runner.CheckEqual(FormatForTest(nothing), std::string{ "nullptr" }, "a null pointer says so");
+    const std::vector<std::byte> blob(40u, std::byte{ 0 });
+    runner.Check(FormatForTest(blob).ends_with("... 24 more]"), "a long range prints its first elements and the count of the rest");
 
     return runner.Report();
 }

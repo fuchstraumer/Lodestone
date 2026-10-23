@@ -57,7 +57,7 @@ QueryErrorCode ErrorCodeOf(const QueryError& error) noexcept
 
 std::string FormatForTest(const QueryError& error)
 {
-    return std::format("code {} (no ToString), axis name \"{}\", detail {}, suggestion \"{}\"", std::to_underlying(error.Code),
+    return std::format("code {}, axis name \"{}\", detail {}, suggestion \"{}\"", FormatForTest(error.Code),
                        error.AxisName, error.Detail, error.Suggestion);
 }
 

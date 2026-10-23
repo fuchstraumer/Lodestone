@@ -3,6 +3,7 @@
 #define LODESTONE_TESTS_TEST_HARNESS_HPP
 #include "ShaderManifestFormat.hpp"
 #include "ShaderManifestIndex.hpp"
+#include "TestFormat.hpp"
 
 #include <concepts>
 #include <cstddef>
@@ -73,9 +74,6 @@ private:
 /** @brief Returns the code of a query error, so that `CheckError` compares codes. */
 QueryErrorCode ErrorCodeOf(const QueryError& error) noexcept;
 
-/** @brief Returns the code, axis name, detail, and suggestion of a query error. */
-std::string FormatForTest(const QueryError& error);
-
 /** @brief Returns the error code of a manifest error, so that `CheckError` compares codes. */
 manifest::ErrorCode ErrorCodeOf(const manifest::ErrorState& error) noexcept;
 
@@ -83,35 +81,6 @@ template<typename ErrorType> requires std::is_enum_v<ErrorType>
 constexpr ErrorType ErrorCodeOf(ErrorType error) noexcept
 {
     return error;
-}
-
-/** @brief Returns the code, table, record, and detail of a manifest error. */
-std::string FormatForTest(const manifest::ErrorState& error);
-
-/** @brief uses template traits to print the best representation we can of a test value */
-template<typename ValueType>
-std::string FormatForTest(const ValueType& value)
-{
-    if constexpr (std::same_as<ValueType, bool>)
-    {
-        return value ? "true" : "false";
-    }
-    else if constexpr (std::formattable<ValueType, char>)
-    {
-        return std::format("{}", value);
-    }
-    else if constexpr (requires { ToString(value); })
-    {
-        return std::format("{}", ToString(value));
-    }
-    else if constexpr (std::is_enum_v<ValueType>)
-    {
-        return std::format("{} (no ToString)", std::to_underlying(value));
-    }
-    else
-    {
-        return "<no formatter>";
-    }
 }
 
 class TestRunner final
