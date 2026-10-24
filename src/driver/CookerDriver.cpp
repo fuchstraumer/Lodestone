@@ -27,6 +27,7 @@
 #include <filesystem>
 #include <format>
 #include <memory>
+#include <optional>
 #include <ranges>
 #include <ratio>
 #include <string>
@@ -60,6 +61,155 @@ namespace
         const std::filesystem::path absolutePath = std::filesystem::absolute(path, error);
         return (error ? path : absolutePath).lexically_normal().generic_string();
     }
+
+    /** Writes a stage dump that the step built, and does nothing for a stage that was not asked for. */
+    CookError WriteStageDump(OutputSink& sink,
+                             std::optional<std::string>& dump,
+                             std::string_view module_name,
+                             std::string_view target_name,
+                             StageDumpKind kind)
+    {
+        if (!dump.has_value())
+        {
+            return CookError::Success;
+        }
+
+        return sink.WriteArtifact(BuildDumpFileName(module_name, target_name, kind), std::move(*dump));
+    }
+
+    /** One (module, target) pair through every per-module step. The returned module points into the space that
+     * this function appends to `permutation_spaces`, so the caller keeps that vector until the emit is done. */
+    CookResult<CookedModule> CookEnvironment(const SharedCookState& cook_state,
+                                             size_t module_index,
+                                             const std::string& target_name,
+                                             OutputSink& sink,
+                                             std::vector<std::unique_ptr<PermutationSpace>>& permutation_spaces,
+                                             std::vector<std::string>& dependency_paths,
+                                             CookStatistics& cook_statistics)
+    {
+        //NOLINTBEGIN(readability-identifier-naming)
+        const static PrepareModuleStep PrepareModule;
+        const static PreparePermutationSpaceStep PreparePermutationSpace;
+        const static BuildModuleStep BuildModule;
+        const static FinalizeModuleStep FinalizeModule;
+        //NOLINTEND(readability-identifier-naming)
+
+        const std::filesystem::path& modulePath = cook_state.Options.ModulePaths[module_index];
+        CookResult<PreparedCompiler> preparedModuleResult = PrepareModule(cook_state, modulePath, target_name);
+        if (!preparedModuleResult)
+        {
+            return std::unexpected(preparedModuleResult.error());
+        }
+
+        const PreparedCompiler& preparedModule = *preparedModuleResult;
+        if (cook_state.Options.WriteDepfile)
+        {
+            for (const std::string& dependencyPath : preparedModule.Compiler->DependencyFilePaths())
+            {
+                dependency_paths.push_back(NormalizeDependencyPath(dependencyPath));
+            }
+        }
+
+        CookResult<std::vector<RawAxisDeclaration>> rawAxesResult = preparedModule.Compiler->BuildAxisDeclarations();
+        if (!rawAxesResult)
+        {
+            return std::unexpected(rawAxesResult.error());
+        }
+
+        const std::string_view moduleName = cook_state.AllModuleNames[module_index];
+        const SymbolTable& symbolTable = preparedModule.Compiler->GetSymbolTable();
+        CookResult<PreparedPermutationSpace> spaceResult = PreparePermutationSpace(cook_state,
+                                                                                   moduleName,
+                                                                                   target_name,
+                                                                                   symbolTable,
+                                                                                   std::move(rawAxesResult.value()));
+        if (!spaceResult)
+        {
+            return std::unexpected(spaceResult.error());
+        }
+
+        PreparedPermutationSpace& preparedSpace = *spaceResult;
+        const CookError spaceDumpError =
+            WriteStageDump(sink, preparedSpace.SpaceDump, moduleName, target_name, StageDumpKind::Space);
+        if (!spaceDumpError)
+        {
+            return std::unexpected(spaceDumpError);
+        }
+
+        const CookError variantDumpError =
+            WriteStageDump(sink, preparedSpace.VariantDump, moduleName, target_name, StageDumpKind::Variants);
+        if (!variantDumpError)
+        {
+            return std::unexpected(variantDumpError);
+        }
+
+        // todo: intern across the whole library, not per module
+        permutation_spaces.emplace_back(std::make_unique<PermutationSpace>(std::move(preparedSpace.Space)));
+        CookResult<BuiltModule> buildResult = BuildModule(cook_state,
+                                                          moduleName,
+                                                          target_name,
+                                                          preparedModule.Compiler.get(),
+                                                          *permutation_spaces.back(),
+                                                          preparedSpace.Variants);
+        if (!buildResult)
+        {
+            return std::unexpected(buildResult.error());
+        }
+
+        BuiltModule& builtModule = *buildResult;
+        const CookError rawDumpError =
+            WriteStageDump(sink, builtModule.RawModuleDump, moduleName, target_name, StageDumpKind::Raw);
+        if (!rawDumpError)
+        {
+            return std::unexpected(rawDumpError);
+        }
+
+        const CookError resolvedDumpError =
+            WriteStageDump(sink, builtModule.ResolvedModuleDump, moduleName, target_name, StageDumpKind::Resolved);
+        if (!resolvedDumpError)
+        {
+            return std::unexpected(resolvedDumpError);
+        }
+
+        const CookError internedDumpError =
+            WriteStageDump(sink, builtModule.InternedModuleDump, moduleName, target_name, StageDumpKind::Interned);
+        if (!internedDumpError)
+        {
+            return std::unexpected(internedDumpError);
+        }
+
+        cook_statistics += builtModule.Statistics;
+
+        CookResult<FinalizedModule> finalizeResult = FinalizeModule(cook_state,
+                                                                    std::move(builtModule.Module),
+                                                                    builtModule.CompiledVariants);
+        if (!finalizeResult)
+        {
+            return std::unexpected(finalizeResult.error());
+        }
+
+        const CookError cookedDumpError =
+            WriteStageDump(sink, finalizeResult->Dump, moduleName, target_name, StageDumpKind::Cooked);
+        if (!cookedDumpError)
+        {
+            return std::unexpected(cookedDumpError);
+        }
+
+        // independent of --dump-stage: it was once inside the Cooked dump branch, and wrote nothing alone
+        if (cook_state.Options.DumpSources)
+        {
+            const std::string outputDir = std::format("{}_{}_sources", moduleName, target_name);
+            const ShaderCodeFormat codeFormat =
+                CodeFormatFromLanguage(cook_state.TargetProfiles.at(target_name).Language);
+            const CookError writeError = DumpShaderSources(finalizeResult->Module, outputDir, codeFormat, sink);
+            if (!writeError)
+            {
+                return std::unexpected(writeError);
+            }
+        }
+
+        return std::move(finalizeResult->Module);
+    }
 } // namespace
 
 CookResult<CookStatistics> RunCookOnce(CookerOptions options,
@@ -68,13 +218,8 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
 {
     const std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
     CookStatistics cookStatistics;
-    //NOLINTBEGIN(readability-identifier-naming)
+    //NOLINTNEXTLINE(readability-identifier-naming)
     const static PrepareCookStep PrepareCook;
-    const static PrepareModuleStep PrepareModule;
-    const static PreparePermutationSpaceStep PreparePermutationSpace;
-    const static BuildModuleStep BuildModule;
-    const static FinalizeModuleStep FinalizeModule;
-    //NOLINTEND(readability-identifier-naming)
 
     CookResult<PreparedCook> preparedCookResult = PrepareCook(std::move(options), diagnostics);
     if (!preparedCookResult)
@@ -92,152 +237,24 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
     permutationSpaces.reserve(library.Environments.size());
     std::vector<std::string> dependencyPaths;
 
-    for (auto&& [moduleIdx, modulePath] : std::views::enumerate(cookState.Options.ModulePaths))
+    for (size_t moduleIndex = 0u; moduleIndex < moduleCount; ++moduleIndex)
     {
         for (auto&& [targetIdx, targetName] : std::views::enumerate(cookState.Options.TargetNames))
         {
-            CookResult<PreparedCompiler> preparedModuleResult = PrepareModule(cookState,
-                                                                              modulePath,
-                                                                              targetName);
-            
-            if (!preparedModuleResult)
-            {
-                return std::unexpected(preparedModuleResult.error());
-            }
-
-            const PreparedCompiler& preparedModule = *preparedModuleResult;
-            if (cookState.Options.WriteDepfile)
-            {
-                for (const std::string& dependencyPath : preparedModule.Compiler->DependencyFilePaths())
-                {
-                    dependencyPaths.push_back(NormalizeDependencyPath(dependencyPath));
-                }
-            }
-
-            CookResult<std::vector<RawAxisDeclaration>> rawAxesResult = preparedModule.Compiler->BuildAxisDeclarations();
-            if (!rawAxesResult)
-            {
-                return std::unexpected(rawAxesResult.error());
-            }
-            
-            std::vector<RawAxisDeclaration> rawAxes = std::move(rawAxesResult.value());
-            const std::string_view moduleName = cookState.AllModuleNames[static_cast<size_t>(moduleIdx)];
-            const SymbolTable& symbolTable = preparedModule.Compiler->GetSymbolTable();
-            CookResult<PreparedPermutationSpace> spaceResult = PreparePermutationSpace(cookState,
-                                                                                       moduleName,
-                                                                                       targetName,
-                                                                                       symbolTable,
-                                                                                       std::move(rawAxes));
-            
-            if (!spaceResult)
-            {
-                return std::unexpected(spaceResult.error());
-            }
-
-            PreparedPermutationSpace& preparedSpace = *spaceResult;
-
-            if (preparedSpace.SpaceDump)
-            {
-                const std::string fileName = BuildDumpFileName(moduleName, targetName, StageDumpKind::Space);
-                CookError writeError = sink.WriteArtifact(fileName, std::move(*preparedSpace.SpaceDump));
-                if (!writeError)
-                {
-                    return std::unexpected(writeError);
-                }
-            }
-
-            if (preparedSpace.VariantDump)
-            {
-                const std::string fileName = BuildDumpFileName(moduleName, targetName, StageDumpKind::Variants);
-                CookError writeError = sink.WriteArtifact(fileName, std::move(*preparedSpace.VariantDump));
-                if (!writeError)
-                {
-                    return std::unexpected(writeError);
-                }
-            }
-
-            // todo: intern across the whole library, not per module
-            permutationSpaces.emplace_back(std::make_unique<PermutationSpace>(std::move(preparedSpace.Space)));
-            CookResult<BuiltModule> buildResult = BuildModule(cookState,
-                                                              moduleName,
+            CookResult<CookedModule> cooked = CookEnvironment(cookState,
+                                                              moduleIndex,
                                                               targetName,
-                                                              preparedModule.Compiler.get(),
-                                                              *permutationSpaces.back(),
-                                                              preparedSpace.Variants);
-            if (!buildResult)
+                                                              sink,
+                                                              permutationSpaces,
+                                                              dependencyPaths,
+                                                              cookStatistics);
+            if (!cooked)
             {
-                return std::unexpected(buildResult.error());
+                return std::unexpected(cooked.error());
             }
 
-            BuiltModule& builtModule = *buildResult;
-
-            if (builtModule.RawModuleDump)
-            {
-                const std::string fileName = BuildDumpFileName(moduleName, targetName, StageDumpKind::Raw);
-                CookError writeError = sink.WriteArtifact(fileName, std::move(*builtModule.RawModuleDump));
-                if (!writeError)
-                {
-                    return std::unexpected(writeError);
-                }
-            }
-
-            if (builtModule.ResolvedModuleDump)
-            {
-                const std::string fileName = BuildDumpFileName(moduleName, targetName, StageDumpKind::Resolved);
-                CookError writeError = sink.WriteArtifact(fileName, std::move(*builtModule.ResolvedModuleDump));
-                if (!writeError)
-                {
-                    return std::unexpected(writeError);
-                }
-            }
-
-            if (builtModule.InternedModuleDump)
-            {
-                const std::string fileName = BuildDumpFileName(moduleName, targetName, StageDumpKind::Interned);
-                CookError writeError = sink.WriteArtifact(fileName, std::move(*builtModule.InternedModuleDump));
-                if (!writeError)
-                {
-                    return std::unexpected(writeError);
-                }
-            }
-            
-            cookStatistics += builtModule.Statistics;
-
-            CookResult<FinalizedModule> finalizeResult = FinalizeModule(cookState,
-                                                                        std::move(builtModule.Module),
-                                                                        builtModule.CompiledVariants);
-
-            if (!finalizeResult)
-            {
-                return std::unexpected(finalizeResult.error());
-            }
-
-            if (finalizeResult->Dump)
-            {
-                const std::string fileName = BuildDumpFileName(moduleName, targetName, StageDumpKind::Cooked);
-                CookError writeError = sink.WriteArtifact(fileName, std::move(*finalizeResult->Dump));
-                if (!writeError)
-                {
-                    return std::unexpected(writeError);
-                }
-            }
-
-            // independent of --dump-stage: it was once inside the Cooked dump branch, and wrote nothing alone
-            if (cookState.Options.DumpSources)
-            {
-                const std::string outputDir = std::format("{}_{}_sources", moduleName, targetName);
-                const ShaderCodeFormat codeFormat =
-                    CodeFormatFromLanguage(cookState.TargetProfiles.at(targetName).Language);
-                CookError writeError = DumpShaderSources(finalizeResult->Module, outputDir, codeFormat, sink);
-                if (!writeError)
-                {
-                    return std::unexpected(writeError);
-                }
-            }
-
-            const size_t environmentIndex =
-                (static_cast<size_t>(targetIdx) * moduleCount) + static_cast<size_t>(moduleIdx);
-            library.Environments[environmentIndex] = std::move(finalizeResult->Module);
+            const size_t environmentIndex = (static_cast<size_t>(targetIdx) * moduleCount) + moduleIndex;
+            library.Environments[environmentIndex] = std::move(*cooked);
         }
 
         cookStatistics.ModulesCooked += 1;
@@ -250,28 +267,23 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
         return std::unexpected(ReportError(diagnostics, CookError::ReflectionMismatch, errStr));
     }
 
+    // each validator reports its own record
     const CookError pairsError = VerifySamplerPairsAcrossProfiles(library, diagnostics);
-    if (pairsError != CookError::Success)
+    if (!pairsError)
     {
-        return std::unexpected(ReportError(diagnostics,
-                                           pairsError,
-                                           "two profiles read different sampler and texture pairs from one variant"));
+        return std::unexpected(pairsError);
     }
 
     const CookError factsError = VerifySourceFactsAcrossProfiles(library, diagnostics);
-    if (factsError != CookError::Success)
+    if (!factsError)
     {
-        return std::unexpected(ReportError(diagnostics,
-                                           factsError,
-                                           "two profiles read different workgroup memory or capabilities from one variant"));
+        return std::unexpected(factsError);
     }
 
     const CookError capabilityAxisError = VerifyCapabilityAxes(library, diagnostics);
-    if (capabilityAxisError != CookError::Success)
+    if (!capabilityAxisError)
     {
-        return std::unexpected(ReportError(diagnostics,
-                                           capabilityAxisError,
-                                           "an axis of kind capability does not change the capabilities that the code needs"));
+        return std::unexpected(capabilityAxisError);
     }
 
     const CookError emitError = EmitLibraryArtifacts(library, sink, diagnostics);
