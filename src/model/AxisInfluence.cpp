@@ -453,6 +453,88 @@ namespace
         return true;
     }
 
+
+    /** A boolean capability axis whose off variant needs a capability name that its on variant does not. */
+    struct InvertedCapabilityPair
+    {
+        uint32_t OffVariant{ 0u };
+        uint32_t OnVariant{ 0u };
+        size_t EntryPoint{ 0u };
+    };
+
+    /** What the capability names of one module show about one axis. `FoundPair` is false when no two cooked variants
+     * differ in that axis alone, and then the axis cannot be judged. */
+    struct CapabilityAxisOutcome
+    {
+        bool FoundPair{ false };
+        bool Changed{ false };
+        std::optional<InvertedCapabilityPair> Inverted;
+    };
+
+    const std::vector<std::string>& CapabilityNamesOf(const CookedModule& module,
+                                                      uint32_t variant_index,
+                                                      size_t entry_point_index)
+    {
+        const LibraryVariant& variant = module.Variants[variant_index];
+        return module.SourceFacts[variant.SourceIndices[entry_point_index]].CapabilityNames;
+    }
+
+    /** The group holds the two values of a boolean axis, and each name list is sorted. */
+    std::optional<InvertedCapabilityPair> FindInvertedPair(const CookedModule& module,
+                                                           std::span<const uint32_t> group,
+                                                           size_t axis_index,
+                                                           size_t entry_point_index)
+    {
+        const auto isOn = [&module, axis_index](uint32_t variant_index)
+        {
+            return module.Variants[variant_index].Canonical[axis_index].Value.AsBool();
+        };
+
+        const auto offIter = std::ranges::find_if_not(group, isOn);
+        const auto onIter = std::ranges::find_if(group, isOn);
+
+        if (offIter == group.end() ||
+            onIter == group.end() ||
+            std::ranges::includes(CapabilityNamesOf(module, *onIter, entry_point_index),
+                                  CapabilityNamesOf(module, *offIter, entry_point_index)))
+        {
+            return std::nullopt;
+        }
+
+        return InvertedCapabilityPair
+        {
+            .OffVariant = *offIter,
+            .OnVariant = *onIter,
+            .EntryPoint = entry_point_index
+        };
+    }
+
+    CapabilityAxisOutcome MeasureCapabilityAxis(const CookedModule& module, size_t axis_index)
+    {
+        const bool isBoolean = module.Space->Axes()[axis_index].ValueDomain == AxisValueDomain::Boolean;
+        CapabilityAxisOutcome outcome;
+        const auto measureGroup = [&module, axis_index, isBoolean, &outcome](std::span<const uint32_t> group)
+        {
+            for (size_t entryPointIndex = 0u; entryPointIndex < module.EntryPoints.size(); ++entryPointIndex)
+            {
+                const std::vector<std::string>& firstNames = CapabilityNamesOf(module, group.front(), entryPointIndex);
+                outcome.Changed = outcome.Changed ||
+                                  std::ranges::any_of(group.subspan(1u),
+                                                      [&](uint32_t variant_index)
+                                                      {
+                                                          return CapabilityNamesOf(module, variant_index, entryPointIndex) !=
+                                                                 firstNames;
+                                                      });
+                if (isBoolean && !outcome.Inverted.has_value())
+                {
+                    outcome.Inverted = FindInvertedPair(module, group, axis_index, entryPointIndex);
+                }
+            }
+        };
+
+        outcome.FoundPair = ForEachOneAxisGroup(module, axis_index, measureGroup);
+        return outcome;
+    }
 } // namespace
 
 CookResult<ModuleInfluence> ComputeActualInfluence(const CookedModule& module)
@@ -616,95 +698,51 @@ CookError VerifyCapabilityAxes(const CookedLibrary& library, DiagnosticSink& sin
 {
     CookError result = CookError::Success;
     const size_t moduleCount = library.ModuleNames.size();
-    for (size_t profileIndex = 0u; profileIndex < library.Profiles.size(); ++profileIndex)
+    for (size_t environmentIndex = 0u; environmentIndex < library.Environments.size(); ++environmentIndex)
     {
-        const CookedProfile& profile = library.Profiles[profileIndex];
-        if (!profile.CodeFactsRead)
+        const CookedProfile& profile = library.Profiles[environmentIndex / moduleCount];
+        const std::optional<CookedModule>& environment = library.Environments[environmentIndex];
+        if (!profile.CodeFactsRead || !environment.has_value() || environment->Space == nullptr)
         {
             continue;
         }
 
-        for (size_t moduleIndex = 0u; moduleIndex < moduleCount; ++moduleIndex)
+        const CookedModule& module = *environment;
+        const std::string_view moduleName = library.ModuleNames[environmentIndex % moduleCount];
+        const std::span<const PermutationAxis> axes = module.Space->Axes();
+        for (size_t k = 0u; k < axes.size(); ++k)
         {
-            const std::optional<CookedModule>& environment = library.Environments[(profileIndex * moduleCount) + moduleIndex];
-            if (!environment.has_value() || environment->Space == nullptr)
+            const PermutationAxis& axis = axes[k];
+            if (axis.Kind != AxisKind::Capability || !axis.ActiveWhen.empty())
             {
                 continue;
             }
 
-            const CookedModule& module = *environment;
-            const std::span<const PermutationAxis> axes = module.Space->Axes();
-            for (size_t k = 0u; k < axes.size(); ++k)
+            const CapabilityAxisOutcome outcome = MeasureCapabilityAxis(module, k);
+            if (outcome.Inverted.has_value())
             {
-                const PermutationAxis& axis = axes[k];
-                if (axis.Kind != AxisKind::Capability || !axis.ActiveWhen.empty())
-                {
-                    continue;
-                }
-
-                const bool isBoolean = axis.ValueDomain == AxisValueDomain::Boolean;
-                bool changed = false;
-                CookError inverted = CookError::Success;
-                auto checkGroup = [&](std::span<const uint32_t> group)
-                {
-                    for (size_t entryPointIndex = 0u; entryPointIndex < module.EntryPoints.size(); ++entryPointIndex)
-                    {
-                        const auto namesOf = [&](uint32_t variant_index) -> const std::vector<std::string>&
-                        {
-                            const LibraryVariant& variant = module.Variants[variant_index];
-                            return module.SourceFacts[variant.SourceIndices[entryPointIndex]].CapabilityNames;
-                        };
-
-                        const std::vector<std::string>& firstNames = namesOf(group.front());
-                        changed = changed || std::ranges::any_of(group.subspan(1u),
-                                                                 [&](uint32_t variant_index)
-                                                                 { return namesOf(variant_index) != firstNames; });
-                        if (!isBoolean || inverted != CookError::Success)
-                        {
-                            continue;
-                        }
-
-                        // the group holds the two values of a boolean axis, and the names are sorted
-                        const auto isOn = [&](uint32_t variant_index)
-                        { return module.Variants[variant_index].Canonical[k].Value.AsBool(); };
-                        const auto offIter = std::ranges::find_if_not(group, isOn);
-                        const auto onIter = std::ranges::find_if(group, isOn);
-                        if (offIter == group.end() || onIter == group.end() ||
-                            std::ranges::includes(namesOf(*onIter), namesOf(*offIter)))
-                        {
-                            continue;
-                        }
-
-                        inverted = ReportError(
-                            sink,
-                            CookError::CapabilityAxisInverted,
-                            std::format("capability axis: module '{}' profile '{}' axis '{}' is off in variant [{}] and entry "
-                                        "point '{}' needs a capability that the on variant [{}] does not",
-                                        library.ModuleNames[moduleIndex],
-                                        profile.TargetName,
-                                        axis.Name,
-                                        module.Variants[*offIter].Description,
-                                        module.EntryPoints[entryPointIndex].Name,
-                                        module.Variants[*onIter].Description));
-                    }
-                };
-
-                const bool foundPair = ForEachOneAxisGroup(module, k, checkGroup);
-                if (inverted != CookError::Success)
-                {
-                    result = inverted;
-                }
-                else if (foundPair && !changed && result == CookError::Success)
-                {
-                    result = ReportError(sink,
-                                         CookError::CapabilityAxisInert,
-                                         std::format("capability axis: module '{}' profile '{}' axis '{}' has kind capability, "
-                                                     "but no pair of variants that differ in it needs different capabilities "
-                                                     "in any entry point",
-                                                     library.ModuleNames[moduleIndex],
-                                                     profile.TargetName,
-                                                     axis.Name));
-                }
+                const InvertedCapabilityPair& inverted = *outcome.Inverted;
+                result = ReportError(sink,
+                                     CookError::CapabilityAxisInverted,
+                                     std::format("capability axis: module '{}' profile '{}' axis '{}' is off in variant [{}] "
+                                                 "and entry point '{}' needs a capability that the on variant [{}] does not",
+                                                 moduleName,
+                                                 profile.TargetName,
+                                                 axis.Name,
+                                                 module.Variants[inverted.OffVariant].Description,
+                                                 module.EntryPoints[inverted.EntryPoint].Name,
+                                                 module.Variants[inverted.OnVariant].Description));
+            }
+            else if (outcome.FoundPair && !outcome.Changed && result == CookError::Success)
+            {
+                result = ReportError(sink,
+                                     CookError::CapabilityAxisInert,
+                                     std::format("capability axis: module '{}' profile '{}' axis '{}' has kind capability, "
+                                                 "but no pair of variants that differ in it needs different capabilities "
+                                                 "in any entry point",
+                                                 moduleName,
+                                                 profile.TargetName,
+                                                 axis.Name));
             }
         }
     }
