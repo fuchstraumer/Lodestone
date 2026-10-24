@@ -115,84 +115,83 @@ namespace
                            const ReflectedBinding& reflected,
                            BindingComparison& comparison)
     {
-        const auto report = [&declared, &comparison](std::string_view what)
+        const auto record = [&declared, &comparison](BindingMismatchKind kind, std::string emitted, std::string reflected_value)
         {
-            comparison.Matches = false;
-            comparison.Report += std::format("  spir-v declares set {} binding {} {} : {}\n",
-                                             declared.Group,
-                                             declared.Binding,
-                                             declared.Name,
-                                             what);
+            comparison.Mismatches.push_back(BindingMismatch{ .Kind = kind,
+                                                             .Group = declared.Group,
+                                                             .Binding = declared.Binding,
+                                                             .Name = std::string{ declared.Name },
+                                                             .Emitted = std::move(emitted),
+                                                             .Reflected = std::move(reflected_value) });
         };
 
         if (!declared.Unsupported.empty())
         {
-            report(declared.Unsupported);
+            record(BindingMismatchKind::Unsupported, std::string{ declared.Unsupported }, std::string{});
             return;
         }
 
         const std::string_view declaredName = StripSlangNameMangling(LastNameSegment(declared.Name));
         if (declaredName != reflected.Name)
         {
-            report(std::format("reflection has mismatched name \"{}\"", reflected.Name));
+            record(BindingMismatchKind::Name, std::string{ declaredName }, reflected.Name);
         }
 
         if (declared.Kind != reflected.Kind)
         {
-            report(std::format("declared as {}, reflection has kind {}", ToString(declared.Kind), ToString(reflected.Kind)));
+            record(BindingMismatchKind::Kind, std::string{ ToString(declared.Kind) }, std::string{ ToString(reflected.Kind) });
             return;
         }
 
         if (declared.ArrayCount != reflected.ArrayCount)
         {
-            report(std::format("declared as an array of {}, reflection has {}", declared.ArrayCount, reflected.ArrayCount));
+            record(BindingMismatchKind::ArrayCount, std::to_string(declared.ArrayCount), std::to_string(reflected.ArrayCount));
         }
 
         if (ShapeIsStated(declared.Kind) && (declared.Shape != reflected.Shape))
         {
-            report(std::format("declared with shape {}, reflection has shape {}",
-                               ToString(declared.Shape),
-                               ToString(reflected.Shape)));
+            record(BindingMismatchKind::Shape, std::string{ ToString(declared.Shape) }, std::string{ ToString(reflected.Shape) });
         }
 
         if ((declared.Kind == BindingKind::StorageTexture) && (declared.StorageFormat != reflected.StorageFormat))
         {
-            report(std::format("declared with format {}, reflection has format {}",
-                               magic_enum::enum_name(declared.StorageFormat),
-                               magic_enum::enum_name(reflected.StorageFormat)));
+            record(BindingMismatchKind::StorageFormat,
+                   std::string{ magic_enum::enum_name(declared.StorageFormat) },
+                   std::string{ magic_enum::enum_name(reflected.StorageFormat) });
         }
 
         if (AccessIsStated(declared.Kind) && (declared.Access != reflected.Access))
         {
-            report(std::format("declared with access {}, reflection has access {}",
-                               magic_enum::enum_name(declared.Access),
-                               magic_enum::enum_name(reflected.Access)));
+            record(BindingMismatchKind::Access,
+                   std::string{ magic_enum::enum_name(declared.Access) },
+                   std::string{ magic_enum::enum_name(reflected.Access) });
         }
     }
 
     void ReportDeclaredOnly(BindingComparison& comparison, const DeclaredBinding& declared)
     {
-        comparison.Matches = false;
-        comparison.Report += std::format("  spir-v declares set {} binding {} {} : reflection has no binding at that location\n",
-                                         declared.Group,
-                                         declared.Binding,
-                                         declared.Name);
+        comparison.Mismatches.push_back(BindingMismatch{ .Kind = BindingMismatchKind::EmittedOnly,
+                                                         .Group = declared.Group,
+                                                         .Binding = declared.Binding,
+                                                         .Name = std::string{ declared.Name },
+                                                         .Emitted = {},
+                                                         .Reflected = {} });
     }
 
     void ReportReflectedOnly(BindingComparison& comparison, const ReflectedBinding& reflected)
     {
-        comparison.Matches = false;
-        comparison.Report += std::format("  reflection has set {} binding {} {} : spir-v has no binding at that location\n",
-                                         GroupOf(reflected),
-                                         BindingOf(reflected),
-                                         reflected.Name);
+        comparison.Mismatches.push_back(BindingMismatch{ .Kind = BindingMismatchKind::ReflectedOnly,
+                                                         .Group = GroupOf(reflected),
+                                                         .Binding = BindingOf(reflected),
+                                                         .Name = reflected.Name,
+                                                         .Emitted = {},
+                                                         .Reflected = {} });
     }
 
     BindingComparison CompareBindings(std::span<const DeclaredBinding> declared,
                                       std::span<const ReflectedBinding*> reflected)
     {
         BindingComparison comparison;
-        comparison.Matches = true;
         auto iterDeclared = declared.begin();
         auto iterReflected = reflected.begin();
 

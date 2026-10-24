@@ -353,16 +353,19 @@ namespace
                 return std::unexpected(comparison.error());
             }
 
-            if (!comparison->Matches)
+            if (!comparison->Matches())
             {
                 ++mismatchCount;
-                const std::string warningStr =
-                    std::format("REFLECTION MISMATCH in {}{} ({}) for target {}:\n{}",
-                                entryPoint.Name,
-                                entryPoint.VariantSuffix,
-                                variant.VariantDescription,
-                                target.Name,
-                                comparison->Report);
+                std::string warningStr = std::format("REFLECTION MISMATCH in {}{} ({}) for target {}:",
+                                                     entryPoint.Name,
+                                                     entryPoint.VariantSuffix,
+                                                     variant.VariantDescription,
+                                                     target.Name);
+                for (const BindingMismatch& mismatch : comparison->Mismatches)
+                {
+                    warningStr += '\n';
+                    warningStr += FormatBindingMismatch(mismatch);
+                }
                 ReportWarning(diagnostics, warningStr);
                 continue;
             }

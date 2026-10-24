@@ -29,8 +29,13 @@ endfunction()
 
 add_xxhash()
 
-add_slang_subdirectory(third_party/slang)
-set_target_properties(slang PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+option(LODESTONE_ISOLATE_SLANG "Build Slang and SPIRV-Tools in their own build trees (cmake/IsolatedSlang.cmake)" ON)
+if (LODESTONE_ISOLATE_SLANG)
+    include(cmake/IsolatedSlang.cmake)
+else()
+    add_slang_subdirectory(third_party/slang)
+    set_target_properties(slang PROPERTIES CXX_STANDARD 23 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+endif()
 
 set(LODESTONE_COMMON_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/CookerErrors.hpp"

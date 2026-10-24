@@ -248,16 +248,17 @@ namespace
         return nullptr;
     }
 
-    enum class CreateDirectory : uint8_t
+    enum class PathMustExist : uint8_t
     {
         No = 0,
         Yes = 1
     };
 
-    /** Not in a table, because it moves the loop index. */
+    /** Not in a table, because it moves the loop index. Parsing touches no file: the output sink creates the output
+     * folder, and `PrepareCookStep` creates the module cache folder. */
     CookResult<std::filesystem::path> ReadPathArgument(std::span<const std::string_view> arguments,
                                                        size_t& index,
-                                                       CreateDirectory create_dir)
+                                                       PathMustExist must_exist)
     {
         if (index + 1u >= arguments.size())
         {
@@ -267,20 +268,9 @@ namespace
         ++index;
 
         std::filesystem::path result{ arguments[index] };
-        if (!std::filesystem::exists(result))
+        if (must_exist == PathMustExist::Yes && !std::filesystem::exists(result))
         {
-            if (create_dir == CreateDirectory::Yes)
-            {
-                const bool dirCreated = std::filesystem::create_directories(result);
-                if (!dirCreated)
-                {
-                    return std::unexpected(CookError::DirectoryCouldNotBeCreated);
-                }
-            }
-            else
-            {
-                return std::unexpected(CookError::DirectoryDoesNotExist);
-            }
+            return std::unexpected(CookError::DirectoryDoesNotExist);
         }
         return result;
     }
@@ -372,7 +362,7 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
 
         if (argument == "--output" || argument == "-o")
         {
-            const CookResult<std::filesystem::path> outputPath = ReadPathArgument(arguments, i, CreateDirectory::Yes);
+            const CookResult<std::filesystem::path> outputPath = ReadPathArgument(arguments, i, PathMustExist::No);
             if (!outputPath)
             {
                 return std::unexpected(outputPath.error());
@@ -381,7 +371,7 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
         }
         else if (argument == "--cache-dir")
         {
-            const CookResult<std::filesystem::path> cacheDirectory = ReadPathArgument(arguments, i, CreateDirectory::Yes);
+            const CookResult<std::filesystem::path> cacheDirectory = ReadPathArgument(arguments, i, PathMustExist::No);
             if (!cacheDirectory)
             {
                 return std::unexpected(cacheDirectory.error());
@@ -390,7 +380,7 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
         }
         else if (argument == "--include-dir" || argument == "-I")
         {
-            CookResult<std::filesystem::path> includeDirectory = ReadPathArgument(arguments, i, CreateDirectory::No);
+            CookResult<std::filesystem::path> includeDirectory = ReadPathArgument(arguments, i, PathMustExist::Yes);
             if (!includeDirectory)
             {
                 return std::unexpected(includeDirectory.error());

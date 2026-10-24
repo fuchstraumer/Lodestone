@@ -20,17 +20,16 @@ set(TINT_BUILD_TESTS OFF)
 set(TINT_BUILD_SAMPLES OFF)
 set(TINT_BUILD_CMD_TOOLS OFF)
 
-# For Tint, we only want the WGSL writer and reader
-# and optionally the SPIR-V writer and reader
-# (we use the latter as a more reliable source for WGSL)
-# (as compared to Slang's builtins for wgsl output at least)
+# The WGSL validator needs the WGSL reader, the inspector, and the IR only. No code reads or writes SPIR-V through
+# Tint (the SPIR-V validator uses SPIRV-Tools directly), and either SPIR-V switch makes Dawn add a second SPIRV-Tools
+# when no SPIRV-Tools target exists, which is the case with LODESTONE_ISOLATE_SLANG.
 set(TINT_BUILD_CMD_TOOLS OFF)
 set(TINT_BUILD_GLSL_VALIDATOR OFF)
 set(TINT_BUILD_GLSL_WRITER OFF)
 set(TINT_BUILD_HLSL_WRITER OFF)
 set(TINT_BUILD_NULL_WRITER OFF)
-set(TINT_BUILD_SPV_WRITER ON)
-set(TINT_BUILD_SPV_READER ON)
+set(TINT_BUILD_SPV_WRITER OFF)
+set(TINT_BUILD_SPV_READER OFF)
 set(TINT_ENABLE_IR_DUMPING OFF)
 set(TINT_BUILD_IR_BINARY OFF)
 set(TINT_BUILD_TESTS OFF)

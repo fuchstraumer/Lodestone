@@ -63,11 +63,50 @@ struct EmittedCodeFacts
     uint32_t WorkgroupMemoryBytes{ 0u };
 };
 
+/** The part of one binding on which the emitted code and reflection disagree. */
+enum class BindingMismatchKind : uint8_t
+{
+    Invalid = 0,
+    /** The code declares a binding at a placement where reflection has none. */
+    EmittedOnly,
+    /** Reflection has a binding at a placement where the code declares none. */
+    ReflectedOnly,
+    /** The code declares a binding that this validator cannot compare. `Emitted` holds the reason. */
+    Unsupported,
+    Name,
+    Kind,
+    ArrayCount,
+    Shape,
+    StorageFormat,
+    Access,
+};
+
+std::string_view ToString(BindingMismatchKind kind) noexcept;
+
+/** One disagreement at one placement. `Emitted` and `Reflected` hold the value of each side as text, and both are
+ * empty for `EmittedOnly` and `ReflectedOnly`. `Name` is the name in the code, or the reflected name when the code
+ * declares no binding there. */
+struct BindingMismatch
+{
+    BindingMismatchKind Kind{ BindingMismatchKind::Invalid };
+    uint32_t Group{ 0u };
+    uint32_t Binding{ 0u };
+    std::string Name;
+    std::string Emitted;
+    std::string Reflected;
+
+    bool operator==(const BindingMismatch&) const = default;
+};
+
+/** One line of the reflection mismatch warning, with no line break. */
+std::string FormatBindingMismatch(const BindingMismatch& mismatch);
+
 struct BindingComparison
 {
-    bool Matches{ false };
-    std::string Report;
+    std::vector<BindingMismatch> Mismatches;
     EmittedCodeFacts Emitted;
+
+    [[nodiscard]] bool Matches() const noexcept { return Mismatches.empty(); }
 };
 
 /** @brief A second opinion on what an entry point declared. The emitted code decides placements, and reflection

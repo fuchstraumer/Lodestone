@@ -7,7 +7,9 @@
 #include <array>
 #include <algorithm>
 #include <expected>
+#include <format>
 #include <span>
+#include <string>
 #include <string_view>
 #include <variant>
 #include <vector>
@@ -86,6 +88,60 @@ CookResult<EmittedCodeFacts> ResolvedLibraryValidator::ReadEmittedCodeFacts(std:
                                                                           DiagnosticSink& sink) const
 {
     return readEmittedCodeFacts(target_code, sink);
+}
+
+std::string_view ToString(BindingMismatchKind kind) noexcept
+{
+    switch (kind)
+    {
+    case BindingMismatchKind::EmittedOnly:
+        return "emitted only";
+    case BindingMismatchKind::ReflectedOnly:
+        return "reflected only";
+    case BindingMismatchKind::Unsupported:
+        return "unsupported";
+    case BindingMismatchKind::Name:
+        return "name";
+    case BindingMismatchKind::Kind:
+        return "kind";
+    case BindingMismatchKind::ArrayCount:
+        return "array count";
+    case BindingMismatchKind::Shape:
+        return "shape";
+    case BindingMismatchKind::StorageFormat:
+        return "storage format";
+    case BindingMismatchKind::Access:
+        return "access";
+    default:
+        return "Invalid";
+    }
+}
+
+std::string FormatBindingMismatch(const BindingMismatch& mismatch)
+{
+    switch (mismatch.Kind)
+    {
+    case BindingMismatchKind::EmittedOnly:
+        return std::format("  group {} binding {} {}: the code declares it, and reflection has no binding there",
+                           mismatch.Group,
+                           mismatch.Binding,
+                           mismatch.Name);
+    case BindingMismatchKind::ReflectedOnly:
+        return std::format("  group {} binding {} {}: reflection has it, and the code declares no binding there",
+                           mismatch.Group,
+                           mismatch.Binding,
+                           mismatch.Name);
+    case BindingMismatchKind::Unsupported:
+        return std::format("  group {} binding {} {}: {}", mismatch.Group, mismatch.Binding, mismatch.Name, mismatch.Emitted);
+    default:
+        return std::format("  group {} binding {} {}: {} differs, the code has {} and reflection has {}",
+                           mismatch.Group,
+                           mismatch.Binding,
+                           mismatch.Name,
+                           ToString(mismatch.Kind),
+                           mismatch.Emitted,
+                           mismatch.Reflected);
+    }
 }
 
 std::string_view ToString(AccessModel model) noexcept

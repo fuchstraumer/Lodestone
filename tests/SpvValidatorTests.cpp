@@ -21,6 +21,7 @@
 // Slang's own output for `ShadeCS` in EntryPointParams.slang, as assembly. Each row changes one fact.
 
 using lodestone::BindingComparison;
+using lodestone::BindingMismatchKind;
 using lodestone::BindingKind;
 using lodestone::CookError;
 using lodestone::CookResult;
@@ -370,10 +371,11 @@ std::vector<const ReflectedBinding*> PointersTo(const std::vector<ReflectedBindi
     return pointers;
 }
 
-/** True when the comparison ran and reports a mismatch. */
-bool Mismatches(const CookResult<BindingComparison>& comparison)
+/** True when the comparison ran and records a mismatch of `kind`. */
+bool Mismatches(const CookResult<BindingComparison>& comparison, BindingMismatchKind kind)
 {
-    return comparison.has_value() && !comparison->Matches && !comparison->Report.empty();
+    return comparison.has_value() &&
+           std::ranges::any_of(comparison->Mismatches, [kind](const lodestone::BindingMismatch& mismatch) { return mismatch.Kind == kind; });
 }
 
 } // namespace
@@ -397,8 +399,8 @@ int main()
     runner.BeginSection("agreeing reflection passes the cross-check");
     const CookResult<BindingComparison> match = validator.ValidateEntryPoint(shadeCs, agreeingPointers, sink);
     runner.CheckOk(match, "valid SPIR-V and agreeing reflection produce a result, not an error");
-    runner.Check(match.has_value() && match->Matches, "reflection that agrees with the module passes");
-    runner.Check(match.has_value() && match->Report.empty(), "a passing comparison reports nothing");
+    runner.Check(match.has_value() && match->Matches(), "reflection that agrees with the module passes");
+    runner.Check(match.has_value() && match->Mismatches.empty(), "a passing comparison records nothing");
     runner.Check(match.has_value() && std::ranges::contains(match->Emitted.CapabilityNames, std::string{ "Shader" }),
                  "the capabilities of the module read back");
 
@@ -437,37 +439,37 @@ int main()
     const std::vector<std::byte> movedTexture =
         Assemble(Replace(k_ShadeCs, "%entryPointParams_albedoMap Binding 1", "%entryPointParams_albedoMap Binding 7"));
     const CookResult<BindingComparison> moved = validator.ValidateEntryPoint(movedTexture, agreeingPointers, sink);
-    runner.Check(Mismatches(moved), "a texture at another binding than reflection states is a mismatch");
+    runner.Check(Mismatches(moved, BindingMismatchKind::EmittedOnly), "a texture at another binding than reflection states is a mismatch");
 
     std::vector<ReflectedBinding> missing = agreeing;
     missing.pop_back();
     std::vector<const ReflectedBinding*> missingPointers = PointersTo(missing);
-    runner.Check(Mismatches(validator.ValidateEntryPoint(shadeCs, missingPointers, sink)),
+    runner.Check(Mismatches(validator.ValidateEntryPoint(shadeCs, missingPointers, sink), BindingMismatchKind::EmittedOnly),
                  "a binding the module declares and reflection lacks is a mismatch");
 
     std::vector<ReflectedBinding> extra = agreeing;
     extra.push_back(MakeReflected("Unused", 3u, 0u, BindingKind::Sampler, ResourceShape::Invalid,
                                   ResourceAccess::ReadOnly));
     std::vector<const ReflectedBinding*> extraPointers = PointersTo(extra);
-    runner.Check(Mismatches(validator.ValidateEntryPoint(shadeCs, extraPointers, sink)),
+    runner.Check(Mismatches(validator.ValidateEntryPoint(shadeCs, extraPointers, sink), BindingMismatchKind::ReflectedOnly),
                  "a binding reflection states and the module lacks is a mismatch");
 
     runner.BeginSection("reflection decides the kind, the shape, and the access");
     std::vector<ReflectedBinding> wrongKind = agreeing;
     wrongKind[1].Kind = BindingKind::Sampler;
     std::vector<const ReflectedBinding*> wrongKindPointers = PointersTo(wrongKind);
-    runner.Check(Mismatches(validator.ValidateEntryPoint(shadeCs, wrongKindPointers, sink)),
+    runner.Check(Mismatches(validator.ValidateEntryPoint(shadeCs, wrongKindPointers, sink), BindingMismatchKind::Kind),
                  "a texture that reflection calls a sampler is a mismatch");
 
     std::vector<ReflectedBinding> wrongAccess = agreeing;
     wrongAccess[0].Access = ResourceAccess::ReadOnly;
     std::vector<const ReflectedBinding*> wrongAccessPointers = PointersTo(wrongAccess);
-    runner.Check(Mismatches(validator.ValidateEntryPoint(shadeCs, wrongAccessPointers, sink)),
+    runner.Check(Mismatches(validator.ValidateEntryPoint(shadeCs, wrongAccessPointers, sink), BindingMismatchKind::Access),
                  "a read-write storage buffer that reflection calls read-only is a mismatch");
 
     const std::vector<std::byte> depthTexture =
         Assemble(Replace(k_ShadeCs, "OpTypeImage %float 2D 2 0 0 1", "OpTypeImage %float 2D 1 0 0 1"));
-    runner.Check(Mismatches(validator.ValidateEntryPoint(depthTexture, agreeingPointers, sink)),
+    runner.Check(Mismatches(validator.ValidateEntryPoint(depthTexture, agreeingPointers, sink), BindingMismatchKind::Shape),
                  "a depth texture (Depth 1) against a plain one is a shape mismatch");
 
     runner.BeginSection("the storage image format is compared");
@@ -484,21 +486,21 @@ int main()
     const std::vector<ReflectedBinding> formatAgrees = storageReflection(TextureFormat::R32Float);
     std::vector<const ReflectedBinding*> formatAgreesPointers = PointersTo(formatAgrees);
     const CookResult<BindingComparison> formatMatch = validator.ValidateEntryPoint(storageImage, formatAgreesPointers, sink);
-    runner.Check(formatMatch.has_value() && formatMatch->Matches, "a storage image with the format of the module matches");
+    runner.Check(formatMatch.has_value() && formatMatch->Matches(), "a storage image with the format of the module matches");
 
     const std::vector<ReflectedBinding> formatMissing = storageReflection(TextureFormat::Invalid);
     std::vector<const ReflectedBinding*> formatMissingPointers = PointersTo(formatMissing);
-    runner.Check(Mismatches(validator.ValidateEntryPoint(storageImage, formatMissingPointers, sink)),
+    runner.Check(Mismatches(validator.ValidateEntryPoint(storageImage, formatMissingPointers, sink), BindingMismatchKind::StorageFormat),
                  "a storage image that reflection reads with no format is a mismatch");
 
     const std::vector<std::byte> otherFormat = Assemble(Replace(k_StorageImageCs, "2 R32f", "2 Rgba32f"));
-    runner.Check(Mismatches(validator.ValidateEntryPoint(otherFormat, formatAgreesPointers, sink)),
+    runner.Check(Mismatches(validator.ValidateEntryPoint(otherFormat, formatAgreesPointers, sink), BindingMismatchKind::StorageFormat),
                  "a storage image that the module declares with another format is a mismatch");
 
     std::vector<ReflectedBinding> wrongName = agreeing;
     wrongName[1].Name = "normalMap";
     std::vector<const ReflectedBinding*> wrongNamePointers = PointersTo(wrongName);
-    runner.Check(Mismatches(validator.ValidateEntryPoint(shadeCs, wrongNamePointers, sink)),
+    runner.Check(Mismatches(validator.ValidateEntryPoint(shadeCs, wrongNamePointers, sink), BindingMismatchKind::Name),
                  "a resource of another name at the right slot is a mismatch");
 
     runner.BeginSection("a binding array is read, and its length is compared");
@@ -515,21 +517,22 @@ int main()
     const std::vector<ReflectedBinding> fourLevels = arrayReflection(4u);
     std::vector<const ReflectedBinding*> fourLevelsPointers = PointersTo(fourLevels);
     const CookResult<BindingComparison> arrayMatch = validator.ValidateEntryPoint(imageArray, fourLevelsPointers, sink);
-    runner.Check(arrayMatch.has_value() && arrayMatch->Matches, "an array of four images matches reflection with four");
+    runner.Check(arrayMatch.has_value() && arrayMatch->Matches(), "an array of four images matches reflection with four");
 
     const std::vector<ReflectedBinding> oneLevel = arrayReflection(1u);
     std::vector<const ReflectedBinding*> oneLevelPointers = PointersTo(oneLevel);
-    runner.Check(Mismatches(validator.ValidateEntryPoint(imageArray, oneLevelPointers, sink)),
+    runner.Check(Mismatches(validator.ValidateEntryPoint(imageArray, oneLevelPointers, sink), BindingMismatchKind::ArrayCount),
                  "an array that reflection reads as one binding is a mismatch");
     const std::vector<ReflectedBinding> threeLevels = arrayReflection(3u);
     std::vector<const ReflectedBinding*> threeLevelsPointers = PointersTo(threeLevels);
-    runner.Check(Mismatches(validator.ValidateEntryPoint(imageArray, threeLevelsPointers, sink)),
+    runner.Check(Mismatches(validator.ValidateEntryPoint(imageArray, threeLevelsPointers, sink), BindingMismatchKind::ArrayCount),
                  "an array of another length is a mismatch");
 
     const std::vector<std::byte> unbounded =
         Assemble(Replace(k_ImageArrayCs, "OpTypeArray %image %uint_4", "OpTypeRuntimeArray %image"));
     const CookResult<BindingComparison> unboundedResult = validator.ValidateEntryPoint(unbounded, fourLevelsPointers, sink);
-    runner.Check(Mismatches(unboundedResult) && unboundedResult->Report.find("unbounded") != std::string::npos,
+    runner.Check(Mismatches(unboundedResult, BindingMismatchKind::Unsupported) &&
+                     unboundedResult->Mismatches.front().Emitted.contains("unbounded"),
                  "an unbounded array is reported as unsupported until the Indexed access model reads it");
 
     runner.BeginSection("an illegal module is an error, not a mismatch");

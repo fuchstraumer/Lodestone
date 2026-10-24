@@ -296,6 +296,9 @@ void TestTargetNames(TestRunner& runner)
         {
             const std::string& message = sink.Records().front().Message;
             runner.Check(message.contains("spriv"), std::format("the record names the misspelled target: '{}'", message));
+            runner.Check(message.contains("OceanFft"), std::format("the record names the module: '{}'", message));
+            runner.Check(message.contains("Did you mean 'spirv'?"),
+                         std::format("the record suggests the nearest target: '{}'", message));
         }
     }
 

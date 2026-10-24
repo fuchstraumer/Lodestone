@@ -211,9 +211,14 @@ CookError PolicyDocument::ValidateTargetNames(std::span<const std::string_view> 
         {
             if (!std::ranges::contains(target_names, targetName))
             {
+                const std::string_view nearest = NearestName(targetName, target_names);
                 return ReportError(sink,
                                    CookError::PolicyUnknownTargetName,
-                                   std::format("Unknown target name '{}'", targetName));
+                                   std::format("module '{}' has a section for unknown target '{}'{}",
+                                               module_name,
+                                               targetName,
+                                               nearest.empty() ? std::string{}
+                                                               : std::format(". Did you mean '{}'?", nearest)));
             }
         }
     }

@@ -55,7 +55,7 @@ int main()
     if (runner.CheckOk(minimal, "-o, one target, and one module"))
     {
         runner.CheckEqual(minimal->OutputPath, std::filesystem::path{ output }, "the output path reads back");
-        runner.Check(std::filesystem::exists(output), "-o creates the output folder");
+        runner.Check(!std::filesystem::exists(output), "parsing does not create the output folder");
         runner.CheckEqual(minimal->TargetNames, std::vector<std::string>{ "wgsl" }, "the target reads back");
         runner.CheckEqual(minimal->ModulePaths.size(), 1u, "one module");
         runner.CheckEqual(minimal->OptimizationLevel, 0u, "the optimization level defaults to 0");

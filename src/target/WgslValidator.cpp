@@ -124,7 +124,7 @@ CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::span<const 
 
     tint::inspector::Inspector epInspector(*entrypointProgram);
     using tint::inspector::ResourceBinding;
-    BindingComparison result{ .Matches = true, .Report = "" };
+    BindingComparison result;
     for (const auto& entrypoint : epInspector.GetEntryPoints())
     {
         std::vector<ResourceBinding> wgslBindings = epInspector.GetResourceBindings(entrypoint.name);
@@ -142,7 +142,7 @@ CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::span<const 
 
         BindingComparison epResult = CompareBindings(wgslBindings, bindings);
         epResult.Emitted.SamplerTexturePairs = ReadPairs(epInspector, entrypoint.name);
-        if (!epResult.Matches)
+        if (!epResult.Matches())
         {
             return epResult;
         }
@@ -352,20 +352,22 @@ namespace
 
     void ReportDeclaredOnly(BindingComparison& comparison, const tint::inspector::ResourceBinding& declared)
     {
-        comparison.Matches = false;
-        comparison.Report += std::format("  wgsl declares @group({}) @binding({}) {} : reflection has no binding at that location\n",
-                                         declared.bind_group,
-                                         declared.binding,
-                                         StripSlangNameMangling(declared.variable_name));
+        comparison.Mismatches.push_back(BindingMismatch{ .Kind = BindingMismatchKind::EmittedOnly,
+                                                         .Group = declared.bind_group,
+                                                         .Binding = declared.binding,
+                                                         .Name = std::string{ StripSlangNameMangling(declared.variable_name) },
+                                                         .Emitted = {},
+                                                         .Reflected = {} });
     }
 
     void ReportReflectedOnly(BindingComparison& comparison, const ReflectedBinding& reflected)
     {
-        comparison.Matches = false;
-        comparison.Report += std::format("  reflection has @group({}) @binding({}) {} : wgsl has no binding at that location\n",
-                                         GroupOf(reflected),
-                                         BindingOf(reflected),
-                                         MakeScopedName(reflected));
+        comparison.Mismatches.push_back(BindingMismatch{ .Kind = BindingMismatchKind::ReflectedOnly,
+                                                         .Group = GroupOf(reflected),
+                                                         .Binding = BindingOf(reflected),
+                                                         .Name = MakeScopedName(reflected),
+                                                         .Emitted = {},
+                                                         .Reflected = {} });
     }
 
     BindingComparison CompareBindings(std::span<const tint::inspector::ResourceBinding> wgsl_bindings,
@@ -373,7 +375,6 @@ namespace
     {
         using tint::inspector::ResourceBinding;
         BindingComparison comparison;
-        comparison.Matches = true;
         auto iterSource = wgsl_bindings.begin();
         auto iterReflected = reflected_bindings.begin();
 
@@ -387,19 +388,20 @@ namespace
             if (declaredTuple == reflectedTuple)
             {
                 const std::string_view unmangledName = StripSlangNameMangling(declaredBinding.variable_name);
-                const auto report = [&](std::string_view what)
+                const auto record = [&](BindingMismatchKind kind, std::string emitted, std::string reflected_value)
                 {
-                    comparison.Matches = false;
-                    comparison.Report += std::format("  wgsl declares @group({}) @binding({}) {} : {}\n",
-                                                     declaredBinding.bind_group,
-                                                     declaredBinding.binding,
-                                                     unmangledName,
-                                                     what);
+                    comparison.Mismatches.push_back(BindingMismatch{ .Kind = kind,
+                                                                     .Group = declaredBinding.bind_group,
+                                                                     .Binding = declaredBinding.binding,
+                                                                     .Name = std::string{ unmangledName },
+                                                                     .Emitted = std::move(emitted),
+                                                                     .Reflected = std::move(reflected_value) });
                 };
 
-                if (unmangledName != MakeScopedName(*reflectedBinding))
+                const std::string scopedName = MakeScopedName(*reflectedBinding);
+                if (unmangledName != scopedName)
                 {
-                    report(std::format("reflection has mismatched name \"{}\"", reflectedBinding->Name));
+                    record(BindingMismatchKind::Name, std::string{ unmangledName }, scopedName);
                 }
 
                 if (!TintTypeAgreesWithReflectionKind(declaredBinding.resource_type,
@@ -410,19 +412,18 @@ namespace
                     const auto tintKind = TintTypeForBindingKind(reflectedBinding->Kind,
                                                                  reflectedBinding->Shape,
                                                                  reflectedBinding->Access);
-                    report(std::format("declared as {}, reflection has kind {}, which needs {}",
-                                       TintTypeToString(declaredBinding.resource_type),
-                                       ToString(reflectedBinding->Kind),
-                                       TintTypeToString(tintKind)));
+                    record(BindingMismatchKind::Kind,
+                           std::string{ TintTypeToString(declaredBinding.resource_type) },
+                           std::format("{} (needs {})", ToString(reflectedBinding->Kind), TintTypeToString(tintKind)));
                 }
                 else if (reflectedBinding->Kind == BindingKind::StorageTexture)
                 {
                     const TextureFormat declaredFormat = TextureFormatFromTint(declaredBinding.image_format);
                     if (declaredFormat != reflectedBinding->StorageFormat)
                     {
-                        report(std::format("declared with format {}, reflection has format {}",
-                                           magic_enum::enum_name(declaredFormat),
-                                           magic_enum::enum_name(reflectedBinding->StorageFormat)));
+                        record(BindingMismatchKind::StorageFormat,
+                               std::string{ magic_enum::enum_name(declaredFormat) },
+                               std::string{ magic_enum::enum_name(reflectedBinding->StorageFormat) });
                     }
                 }
 
