@@ -462,7 +462,13 @@ CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library, Diagnos
 
             if (!pairs || !baselinePairs)
             {
-                return !pairs ? pairs.error() : baselinePairs.error();
+                return ReportError(sink,
+                                   !pairs ? pairs.error() : baselinePairs.error(),
+                                   std::format("sampler pairs: module '{}' variant [{}] entry point '{}' has no layout to "
+                                               "name its pairs",
+                                               library.ModuleNames[shared.Module],
+                                               shared.Variant.Description,
+                                               shared.Environment.EntryPoints[entryPointIndex].Name));
             }
 
             if (combined || baselineCombined || *pairs == *baselinePairs)
