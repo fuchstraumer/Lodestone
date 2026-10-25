@@ -321,35 +321,63 @@ constexpr const char* k_AllWarningsAsErrors = "all";
 // are ours to record, from the emitted code
 constexpr const char* k_DisabledWarnings = "31010,41012";
 // the two warning level rows must stay in this order
-constexpr std::array<CompilerOptionRow, 9u> k_CompilerOptionRows{
-    CompilerOptionRow{ .Name = slang::CompilerOptionName::WarningLevel,
-                           .Kind = slang::CompilerOptionValueKind::Int,
-                           .IntValue = SLANG_WARNING_LEVEL_PEDANTIC },
-    CompilerOptionRow{ .Name = slang::CompilerOptionName::WarningLevel,
-                           .Kind = slang::CompilerOptionValueKind::Int,
-                           .IntValue = SLANG_WARNING_LEVEL_ALL },
-    CompilerOptionRow{ .Name = slang::CompilerOptionName::DisableWarnings,
-                           .Kind = slang::CompilerOptionValueKind::String,
-                           .StringValue = k_DisabledWarnings },
-    CompilerOptionRow{ .Name = slang::CompilerOptionName::WarningsAsErrors,
-                           .Kind = slang::CompilerOptionValueKind::String,
-                           .StringValue = k_AllWarningsAsErrors },
-    CompilerOptionRow{ .Name = slang::CompilerOptionName::FloatingPointMode,
-                           .Kind = slang::CompilerOptionValueKind::Int,
-                           .IntValue = SLANG_FLOATING_POINT_MODE_FAST },
-    CompilerOptionRow{ .Name = slang::CompilerOptionName::DebugInformation,
-                           .Kind = slang::CompilerOptionValueKind::Int,
-                           .IntValue = SLANG_DEBUG_INFO_LEVEL_NONE },
-    CompilerOptionRow{ .Name = slang::CompilerOptionName::EnableMachineReadableDiagnostics,
-                           .Kind = slang::CompilerOptionValueKind::Int,
-                           .IntValue = 1 },
-    CompilerOptionRow{ .Name = slang::CompilerOptionName::UseUpToDateBinaryModule,
-                           .Kind = slang::CompilerOptionValueKind::Int,
-                           .IntValue = 1 },
+constexpr std::array<CompilerOptionRow, 9u> k_CompilerOptionRows
+{
+    CompilerOptionRow
+    { 
+        .Name = slang::CompilerOptionName::WarningLevel,
+        .Kind = slang::CompilerOptionValueKind::Int,
+        .IntValue = SLANG_WARNING_LEVEL_PEDANTIC
+    },
+    CompilerOptionRow
+    {
+        .Name = slang::CompilerOptionName::WarningLevel,
+        .Kind = slang::CompilerOptionValueKind::Int,
+        .IntValue = SLANG_WARNING_LEVEL_ALL
+    },
+    CompilerOptionRow
+    {
+        .Name = slang::CompilerOptionName::DisableWarnings,
+        .Kind = slang::CompilerOptionValueKind::String,
+        .StringValue = k_DisabledWarnings
+    },
+    CompilerOptionRow
+    {
+        .Name = slang::CompilerOptionName::WarningsAsErrors,
+        .Kind = slang::CompilerOptionValueKind::String,
+        .StringValue = k_AllWarningsAsErrors
+    },
+    CompilerOptionRow
+    {
+        .Name = slang::CompilerOptionName::FloatingPointMode,
+        .Kind = slang::CompilerOptionValueKind::Int,
+        .IntValue = SLANG_FLOATING_POINT_MODE_FAST
+    },
+    CompilerOptionRow
+    {
+        .Name = slang::CompilerOptionName::DebugInformation,     
+        .Kind = slang::CompilerOptionValueKind::Int,
+        .IntValue = SLANG_DEBUG_INFO_LEVEL_NONE
+    },
+    CompilerOptionRow
+    {
+        .Name = slang::CompilerOptionName::EnableMachineReadableDiagnostics,
+        .Kind = slang::CompilerOptionValueKind::Int,
+        .IntValue = 1
+    },
+    CompilerOptionRow
+    { 
+        .Name = slang::CompilerOptionName::UseUpToDateBinaryModule,
+        .Kind = slang::CompilerOptionValueKind::Int,
+        .IntValue = 1
+    },
     // the cook compares the OpEntryPoint name with the manifest name
-    CompilerOptionRow{ .Name = slang::CompilerOptionName::VulkanUseEntryPointName,
-                           .Kind = slang::CompilerOptionValueKind::Int,
-                           .IntValue = 1 }
+    CompilerOptionRow
+    {
+        .Name = slang::CompilerOptionName::VulkanUseEntryPointName,
+        .Kind = slang::CompilerOptionValueKind::Int,
+        .IntValue = 1
+    }
 };
 
 constexpr SlangOptimizationLevel ToSlangOptimizationLevel(uint32_t level) noexcept
@@ -371,7 +399,7 @@ constexpr SlangOptimizationLevel ToSlangOptimizationLevel(uint32_t level) noexce
 
 slang::CompilerOptionEntry ToOptionEntry(const CompilerOptionRow& row) noexcept;
 
-std::vector<slang::CompilerOptionEntry> MakeCompilerOptions(uint32_t optimization_level);
+std::vector<slang::CompilerOptionEntry> MakeCompilerOptions(uint32_t optimization_level, uint32_t debug_level);
 
 std::vector<std::byte> BlobToBytes(slang::IBlob* blob);
 std::string BlobToString(slang::IBlob* blob);

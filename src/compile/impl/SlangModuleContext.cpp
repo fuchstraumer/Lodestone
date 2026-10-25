@@ -142,7 +142,7 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
     }
 
     const std::vector<slang::CompilerOptionEntry> compileOptions =
-        MakeCompilerOptions(create_info.OptimizationLevel);
+        MakeCompilerOptions(create_info.OptimizationLevel, create_info.DebugLevel);
 
     const std::filesystem::path canonicalModulePath = std::filesystem::canonical(create_info.ModulePath);
     const std::string sourceDirectory = canonicalModulePath.parent_path().string();

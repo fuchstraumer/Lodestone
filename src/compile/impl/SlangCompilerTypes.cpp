@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <ranges>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -21,16 +22,28 @@ slang::CompilerOptionEntry ToOptionEntry(const CompilerOptionRow& row) noexcept
     return entry;
 }
 
-std::vector<slang::CompilerOptionEntry> MakeCompilerOptions(uint32_t optimization_level)
+std::vector<slang::CompilerOptionEntry> MakeCompilerOptions(uint32_t optimization_level, uint32_t debug_level)
 {
     std::vector<slang::CompilerOptionEntry> options = k_CompilerOptionRows |
                                                       std::views::transform(ToOptionEntry) |
                                                       std::ranges::to<std::vector>();
+    
+    const CompilerOptionRow optimizationOption
+    {
+        .Name = slang::CompilerOptionName::Optimization,
+        .Kind = slang::CompilerOptionValueKind::Int,
+        .IntValue = static_cast<int32_t>(ToSlangOptimizationLevel(optimization_level))
+    };
 
-    options.emplace_back(ToOptionEntry(
-        CompilerOptionRow{ .Name = slang::CompilerOptionName::Optimization,
-                           .Kind = slang::CompilerOptionValueKind::Int,
-                           .IntValue = static_cast<int32_t>(ToSlangOptimizationLevel(optimization_level)) }));
+    const CompilerOptionRow debugOption
+    {
+        .Name = slang::CompilerOptionName::DebugInformation,
+        .Kind = slang::CompilerOptionValueKind::Int,
+        .IntValue = static_cast<int32_t>(debug_level)
+    };
+
+    options.emplace_back(ToOptionEntry(optimizationOption));
+    options.emplace_back(ToOptionEntry(debugOption));
 
     return options;
 }

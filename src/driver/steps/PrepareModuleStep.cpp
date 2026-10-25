@@ -24,6 +24,7 @@ CookResult<PreparedCompiler> PrepareModuleStep::operator()(const SharedCookState
     createInfo.ModuleCacheDirectory = shared_state.Options.ModuleCacheDirectory;
     createInfo.IncludeDirectories = shared_state.Options.IncludeDirectories;
     createInfo.OptimizationLevel = shared_state.Options.OptimizationLevel;
+    createInfo.DebugLevel = shared_state.Options.DebugLevel;
     createInfo.MultithreadVariantBuild = shared_state.Options.MultithreadEntryPointCodegen;
     
     CookResult<TargetProfile> targetProfileResult = FindTargetProfile(target_name);
