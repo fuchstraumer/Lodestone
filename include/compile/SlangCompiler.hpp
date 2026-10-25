@@ -40,6 +40,8 @@ struct SlangCompilerCreateInfo
     TargetLanguage Language{ TargetLanguage::Invalid };
     std::string_view SlangProfileName;
     ShimForms Forms;
+    /** @brief Given to Slang as the bindless space index. */
+    std::optional<uint32_t> DescriptorHeapSet;
     std::string_view TargetName;
 };
 

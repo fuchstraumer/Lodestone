@@ -1,6 +1,7 @@
 module LodestoneShims;
+import LodestoneAttributes;
 
-// Shim interfaces for resources, and their Bound implementations. A shader declares `extern struct X : IReadBuffer<T>`
+// Shim interfaces for resources, and their Bound, Pointer, and Handle implementations. A shader declares `extern struct X : IReadBuffer<T>`
 // and calls the interface. The cooker links the implementation that the target profile uses for that resource class.
 // Each implementation method is [ForceInline] so that a constant index into an array of shims stays a constant, and needs
 // no dynamic-indexing device feature.
@@ -142,6 +143,76 @@ public struct BoundWriteStorageTexture2D<F : ITexelElement> : IWriteStorageTextu
     where F.DataType : IStorageTexelFromFloat4
 {
     WTexture2D<F> texture;
+
+    [ForceInline]
+    public void Store(uint2 coordinate, float4 value)
+    {
+        texture.Store(coordinate, F.DataType.FromFloat4(value));
+    }
+}
+
+// The Pointer form: a buffer device address. Read access is checked by Slang's type checker only, and the SPIR-V carries no
+// NonWritable for it.
+public struct PointerReadBuffer<T> : IReadBuffer<T>
+{
+    [ls_shim_value]
+    Ptr<T, Access.Read> data;
+
+    [ForceInline]
+    public T Load(uint index)
+    {
+        return data[index];
+    }
+}
+
+public struct PointerReadWriteBuffer<T> : IReadWriteBuffer<T>
+{
+    [ls_shim_value]
+    Ptr<T> data;
+
+    [ForceInline]
+    public T Load(uint index)
+    {
+        return data[index];
+    }
+
+    [ForceInline]
+    public void Store(uint index, T value)
+    {
+        data[index] = value;
+    }
+}
+
+// The Handle form: a descriptor handle, a uint2 whose x component is the index into the descriptor heap.
+public struct HandleTexture2D : ITexture2DRef
+{
+    [ls_shim_value]
+    DescriptorHandle<Texture2D<float4>> texture;
+
+    [ForceInline]
+    public Texture2D<float4> Get()
+    {
+        return texture;
+    }
+}
+
+public struct HandleSampler : ISamplerRef
+{
+    [ls_shim_value]
+    DescriptorHandle<SamplerState> sampler;
+
+    [ForceInline]
+    public SamplerState Get()
+    {
+        return sampler;
+    }
+}
+
+public struct HandleWriteStorageTexture2D<F : ITexelElement> : IWriteStorageTexture2D
+    where F.DataType : IStorageTexelFromFloat4
+{
+    [ls_shim_value]
+    DescriptorHandle<WTexture2D<F>> texture;
 
     [ForceInline]
     public void Store(uint2 coordinate, float4 value)

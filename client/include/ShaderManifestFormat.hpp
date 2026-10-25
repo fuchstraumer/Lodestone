@@ -319,7 +319,8 @@ struct alignas(8) Variant
     uint32_t Reserved{ 0u };
 };
 
-/** @brief Where a shader finds a resource. Bound: group, binding. Handle and Pointer are not written yet. */
+/** @brief Where a shader finds a resource.
+ *  Bound: group, binding. Handle and Pointer are not written yet. */
 struct alignas(8) PlacementPayload
 {
     uint32_t Word0{ 0u };

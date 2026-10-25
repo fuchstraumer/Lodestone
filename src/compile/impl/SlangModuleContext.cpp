@@ -183,6 +183,17 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
 
     slang::TargetDesc target{};
     target.format = ToSlangCompileTarget(create_info.Language);
+    // with no index, the heap takes the next free set, which can differ between the variants of one module
+    slang::CompilerOptionEntry heapSet{};
+    if (create_info.DescriptorHeapSet.has_value())
+    {
+        heapSet.name = slang::CompilerOptionName::BindlessSpaceIndex;
+        heapSet.value.kind = slang::CompilerOptionValueKind::Int;
+        heapSet.value.intValue0 = static_cast<int32_t>(*create_info.DescriptorHeapSet);
+        target.compilerOptionEntries = &heapSet;
+        target.compilerOptionEntryCount = 1u;
+    }
+
     if (!create_info.SlangProfileName.empty())
     {
         const std::string profileName(create_info.SlangProfileName);
@@ -194,6 +205,7 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
                                std::format("Slang has no profile named '{}'", create_info.SlangProfileName));
         }
     }
+    
     slang::SessionDesc sessionDesc{};
     sessionDesc.targets = &target;
     sessionDesc.targetCount = 1;

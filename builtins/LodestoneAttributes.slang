@@ -94,6 +94,13 @@ public struct ls_storage_formatAttribute
     public string axis;
 };
 
+/** Marks the member of a Pointer or Handle shim implementation that stores the buffer device address or the descriptor
+  * handle, so that reflection can tell it from user data of the same type. Only `LodestoneShims` uses it. */
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct ls_shim_valueAttribute
+{
+};
+
 [__AttributeUsage(_AttributeTargets.Struct)]
 public struct ls_axis_interfaceAttribute
 {

@@ -133,7 +133,14 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input, Diag
         {
             return std::unexpected(CookError::TargetProfileNotFound);
         }
-        if (!targetResult->IncompleteReason.empty())
+        if (!targetResult->IncompleteReason.empty() && result.Options.AllowIncompleteProfiles)
+        {
+            ReportWarning(diagnostics,
+                          std::format("target profile '{}' is not complete, and a test cooks it: {}",
+                                      targetName,
+                                      targetResult->IncompleteReason));
+        }
+        else if (!targetResult->IncompleteReason.empty())
         {
             return std::unexpected(ReportError(diagnostics,
                                                CookError::TargetProfileIncomplete,

@@ -208,6 +208,7 @@ Measured on 2026-10-21, DiamondDogs OceanFft, `spirv`, 62 unique modules:
 | F4.3 | Add the placement to the manifest, and to `ResolvedResource`. | The manifest round trip, and `ManifestIndexTest`. |
 | F4.4 | Teach the SPIR-V validator the heap set. Reflection gives it through `getBindlessSpaceIndex()`. | A cook of the F2.6 asset for `spirv-modern`. |
 | F4.5 | Record the offset table for each profile. Vocabulary §5 asks for this. A wrapper takes 16 bytes in a uniform buffer and 8 in push constants. | The offsets in the manifest equal the offsets in the SPIR-V `Offset` decorations. |
+| F4.6 | A second Handle profile on the per-descriptor-type lowering: `BindlessDescriptorOptions.None`, one binding for each descriptor type, through a `getDescriptorFromHandle` override in a link module. No mutable descriptors. | A cook of the F2.6 asset for both Handle profiles, with the heap bindings that each lowering states. |
 
 ### F5 — Binding-time lowering
 
@@ -716,3 +717,81 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
     (0xC0000005), because Report empties `sections` and the destructor then read `sections.back()`. `endScopedSection` now
     returns when no section is open, and `TestHarnessTest` has the case.
   - The author filed the issue as shader-slang/slang#13895. The warning, the canary, and the docs name it.
+- 2026-10-24. **F4.A done**, not committed. 45 of 45 tests, 60 of 60 known-good dumps. The author chose `IsUnbounded()` over a
+  signed count of -1.
+  - Measured on Slang `e9fc02c8d`: `getBindingRangeBindingCount` returns `SLANG_UNBOUNDED_SIZE`, and stage 3 cast it to
+    4294967295, which a `--no-validate` cook wrote to the manifest with no warning. Slang places each unbounded array at an
+    ordinary binding of set 0, beside the other bindings (two arrays at bindings 0 and 1, `Output` at 2). Slang states
+    `RuntimeDescriptorArray`, and for `NonUniformResourceIndex` also `ShaderNonUniform` (which the Vulkan 1.2 floor
+    enables, so the cook does not store it) and `SampledImageArrayNonUniformIndexing`. WGSL: Tint rejects
+    `array<texture_2d<f32>>`, and Slang rejects `NonUniformResourceIndex` for WGSL (E36107).
+  - Format 16: `Binding::ArrayCount` 0 means unbounded. No new field: 0 was never a valid count, so the value carries the
+    fact, and every key, round trip, and merge that compares `ArrayCount` covers it with no change.
+  - Stage 3 stores 0. The SPIR-V reader reads `OpTypeRuntimeArray` as a count of 0 (and `Array`), and adds the
+    `...ArrayDynamicIndexing` feature for a dynamic index into it. The binding description prints `array=unbounded`.
+  - Client: `ResolvedResource::IsUnbounded()`, and `CreationFields::BindingCount` (`Cpu` when unbounded, `Shader` for a fixed
+    array of more than one, else `NotApplicable`). The resource report prints it as `count`.
+  - Proof: `BindingArrayTest` (`UnboundedArray.slang` with a uniform and a non-uniform entry point) and `SpvValidatorTest`.
+  - Open for the author: Slang does not put an unbounded array at the highest binding of its set, which
+    `VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT` needs, and two arrays share one set. A renderer can declare a fixed
+    upper bound with `PARTIALLY_BOUND`. A check that rejects the layout, or a rule that places the array, waits for a consumer
+    (C4).
+- 2026-10-24. **`spirv-modern` exists and fails loudly** (the author's choice): `TargetProfile::IncompleteReason`, and
+  `PrepareCookStep` fails the cook with `TargetProfileIncomplete` = 24 and an error that names the profile. Proof: a section in
+  `AccessModelRejectTest`. 45 of 45 tests.
+- 2026-10-24. **F4.1 spike done** (no code). A Sonnet agent ran the probes, and I checked the key outputs. First run used a stale
+  slangc (a 2026-09-29 package in `_isolated/slang-build/slang-2026.19-windows-x86_64`); the rerun used `slangc` built from the
+  submodule in `_isolated/slang-build/Release/bin` (`2026.19-87-ge9fc02c8d`), next to the DLL that the cooker loads. Only the
+  storage-handle result changed between the runs. Outputs: the scratchpad `f41spike/current`.
+  - **Pointer form.** `Ptr<T, Access.Read>` in a block: `PhysicalStorageBufferAddresses`, `SPV_KHR_physical_storage_buffer`, and
+    the whole module moves to `PhysicalStorageBuffer64` addressing. `spirv-val` passes. `Access.Read` leaves no decoration;
+    only the type check rejects a write (E30011, "not an l-value"). In an entry point `uniform` it is an 8-byte push constant.
+  - **Handle form.** `DescriptorHandle<T>` member, and `return texture;` converts with no `*`. The handle is a `uint2` (8 bytes);
+    the heap index is `.x`. Default lowering (`VkMutable`): runtime arrays in one heap set, samplers at binding 0, every image
+    at binding 2. A sampled-image heap and a storage-image heap are two variables at the same set and binding, which
+    `spirv-val` accepts and which needs `VK_EXT_mutable_descriptor_type` on the device. No SPIR-V capability states that.
+    `DescriptorHandle<WTexture2D<RGBA16F>>` keeps `Rgba16f`, and needs no `StorageImageWriteWithoutFormat`; no `NonReadable`.
+  - **Wrapper sizes.** In a std140 block each wrapper struct takes 16 bytes (a handle or a pointer is 8); in a push constant
+    block 8. This is the 16 and 8 of F4.5.
+  - **Reflection.** A pointer member is kind `pointer`, size 8, with no element type, access, or address space. A handle member
+    is a plain `uint32` vector of 2, the same as user data. The heap variables are not in reflection; only the top-level
+    `bindlessSpaceIndex` is, and it is present when no handle is used (P1 gives 2). So the type behind a handle and the access
+    behind a pointer come from the shim table and the shim extern, not from reflection, and the heap layout comes from the
+    profile and the SPIR-V.
+  - **Heap set.** With no option, the heap takes the next free set: 2 beside one block at set 1, 1 when only push constants
+    exist. That can differ between variants of one module. `-bindless-space-index N` (`CompilerOptionName::BindlessSpaceIndex`)
+    fixes it, and reflection follows.
+  - **Non-uniform.** `NonUniformResourceIndex` on an index into an array of handles decorates the extract, the access chain, the
+    load, and the sampled image, and adds `ShaderNonUniform` and `SampledImageArrayNonUniformIndexing`. A non-uniform choice
+    between two handles (`?:`) gets no decoration, and `NonUniformResourceIndex` around a handle value is deprecated and does
+    nothing (E31200). That follows HLSL rules: the author marks non-uniform indices.
+  - **WGSL.** Both forms compile with exit 0 and no diagnostic, and the WGSL is invalid (`ptr<, vec4<f32>>`, arrays of
+    textures). D1 stands; Tint would reject it.
+  - **`spvDescriptorHeapEXT`** (F6): no heap descriptor sets; the heaps are `OpUntypedVariableKHR` builtins (`ResourceHeapEXT`,
+    `SamplerHeapEXT`), `UntypedPointersKHR` and `DescriptorHeapEXT`, and this `spirv-val` accepts it. Reflection still reports
+    `bindlessSpaceIndex` 2.
+- 2026-10-24. **F4.1 done**, not committed. 45 of 45 tests. The author's decisions: the heap in set 3 for now, the `VkMutable`
+  lowering now and the per-descriptor-type lowering soon (F4.6), `Indexed` renamed to `Handle`, and a form for each resource
+  class in F4.1.
+  - `AccessModel::Handle` and `PlacementKind::Handle` (the stored value stays 2), `ShimInterface::Handle`.
+  - `ShimForms` (one `AccessModel` for each `ShimResourceClass`) replaces `TargetProfile::Access`. `ShimFormOf` reads it,
+    `ShimLinkSource` links each extern in the form of its class, and `SingleForm` gives the manifest's one access model for
+    each profile (`Invalid` when the classes differ, until F4.3 records the forms). The reflector permits a pointer member
+    when the buffer form is Pointer.
+  - `spirv-modern`: Pointer buffers, Handle textures, samplers, and storage textures, and `DescriptorHeapSet` 3. The value is
+    not given to Slang yet (`-bindless-space-index`); that waits for the first cook of the profile, in F4.2. It still fails
+    with `TargetProfileIncomplete`.
+  - `builtins/LodestoneShims.slang`: `PointerReadBuffer<T>`, `PointerReadWriteBuffer<T>`, `HandleTexture2D`, `HandleSampler`,
+    and `HandleWriteStorageTexture2D<F>`, each method `[ForceInline]`.
+  - Proof: `ShimTableTest` (D6) loads every new cell, and `ShimLinkSourceTest` the exact text for `spirv-modern`. A probe
+    outside the tests, with the five impls in one block and `-bindless-space-index 3`, compiles with the current slangc and
+    passes `spirv-val`: the heap is in set 3, and the storage handle keeps `Rgba16f`.
+  - Built for the spike: `slangc` in `_isolated/slang-build/Release/bin`, next to the cooker's DLL. The older
+    `slang-2026.19-windows-x86_64` folder there is a stale package of 2026-09-29.
+  - Added to the plan: **F4.6**, a second Handle profile on the per-descriptor-type lowering (`BindlessDescriptorOptions.None`,
+    one binding for each descriptor type, through a `getDescriptorFromHandle` override in a link module).
+  - **Design for F4.2, from the author:** a marker on the Pointer and Handle members (for example `[ls_shim_handle]`), in the
+    shim module, so that reflection of the linked program can tell a handle `uint2` from user data. The class and the
+    interface come from the shim table and the extern, and the format from the format axis. First measure: does reflection
+    read a user attribute on an ordinary-data member of a struct from another module? Open: F4.2 needs a cook of
+    `spirv-modern` that the incomplete profile refuses.

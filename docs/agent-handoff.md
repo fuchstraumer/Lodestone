@@ -17,12 +17,13 @@ fixed, remove it; when a task is done, add one line to section 7 and remove its 
 - RelWithDebInfo, `ninja-msvc`: build green, 45 of 45 tests (after F4.0, not committed). Known-good dumps: 60 of 60
   (checked 2026-10-24).
 - Debug: do not run it unattended (section 2, item 2).
-- Manifest format version 15. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
-- Phases D and E are complete. Phase F has F0, F1, F2, F3.1 to F3.4c, F3.5, C11, and F4.0 done; F4, F5, and F6 are open.
+- Manifest format version 16. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
+- Phases D and E are complete. Phase F has F0, F1, F2, F3.1 to F3.4c, F3.5, C11, F4.0, F4.A, and F4.1 done; F4, F5, and F6 are open.
 - **Phase F is the current work.** The VeloxRhi rendergraph tasks (`docs/rendergraph-integration-tasks.md`) are done
   except L11 (optional dispatch extent) and a JSON writer for the resource report. L5 and L6 became phase F slice F3:
-  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: F4.A**
-  (unbounded binding arrays on `spirv`; decide `IsUnbounded()` first), then F4.1 to F4.5 (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
+  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: F4.2**
+  (reflect Pointer and Handle members as placements; `spirv-modern` exists and fails with `TargetProfileIncomplete` until
+  F4.4), then F4.3 to F4.6 (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
   bind groups) waits for a consumer to name its limits. After F3: F2 (the shim module and the two tables), F4 (Pointer and
   Handle placements, and unbounded binding arrays), F5 (binding-time lowering), and F6. `docs/phase-f-plan.md` has the
   slices and a progress log. The author calls phase F the last major feature work.
@@ -196,8 +197,8 @@ and `phase-e-interface-spike.md`).
 
 - **Bindless (Indexed and Pointer, phase F step F4).** The reflected schema is the invariant, and placement is the
   variant. Under bindless the schema facts are the only guard a driver would otherwise give. An unbounded binding array
-  (`Texture2D A[]`) is the Indexed form: the SPIR-V cross-check reports it as unsupported today, and F4 reads it.
-  DiamondDogs request C4 waits for this.
+  (`Texture2D A[]`) cooks on `spirv` since F4.A (format 16, `ResolvedResource::IsUnbounded`). DiamondDogs request C4
+  waits for the Pointer and Handle forms.
 - **Device capabilities (F3).** Built, except F3.4d (layout limits).
 - **WGSL binding arrays.** Slang rejects an array of resources for WGSL (E56105). WebGPU's `binding_array` is a separate
   story, with F4.
@@ -277,3 +278,8 @@ One line for each step. Git history holds the full text.
   rejections named no module. `docs/test-audit.md` has the status.
 - **2026-10-24 (F4.0).** Arrays of shim externs on `spirv`: `[ForceInline]` on the Bound methods, the `NonReadable` validator
   workaround and `SlangNonReadableCanaryTest`, `ShimArrayTest` (a pyramid against literal controls), `CookForTargets`.
+- **2026-10-24 (F4.A).** Unbounded binding arrays on `spirv`, format 16: `ArrayCount` 0, `ResolvedResource::IsUnbounded`,
+  `CreationFields::BindingCount`, the reader reads `OpTypeRuntimeArray`. Fixed: a `--no-validate` cook stored 4294967295.
+- **2026-10-24 (F4.1).** The Pointer and Handle shim impls, `ShimForms` on the profile, `Indexed` renamed to `Handle`,
+  `spirv-modern` (heap set 3) failing with `TargetProfileIncomplete`. The spike: reflection gives a pointer as kind `pointer` and
+  a handle as a `uint2`, and no heap variable.
