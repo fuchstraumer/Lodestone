@@ -172,6 +172,11 @@ target_compile_definitions(StorageFormatTest PRIVATE
 add_lodestone_unit_test(StorageFormatAxisTest StorageFormatAxisTests.cpp)
 target_compile_definitions(StorageFormatAxisTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/StorageFormatAxis")
+# The levels of a mip pyramid as one array of storage shims with a format axis, compared with one control for each format
+# written with the literal type, for spirv. A dynamic and a constant index. It cooks through Slang three times.
+add_lodestone_unit_test(ShimArrayTest ShimArrayTests.cpp)
+target_compile_definitions(ShimArrayTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/ShimArrays")
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
 # A canary for shader-slang/slang#13895, the missing NonReadable on an array of write-only storage images: it fails when Slang decorates the array,

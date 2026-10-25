@@ -555,6 +555,7 @@ namespace
                 return declared;
             }
             declared.ArrayCount = static_cast<uint32_t>(length.ConstantBits);
+            declared.Array = true;
             element = &parse_state.Ids[pointee.ElementType];
         }
 

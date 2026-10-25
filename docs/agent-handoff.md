@@ -12,17 +12,17 @@ fixed, remove it; when a task is done, add one line to section 7 and remove its 
 
 ---
 
-## 1. State on 2026-10-23
+## 1. State on 2026-10-24
 
-- RelWithDebInfo, `ninja-msvc`: build green, 43 of 43 tests (after the test audit, 2026-10-23). Known-good dumps: 60 of 60
-  (checked 2026-10-22).
+- RelWithDebInfo, `ninja-msvc`: build green, 45 of 45 tests (after F4.0, not committed). Known-good dumps: 60 of 60
+  (checked 2026-10-24).
 - Debug: do not run it unattended (section 2, item 2).
 - Manifest format version 15. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
-- Phases D and E are complete. Phase F has F0, F1, F2, F3.1 to F3.4c, F3.5, and C11 done; F4, F5, and F6 are open.
+- Phases D and E are complete. Phase F has F0, F1, F2, F3.1 to F3.4c, F3.5, C11, and F4.0 done; F4, F5, and F6 are open.
 - **Phase F is the current work.** The VeloxRhi rendergraph tasks (`docs/rendergraph-integration-tasks.md`) are done
   except L11 (optional dispatch extent) and a JSON writer for the resource report. L5 and L6 became phase F slice F3:
-  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: F4.0**
-  (shim externs in an array for DiamondDogs' pyramid; the spike is done and the work list is in the plan), then F4.A and F4.1 to F4.5 (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
+  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: F4.A**
+  (unbounded binding arrays on `spirv`; decide `IsUnbounded()` first), then F4.1 to F4.5 (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
   bind groups) waits for a consumer to name its limits. After F3: F2 (the shim module and the two tables), F4 (Pointer and
   Handle placements, and unbounded binding arrays), F5 (binding-time lowering), and F6. `docs/phase-f-plan.md` has the
   slices and a progress log. The author calls phase F the last major feature work.
@@ -63,7 +63,10 @@ Ordered by what can write wrong output first.
    hurts a Debug cook. Read it before you measure anything.
 7. **shader-slang/slang#13789 has a workaround in the cook.** `ApplySlangWorkaround13789` (`BuildModuleStep.cpp`).
    `SlangMetadataCanaryTest` fails when Slang fixes the issue, and its header lists what to delete.
-8. **Axis declarations have no source location.** The axis-default errors (`AxisDefaultMissing`, `AxisDefaultNotDeclared`, ...)
+8. **shader-slang/slang#13895 has a workaround in the SPIR-V validator.** An array of write-only storage images gets no
+   `NonReadable`. `IsSlangNonReadableArrayFault` (`SpvValidator.cpp`) accepts it with a warning, and
+   `SlangNonReadableCanaryTest` fails when Slang fixes it, and its header lists what to delete.
+9. **Axis declarations have no source location.** The axis-default errors (`AxisDefaultMissing`, `AxisDefaultNotDeclared`, ...)
    print none, because `getDeclSourceLocation` fails for the axis `Variable` decl and `RawAxisDeclaration::SourceFile` is
    `<unknown>`. Not measured why. The symbol table has the line, and could supply it.
 
@@ -156,7 +159,7 @@ and `phase-e-interface-spike.md`).
 - The direct SPIR-V path drops `NonReadable` on an array of `WTexture*` (`maybeEmitWriteOnlyImageDecoration` does not
   unwrap the array). The glslang path keeps it. The cross-check fails on access. Draft issue in `docs/`.
 - Slang does not inline a shim method, so `levels[3].Store(...)` passes the index as a parameter and needs
-  `StorageImageArrayDynamicIndexing`. `[ForceInline]` keeps the constant.
+  `StorageImageArrayDynamicIndexing`. `[ForceInline]` keeps the constant, and every Bound method has it since F4.0.
 - A plain or shim array of storage textures fails on WGSL in Tint. E56105 covers buffer arrays only. Upstream #13708 (after
   our submodule) emits `binding_array` for texture arrays.
 - No SPIR-V grammar entry requires an `...ArrayDynamicIndexing` capability, and glslang omits them. Only the device feature
@@ -272,3 +275,5 @@ One line for each step. Git history holds the full text.
   `RunCook` takes a `DiagnosticSink&` and every cooker message reaches it, `CookerOptionsTest`, `EnumAxisTest`, known-answer
   keys. Fixed: `MaxVariants` = N rejected N variants; a missing `--policy-file` was ignored; `--O2x` read as 2; three
   rejections named no module. `docs/test-audit.md` has the status.
+- **2026-10-24 (F4.0).** Arrays of shim externs on `spirv`: `[ForceInline]` on the Bound methods, the `NonReadable` validator
+  workaround and `SlangNonReadableCanaryTest`, `ShimArrayTest` (a pyramid against literal controls), `CookForTargets`.

@@ -701,3 +701,18 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
      `StorageImageArrayDynamicIndexing` for the dynamic one). WGSL must fail (Tint).
   4. Update the DiamondDogs C11 note: the array form works, with an example; the dynamic index needs the device feature.
   Then F4.A (unbounded arrays; the `IsUnbounded()` decision), then F4.1 to F4.5.
+- 2026-10-24. **F4.0 done**, not committed. 45 of 45 tests, 60 of 60 known-good dumps.
+  - `[ForceInline]` on the six Bound methods in `builtins/LodestoneShims.slang`.
+  - `DeclaredBinding::Array` (an `OpTypeArray`, also of length 1), and `IsSlangNonReadableArrayFault` in `SpvValidator.cpp`:
+    declared `ReadWrite` against reflected `WriteOnly` is accepted for an array of storage images only, with a warning through
+    the sink (`CompareBindings` takes it). `SpvValidatorTest` proves that the same array against `ReadOnly`, and a single image
+    against `WriteOnly`, still fail.
+  - `SlangNonReadableCanaryTest`: the issue repro through the Slang API, and a word scan for `OpName` and `OpDecorate
+    NonReadable`. The single image has the decoration (the control), and the array has none.
+  - `ShimArrayTest` and `tests/assets/ShimArrays/Pyramid.slang`, with `CookForTargets` and `CapabilityNamesOf` in
+    `tests/CookComparison.hpp`. Before the workaround it failed on access only, for the subject and the literal control alike.
+  - DiamondDogs C11 note: the array form works on `spirv`.
+  - Found on the way, and fixed: a `ScopedSection` that was still alive at `return runner.Report();` crashed the test
+    (0xC0000005), because Report empties `sections` and the destructor then read `sections.back()`. `endScopedSection` now
+    returns when no section is open, and `TestHarnessTest` has the case.
+  - The author filed the issue as shader-slang/slang#13895. The warning, the canary, and the docs name it.

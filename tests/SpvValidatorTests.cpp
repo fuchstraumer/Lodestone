@@ -535,6 +535,30 @@ int main()
                      unboundedResult->Mismatches.front().Emitted.contains("unbounded"),
                  "an unbounded array is reported as unsupported until the Indexed access model reads it");
 
+    // Slang gives an array of write-only storage images no NonReadable (shader-slang/slang#13895), and a single image
+    // gets one, so the validator accepts that one difference and no other
+    runner.BeginSection("the missing NonReadable is accepted on an array of storage images only");
+    const auto withAccess = [](std::vector<ReflectedBinding> reflected, ResourceAccess access)
+    {
+        reflected[0].Access = access;
+        return reflected;
+    };
+    const std::vector<ReflectedBinding> writeOnlyLevels = withAccess(arrayReflection(4u), ResourceAccess::WriteOnly);
+    std::vector<const ReflectedBinding*> writeOnlyLevelsPointers = PointersTo(writeOnlyLevels);
+    const CookResult<BindingComparison> writeOnlyArray = validator.ValidateEntryPoint(imageArray, writeOnlyLevelsPointers, sink);
+    runner.Check(writeOnlyArray.has_value() && writeOnlyArray->Matches(),
+                 "an array with no NonReadable matches reflection that reads it as write-only");
+
+    const std::vector<ReflectedBinding> readOnlyLevels = withAccess(arrayReflection(4u), ResourceAccess::ReadOnly);
+    std::vector<const ReflectedBinding*> readOnlyLevelsPointers = PointersTo(readOnlyLevels);
+    runner.Check(Mismatches(validator.ValidateEntryPoint(imageArray, readOnlyLevelsPointers, sink), BindingMismatchKind::Access),
+                 "an array that reflection reads as read-only is still a mismatch");
+
+    const std::vector<ReflectedBinding> writeOnlyVolume = withAccess(storageReflection(TextureFormat::R32Float), ResourceAccess::WriteOnly);
+    std::vector<const ReflectedBinding*> writeOnlyVolumePointers = PointersTo(writeOnlyVolume);
+    runner.Check(Mismatches(validator.ValidateEntryPoint(storageImage, writeOnlyVolumePointers, sink), BindingMismatchKind::Access),
+                 "a single storage image with no NonReadable against write-only reflection is still a mismatch");
+
     runner.BeginSection("an illegal module is an error, not a mismatch");
     // Every module needs exactly one OpMemoryModel. Without it the text still assembles, and spirv-val
     // rejects it.

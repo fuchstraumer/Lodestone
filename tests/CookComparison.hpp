@@ -1,13 +1,18 @@
 #pragma once
 #ifndef LODESTONE_TESTS_COOK_COMPARISON_HPP
 #define LODESTONE_TESTS_COOK_COMPARISON_HPP
+#include "CookerErrors.hpp"
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifest.hpp"
+#include "ShaderManifestFormat.hpp"
+#include "ShaderManifestLayout.hpp"
 #include "driver/CookerDriver.hpp"
 #include "driver/CookerOptions.hpp"
+#include "driver/CookerSteps.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
+#include <utility>
 
 #include <algorithm>
 #include <cstddef>
@@ -16,6 +21,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -30,14 +36,14 @@ struct CookedBundle
     CookError Result{ CookError::Invalid };
 };
 
-/** Cooks for `wgsl` and `spirv` in one run, twice, so that the two cooks must agree byte for byte. */
-inline CookedBundle CookBothTargets(std::vector<std::filesystem::path> module_paths,
-                                    std::optional<std::filesystem::path> policy_file)
+/** Cooks for each of `target_names` in one run, twice, so that the two cooks must agree byte for byte. */
+inline CookedBundle CookForTargets(std::vector<std::filesystem::path> module_paths,
+                                   std::optional<std::filesystem::path> policy_file,
+                                   std::vector<std::string> target_names)
 {
     CookerOptions options;
     options.ModulePaths = std::move(module_paths);
-    options.TargetNames.emplace_back("wgsl");
-    options.TargetNames.emplace_back("spirv");
+    options.TargetNames = std::move(target_names);
     options.OutputPath = "CookComparison";
     options.PolicyFile = std::move(policy_file);
     options.VerifyDeterministic = true;
@@ -55,9 +61,23 @@ inline CookedBundle CookBothTargets(std::vector<std::filesystem::path> module_pa
     return result;
 }
 
-/** What a renderer needs to create and bind one resource, without its name: a shim and its control name it differently. */
-using ResourceKey =
-    std::tuple<uint32_t, uint32_t, BindingKind, ResourceShape, ResourceAccess, uint32_t, uint32_t, uint64_t, TextureFormat>;
+inline CookedBundle CookBothTargets(std::vector<std::filesystem::path> module_paths,
+                                    std::optional<std::filesystem::path> policy_file)
+{
+    return CookForTargets(std::move(module_paths), std::move(policy_file), { "wgsl", "spirv" });
+}
+
+/** What a renderer needs to create and bind one resource, without its name: a shim and its control name it
+ * differently. */
+using ResourceKey = std::tuple<uint32_t,
+                               uint32_t,
+                               BindingKind,
+                               ResourceShape,
+                               ResourceAccess,
+                               uint32_t,
+                               uint32_t,
+                               uint64_t,
+                               TextureFormat>;
 
 /** Sorted, so that two lists compare by content. */
 inline std::vector<ResourceKey> ResourceKeysOf(const manifest::EnvironmentView& environment,
@@ -65,7 +85,8 @@ inline std::vector<ResourceKey> ResourceKeysOf(const manifest::EnvironmentView& 
                                                uint32_t entry_point)
 {
     std::vector<ResourceKey> keys;
-    for (const manifest::ResolvedResource resource : environment.VariantAt(variant_index).EntryPoint(entry_point).Layout())
+    for (const manifest::ResolvedResource resource :
+         environment.VariantAt(variant_index).EntryPoint(entry_point).Layout())
     {
         const manifest::PlacementPayload placement = resource.PlacementValue();
         keys.emplace_back(placement.Word0,
@@ -80,6 +101,25 @@ inline std::vector<ResourceKey> ResourceKeysOf(const manifest::EnvironmentView& 
     }
     std::ranges::sort(keys);
     return keys;
+}
+
+/** Sorted, so that two lists compare by content. */
+inline std::vector<std::string_view> CapabilityNamesOf(const manifest::EnvironmentView& environment,
+                                                       uint32_t variant_index,
+                                                       uint32_t entry_point)
+{
+    const manifest::EntryPointInstanceView instance =
+        environment.VariantAt(variant_index).EntryPoint(entry_point);
+    std::vector<std::string_view> names;
+    for (uint32_t i = 0u; i < environment.CapabilityNames().size(); ++i)
+    {
+        if (instance.RequiresCapability(i))
+        {
+            names.push_back(environment.CapabilityName(i));
+        }
+    }
+    std::ranges::sort(names);
+    return names;
 }
 
 } // namespace lodestone::tests

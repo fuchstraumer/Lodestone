@@ -12,6 +12,7 @@ DiamondDogs needs from Lodestone. Text follows ASD-STE100. Ask the author before
 | E1 | **Done 2026-10-21.** `tools/cooker_console`, `tools/manifest_dump`, and `tests/` CMakeLists use `${CMAKE_SOURCE_DIR}`. Embedded, that is the parent's root. | Use `${PROJECT_SOURCE_DIR}`. Then remove the include workaround in `DiamondDogs/cmake/ConfigureLodestone.cmake`. |
 | E2 | **Done 2026-10-21.** `LodestoneCooker.cmake` prepends `cmake/` (FindVulkanHeaders) only when `Vulkan::Vulkan` does not exist. A parent that found Vulkan first breaks Slang's `find_package(VulkanHeaders)`. | Prepend unconditionally. |
 | E3 | **Done 2026-10-21.** Set both options `OFF` before `add_subdirectory`; Lodestone keeps a defined value. `ConfigureSlang.cmake` forces `SLANG_ENABLE_MIMALLOC` and `SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC` with plain `set()`. A parent with its own `mimalloc-static` gets a duplicate target. | Respect a parent value (`if(NOT DEFINED ...)`), or skip when `TARGET mimalloc-static` exists. Note: with several mimalloc copies per process, `MI_WIN_USE_FIXED_TLS` must stay OFF (it crashed `slang-bootstrap`). |
+| E4 | **Open, 2026-10-24.** `client/CMakeLists.txt` (`lodestone_client_library`) and `cmake/LodestoneCooker.cmake` (`lodestone`) add the clang Debug flags when `CMAKE_CXX_COMPILER_ID` is not `MSVC`. clang-cl reports `Clang`, so it gets them too, and warns "unknown argument ignored: '-fno-omit-frame-pointer'" on every file (52 files in DiamondDogs' clang-cl build). It accepts the other four flags. | Leave out `-fno-omit-frame-pointer` when `CMAKE_CXX_COMPILER_FRONTEND_VARIANT` is `MSVC`. Then remove the workaround in `DiamondDogs/cmake/ConfigureLodestone.cmake`, which deletes the flag from both targets' `COMPILE_OPTIONS`. |
 
 ## Capabilities
 
@@ -29,6 +30,7 @@ DiamondDogs needs from Lodestone. Text follows ASD-STE100. Ask the author before
 | C11 | **Done 2026-10-23** (phase F steps C11.0 to C11.4; see the notes below). Not an `ls_format` string: an enum axis over `StorageFormat` in `LodestoneShims` (six float formats) selects the type argument of a write-only storage shim, `[ls_storage_format("AXIS")] extern struct Next : IWriteStorageTexture2D;`. A policy `CookValues` list of case names cooks a subset. The manifest records each variant's format as `StorageFormat`, as before. | Slang's `[format(...)]` takes a literal, so an axis cannot pick the format of a storage image. A shader that works on several formats (a mip generator, a blur, a copy) must then write without a format. Without any `[format]`, Slang guesses `rgba32f` from `float4`, which is wrong for every other format: validation reports `Undefined-Value-StorageImage-FormatMismatch-ImageView`. | `NvproPyramid` (`assets/shaders/compute/Pyramid`) declares its level bindings `[format("unknown")]`, and `pyramid::MipGenerator` requires `shaderStorageImageWriteWithoutFormat`. The WGSL target cannot cook it, because WGSL storage textures need a format. |
 | C12 | **Done 2026-10-22** (SPIR-V; see the notes below). Binding arrays in the SPIR-V validator: a fixed-size `OpTypeArray` of images, samplers or buffers. The validator now rejects them ("a binding array, which this validator does not read yet", `SpvModuleReader.cpp` `ClassifyVariable`), so the cook fails with `ReflectionMismatch`. The client already reads `ResolvedResource::ArrayCount()`. | A shader that indexes one of several views by a uniform index, such as the mip levels of a texture (nvpro_pyramid's `imageMipLevels[16]`). | `NvproPyramid` declares sixteen bindings, `PyramidLevel0` to `PyramidLevel15`, and switches on the level. `WriteManifestDescriptors` (DiamondDogs RhiResources) already writes array bindings from `ArrayCount()`, so the switch can go when C12 lands. |
 | C13 | **Done 2026-10-22** (one fault, fixed by C8; see the notes below). Cross-module imports in one cook (added 2026-10-22). Two parts: (1) when module B imports module A and both are in `MODULES`, the cook fails in worker setup with `WorkerSetupFailed (ModuleLoadFailed)`, also with a 4-line test module, so it is not specific to one shader; (2) an imported module is found only in the importer's folder or that folder's parent. C8 (include search paths) may solve part 2, but part 1 is a separate failure. | Shared shader libraries. `ddColor` (`assets/shaders/common/Color`) is the color math that every HDR pass and opt-in material shader imports, in other folders. | `ColorMathTest/CMakeLists.txt` copies the kernel, `ddColor.slang` and `ddColorGenerated.slang` into one build folder, and cooks only the kernel. OceanFft cannot import `ddColor` until this is fixed. |
+| C14 | The isolated Slang build (`LODESTONE_ISOLATE_SLANG`) must follow the parent's C runtime. `cmake/IsolatedSlang.cmake` passes neither `CMAKE_MSVC_RUNTIME_LIBRARY` nor `CMAKE_POLICY_DEFAULT_CMP0091` to the inner builds, so the inner SPIRV-Tools builds with the dynamic CRT. Forward both to the SPIRV-Tools `CMAKE_CACHE_ARGS`. Slang's DLL can keep the dynamic CRT: it is a build tool and does not ship. (Added 2026-10-24.) | DiamondDogs' `ninja-msvc-static` preset links the static CRT into everything, for the OceanFft package that runs on other machines. | `OceanFft_package` Release on `ninja-msvc-static` fails to link `lodestone_cooker_console.exe`: `SPIRV-Tools.lib(parse_number.cpp.obj): LNK2019 unresolved external symbol __imp_round` (a dynamic CRT import). The `ninja-msvc` and `ninja-clang-cl` presets build and pass. |
 
 ## Proof that DiamondDogs uses
 
@@ -70,10 +72,23 @@ ParameterBlock<MipLevel> level;
 - The axis must not be gated by `ls_axis_active_when`. A storage extern with no attribute, an attribute that names no axis,
   and an axis over another enum each fail the cook with their own error (`ShimStorageFormatMissing` = 180,
   `ShimStorageFormatAxisUnknown` = 181, `ShimStorageFormatAxisInvalid` = 182).
-- **Not covered: an array of shim externs.** `NvproPyramid` binds its levels as one array (`imageMipLevels[16]`, C12). A shim
-  extern cannot be an array element yet, so this form serves a kernel that writes one level for each dispatch (the shape of
-  `tests/assets/StorageFormatAxis/MipDownsample.slang`). Tell the author if the pyramid needs the array form with a format
-  axis.
+- **An array of shim externs works** (phase F step F4.0, 2026-10-24), on `spirv` only. The pyramid can bind its levels as one
+  array with one format axis for every level:
+
+  ```slang
+  [ls_storage_format("LEVEL_FORMAT")]
+  extern struct Level : IWriteStorageTexture2D;
+  struct Levels { Level levels[16]; };
+  ParameterBlock<Levels> pyramid;
+  // pyramid.levels[level].Store(id.xy, value);
+  ```
+
+  The manifest has one storage texture binding with `ArrayCount()` 16 and the format of the variant, the same as a literal
+  `WTexture2D<RGBA16F> imageMipLevels[16]`. A dynamic index needs the device feature `shaderStorageImageArrayDynamicIndexing`,
+  and the entry point's capability names list it (`StorageImageArrayDynamicIndexing`). A constant index needs nothing. WGSL
+  cannot cook an array of storage textures (Tint rejects it), with a shim or without one. Slang does not mark the array
+  `NonReadable` in SPIR-V; the cook accepts that and prints a warning, and the manifest still records `WriteOnly`.
+  `tests/ShimArrayTest` is the proof.
 - On this Slang a plain `RWTexture2D<float4>` with no `[format]` gets `rgba32f` from its element type, so it does not need
   `StorageImageWriteWithoutFormat` either. That is the wrong format for any other image view, which is the fault C11 removes.
 

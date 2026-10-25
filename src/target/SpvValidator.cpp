@@ -33,7 +33,8 @@ using spirv::ParseState;
 namespace
 {
     BindingComparison CompareBindings(std::span<const DeclaredBinding> declared,
-                                      std::span<const ReflectedBinding*> reflected);
+                                      std::span<const ReflectedBinding*> reflected,
+                                      DiagnosticSink& sink);
 }
 
 SpvValidator::SpvValidator() : context{ spvContextCreate(SPV_ENV_VULKAN_1_2) }
@@ -66,7 +67,7 @@ CookResult<BindingComparison> SpvValidator::validateEntryPoint(std::span<const s
         return std::make_tuple(binding.Group, binding.Binding);
     });
 
-    BindingComparison comparison = CompareBindings(declared, bindings);
+    BindingComparison comparison = CompareBindings(declared, bindings, sink);
 
     CookResult<EmittedCodeFacts> facts = CollectEmittedCodeFacts(state, sink);
     if (!facts)
@@ -111,9 +112,21 @@ namespace
         return (lastDot == std::string_view::npos) ? spirv_name : spirv_name.substr(lastDot + 1u);
     }
 
+    /** Workaround for shader-slang/slang#13895: the direct SPIR-V emitter gives an array of write-only storage images no
+     * NonReadable decoration, and a single image gets one. When SlangNonReadableCanaryTest fails, delete this function,
+     * its call, `DeclaredBinding::Array`, the sink parameter of `CompareBindings`, and that test. */
+    bool IsSlangNonReadableArrayFault(const DeclaredBinding& declared, const ReflectedBinding& reflected) noexcept
+    {
+        return declared.Kind == BindingKind::StorageTexture &&
+               declared.Array &&
+               declared.Access == ResourceAccess::ReadWrite &&
+               reflected.Access == ResourceAccess::WriteOnly;
+    }
+
     void CompareOneBinding(const DeclaredBinding& declared,
                            const ReflectedBinding& reflected,
-                           BindingComparison& comparison)
+                           BindingComparison& comparison,
+                           DiagnosticSink& sink)
     {
         const auto record = [&declared, &comparison](BindingMismatchKind kind, std::string emitted, std::string reflected_value)
         {
@@ -160,7 +173,16 @@ namespace
                    std::string{ magic_enum::enum_name(reflected.StorageFormat) });
         }
 
-        if (AccessIsStated(declared.Kind) && (declared.Access != reflected.Access))
+        if (IsSlangNonReadableArrayFault(declared, reflected))
+        {
+            ReportWarning(sink,
+                          std::format("workaround for shader-slang/slang#13895: set {} binding {} {} is an array of write-only storage "
+                                      "images with no NonReadable decoration, and reflection's WriteOnly is kept",
+                                      declared.Group,
+                                      declared.Binding,
+                                      declared.Name));
+        }
+        else if (AccessIsStated(declared.Kind) && (declared.Access != reflected.Access))
         {
             record(BindingMismatchKind::Access,
                    std::string{ magic_enum::enum_name(declared.Access) },
@@ -189,7 +211,8 @@ namespace
     }
 
     BindingComparison CompareBindings(std::span<const DeclaredBinding> declared,
-                                      std::span<const ReflectedBinding*> reflected)
+                                      std::span<const ReflectedBinding*> reflected,
+                                      DiagnosticSink& sink)
     {
         BindingComparison comparison;
         auto iterDeclared = declared.begin();
@@ -204,7 +227,7 @@ namespace
 
             if (declaredTuple == reflectedTuple)
             {
-                CompareOneBinding(declaredBinding, reflectedBinding, comparison);
+                CompareOneBinding(declaredBinding, reflectedBinding, comparison, sink);
                 ++iterDeclared;
                 ++iterReflected;
             }

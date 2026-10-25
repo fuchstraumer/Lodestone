@@ -131,7 +131,11 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space,
     module.ResourceLists.push_back(lodestone::ResourceList{ 0u, 1u, 2u, 3u });
     module.ResourceLists.push_back(lodestone::ResourceList{ 0u, 4u });
     module.ResourceLists.push_back(lodestone::ResourceList{ 0u, 5u });
-    module.FootprintLists.emplace_back();
+    // the cook writes one footprint for each resource of a list, and the emitter reads them in parallel
+    for (const lodestone::ResourceList& resources : module.ResourceLists)
+    {
+        module.FootprintLists.emplace_back(resources.size());
+    }
     module.VisibilityLists = std::move(visibility_lists);
     lodestone::tests::AddDefaultInstanceTables(module);
 
@@ -152,6 +156,7 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space,
             lodestone::PermutationAssignment{ lodestone::PermutationBinding{ .Axis = &axis, .Value = axis.GetValues()[caseIndex] } },
             instances);
         variant.ResourceListIndex = caseIndex;
+        variant.FootprintListIndex = caseIndex;
         module.Variants.push_back(std::move(variant));
     }
 

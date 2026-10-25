@@ -139,6 +139,8 @@ struct DeclaredBinding
     ResourceAccess Access{ ResourceAccess::Invalid };
     TextureFormat StorageFormat{ TextureFormat::Invalid };
     uint32_t ArrayCount{ 1u };
+    // an OpTypeArray, also of length 1
+    bool Array{ false };
     std::string_view Name;
     std::string_view Unsupported;
 };

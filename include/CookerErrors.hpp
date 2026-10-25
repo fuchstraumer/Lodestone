@@ -174,6 +174,23 @@ using CookResult = std::expected<T, CookError>;
 
 std::string_view ToString(CookError error) noexcept;
 
+/** The value range that magic_enum reads names from for `CookError`. Its default is [-128, 127], and the widest error
+ * is above 300. */
+struct CookErrorEnumRange
+{
+    static constexpr int min = 0;
+    static constexpr int max = 511;
+    static constexpr bool is_flags = false;
+};
+
+/** magic_enum finds this declaration by argument-dependent lookup and reads its return type only, so it needs no
+ * definition and no magic_enum include. It must be in this header: a specialization of `enum_range` in one source file
+ * left every other file that instantiated magic_enum for `CookError` with the default range. The two instantiations
+ * have one name, so the linker kept one of them, and in Debug `ToString` read the table with the default range and
+ * returned an empty name for every error above 127. */
+//NOLINTNEXTLINE(readability-identifier-naming)
+CookErrorEnumRange magic_enum_define_range_adl(CookError error) noexcept;
+
 } // namespace lodestone
 
 #endif // !LODESTONE_ERRORS_HPP
