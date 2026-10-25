@@ -512,17 +512,30 @@ CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library, Diagnost
         &CookedProfile::CodeFactsRead,
         [&library, &sink](const SharedVariant& shared) -> CookError
         {
-        const ShaderCodeFormat format = library.Profiles[shared.Profile].CodeFormat;
-        const ShaderCodeFormat baselineFormat = library.Profiles[shared.BaselineProfile].CodeFormat;
+        const CookedProfile& profile = library.Profiles[shared.Profile];
+        const CookedProfile& baselineProfile = library.Profiles[shared.BaselineProfile];
         for (size_t entryPointIndex = 0u; entryPointIndex < shared.Environment.EntryPoints.size(); ++entryPointIndex)
         {
             const SourceCodeFacts& facts = shared.Environment.SourceFacts[shared.Variant.SourceIndices[entryPointIndex]];
             const SourceCodeFacts& baselineFacts =
                 shared.Baseline.SourceFacts[shared.BaselineVariant.SourceIndices[entryPointIndex]];
 
-            const uint32_t portable = PortableCapabilities(format, facts.CapabilityNames);
-            const uint32_t baselinePortable = PortableCapabilities(baselineFormat, baselineFacts.CapabilityNames);
-            if (facts.WorkgroupMemoryBytes == baselineFacts.WorkgroupMemoryBytes && portable == baselinePortable)
+            const uint32_t portable = PortableCapabilities(profile.CodeFormat, facts.CapabilityNames);
+            const uint32_t baselinePortable = PortableCapabilities(baselineProfile.CodeFormat, baselineFacts.CapabilityNames);
+            const bool equal = facts.WorkgroupMemoryBytes == baselineFacts.WorkgroupMemoryBytes && portable == baselinePortable;
+            // an optimizer only removes code, so the optimized profile must need no more than the other
+            auto needsNoMore = [](const SourceCodeFacts& optimized, uint32_t optimized_portable,
+                                  const SourceCodeFacts& other, uint32_t other_portable)
+            {
+                return optimized.WorkgroupMemoryBytes <= other.WorkgroupMemoryBytes &&
+                       (optimized_portable & ~other_portable) == 0u;
+            };
+            const bool consistent =
+                profile.CodeOptimized == baselineProfile.CodeOptimized
+                    ? equal
+                    : profile.CodeOptimized ? needsNoMore(facts, portable, baselineFacts, baselinePortable)
+                                            : needsNoMore(baselineFacts, baselinePortable, facts, portable);
+            if (consistent)
             {
                 continue;
             }

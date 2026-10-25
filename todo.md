@@ -3,6 +3,11 @@
 - Decide the persisted form of a variant. `DecodedVariant` holds string views into one manifest and
   no axis names, so it cannot outlive that manifest. A persisted form needs (axis name, value) pairs
   with owned strings, and a load that re-keys them through a query.
+- An `--O0` validation cook (2026-10-25). Above `--O0` Slang gives SPIR-V to spirv-opt and gives WGSL to no optimizer, so
+  the cross-profile source facts check is one-way (the optimized profile needs no more), and the pair check compares only
+  bindings that both profiles use. A difference can be noise, or a lowering that changes behavior between SPIR-V and WGSL.
+  Consider a second SPIR-V compile at `--O0`, compared exactly: in the background for a live cook, and behind a full
+  validation flag for a full cook (possibly stored in the variant).
 # Resource Layer
 - Reflection joins a scope with `_` (`JoinScopeName` in `SlangReflector.cpp`), which is the WGSL
   spelling. SPIR-V uses `.`. Store `.`, and let each validator make its own form. `SpvValidator` compares

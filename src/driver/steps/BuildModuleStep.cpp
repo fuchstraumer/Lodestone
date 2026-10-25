@@ -367,8 +367,7 @@ namespace
                 {
                     warningStr += '\n';
                     warningStr += FormatBindingMismatch(mismatch);
-                }
-                ReportWarning(diagnostics, warningStr);
+                }                ReportWarning(diagnostics, warningStr);
                 continue;
             }
 

@@ -160,6 +160,8 @@ struct CookedProfile
     bool SamplerTexturePairsRecorded{ false };
     /** Whether the capability names and workgroup memory were read */
     bool CodeFactsRead{ false };
+    /** An optimizer ran on the emitted code, so its facts can need less than an unoptimized profile's */
+    bool CodeOptimized{ false };
 };
 
 /** @brief The whole cook. `Environments` is the profile-major grid, and an empty entry was not cooked. */

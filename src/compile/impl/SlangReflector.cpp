@@ -581,7 +581,6 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
     }
 
     const size_t globalBindingCount = rawVariant.Bindings.size();
-    const std::span<const RawBinding> globalBindings = std::span{ rawVariant.Bindings }.first(globalBindingCount);
     std::vector<RawBindingDraft> entryPointDrafts;
     entryPointDrafts.reserve(16u); // rarely more than this
 
@@ -589,6 +588,8 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
     {
         entryPointDrafts.clear(); // reuse the pre-allocated vector for this entry point
 
+        // made again each time: AppendBindingDrafts below can reallocate the vector
+        const std::span<const RawBinding> globalBindings = std::span{ rawVariant.Bindings }.first(globalBindingCount);
         CookResult<RawEntryPoint> entryPointResult = extractRawEntryPoint(linked_variant,
                                                                           i,
                                                                           globalBindings,

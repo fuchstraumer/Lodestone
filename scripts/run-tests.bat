@@ -33,7 +33,7 @@ if not exist "%BIN%" (
 set "FAILED=0"
 
 for %%T in ("%BIN%\*Test.exe") do (
-    if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="WorkgroupMemoryCookTest" if /I not "%%~nT"=="CrossModuleCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" if /I not "%%~nT"=="KitchenSinkCookTest" (
+    if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="WorkgroupMemoryCookTest" if /I not "%%~nT"=="CrossModuleCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" if /I not "%%~nT"=="KitchenSinkCookTest" if /I not "%%~nT"=="KitchenSinkOptimizedCookTest" (
         "%%~fT" >nul 2>&1
         if !ERRORLEVEL! neq 0 (
             echo [FAIL] %%~nT
@@ -101,6 +101,15 @@ if !ERRORLEVEL! neq 0 (
     set "FAILED=1"
 ) else (
     echo [ ok ] KitchenSinkCookTest
+)
+
+REM The same KitchenSink cook at --O2, where spirv-opt removes bindings and workgroup memory from SPIR-V only.
+"%BIN%\KitchenSinkOptimizedCookTest.exe" -o "%REPO%\build\%PRESET%\tests\kitchen_sink_optimized_output" --target=wgsl --target=spirv --verify-deterministic --O2 --policy-file "%REPO%\tests\assets\KitchenSink\KitchenSink.toml" "%REPO%\tests\assets\KitchenSink\KsGeometry.slang" "%REPO%\tests\assets\KitchenSink\KsMaterial.slang" "%REPO%\tests\assets\KitchenSink\KsVolume.slang" "%REPO%\tests\assets\KitchenSink\KsPost.slang" >nul 2>&1
+if !ERRORLEVEL! neq 0 (
+    echo [FAIL] KitchenSinkOptimizedCookTest
+    set "FAILED=1"
+) else (
+    echo [ ok ] KitchenSinkOptimizedCookTest
 )
 
 if "%FAILED%"=="1" (

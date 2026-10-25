@@ -62,12 +62,14 @@ Ordered by what can write wrong output first.
 6. **The Slang global-session convoy.** `slang_createGlobalSession` serializes per-thread startup.
    `k_UseSlangWorkaround` in `SlangModuleContext.cpp` (now `true`) toggles a bypass. It helps a release cook and
    hurts a Debug cook. Read it before you measure anything.
-7. **shader-slang/slang#13789 has a workaround in the cook.** `ApplySlangWorkaround13789` (`BuildModuleStep.cpp`).
-   `SlangMetadataCanaryTest` fails when Slang fixes the issue, and its header lists what to delete.
+7. **shader-slang/slang#13789 needs no workaround now** (2026-10-25): the used bindings come from the emitted code
+   (`KeepDeclaredBindings`). `SlangMetadataCanaryTest` stays as a signal (the author's choice); when it fails, delete it.
 8. **shader-slang/slang#13895 has a workaround in the SPIR-V validator.** An array of write-only storage images gets no
    `NonReadable`. `IsSlangNonReadableArrayFault` (`SpvValidator.cpp`) accepts it with a warning, and
    `SlangNonReadableCanaryTest` fails when Slang fixes it, and its header lists what to delete.
-9. **UPSTREAM REPORT OWED (author, 2026-10-25): Slang's metadata describes code that spirv-opt later removes.**
+9. **TWO UPSTREAM REPORTS OWED (author, 2026-10-25).** The second: with `-g`, Slang emits a `DebugSource` for linked
+   modules that contribute no code (`docs/base-cook-plan.md` section 7). The first: **Slang's metadata describes code that
+   spirv-opt later removes.** Frame it as a question about the intended meaning, not as a bug claim (the author's caution).
    `IMetadata::isParameterLocationUsed` comes from Slang's IR before `slang-emit.cpp` gives the SPIR-V to spirv-opt
    (`slang-glslang.cpp`, `Default`, `High`, and `Maximal` pass lists). At `--O1` and above a binding that Slang marks used
    is gone from the code (DiamondDogs `NvproPyramid`, `PyramidSampler` at `--O2`; KitchenSink `Albedo` at `--O1`).
@@ -291,3 +293,4 @@ One line for each step. Git history holds the full text.
   a handle as a `uint2`, and no heap variable.
 - **2026-10-24 (F4.2 to F4.4).** Format 17: stored values (`StoredValuePlacement`, `Binding::ValueOffset` and `ValueContainer`,
   `Profile::Forms`, `PlacementOrderKey`), `[ls_shim_value]`, the heap compared with the mutable lowering, `ShimPlacementTest`.
+- **2026-10-25 (optimization levels).** No test cooked above `--O0`. Above it spirv-opt removes bindings and workgroup memory that Slang's metadata keeps (DiamondDogs `NvproPyramid` at `--O2`, KitchenSink at `--O1`). The used bindings now come from the code (`KeepDeclaredBindings`), the pair check compares bindings both profiles use, and the source facts check is one-way for an optimized profile (`CookedProfile::CodeOptimized`). `OptimizedLayoutTest` and `KitchenSinkOptimizedCookTest` (`--O2`). Also fixed: a span over `rawVariant.Bindings` held across `AppendBindingDrafts` in `SlangReflector::Reflect` (from `28bccf3`) read freed memory, and failed `EntryPointParamsCookTest` about one run in seven. 48 of 48 tests, 60 of 60 known-good.

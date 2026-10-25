@@ -98,6 +98,18 @@ add_lodestone_unit_test(KitchenSinkCookTest CookTest.cpp
               "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KsMaterial.slang"
               "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KsVolume.slang"
               "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KsPost.slang")
+# The same cook at --O2, where spirv-opt removes bindings and workgroup memory from SPIR-V only.
+add_lodestone_unit_test(KitchenSinkOptimizedCookTest CookTest.cpp
+    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/kitchen_sink_optimized_output"
+              --target=wgsl
+              --target=spirv
+              --verify-deterministic
+              --O2
+              --policy-file "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KitchenSink.toml"
+              "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KsGeometry.slang"
+              "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KsMaterial.slang"
+              "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KsVolume.slang"
+              "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KsPost.slang")
 # The one test in this suite that asserts a cook FAILS.
 #
 # Every other cook test checks that a good module cooks. A check that never fires and a check that
@@ -177,6 +189,11 @@ target_compile_definitions(StorageFormatAxisTest PRIVATE
 add_lodestone_unit_test(ShimArrayTest ShimArrayTests.cpp)
 target_compile_definitions(ShimArrayTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/ShimArrays")
+# A branch that spirv-opt removes (O2): the cook takes the used bindings from the emitted code, and the cross-profile checks accept
+# a layout and workgroup memory that only the optimized profile shrinks. It cooks through Slang four times.
+add_lodestone_unit_test(OptimizedLayoutTest OptimizedLayoutTests.cpp)
+target_compile_definitions(OptimizedLayoutTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/OptimizedLayout")
 # Shim resources in the Pointer and Handle forms, cooked for spirv-modern through the test-only switch: each stored value
 # reads back with its container and offset, and the resource of each equals the reflection of its Bound form.
 add_lodestone_unit_test(ShimPlacementTest ShimPlacementTests.cpp)

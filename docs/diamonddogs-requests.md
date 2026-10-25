@@ -223,3 +223,21 @@ Not covered: an array of texel buffers (`Buffer<T>[N]`), which needs the `...Tex
 a non-uniform index (`NonUniformResourceIndex`), which needs the `ShaderNonUniform` family. Tell the author if you need either.
 
 `tests/BindingArrayTest` is the proof.
+
+### Cooks above `--O0`: each variant's layout is what its code uses (2026-10-25)
+
+The `ocean_fft_shaders` cook failed at `--O2` with `ReflectionMismatch` on `PyramidSampler`. The cause is in Slang. Above
+`--O0` Slang gives the SPIR-V to spirv-opt, after it computes the reflection metadata. For `PYRAMID_REDUCTION` = `PyramidMax`
+or `PyramidMin`, `BilinearIsExact()` is a constant `false`, the optimizer removes the bilinear branch, and the sampler is
+gone from the code of `NvproPyramidFastCS`. Reflection still said the sampler was used.
+
+The fix is in Lodestone: the bindings that an entry point uses now come from the emitted code. At `--O2` the Max and Min
+variants of `NvproPyramidFastCS` have no `PyramidSampler` in their layout, and the other variants still have it. What the
+host must do:
+
+- Do not require a binding in every variant. Read the layout of the variant you bind (`EntryPointInstanceView::Layout()`),
+  and create and bind only what it holds. A lookup by name for a binding that the variant does not use finds nothing.
+- The layout of a variant can change with the optimization level. Build each pipeline layout from the manifest of the
+  cook that made its code.
+
+The cook now passes at `--O0` to `--O3`. Lodestone's `KitchenSinkOptimizedCookTest` cooks at `--O2`.

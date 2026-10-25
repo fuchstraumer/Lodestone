@@ -54,7 +54,7 @@ optional parameters, so each arity has its own name (`ls_extent_1d`, `_2d`, `_3d
 
 Files: [SlangReflector.cpp](../src/compile/impl/SlangReflector.cpp) (`readEntryPointConstants`),
 [BuildModuleStep.cpp](../src/driver/steps/BuildModuleStep.cpp) (`ReconcileEntryPointConstants`,
-`ApplySlangWorkaround13789`).
+`KeepDeclaredBindings`).
 
 **Delivery.** The range type of the parameters' constant buffer gives the delivery. A `ConstantBuffer` range is a
 uniform buffer with a placement (WGSL). Stage 3 drafts it as a binding named as the target code names it, so the
@@ -68,10 +68,16 @@ no block. A block that reflection does not state, or that covers more bytes than
 
 **slang#13789.** `collectMetadataFromInst` in `slang-ir-metadata.cpp` marks the whole slot range of the parameters'
 constant buffer as used once any part is used. A resource beside that data that the entry point does not read then shows
-in reflection and is absent from the code. `ApplySlangWorkaround13789` removes such a resource from the visibility when
-the emitted code does not declare it, reading only `ConstantsElementBindings`, so every other binding keeps the full
-cross-check. The element follows the container in placement order, so a removal never moves the container's position.
-`SlangMetadataCanaryTest` fails when Slang fixes the issue.
+in reflection and is absent from the code. Until 2026-10-25 a narrow workaround removed such a resource. Now
+`KeepDeclaredBindings` covers it with every other binding the code does not declare (section 14). The canary
+`SlangMetadataCanaryTest` stays, so that the fault cannot be forgotten. When it fails, delete the test.
+
+**Used bindings come from the code (2026-10-25).** Slang computes `IMetadata` from its IR before `slang-emit.cpp` gives
+the SPIR-V to spirv-opt (`slang-glslang.cpp`). Above `--O0` the optimizer inlines, folds constants, and removes dead
+branches and variables that Slang kept, for example a branch on an interface method that returns a constant `false`
+(DiamondDogs `NvproPyramid`, KitchenSink `Albedo` at `--O1`). `KeepDeclaredBindings` keeps only the bound bindings that
+the code declares (`EmittedCodeFacts::DeclaredPlacements`), and the values stored in a removed uniform buffer. Entry point
+constants in a uniform buffer name it by position, so the position is computed again. Slang runs no optimizer on WGSL.
 
 ## 3. Axis declarations
 
@@ -364,10 +370,10 @@ Moved from `CLAUDE.md` on 2026-10-25. Each bullet is one validator of the cook.
   the parameters' constant buffer as used once any part is used (`collectMetadataFromInst` in
   `slang-ir-metadata.cpp` inserts the whole slot range of the parameter). A resource parameter beside that data
   that the entry point does not read is then visible to reflection and absent from the code. Reported as
-  shader-slang/slang#13789. `ApplySlangWorkaround13789` (in `BuildModuleStep.cpp`) removes such a resource from the
-  visibility when the emitted code does not declare it, and prints a warning for each one. It reads only the
-  resources in the constants element (`ConstantsElementBindings`), so every other binding keeps the full
-  cross-check. `SlangMetadataCanaryTest` fails when Slang fixes the issue, so the workaround cannot outlive it.
+  shader-slang/slang#13789. Since 2026-10-25 no workaround is needed: the used bindings come from the emitted code
+  (`KeepDeclaredBindings`, section 2), because spirv-opt removes bindings in the same way above `--O0`. A reflected
+  binding that the code does not declare is not a mismatch. `SlangMetadataCanaryTest` still fails when Slang fixes the
+  issue.
 
   A second Slang fault, measured on 2026-10-23: the direct SPIR-V emitter gives an array of write-only storage images no
   `NonReadable` (`maybeEmitWriteOnlyImageDecoration` in `slang-emit-spirv.cpp` does not unwrap the array, shader-slang/slang#13895), so the code
@@ -377,14 +383,19 @@ Moved from `CLAUDE.md` on 2026-10-25. Each bullet is one validator of the cook.
 - **The sampler pair cross-check**, after the last module and before the emit. `VerifySamplerPairsAcrossProfiles`
   (in `model/CookedLibrary.cpp`) compares the pairs of each variant that two profiles cooked, by resource scope
   and name. The two readers are independent, so agreement is a second opinion. It skips an entry point with a
-  combined texture sampler, which SPIR-V samples with no `OpSampledImage`. A difference fails the cook with
-  `SamplerPairsTargetMismatch`.
+  combined texture sampler, which SPIR-V samples with no `OpSampledImage`. It compares only the pairs whose texture and
+  sampler both profiles use (`KeepPairsVisibleIn`): above `--O0` spirv-opt removes bindings from SPIR-V only, and a
+  profile has no opinion on a binding it does not use. A difference fails the cook with `SamplerPairsTargetMismatch`.
 - **The source facts cross-check**, next to it. `VerifySourceFactsAcrossProfiles` (in `model/CookedLibrary.cpp`)
   compares the workgroup memory bytes, and a portable subset of the capability names, of each entry point that two
   profiles cooked for one variant. The map is `f16` with `Float16`, and `subgroups` with the `GroupNonUniform` family.
   A name that only one target spells (`StorageInputOutput16`, `DrawParameters`) is not compared. A profile with no
   reader (`CookedProfile::CodeFactsRead` false) is skipped, because it stores empty facts. A difference fails the
-  cook with `SourceFactsTargetMismatch`. Both cross-profile checks share `VisitSharedVariants`.
+  cook with `SourceFactsTargetMismatch`. Both cross-profile checks share `VisitSharedVariants`. When only one profile's
+  code went through an optimizer (`CookedProfile::CodeOptimized`, from `TargetProfile::OptimizesEmittedCode` above
+  `--O0`), the check is one-way: the optimized profile needs no more workgroup memory and no portable capability that the
+  other lacks. Measured 2026-10-25: KitchenSink `KsVolume` `GenerateCS` needs 0 bytes in SPIR-V and 256 in WGSL at `--O1`.
+  This one-way check cannot see a lowering that differs between the targets in the other direction (`todo.md`).
 - **The capability axis check**, next to it. `VerifyCapabilityAxes` (in `model/AxisInfluence`) reads the capability
   names that each profile's reader measured, for each axis of kind `capability` that no other axis gates. A one-axis pair
   must differ in the names of some entry point, or the cook fails with `CapabilityAxisInert`: the "off" path still needs

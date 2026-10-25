@@ -156,7 +156,7 @@ itself. A function in the cooker library that can report takes a `DiagnosticSink
 
 `ParseCommandLine` in `src/driver/CookerOptions.cpp` parses the flags, and `GetUsageText` prints them:
 `--output/-o`, `--cache-dir`, `--include-dir/-I <path>` (repeatable),
-`--O0` to `--O3`, `--target=<name>`, `--no-validate`, `--quiet`,
+`--O0` to `--O3`, `--g0` to `--g3` (Slang's debug information level), `--target=<name>`, `--no-validate`, `--quiet`,
 `--single-threaded`, `--no-dedupe`, `--verify-deterministic`, `--dump-stage=<name>`, `--dump-sources`,
 and `--depfile`. `--depfile` writes `ShaderLibrary.d`, a Makefile-form depfile that names every file Slang
 read, `import` and `__include` included. `--dump-sources` writes every unique compiled source to a subfolder
@@ -493,13 +493,17 @@ skips, and the Slang workarounds it carries.
   the cook with `ReflectionMismatch`. A profile with no validator fails with `TargetValidatorUnavailable`, and
   `--no-validate` skips the check on purpose. The same read gives cook output: the sampler and texture pairs (task L7),
   the push constant block of the entry point constants (task L14), and the source facts. `--no-validate` still reads them
-  (`ReadEmittedCodeFacts`). Two Slang faults have narrow workarounds here, each with a canary test:
-  shader-slang/slang#13789 (`ApplySlangWorkaround13789`) and shader-slang/slang#13895 (`IsSlangNonReadableArrayFault`).
+  (`ReadEmittedCodeFacts`). **The code decides which bindings an entry point uses** (`KeepDeclaredBindings`): above `--O0`
+  Slang gives SPIR-V to spirv-opt, which removes bindings that Slang's metadata marks used, so a reflected binding that the
+  code does not declare leaves the visibility and is not a mismatch. Every other difference still fails. One Slang fault
+  has a narrow workaround here, with a canary test: shader-slang/slang#13895 (`IsSlangNonReadableArrayFault`).
+  `SlangMetadataCanaryTest` still watches shader-slang/slang#13789, which needs no workaround now.
 - **The sampler pair cross-check** (`VerifySamplerPairsAcrossProfiles`, `model/CookedLibrary.cpp`). The pairs that two
-  profiles read for one variant must agree (`SamplerPairsTargetMismatch`). It skips an entry point whose pairs the code
-  cannot show: a combined texture sampler, or a texture or sampler through a handle.
+  profiles read for one variant must agree (`SamplerPairsTargetMismatch`), on the bindings that both profiles use. It skips
+  an entry point whose pairs the code cannot show: a combined texture sampler, or a texture or sampler through a handle.
 - **The source facts cross-check** (`VerifySourceFactsAcrossProfiles`, same file). Workgroup memory and a portable subset of
-  the capability names must agree between profiles (`SourceFactsTargetMismatch`).
+  the capability names must agree between profiles (`SourceFactsTargetMismatch`). When only one profile's code went through
+  an optimizer (`CookedProfile::CodeOptimized`: SPIR-V above `--O0`), the check is one-way: that profile must need no more.
 - **The capability axis check** (`VerifyCapabilityAxes`, `model/AxisInfluence`). An axis of kind `capability` must change
   the measured capability names (`CapabilityAxisInert`), and a boolean off path must need a subset of the on path
   (`CapabilityAxisInverted`).

@@ -320,8 +320,9 @@ constexpr const char* k_AllWarningsAsErrors = "all";
 // 41012 checks the entry point before specialization, so a capability axis fails every variant. Device capabilities
 // are ours to record, from the emitted code
 constexpr const char* k_DisabledWarnings = "31010,41012";
-// the two warning level rows must stay in this order
-constexpr std::array<CompilerOptionRow, 9u> k_CompilerOptionRows
+// the two warning level rows must stay in this order. Slang keeps the first value of a repeated option, so the
+// options that MakeCompilerOptions appends (optimization, debug information) must have no row here
+constexpr std::array<CompilerOptionRow, 8u> k_CompilerOptionRows
 {
     CompilerOptionRow
     { 
@@ -352,12 +353,6 @@ constexpr std::array<CompilerOptionRow, 9u> k_CompilerOptionRows
         .Name = slang::CompilerOptionName::FloatingPointMode,
         .Kind = slang::CompilerOptionValueKind::Int,
         .IntValue = SLANG_FLOATING_POINT_MODE_FAST
-    },
-    CompilerOptionRow
-    {
-        .Name = slang::CompilerOptionName::DebugInformation,     
-        .Kind = slang::CompilerOptionValueKind::Int,
-        .IntValue = SLANG_DEBUG_INFO_LEVEL_NONE
     },
     CompilerOptionRow
     {

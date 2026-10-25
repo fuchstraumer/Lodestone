@@ -404,7 +404,9 @@ namespace
                                                           .Forms = PlacementFormsOf(profile.Forms),
                                                           .CodeFormat = CodeFormatFromLanguage(profile.Language),
                                                           .SamplerTexturePairsRecorded = profile.Validator != nullptr,
-                                                          .CodeFactsRead = profile.Validator != nullptr });
+                                                          .CodeFactsRead = profile.Validator != nullptr,
+                                                          .CodeOptimized = profile.OptimizesEmittedCode &&
+                                                                           cook_state.Options.OptimizationLevel > 0u });
         }
 
         library.Environments.resize(library.Profiles.size() * library.ModuleNames.size());

@@ -74,7 +74,8 @@ namespace
                            .Forms = k_AllBound,
                            .Validator = &k_SpvValidator,
                            .MaxPushConstantBytes = 128u,
-                           .VulkanApiVersion = (1u << 22u) | (2u << 12u) },
+                           .VulkanApiVersion = (1u << 22u) | (2u << 12u),
+                           .OptimizesEmittedCode = true },
         // buffers through buffer device addresses, and textures and samplers through descriptor handles
         TargetProfile{ .Name = k_SpirvModernName,
                            .Language = TargetLanguage::Spirv,
@@ -87,6 +88,7 @@ namespace
                            .Validator = &k_SpvModernValidator,
                            .MaxPushConstantBytes = 128u,
                            .VulkanApiVersion = (1u << 22u) | (2u << 12u),
+                           .OptimizesEmittedCode = true,
                            .IncompleteReason = "the manifest does not record the descriptor heap, the validator does not compare "
                                                "the offsets of handles and pointers with the code, and the sampler pairs of "
                                                "handles are not recorded" },
