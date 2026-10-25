@@ -2,6 +2,8 @@ module LodestoneShims;
 
 // Shim interfaces for resources, and their Bound implementations. A shader declares `extern struct X : IReadBuffer<T>`
 // and calls the interface. The cooker links the implementation that the target profile uses for that resource class.
+// Each implementation method is [ForceInline] so that a constant index into an array of shims stays a constant, and needs
+// no dynamic-indexing device feature.
 
 // The storage texture formats that every target accepts, for a texture that a shader writes. A format axis is an enum axis over
 // this enum (`[ls_axis_enum] extern static const StorageFormat LEVEL_FORMAT = StorageFormat::Rgba16Float;`), so a case that
@@ -89,6 +91,7 @@ public struct BoundReadBuffer<T> : IReadBuffer<T>
 {
     StructuredBuffer<T> data;
 
+    [ForceInline]
     public T Load(uint index)
     {
         return data[index];
@@ -99,11 +102,13 @@ public struct BoundReadWriteBuffer<T> : IReadWriteBuffer<T>
 {
     RWStructuredBuffer<T> data;
 
+    [ForceInline]
     public T Load(uint index)
     {
         return data[index];
     }
 
+    [ForceInline]
     public void Store(uint index, T value)
     {
         data[index] = value;
@@ -114,6 +119,7 @@ public struct BoundTexture2D : ITexture2DRef
 {
     Texture2D<float4> texture;
 
+    [ForceInline]
     public Texture2D<float4> Get()
     {
         return texture;
@@ -124,6 +130,7 @@ public struct BoundSampler : ISamplerRef
 {
     SamplerState sampler;
 
+    [ForceInline]
     public SamplerState Get()
     {
         return sampler;
@@ -136,6 +143,7 @@ public struct BoundWriteStorageTexture2D<F : ITexelElement> : IWriteStorageTextu
 {
     WTexture2D<F> texture;
 
+    [ForceInline]
     public void Store(uint2 coordinate, float4 value)
     {
         texture.Store(coordinate, F.DataType.FromFloat4(value));
