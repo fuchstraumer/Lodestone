@@ -41,6 +41,7 @@ struct CookerOptions
     std::vector<std::filesystem::path> IncludeDirectories;
     std::vector<std::filesystem::path> ModulePaths;
     uint32_t OptimizationLevel{ 0u };
+    uint32_t DebugLevel{ 0u };
     std::vector<std::string> TargetNames;
     bool ValidateAgainstEmittedText{ true };
     bool ReportReflection{ false };

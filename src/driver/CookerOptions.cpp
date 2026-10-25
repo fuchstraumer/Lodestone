@@ -32,6 +32,7 @@ namespace
         "  --output, -o    output directory (required)\n"
         "  --target=<name> output target profile (required). Repeat it for more than one. Names: wgsl\n"
         "  --O<level>      slang optimization level: 0-3, defaults to 0\n"
+        "  --g<level>      slang debug level: 0-3, defaults to 0\n"
         "  --no-validate   skip cross-checking reflection against the emitted text\n"
         "  --quiet         suppress the per-variant reflection report\n"
         "  --cache-dir     directory for precompiled slang modules\n"
@@ -48,6 +49,7 @@ namespace
         "  --depfile       write ShaderLibrary.d, a depfile that names every source file the cook read\n";
 
     constexpr std::string_view k_OptimizationPrefix = "--O";
+    constexpr std::string_view k_DebugPrefix = "--g";
     constexpr std::string_view k_TargetPrefix = "--target=";
     constexpr std::string_view k_StageDumpPrefix = "--dump-stage=";
     constexpr std::string_view k_AllStageDumpsName = "all";
@@ -59,7 +61,8 @@ namespace
         std::string_view Name;
     };
 
-    constexpr std::array<StageDumpName, 6u> k_StageDumpNames{
+    constexpr std::array<StageDumpName, 6u> k_StageDumpNames
+    {
         StageDumpName{ .Kind = StageDumpKind::Space, .Name = "space" },
         StageDumpName{ .Kind = StageDumpKind::Variants, .Name = "variants" },
         StageDumpName{ .Kind = StageDumpKind::Raw, .Name = "raw" },
@@ -89,7 +92,8 @@ namespace
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
 #endif
-    CookResult<uint32_t> ParseOptimizationLevel(std::string_view level_text)
+    // used to be optimization level only: now used for debug level as well
+    CookResult<uint32_t> ParseOptionLevel(std::string_view level_text)
     {
         if (level_text.empty())
         {
@@ -152,7 +156,8 @@ namespace
         options.WriteDepfile = true;
     }
 
-    constexpr std::array<SwitchFlag, 7u> k_SwitchFlags{
+    constexpr std::array<SwitchFlag, 7u> k_SwitchFlags
+    {
         SwitchFlag{ .Name = "--no-dedupe", .Apply = &DisableDedupe },
         SwitchFlag{ .Name = "--verify-deterministic", .Apply = &EnableVerifyDeterminism },
         SwitchFlag{ .Name = "--no-validate", .Apply = &DisableValidateAgainstEmittedText },
@@ -218,7 +223,7 @@ namespace
 
     CookError ApplyDesiredOptimizationLevel(CookerOptions& options, std::string_view value)
     {
-        const CookResult<uint32_t> level = ParseOptimizationLevel(value);
+        const CookResult<uint32_t> level = ParseOptionLevel(value);
         if (!level)
         {
             return level.error();
@@ -227,11 +232,24 @@ namespace
         return CookError::Success;
     }
 
-    const std::array<ValueFlag, 3u> k_ValueFlags{
+    CookError ApplyDebugLevel(CookerOptions& options, std::string_view value)
+    {
+        const CookResult<uint32_t> level = ParseOptionLevel(value);
+        if (!level)
+        {
+            return level.error();
+        }
+        options.DebugLevel = level.value();
+        return CookError::Success;
+    }
+
+    const std::array<ValueFlag, 4u> k_ValueFlags
+    {
         ValueFlag{ .Prefix = k_StageDumpPrefix, .Apply = &ApplyDumpStageArgument },
         // rejected here, so every name in CookerOptions is one FindTargetProfile accepts
         ValueFlag{ .Prefix = k_TargetPrefix, .Apply = &ApplyTargetOption },
-        ValueFlag{ .Prefix = k_OptimizationPrefix, .Apply = &ApplyDesiredOptimizationLevel }
+        ValueFlag{ .Prefix = k_OptimizationPrefix, .Apply = &ApplyDesiredOptimizationLevel },
+        ValueFlag{ .Prefix = k_DebugPrefix, .Apply = &ApplyDebugLevel }
     };
 
     const ValueFlag* FindValueFlag(std::string_view argument) noexcept
