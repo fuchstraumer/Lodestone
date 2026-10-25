@@ -174,6 +174,9 @@ target_compile_definitions(StorageFormatAxisTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/StorageFormatAxis")
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
+# A canary for shader-slang/slang#13895, the missing NonReadable on an array of write-only storage images: it fails when Slang decorates the array,
+# so the SPIR-V validator's workaround cannot outlive the fault.
+add_lodestone_unit_test(SlangNonReadableCanaryTest SlangNonReadableCanaryTests.cpp)
 # The command line, which every later step trusts. It needs no Slang.
 add_lodestone_unit_test(CookerOptionsTest CookerOptionsTests.cpp)
 target_compile_definitions(CookerOptionsTest PRIVATE
