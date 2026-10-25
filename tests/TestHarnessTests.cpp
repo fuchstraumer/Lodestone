@@ -71,6 +71,19 @@ int main()
         runner.CheckEqual(silent.Report(), 1, "a suite with no check fails");
     }
 
+    runner.BeginSection("a scoped section that is still open at Report ends once");
+    {
+        TestRunner inner{ "inner" };
+        int32_t reported = 0;
+        {
+            const auto scoped = inner.Section("open at Report");
+            inner.Check(true, "a check");
+            reported = inner.Report();
+        }
+        runner.CheckEqual(reported, 0, "Report finishes the open section");
+        runner.CheckEqual(inner.Failures(), 0, "the section's destructor after Report changes nothing");
+    }
+
     runner.BeginSection("a failure prints the value in a readable form");
     runner.CheckEqual(FormatForTest(CookError::FileNotFound), std::string{ "FileNotFound" }, "an enum prints its name");
     runner.CheckEqual(FormatForTest(std::vector<int32_t>{ 1, 2 }), std::string{ "[1, 2]" }, "a range prints its elements");

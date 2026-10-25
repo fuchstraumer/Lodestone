@@ -213,6 +213,12 @@ void TestRunner::finishSection(SectionState& section)
 
 void TestRunner::endScopedSection()
 {
+    // `return runner.Report();` runs before the destructor of a section in the same scope, and Report finished it
+    if (sections.empty())
+    {
+        return;
+    }
+
     finishSection(sections.back());
     sections.pop_back();
 }
