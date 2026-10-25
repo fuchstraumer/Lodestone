@@ -426,7 +426,11 @@ std::string DescribeBinding(const ReflectedBinding& binding)
         description += std::format(" sample={}", ToString(binding.SampleType));
     }
 
-    if (binding.ArrayCount > 1u)
+    if (binding.ArrayCount == 0u)
+    {
+        description += " array=unbounded";
+    }
+    else if (binding.ArrayCount > 1u)
     {
         description += std::format(" array={}", binding.ArrayCount);
     }

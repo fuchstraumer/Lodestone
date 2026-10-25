@@ -64,6 +64,7 @@ namespace
         JoinSource(joined.MipLevels, fields.MipLevels);
         JoinSource(joined.SampleCount, fields.SampleCount);
         JoinSource(joined.SamplerState, fields.SamplerState);
+        JoinSource(joined.BindingCount, fields.BindingCount);
     }
 
     /** Counts and extents print only when every footprint seen agrees. */
@@ -307,7 +308,7 @@ std::string FormatResourceReport(const ResourceReport& report)
                                 JoinNames(entry.EntryPoints));
 
             const CreationFields& fields = entry.Fields;
-            const std::array<std::tuple<std::string_view, CreationSource, bool>, 9u> rows{ {
+            const std::array<std::tuple<std::string_view, CreationSource, bool>, 10u> rows{ {
                 { "size", fields.Size, true },
                 { "usage", fields.Usage, false },
                 { "dimension", fields.Dimension, false },
@@ -317,6 +318,7 @@ std::string FormatResourceReport(const ResourceReport& report)
                 { "mips", fields.MipLevels, false },
                 { "samples", fields.SampleCount, false },
                 { "sampler", fields.SamplerState, false },
+                { "count", fields.BindingCount, false },
             } };
 
             std::string line;

@@ -305,8 +305,7 @@ constexpr std::string_view k_WorkgroupCs = R"(
 )";
 
 // An array of four storage images (a binding array), written through a constant index. Replacing `%uint_0` in the access
-// chain with `%index` makes it a dynamic index. The runtime array form is the
-// unbounded array of the Indexed access model, which this validator does not read.
+// chain with `%index` makes it a dynamic index. The runtime array form is an unbounded array.
 constexpr std::string_view k_ImageArrayCs = R"(
                OpCapability Shader
                OpCapability RuntimeDescriptorArray
@@ -530,10 +529,15 @@ int main()
 
     const std::vector<std::byte> unbounded =
         Assemble(Replace(k_ImageArrayCs, "OpTypeArray %image %uint_4", "OpTypeRuntimeArray %image"));
-    const CookResult<BindingComparison> unboundedResult = validator.ValidateEntryPoint(unbounded, fourLevelsPointers, sink);
-    runner.Check(Mismatches(unboundedResult, BindingMismatchKind::Unsupported) &&
-                     unboundedResult->Mismatches.front().Emitted.contains("unbounded"),
-                 "an unbounded array is reported as unsupported until the Indexed access model reads it");
+    const std::vector<ReflectedBinding> unboundedLevels = arrayReflection(0u);
+    std::vector<const ReflectedBinding*> unboundedLevelsPointers = PointersTo(unboundedLevels);
+    const CookResult<BindingComparison> unboundedMatch = validator.ValidateEntryPoint(unbounded, unboundedLevelsPointers, sink);
+    runner.Check(unboundedMatch.has_value() && unboundedMatch->Matches(),
+                 "an unbounded array matches reflection with an array count of 0");
+    runner.Check(Mismatches(validator.ValidateEntryPoint(unbounded, fourLevelsPointers, sink), BindingMismatchKind::ArrayCount),
+                 "an unbounded array against reflection with four is a mismatch");
+    runner.Check(Mismatches(validator.ValidateEntryPoint(imageArray, unboundedLevelsPointers, sink), BindingMismatchKind::ArrayCount),
+                 "an array of four against unbounded reflection is a mismatch");
 
     // Slang gives an array of write-only storage images no NonReadable (shader-slang/slang#13895), and a single image
     // gets one, so the validator accepts that one difference and no other
@@ -638,6 +642,15 @@ int main()
                      std::ranges::find(dynamicIndex->CapabilityNames, "StorageImageArrayDynamicIndexing") !=
                          dynamicIndex->CapabilityNames.end(),
                  "an index that is not a constant adds StorageImageArrayDynamicIndexing, which Slang does not state");
+    const std::vector<std::byte> dynamicUnbounded = Assemble(
+        Replace(Replace(k_ImageArrayCs, "OpAccessChain %ptrImage %Levels %uint_0", "OpAccessChain %ptrImage %Levels %index"),
+                "OpTypeArray %image %uint_4",
+                "OpTypeRuntimeArray %image"));
+    const CookResult<EmittedCodeFacts> dynamicUnboundedIndex = validator.ReadEmittedCodeFacts(dynamicUnbounded, sink);
+    runner.Check(dynamicUnboundedIndex.has_value() &&
+                     std::ranges::find(dynamicUnboundedIndex->CapabilityNames, "StorageImageArrayDynamicIndexing") !=
+                         dynamicUnboundedIndex->CapabilityNames.end(),
+                 "a dynamic index into an unbounded array adds the feature too");
 
     return runner.Report();
 }

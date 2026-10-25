@@ -200,6 +200,11 @@ uint32_t ResolvedResource::ArrayCount() const noexcept
     return record->ArrayCount;
 }
 
+bool ResolvedResource::IsUnbounded() const noexcept
+{
+    return record->ArrayCount == 0u;
+}
+
 uint64_t ResolvedResource::ByteSize() const noexcept
 {
     return record->ByteSize;
@@ -258,8 +263,8 @@ bool ResolvedResource::HasTag(std::string_view tag) const noexcept
 
 bool CreationFields::IsComplete() const noexcept
 {
-    const std::array<CreationSource, 9u> sources{ Size,        Usage,     Dimension,   Format,      Extent,
-                                                  ArrayLayers, MipLevels, SampleCount, SamplerState };
+    const std::array<CreationSource, 10u> sources{ Size,        Usage,     Dimension,   Format,       Extent,
+                                                   ArrayLayers, MipLevels, SampleCount, SamplerState, BindingCount };
     return std::ranges::none_of(sources, [](CreationSource source) { return source == CreationSource::Cpu; });
 }
 
@@ -294,6 +299,15 @@ CreationFields DescribeCreation(const ResolvedResource& resource) noexcept
         break;
     default:
         break;
+    }
+
+    if (resource.IsUnbounded())
+    {
+        fields.BindingCount = CreationSource::Cpu;
+    }
+    else if (resource.ArrayCount() > 1u)
+    {
+        fields.BindingCount = CreationSource::Shader;
     }
     return fields;
 }

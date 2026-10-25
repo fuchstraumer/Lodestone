@@ -12,7 +12,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <expected>
 #include <filesystem>
+#include <format>
 #include <map>
 #include <optional>
 #include <string>
@@ -131,17 +133,102 @@ int main(int argc, char** argv)
         }
     }
 
-    runner.BeginSection("the forms that are not read yet fail with their own errors");
-    MemoryOutputSink wgslSink;
-    const CookResult<CookStatistics> wgsl = CookIntoMemory(assetDirectory / "BindingArrays.slang", "wgsl", wgslSink);
-    runner.CheckError(wgsl, CookError::CodeGenerationFailed,
-                      "WGSL has no array of resources, and Slang rejects it");
-
+    runner.BeginSection("an unbounded binding array cooks for SPIR-V, and the manifest marks it unbounded");
     MemoryOutputSink unboundedSink;
     const CookResult<CookStatistics> unbounded =
         CookIntoMemory(assetDirectory / "UnboundedArray.slang", "spirv", unboundedSink);
-    runner.CheckError(unbounded, CookError::ReflectionMismatch,
-                      "an unbounded array fails the SPIR-V cross-check until the Indexed access model reads it");
+    runner.CheckOk(unbounded, "the module with an unbounded array of textures and of storage buffers cooks");
+    const std::vector<std::byte> unboundedBytes = ManifestBytes(unboundedSink);
+    const manifest::ManifestResult<manifest::BundleView> unboundedBundle = manifest::BundleView::Open(unboundedBytes);
+    const manifest::ManifestResult<manifest::EnvironmentView> unboundedEnvironment =
+        unboundedBundle.has_value() ? unboundedBundle->OpenEnvironment(0u, 0u) : std::unexpected(unboundedBundle.error());
+    if (runner.CheckOk(unboundedEnvironment, "the environment opens"))
+    {
+        const auto needs = [&unboundedEnvironment](const manifest::EntryPointInstanceView& instance, std::string_view name)
+        {
+            for (uint32_t i = 0u; i < unboundedEnvironment->CapabilityNames().size(); ++i)
+            {
+                if (unboundedEnvironment->CapabilityName(i) == name)
+                {
+                    return instance.RequiresCapability(i);
+                }
+            }
+            return false;
+        };
+
+        const manifest::ModuleView module = unboundedBundle->Module(0u);
+        const manifest::ManifestResult<uint32_t> uniformIndex = module.FindEntryPointIndex("UniformCS");
+        const manifest::ManifestResult<uint32_t> nonUniformIndex = module.FindEntryPointIndex("NonUniformCS");
+        if (runner.CheckOk(uniformIndex, "the entry point with a uniform index exists") &&
+            runner.CheckOk(nonUniformIndex, "the entry point with a non-uniform index exists"))
+        {
+            const manifest::EntryPointInstanceView uniform = unboundedEnvironment->VariantAt(0u).EntryPoint(*uniformIndex);
+            const manifest::LayoutRange layout = uniform.Layout();
+            for (const std::string_view name : { "Views", "Buffers" })
+            {
+                const std::optional<manifest::ResolvedResource> resource = FindResource(layout, name);
+                if (runner.Check(resource.has_value(), std::format("{} is in the layout", name)))
+                {
+                    runner.Check(resource->IsUnbounded(), std::format("{} is unbounded", name));
+                    runner.CheckEqual(resource->ArrayCount(), 0u, std::format("{} has an array count of 0", name));
+                    runner.CheckEqual(manifest::DescribeCreation(*resource).BindingCount, manifest::CreationSource::Cpu,
+                                      std::format("the renderer chooses the descriptor count of {}", name));
+                }
+            }
+
+            const std::optional<manifest::ResolvedResource> buffers = FindResource(layout, "Buffers");
+            if (buffers.has_value())
+            {
+                const manifest::CreationFields fields = manifest::DescribeCreation(*buffers);
+                runner.Check(fields.Size == manifest::CreationSource::Shader && !fields.IsComplete(),
+                             "a buffer array with a stated size is not complete, because the count is the renderer's");
+            }
+
+            const std::optional<manifest::ResolvedResource> output = FindResource(layout, "Output");
+            if (runner.Check(output.has_value(), "Output is in the layout"))
+            {
+                runner.Check(!output->IsUnbounded(), "a single resource is not unbounded");
+                runner.CheckEqual(manifest::DescribeCreation(*output).BindingCount, manifest::CreationSource::NotApplicable,
+                                  "a single resource has no descriptor count to choose");
+            }
+
+            runner.Check(needs(uniform, "RuntimeDescriptorArray"), "Slang states RuntimeDescriptorArray");
+            runner.Check(needs(uniform, "SampledImageArrayDynamicIndexing") &&
+                             needs(uniform, "StorageBufferArrayDynamicIndexing"),
+                         "a dynamic index into an unbounded array states the device feature it needs");
+            runner.Check(!needs(uniform, "SampledImageArrayNonUniformIndexing"),
+                         "a dynamically uniform index needs no non-uniform feature");
+
+            const manifest::EntryPointInstanceView nonUniform =
+                unboundedEnvironment->VariantAt(0u).EntryPoint(*nonUniformIndex);
+            // ShaderNonUniform comes with Vulkan 1.2, the floor of the profile, so the cook does not store it
+            runner.Check(needs(nonUniform, "SampledImageArrayNonUniformIndexing"),
+                         "NonUniformResourceIndex states SampledImageArrayNonUniformIndexing");
+        }
+    }
+
+    runner.BeginSection("a fixed-size array has a descriptor count that the shader fixes");
+    if (bundle.has_value())
+    {
+        const manifest::ManifestResult<manifest::EnvironmentView> environment = bundle->OpenEnvironment(0u, 0u);
+        const std::optional<manifest::ResolvedResource> levels =
+            environment.has_value() ? FindResource(environment->VariantAt(0u).EntryPoint(0u).Layout(), "Levels") : std::nullopt;
+        if (runner.Check(levels.has_value(), "Levels is in the layout"))
+        {
+            runner.Check(!levels->IsUnbounded(), "an array of four is not unbounded");
+            runner.CheckEqual(manifest::DescribeCreation(*levels).BindingCount, manifest::CreationSource::Shader,
+                              "the shader fixes the descriptor count of an array of four");
+        }
+    }
+
+    runner.BeginSection("WGSL has no array of resources");
+    MemoryOutputSink wgslSink;
+    const CookResult<CookStatistics> wgsl = CookIntoMemory(assetDirectory / "BindingArrays.slang", "wgsl", wgslSink);
+    runner.CheckError(wgsl, CookError::CodeGenerationFailed, "Slang rejects a fixed-size array of resources for WGSL");
+    MemoryOutputSink unboundedWgslSink;
+    const CookResult<CookStatistics> unboundedWgsl =
+        CookIntoMemory(assetDirectory / "UnboundedArray.slang", "wgsl", unboundedWgslSink);
+    runner.Check(!unboundedWgsl.has_value(), "an unbounded array does not cook for WGSL");
 
     return runner.Report();
 }

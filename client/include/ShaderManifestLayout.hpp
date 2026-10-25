@@ -124,7 +124,9 @@ public:
     [[nodiscard]] TextureSampleType SampleType() const noexcept;
     [[nodiscard]] bool IsComparisonSampler() const noexcept;
     [[nodiscard]] uint32_t ElementStride() const noexcept;
+    /** @note Returns 0 if array is unbounded. */
     [[nodiscard]] uint32_t ArrayCount() const noexcept;
+    [[nodiscard]] bool IsUnbounded() const noexcept;
     [[nodiscard]] uint64_t ByteSize() const noexcept;
     /** @brief `[ls_element_count]` for this variant. Zero when not declared, and the caller supplies the size. */
     [[nodiscard]] uint64_t ElementCount() const noexcept;
@@ -181,8 +183,8 @@ struct CreationFields
     CreationSource ArrayLayers{ CreationSource::NotApplicable };
     CreationSource MipLevels{ CreationSource::NotApplicable };
     CreationSource SampleCount{ CreationSource::NotApplicable };
-    /** Filters and address modes. Comparison is fixed by the shader. */
     CreationSource SamplerState{ CreationSource::NotApplicable };
+    CreationSource BindingCount{ CreationSource::NotApplicable };
 
     [[nodiscard]] bool IsComplete() const noexcept;
 };

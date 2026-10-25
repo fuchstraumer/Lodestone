@@ -949,8 +949,9 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
         draft.Binding.Placement = BoundPlacement{ .Group = scope.Base.Group + *spaceOffset,
                                                   .Binding = scope.Base.Binding + *indexOffset };
         draft.Binding.Kind = FromSlangBindingType(bindingType);
+        const SlangInt bindingCount = containing_layout->getBindingRangeBindingCount(rangeIndex);
         draft.Binding.ArrayCount =
-            static_cast<uint32_t>(containing_layout->getBindingRangeBindingCount(rangeIndex));
+            static_cast<size_t>(bindingCount) == SLANG_UNBOUNDED_SIZE ? 0u : static_cast<uint32_t>(bindingCount);
 
         const CookError applyLayoutError = applyLeafTypeLayout(containing_layout,
                                                                rangeIndex,

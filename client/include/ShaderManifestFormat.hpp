@@ -13,7 +13,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 15u;
+inline constexpr uint32_t k_ShaderManifestVersion = 16u;
 
 // NOLINTBEGIN(readability-enum-initial-value, performance-enum-size)
 enum class ErrorCode : uint32_t
@@ -335,6 +335,7 @@ struct alignas(8) Binding
     uint32_t NameString{ 0u };
     uint32_t ScopeString{ 0u };
     uint32_t ElementStride{ 0u };
+    // 0 for an unbounded binding array, whose descriptor count the renderer chooses
     uint32_t ArrayCount{ 1u };
     uint32_t StorageFormat{ 0u };
     uint32_t UniformMemberCount{ 0u };

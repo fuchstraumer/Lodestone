@@ -541,10 +541,16 @@ namespace
         const IdRecord& pointer = parse_state.Ids[variable.TypeId];
         const IdRecord& pointee = parse_state.Ids[pointer.PointeeType];
 
-        // a binding array is one OpTypeArray of the resource type. Vulkan allows no array of arrays here, and spirv-val
-        // rejects it before we get this far
+        // a binding array is one OpTypeArray or OpTypeRuntimeArray of the resource type. Vulkan allows no array of arrays
+        // here, and spirv-val rejects it before we get this far
         const IdRecord* element = &pointee;
-        if (pointee.OpCode == spv::Op::OpTypeArray)
+        if (pointee.OpCode == spv::Op::OpTypeRuntimeArray)
+        {
+            declared.ArrayCount = 0u;
+            declared.Array = true;
+            element = &parse_state.Ids[pointee.ElementType];
+        }
+        else if (pointee.OpCode == spv::Op::OpTypeArray)
         {
             const IdRecord& length = parse_state.Ids[pointee.LengthId];
             if (length.Constant != ConstantKind::Constant ||
@@ -557,12 +563,6 @@ namespace
             declared.ArrayCount = static_cast<uint32_t>(length.ConstantBits);
             declared.Array = true;
             element = &parse_state.Ids[pointee.ElementType];
-        }
-
-        if (element->OpCode == spv::Op::OpTypeRuntimeArray)
-        {
-            declared.Unsupported = "an unbounded binding array, which needs the Indexed access model (phase F step F4)";
-            return declared;
         }
 
         switch (static_cast<spv::StorageClass>(pointer.StorageClass))
@@ -718,7 +718,7 @@ std::vector<std::string_view> CollectDynamicIndexingCapabilities(const ParseStat
         }
 
         const IdRecord& pointee = parse_state.Ids[parse_state.Ids[base.TypeId].PointeeType];
-        if (pointee.OpCode != spv::Op::OpTypeArray)
+        if (pointee.OpCode != spv::Op::OpTypeArray && pointee.OpCode != spv::Op::OpTypeRuntimeArray)
         {
             continue;
         }

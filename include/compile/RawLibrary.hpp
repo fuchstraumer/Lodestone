@@ -72,6 +72,7 @@ struct RawBinding
 
     uint32_t ElementStride{ 0u };
     uint64_t ByteSize{ 0u };
+    // 0 for an unbounded binding array
     uint32_t ArrayCount{ 1u };
 
     ResourceShape Shape{ ResourceShape::Invalid };
