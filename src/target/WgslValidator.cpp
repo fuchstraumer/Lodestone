@@ -141,12 +141,12 @@ CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::span<const 
         std::ranges::sort(wgslBindings, sortResourceBindings);
 
         BindingComparison epResult = CompareBindings(wgslBindings, bindings);
-        epResult.Emitted.SamplerTexturePairs = ReadPairs(epInspector, entrypoint.name);
-        if (!epResult.Matches())
+        result.Mismatches.append_range(std::move(epResult.Mismatches));
+        result.Emitted.SamplerTexturePairs.append_range(ReadPairs(epInspector, entrypoint.name));
+        for (const ResourceBinding& binding : wgslBindings)
         {
-            return epResult;
+            result.Emitted.DeclaredPlacements.emplace_back(binding.bind_group, binding.binding);
         }
-        result.Emitted.SamplerTexturePairs.append_range(std::move(epResult.Emitted.SamplerTexturePairs));
     }
 
     const CookError read = ReadCodeFacts(*entrypointProgram, epInspector, result.Emitted, sink);

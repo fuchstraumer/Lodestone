@@ -116,7 +116,6 @@ namespace
         entryPoint.Reflection.Workgroup = raw_entry_point.Workgroup;
         entryPoint.Reflection.UsedBindingIndices = raw_entry_point.UsedBindingIndices;
         entryPoint.Reflection.Raster = raw_entry_point.Raster;
-        entryPoint.Reflection.ConstantsElementBindings = raw_entry_point.ConstantsElementBindings;
 
         const RawEntryPointConstants& rawConstants = raw_entry_point.Constants;
         EntryPointConstants& constants = entryPoint.Reflection.Constants;

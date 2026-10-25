@@ -26,22 +26,22 @@ std::string_view ToString(RawSizeAttributeKind kind) noexcept
     return "Invalid";
 }
 
-uint32_t ArgumentCountOf(RawSizeAttributeKind kind) noexcept
+int32_t ArgumentCountOf(RawSizeAttributeKind kind) noexcept
 {
     switch (kind)
     {
     case RawSizeAttributeKind::ElementCount:
     case RawSizeAttributeKind::Extent1d:
-        return 1u;
+        return 1;
     case RawSizeAttributeKind::Extent2d:
-        return 2u;
+        return 2;
     case RawSizeAttributeKind::Extent3d:
-        return 3u;
+        return 3;
     case RawSizeAttributeKind::Invalid:
-        return 0u;
+        return 0;
     }
 
-    return 0u;
+    return 0;
 }
 
 std::string DescribeShimExtern(const RawShimExtern& shim_extern)

@@ -5,8 +5,8 @@
 
 #include <print>
 
-// Fails when Slang fixes shader-slang/slang#13789. Then delete `ApplySlangWorkaround13789` and its call,
-// `ConstantsElementBindings`, `EmittedCodeFacts::DeclaredPlacements`, and this test.
+// Fails when Slang fixes shader-slang/slang#13789. The cook no longer needs a workaround: the code decides which
+// bindings an entry point uses (`KeepDeclaredBindings`). When it fails, delete this test and its row in tests/README.md.
 
 namespace
 {

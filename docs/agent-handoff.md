@@ -67,7 +67,13 @@ Ordered by what can write wrong output first.
 8. **shader-slang/slang#13895 has a workaround in the SPIR-V validator.** An array of write-only storage images gets no
    `NonReadable`. `IsSlangNonReadableArrayFault` (`SpvValidator.cpp`) accepts it with a warning, and
    `SlangNonReadableCanaryTest` fails when Slang fixes it, and its header lists what to delete.
-9. **Axis declarations have no source location.** The axis-default errors (`AxisDefaultMissing`, `AxisDefaultNotDeclared`, ...)
+9. **UPSTREAM REPORT OWED (author, 2026-10-25): Slang's metadata describes code that spirv-opt later removes.**
+   `IMetadata::isParameterLocationUsed` comes from Slang's IR before `slang-emit.cpp` gives the SPIR-V to spirv-opt
+   (`slang-glslang.cpp`, `Default`, `High`, and `Maximal` pass lists). At `--O1` and above a binding that Slang marks used
+   is gone from the code (DiamondDogs `NvproPyramid`, `PyramidSampler` at `--O2`; KitchenSink `Albedo` at `--O1`).
+   The cook no longer depends on it (`KeepDeclaredBindings`), but Slang should hear of it. Draft it after the usage reset,
+   with the rules in the memory note on upstream reports: search `gh` first, a plain `slangc` repro, never post.
+10. **Axis declarations have no source location.** The axis-default errors (`AxisDefaultMissing`, `AxisDefaultNotDeclared`, ...)
    print none, because `getDeclSourceLocation` fails for the axis `Variable` decl and `RawAxisDeclaration::SourceFile` is
    `<unknown>`. Not measured why. The symbol table has the line, and could supply it.
 

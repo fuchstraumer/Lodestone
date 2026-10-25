@@ -82,6 +82,9 @@ Struct::Struct(int _val0, int _val1, int _val2) :
 - **Local variables**: If doing repeated operations, prefer longer variable names. use `deltaX` instead of `dX`, assign variables to const during long chains of mathematical operations (almost like writing scalarized SSA code), and favor being readable over being clever or taking shortcuts. We will save shortcuts and esoteric performant code for profiling results
 - **Eagerly factor out common logic**: If some bit of code is greater than 4-5 lines and being duplicated, factor it out into a common function.
 - **`todo` comments**: Spare these for things that are actually worth having greppable as distinct work items. For things that will need to be fixed before shipping this to customers or clients who are not devs or friends: use `todo-ship`. use `todo-perf` for things that could grant sizeable performance benefits. Minimize the usage of `todo` as much as possible: we need to get to MVP, but we also don't need to fill our backlog on that road.
+- **Spacing between statements**: Maintain a single blank line between logically distinct blocks of code, such as variable declarations, loops, and conditionals. Avoid excessive blank lines that do not contribute to readability. Ensure that spacing is consistent throughout the file to improve visual structure and comprehension. `if` statements, `for` loops, and other control structures should be visually separated from surrounding code to enhance clarity
+  - Singular variables used immediately in the following control block (`for`/`if`/`while`) may be attached to the control statement as a preceding line, but that variable should then still be spaced from any preceding code block to maintain visual separation (thus tying the variable to the proceeding control block).
+  - If a variable is modified after a control block, or a return statement is used, there should be a line break between the control statement and what follows.
 
 #### Comment Style
 
@@ -184,6 +187,13 @@ Examples of well formatted code in this codebase: `Future.hpp`, `InputManager.hp
 - **Plain indices in a public API.** Name the field or the parameter for the table it indexes. Do not
   wrap an index in a type only to stop a wrong index, because each caller must then convert it. Use a
   wrapper type only when a mix-up fails in silence and the wrapper costs the caller nothing
+
+## Loops and Loop Indexing
+  - **Favor signed indices for loops**: Try to prefer using signed indices, as part of the updated C++ guidelines as of late, for most loops. Be most rigid about this where the loop is compact and performing simple operations within its scope, as this is where any potential assembly impact is most noticeable. 
+    - For nested function calls, this is less critical.
+    - Use `std::ssize` for the loop bounds instead of `size()` to obtain a signed index
+    - Where the preceding rule is not possible and would involve comparison against unsigned values - use `std::cmp_less` or `std::cmp_greater` as appropriate to maintain correctness while avoiding signed/unsigned mismatches.
+  - If already working with ranges, and writing a loop where you need both an index and the element, prefer using `std::views::enumerate` to obtain a tuple of the index and the element, rather than manually managing a separate index variable. This ensures consistency with signed indexing and reduces the risk of signed/unsigned comparison issues.
 
 #### C++ Language Preferences
 - **Functions**: No implementations in headers; mark `constexpr` and `noexcept` when possible

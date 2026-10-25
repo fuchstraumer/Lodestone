@@ -14,6 +14,8 @@
 #include <tuple>
 #include <magic_enum/magic_enum.hpp>
 #include <utility>
+#include <variant>
+#include <vector>
 
 namespace lodestone
 {

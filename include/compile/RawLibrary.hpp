@@ -30,7 +30,7 @@ enum class RawSizeAttributeKind : uint8_t
 
 std::string_view ToString(RawSizeAttributeKind kind) noexcept;
 
-uint32_t ArgumentCountOf(RawSizeAttributeKind kind) noexcept;
+int32_t ArgumentCountOf(RawSizeAttributeKind kind) noexcept;
 
 /** One `[ls_*]` annotation as written. A string is the only way to stop Slang folding it. */
 struct RawSizeAttribute
@@ -108,8 +108,6 @@ struct RawEntryPoint
     std::vector<uint32_t> UsedBindingIndices;
     ReflectedRasterState Raster;
     RawEntryPointConstants Constants;
-    /** Settled against the emitted code later (shader-slang/slang#13789). */
-    std::vector<uint32_t> ConstantsElementBindings;
 };
 
 struct RawVariant

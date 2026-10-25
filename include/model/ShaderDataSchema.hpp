@@ -216,8 +216,6 @@ struct EntryPointReflection
     std::vector<uint32_t> UsedBindingIndices;
     ReflectedRasterState Raster;
     EntryPointConstants Constants;
-    /** Settled against the emitted code (shader-slang/slang#13789). Not stored in a manifest. */
-    std::vector<uint32_t> ConstantsElementBindings;
 };
 
 std::string DescribeRasterState(const ReflectedRasterState& raster);

@@ -13,6 +13,7 @@
 #include "target/StorageFormatTable.hpp"
 #include "slang-com-ptr.h"
 #include "slang.h"
+#include "target/TargetProfile.hpp"
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -469,7 +470,9 @@ void AddVisibleStoredValues(std::span<const RawBinding> bindings,
                             bool reads_push_constants,
                             std::vector<uint32_t>& used)
 {
-    const size_t usedResources = used.size();
+    // we test against this span during each iteration, and it should only include the elements that were present before this function call,
+    // ensuring that we do not consider any newly added used indices within the same iteration loop.
+    const std::span<const uint32_t> testSpan{ used };
     for (size_t index = 0u; index < bindings.size(); ++index)
     {
         const StoredValuePlacement* stored = GetStoredValuePlacement(bindings[index].Placement);
@@ -485,12 +488,12 @@ void AddVisibleStoredValues(std::span<const RawBinding> bindings,
         }
         else
         {
-            visible = std::ranges::any_of(std::span{ used }.first(usedResources),
-                                          [&](uint32_t used_index)
-                                          {
-                                              const BoundPlacement* block = GetBoundPlacement(bindings[used_index].Placement);
-                                              return block != nullptr && *block == stored->Block;
-                                          });
+            auto placementUsed = [&](uint32_t used_index)
+            {
+                const BoundPlacement* block = GetBoundPlacement(bindings[used_index].Placement);
+                return block != nullptr && *block == stored->Block;
+            };
+            visible = std::ranges::any_of(testSpan, placementUsed);
         }
 
         if (visible)
@@ -578,13 +581,18 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
     }
 
     const size_t globalBindingCount = rawVariant.Bindings.size();
+    const std::span<const RawBinding> globalBindings = std::span{ rawVariant.Bindings }.first(globalBindingCount);
+    std::vector<RawBindingDraft> entryPointDrafts;
+    entryPointDrafts.reserve(16u); // rarely more than this
+
     for (int64_t i = 0; i < std::ssize(linked_variant.EntryPointCode); ++i)
     {
-        std::vector<RawBindingDraft> entryPointDrafts;
-        const std::span<const RawBinding> globalBindings =
-            std::span{ rawVariant.Bindings }.first(globalBindingCount);
-        CookResult<RawEntryPoint> entryPointResult =
-            extractRawEntryPoint(linked_variant, i, globalBindings, entryPointDrafts);
+        entryPointDrafts.clear(); // reuse the pre-allocated vector for this entry point
+
+        CookResult<RawEntryPoint> entryPointResult = extractRawEntryPoint(linked_variant,
+                                                                          i,
+                                                                          globalBindings,
+                                                                          entryPointDrafts);
         if (!entryPointResult) [[unlikely]]
         {
             return std::unexpected(entryPointResult.error());
@@ -600,11 +608,6 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
             *rawEntryPoint.Constants.ContainerBinding += ownedBaseSize;
         }
 
-        for (uint32_t& binding : rawEntryPoint.ConstantsElementBindings)
-        {
-            binding += ownedBaseSize;
-        }
-
         std::span<const RawBinding> entryPointBindings = std::span{ rawVariant.Bindings }.subspan(ownedBaseSize);
         std::vector entryPointIndices = CollectUsedBindingIndices(linked_variant, i, entryPointBindings, ownedBaseSize);
         rawEntryPoint.UsedBindingIndices.append_range(std::move(entryPointIndices));
@@ -613,6 +616,7 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
                                ownedBaseSize,
                                rawEntryPoint.Constants.Delivery == EntryPointConstantsDelivery::PushConstant,
                                rawEntryPoint.UsedBindingIndices);
+
         // the merged layout needs every used binding in placement order
         const std::span<const RawBinding> allBindings = rawVariant.Bindings;
         std::ranges::stable_sort(rawEntryPoint.UsedBindingIndices,
@@ -637,11 +641,13 @@ CookError SlangReflector::applyLeafTypeSamplerLayout(slang::TypeReflection* leaf
     binding.IsComparisonSampler = false;
     constexpr static std::string_view k_ComparisonSamplerName = "SamplerComparisonState";
     const char* typeName = leaf_type->getName();
+
     std::string_view typeNameView{ typeName };
     if (typeNameView == k_ComparisonSamplerName)
     {
         binding.IsComparisonSampler = true;
     }
+    
     return CookError::Success;
 }
 
@@ -709,15 +715,18 @@ CookError SlangReflector::applyLeafTypeStorageBufferLayout(slang::TypeLayoutRefl
 {
     if (GetBaseShape(binding.Shape) == ResourceShape::StructuredBuffer)
     {
+
         slang::TypeLayoutReflection* elementLayout = leaf_layout->getElementTypeLayout();
         if (elementLayout != nullptr)
         {
             binding.ElementStride = static_cast<uint32_t>(elementLayout->getSize());
+
             const CookError structWalkResult = collectStructMembers(elementLayout, binding.UniformMembers, nullptr);
             if (!structWalkResult)
             {
                 return structWalkResult;
             }
+
             return CookError::Success;
         }
         else
@@ -725,6 +734,7 @@ CookError SlangReflector::applyLeafTypeStorageBufferLayout(slang::TypeLayoutRefl
             std::string message = std::format("Could not find element layout for structured buffer: {}", binding.Name);
             return ReportError(*sink, CookError::ReflectionCouldNotFindBufferElementLayout, std::move(message));
         }
+
     }
     else
     {
@@ -743,10 +753,12 @@ CookError SlangReflector::applyLeafTypeTexelBufferLayout(slang::TypeLayoutReflec
     // a read-only texel buffer reports a sample result type, and RWBuffer<T> a format
     if (binding.Access == ResourceAccess::ReadOnly)
     {
+
         if (slang::TypeReflection* resultType = leaf_type->getResourceResultType(); resultType != nullptr)
         {
             binding.SampleType = FromSlangScalarType(resultType->getScalarType());
         }
+
         return CookError::Success;
     }
 
@@ -832,7 +844,7 @@ CookError SlangReflector::collectRawSizeAttributes(slang::VariableReflection* le
         attribute.Kind = kind;
         attribute.Arguments.reserve(ArgumentCountOf(kind));
 
-        for (uint32_t i = 0u; i < ArgumentCountOf(kind); ++i)
+        for (int32_t i = 0; i < ArgumentCountOf(kind); ++i)
         {
             CookResult<std::string> argument = ReadStringArgument(*sink, found, i, binding_name);
             if (!argument)
@@ -871,7 +883,9 @@ CookError SlangReflector::readSingleStringAttribute(slang::VariableReflection* l
     {
         return argument.error();
     }
+
     out_value = std::move(argument.value());
+    
     return CookError::Success;
 }
 
@@ -1206,9 +1220,16 @@ CookError SlangReflector::appendStoredValueDrafts(std::span<const StoredValueLea
         {
             // the full name keeps the access of the pointer, so it is compared with the access of the interface
             const std::string pointerName = FullNameOf(value.Member->getType());
-            const ResourceAccess pointerAccess = pointerName.contains("Access.ReadWrite") ? ResourceAccess::ReadWrite
-                                                 : pointerName.contains("Access.Read")    ? ResourceAccess::ReadOnly
-                                                                                          : ResourceAccess::Invalid;
+            ResourceAccess pointerAccess = ResourceAccess::Invalid;
+            if (pointerName.contains("Access.ReadWrite"))
+            {
+                pointerAccess = ResourceAccess::ReadWrite;
+            }
+            else if (pointerName.contains("Access.Read"))
+            {
+                pointerAccess = ResourceAccess::ReadOnly;
+            }
+
             if (pointerAccess != row->Resource.Access)
             {
                 return ReportError(*sink,
@@ -1391,18 +1412,10 @@ CookResult<RawEntryPoint> SlangReflector::extractRawEntryPoint(const LinkedVaria
         parametersLayout = *elementLayout;
     }
 
-    const auto elementBegin = static_cast<uint32_t>(out_drafts.size());
     const CookError walkError = collectBindingRangeDrafts(parametersLayout, scope.value(), out_drafts);
     if (!walkError)
     {
         return std::unexpected(walkError);
-    }
-    if (rawEntryPoint.Constants.Delivery != EntryPointConstantsDelivery::None)
-    {
-        for (auto draft = elementBegin; draft < static_cast<uint32_t>(out_drafts.size()); ++draft)
-        {
-            rawEntryPoint.ConstantsElementBindings.push_back(draft);
-        }
     }
 
     return rawEntryPoint;
@@ -1425,10 +1438,9 @@ CookResult<slang::TypeLayoutReflection*> SlangReflector::readEntryPointConstants
                                  : std::nullopt;
     if (!byteSize || parametersLayout->getBindingRangeCount() < 1)
     {
-        return std::unexpected(ReportError(
-            *sink,
-            CookError::ReflectionUnavailable,
-            std::format("entry point {} has uniform parameters with no readable layout", out_entry_point.Name)));
+        return std::unexpected(ReportError(*sink,
+                                                CookError::ReflectionUnavailable,
+                                                std::format("entry point {} has uniform parameters with no readable layout", out_entry_point.Name)));
     }
 
     RawEntryPointConstants& constants = out_entry_point.Constants;
@@ -1445,12 +1457,14 @@ CookResult<slang::TypeLayoutReflection*> SlangReflector::readEntryPointConstants
     {
         // the metadata does not track push constants, so the emitted code settles this block later
         constants.Delivery = EntryPointConstantsDelivery::PushConstant;
+
         const CookError storedError =
             appendStoredValueDrafts(storedValues, StoredValueContainer::PushConstants, BoundPlacement{}, scope.Name, out_drafts);
         if (!storedError)
         {
             return std::unexpected(storedError);
         }
+
         return elementLayout;
     }
 
@@ -1493,12 +1507,14 @@ CookResult<slang::TypeLayoutReflection*> SlangReflector::readEntryPointConstants
         constants.ContainerBinding = static_cast<uint32_t>(out_drafts.size());
     }
     out_drafts.emplace_back(std::move(container));
+
     const CookError storedError =
         appendStoredValueDrafts(storedValues, StoredValueContainer::UniformBuffer, containerPlacement, scope.Name, out_drafts);
     if (!storedError)
     {
         return std::unexpected(storedError);
     }
+
     return elementLayout;
 }
 

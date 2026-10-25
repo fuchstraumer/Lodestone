@@ -132,15 +132,20 @@ namespace
 
     /** Texture scope, texture name, sampler scope, sampler name. */
     using NamedPair = std::array<std::string_view, 4u>;
+    /** Scope and name. */
+    using NamedBinding = std::array<std::string_view, 2u>;
 
-    /** Empty with `has_combined` set for a combined texture sampler. */
     /** `has_unread_pairs` is set when the code cannot show every pair: a combined texture sampler, which SPIR-V samples
      * with no `OpSampledImage`, or a texture or a sampler reached through a descriptor handle, whose pairs are not
-     * recorded yet. */
+     * recorded yet. `visible` receives the sorted names of the used bindings. */
     CookResult<std::vector<NamedPair>> NamePairs(const CookedModule& module,
                                                  const LibraryVariant& variant,
                                                  size_t entry_point_index,
-                                                 bool& has_unread_pairs);
+                                                 bool& has_unread_pairs,
+                                                 std::vector<NamedBinding>& visible);
+
+    /** Keeps the pairs whose texture and sampler `other_visible` also holds. */
+    void KeepPairsVisibleIn(std::vector<NamedPair>& pairs, std::span<const NamedBinding> other_visible);
 
 } // namespace
 
@@ -457,11 +462,13 @@ CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library, Diagnos
         {
             bool unreadPairs = false;
             bool baselineUnreadPairs = false;
+            std::vector<NamedBinding> visible;
+            std::vector<NamedBinding> baselineVisible;
 
-            const CookResult<std::vector<NamedPair>> pairs =
-                NamePairs(shared.Environment, shared.Variant, entryPointIndex, unreadPairs);
-            const CookResult<std::vector<NamedPair>> baselinePairs =
-                NamePairs(shared.Baseline, shared.BaselineVariant, entryPointIndex, baselineUnreadPairs);
+            CookResult<std::vector<NamedPair>> pairs =
+                NamePairs(shared.Environment, shared.Variant, entryPointIndex, unreadPairs, visible);
+            CookResult<std::vector<NamedPair>> baselinePairs =
+                NamePairs(shared.Baseline, shared.BaselineVariant, entryPointIndex, baselineUnreadPairs, baselineVisible);
 
             if (!pairs || !baselinePairs)
             {
@@ -474,6 +481,9 @@ CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library, Diagnos
                                                shared.Environment.EntryPoints[entryPointIndex].Name));
             }
 
+            // an optimizer can remove a binding from one target only, and a profile has no opinion on a binding it does not use
+            KeepPairsVisibleIn(*pairs, baselineVisible);
+            KeepPairsVisibleIn(*baselinePairs, visible);
             if (unreadPairs || baselineUnreadPairs || *pairs == *baselinePairs)
             {
                 continue;
@@ -542,7 +552,8 @@ namespace
     CookResult<std::vector<NamedPair>> NamePairs(const CookedModule& module,
                                                  const LibraryVariant& variant,
                                                  size_t entry_point_index,
-                                                 bool& has_unread_pairs)
+                                                 bool& has_unread_pairs,
+                                                 std::vector<NamedBinding>& visible)
     {
         const CookResult<ShaderLayoutView> layout = ResolveLayoutView(module, variant, entry_point_index);
         if (!layout)
@@ -559,6 +570,14 @@ namespace
 
         has_unread_pairs = std::ranges::any_of(*layout, hidesPairs);
 
+        visible.clear();
+        visible.reserve(layout->size());
+        for (const ResolvedBindingView& binding : *layout)
+        {
+            visible.push_back(NamedBinding{ binding.Resource->ScopeName, binding.Resource->Name });
+        }
+        std::ranges::sort(visible);
+
         std::vector<NamedPair> named;
         const ShaderLayoutView& layout_view = *layout;
         for (const SamplerTexturePair& pair : module.SamplerPairLists[variant.SamplerPairIndices[entry_point_index]])
@@ -569,8 +588,17 @@ namespace
         }
 
         std::ranges::sort(named);
-        
+
         return named;
+    }
+
+    void KeepPairsVisibleIn(std::vector<NamedPair>& pairs, std::span<const NamedBinding> other_visible)
+    {
+        std::erase_if(pairs, [other_visible](const NamedPair& pair)
+        {
+            return !std::ranges::binary_search(other_visible, NamedBinding{ pair[0], pair[1] }) ||
+                   !std::ranges::binary_search(other_visible, NamedBinding{ pair[2], pair[3] });
+        });
     }
 
 }

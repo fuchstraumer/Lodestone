@@ -69,7 +69,7 @@ struct EmittedCodeFacts
     /** No value when the code declares no block. Slang removes unread blocks, so this decides whether the entry point
      * constants exist. */
     std::optional<uint32_t> PushConstantExtent;
-    /** Read path only. Settles the visibility of shader-slang/slang#13789. */
+    /** Every bound placement the code declares. These are the bindings the entry point uses. */
     std::vector<std::pair<uint32_t, uint32_t>> DeclaredPlacements;
     std::string EntryPointName;
     /** Sorted and unique: `OpCapability` and `OpExtension`, or `enable` directives. */

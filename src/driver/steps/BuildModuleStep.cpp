@@ -63,12 +63,11 @@ namespace
                                            CompiledEntryPoint& entry_point,
                                            std::optional<uint32_t> push_constant_extent,
                                            DiagnosticSink& diagnostics);
-    // workaround for shader-slang/slang#13789. When SlangMetadataCanaryTest fails, delete this function, its call,
-    // and `ConstantsElementBindings`
-    CookError ApplySlangWorkaround13789(const TargetProfile& target,
-                                        CompiledVariant& variant,
-                                        size_t entry_point_index,
-                                        DiagnosticSink& diagnostics);
+    // the code decides which bindings an entry point uses: an optimizer removes bindings after Slang's metadata
+    // marks them used. Removes each bound binding the code does not declare, and each value stored in it
+    void KeepDeclaredBindings(CompiledVariant& variant,
+                              size_t entry_point_index,
+                              std::span<const std::pair<uint32_t, uint32_t>> declared_placements);
     CookError ApplyEmittedCodeFacts(const TargetProfile& target,
                                     CompiledVariant& variant,
                                     size_t entry_point_index,
@@ -311,12 +310,6 @@ namespace
 
         for (size_t i = 0u; i < variant.EntryPoints.size(); ++i)
         {
-            const CookError workaround = ApplySlangWorkaround13789(target, variant, i, diagnostics);
-            if (workaround != CookError::Success)
-            {
-                return std::unexpected(workaround);
-            }
-
             const CompiledEntryPoint& entryPoint = variant.EntryPoints[i];
             if (!validate)
             {
@@ -328,6 +321,7 @@ namespace
                     return std::unexpected(facts.error());
                 }
 
+                KeepDeclaredBindings(variant, i, facts->DeclaredPlacements);
                 const CookError applied = ApplyEmittedCodeFacts(target, variant, i, *facts, diagnostics);
 
                 if (applied != CookError::Success)
@@ -347,13 +341,19 @@ namespace
                                                         std::views::transform(extractBinding) |
                                                         std::ranges::to<std::vector>();
 
-            const CookResult<BindingComparison> comparison =
+            CookResult<BindingComparison> comparison =
                 target.Validator->ValidateEntryPoint(entryPoint.Code, used, diagnostics);
 
             if (!comparison)
             {
                 return std::unexpected(comparison.error());
             }
+
+            // a reflected binding that the code does not declare is unused, and leaves the visibility below
+            std::erase_if(comparison->Mismatches, [](const BindingMismatch& mismatch)
+            {
+                return mismatch.Kind == BindingMismatchKind::ReflectedOnly;
+            });
 
             if (!comparison->Matches())
             {
@@ -372,6 +372,7 @@ namespace
                 continue;
             }
 
+            KeepDeclaredBindings(variant, i, comparison->Emitted.DeclaredPlacements);
             const CookError applied = ApplyEmittedCodeFacts(target, variant, i, comparison->Emitted, diagnostics);
 
             if (applied != CookError::Success)
@@ -383,49 +384,47 @@ namespace
         return mismatchCount;
     }
 
-    CookError ApplySlangWorkaround13789(const TargetProfile& target,
-                                        CompiledVariant& variant,
-                                        size_t entry_point_index,
-                                        DiagnosticSink& diagnostics)
+    void KeepDeclaredBindings(CompiledVariant& variant,
+                              size_t entry_point_index,
+                              std::span<const std::pair<uint32_t, uint32_t>> declared_placements)
     {
         CompiledEntryPoint& entryPoint = variant.EntryPoints[entry_point_index];
-        std::vector<uint32_t>& elementBindings = entryPoint.Reflection.ConstantsElementBindings;
-        if (elementBindings.empty())
-        {
-            return CookError::Success;
-        }
-
-        const CookResult<EmittedCodeFacts> facts = target.Validator->ReadEmittedCodeFacts(entryPoint.Code, diagnostics);
-        if (!facts)
-        {
-            return facts.error();
-        }
-
-        // the element follows the container in placement order, so a removal never moves the container
         std::vector<uint32_t>& used = entryPoint.Reflection.UsedBindingIndices;
-        for (const uint32_t bindingIndex : elementBindings)
-        {
-            const ReflectedBinding& binding = variant.Bindings[bindingIndex];
-            const BoundPlacement* placement = GetBoundPlacement(binding.Placement);
-            const auto key = std::pair{ placement->Group, placement->Binding };
-            const bool declared = std::ranges::find(facts->DeclaredPlacements, key) != facts->DeclaredPlacements.end();
-            const auto position = std::ranges::find(used, bindingIndex);
-            if (declared || position == used.end())
-            {
-                continue;
-            }
+        EntryPointConstants& constants = entryPoint.Reflection.Constants;
+        const std::optional<uint32_t> constantsBuffer =
+            constants.Delivery == EntryPointConstantsDelivery::UniformBuffer ? std::optional{ used[constants.Binding] }
+                                                                             : std::nullopt;
 
-            used.erase(position);
-            ReportWarning(diagnostics,
-                       std::format("workaround for shader-slang/slang#13789: {}{} for target {} does not use '{}', "
-                                   "which Slang's metadata reports as used",
-                                   entryPoint.Name,
-                                   entryPoint.VariantSuffix,
-                                   target.Name,
-                                   binding.Name));
+        auto isDeclared = [declared_placements](uint32_t group, uint32_t binding)
+        {
+            return std::ranges::find(declared_placements, std::pair{ group, binding }) != declared_placements.end();
+        };
+
+        std::erase_if(used, [&](uint32_t binding_index)
+        {
+            const ResourcePlacement& placement = variant.Bindings[binding_index].Placement;
+            if (const BoundPlacement* bound = GetBoundPlacement(placement))
+            {
+                return !isDeclared(bound->Group, bound->Binding);
+            }
+            const StoredValuePlacement* stored = GetStoredValuePlacement(placement);
+            return stored != nullptr && stored->Container == StoredValueContainer::UniformBuffer &&
+                   !isDeclared(stored->Block.Group, stored->Block.Binding);
+        });
+
+        if (!constantsBuffer)
+        {
+            return;
         }
 
-        return CookError::Success;
+        // the constants name their buffer by position, so a removal before it moves it
+        const auto position = std::ranges::find(used, *constantsBuffer);
+        if (position == used.end())
+        {
+            constants = EntryPointConstants{};
+            return;
+        }
+        constants.Binding = static_cast<uint32_t>(std::distance(used.begin(), position));
     }
 
     /** Drops the names the profile's Vulkan version enables alone, such as `Shader`. */
