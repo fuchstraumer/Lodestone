@@ -330,6 +330,11 @@ bool SameBindingLocation(const ReflectedBinding& lhs, const ReflectedBinding& rh
     return lhs.Placement == rhs.Placement;
 }
 
+const EntryPointCode& BaseForm(const CompiledEntryPoint& entry_point) noexcept
+{
+    return entry_point.Base.has_value() ? *entry_point.Base : entry_point.Delivered;
+}
+
 std::vector<ResolvedBinding> BuildEntryPointLayout(const CompiledVariant& variant, size_t entry_point_index)
 {
     if (entry_point_index >= variant.EntryPoints.size())
@@ -338,9 +343,9 @@ std::vector<ResolvedBinding> BuildEntryPointLayout(const CompiledVariant& varian
     }
 
     std::vector<ResolvedBinding> layout;
-    layout.reserve(variant.EntryPoints[entry_point_index].Reflection.UsedBindingIndices.size());
+    layout.reserve(variant.EntryPoints[entry_point_index].Delivered.UsedBindingIndices.size());
 
-    for (const uint32_t index : variant.EntryPoints[entry_point_index].Reflection.UsedBindingIndices)
+    for (const uint32_t index : variant.EntryPoints[entry_point_index].Delivered.UsedBindingIndices)
     {
         if (index >= variant.Bindings.size())
         {
@@ -367,9 +372,9 @@ std::vector<ResolvedBindingView> BuildEntryPointLayoutView(const CompiledVariant
     }
 
     std::vector<ResolvedBindingView> layout;
-    layout.reserve(variant.EntryPoints[entry_point_index].Reflection.UsedBindingIndices.size());
+    layout.reserve(variant.EntryPoints[entry_point_index].Delivered.UsedBindingIndices.size());
 
-    for (const uint32_t index : variant.EntryPoints[entry_point_index].Reflection.UsedBindingIndices)
+    for (const uint32_t index : variant.EntryPoints[entry_point_index].Delivered.UsedBindingIndices)
     {
         if (index >= variant.Bindings.size())
         {

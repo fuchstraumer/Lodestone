@@ -67,6 +67,9 @@ public:
     /** @brief The form of the profile's buffers. Only the Pointer form permits a pointer member. */
     [[nodiscard]] AccessModel BufferForm() const noexcept;
     [[nodiscard]] TargetLanguage Language() const noexcept;
+    /** @brief True when session compiled two different forms of the module
+      * The delivered form is the one that uses the flags input by user/invocation. */
+    [[nodiscard]] bool CompilesDeliveredForm() const noexcept;
 
     /** @brief Returns every loaded module, serialized in dependency order. */
     [[nodiscard]] std::vector<SerializedModule> SerializeModules() const;
@@ -130,6 +133,7 @@ private:
     std::vector<std::string> dependencyFilePaths;
     AccessModel bufferForm{ AccessModel::Invalid };
     TargetLanguage language{ TargetLanguage::Invalid };
+    bool compilesDeliveredForm{ false };
     DiagnosticSink* diagnosticSink{ nullptr };
 };
 

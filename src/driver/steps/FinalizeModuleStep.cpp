@@ -172,14 +172,16 @@ namespace
 
             for (size_t i = 0u; i < origin->EntryPoints.size(); ++i)
             {
-                std::span<const std::byte> resolvedSource{ ResolveSource(module, variant, i) };
-                std::span<const std::byte> epSourceSpan{ origin->EntryPoints[i].Code };
-                if (!std::ranges::equal(resolvedSource, epSourceSpan))
+                const CompiledEntryPoint& entryPoint = origin->EntryPoints[i];
+                const bool deliveredEqual = std::ranges::equal(ResolveSource(module, variant, i), entryPoint.Delivered.Code);
+                const bool baseEqual = std::ranges::equal(ResolveBaseSource(module, variant, i), BaseForm(entryPoint).Code);
+                if (!deliveredEqual || !baseEqual)
                 {
-                    const std::string errStr = std::format("ROUND TRIP FAILED for {} [{}]: the table returns "
+                    const std::string errStr = std::format("ROUND TRIP FAILED for {} [{}]: the {} table returns "
                                                            "different text than the compiler produced",
-                                                           origin->EntryPoints[i].Name,
-                                                           variant.Description);
+                                                           entryPoint.Name,
+                                                           variant.Description,
+                                                           deliveredEqual ? "base source" : "source");
                     lastError = ReportError(diagnostics, CookError::LibraryRoundTripFailed, errStr);
                 }
             }

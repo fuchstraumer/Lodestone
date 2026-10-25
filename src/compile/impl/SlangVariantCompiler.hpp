@@ -19,7 +19,11 @@ struct LinkedVariant
     Slang::ComPtr<slang::IComponentType> LinkedProgram;
     slang::ProgramLayout* ProgramLayout{ nullptr };
     using EpCode = std::vector<std::byte>;
+    /** The base target's code. */
     std::vector<EpCode> EntryPointCode;
+    /** The delivered target's code. Empty when the session has the base target only. */
+    std::vector<EpCode> DeliveredEntryPointCode;
+    /** The base target's metadata. */
     std::vector<Slang::ComPtr<slang::IMetadata>> EntryPointMetadata;
 };
 

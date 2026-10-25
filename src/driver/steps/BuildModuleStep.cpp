@@ -43,16 +43,25 @@ namespace
     void ReportVariantIfRequested(const CookerOptions& options,
                                   const CompiledVariant& variant,
                                   DiagnosticSink& diagnostics);
-    // always reads the cook output facts. With `validate`, also runs the cross-check on the same parse and returns the
-    // mismatch count. A target with no reader fails only when `validate` is set
+    // always reads the cook output facts of each form. With `validate`, also runs the cross-check on the same parse and
+    // returns the mismatch count. A target with no reader fails only when `validate` is set
     CookResult<uint32_t> ReadEmittedCode(const TargetProfile& target,
                                          bool validate,
                                          CompiledVariant& variant,
                                          DiagnosticSink& diagnostics);
+    // reads one form of one entry point. Returns false for a reflection mismatch, which it reports
+    CookResult<bool> ReadEmittedForm(const TargetProfile& target,
+                                     bool validate,
+                                     const CompiledVariant& variant,
+                                     const CompiledEntryPoint& entry_point,
+                                     EntryPointCode& form,
+                                     std::string_view form_name,
+                                     DiagnosticSink& diagnostics);
     // maps placement pairs to positions in the used bindings. Pairs that do not resolve fail, since a dropped pair
     // would hide a sampler constraint
-    CookError ResolveSamplerTexturePairs(CompiledVariant& variant,
-                                         size_t entry_point_index,
+    CookError ResolveSamplerTexturePairs(const CompiledVariant& variant,
+                                         const CompiledEntryPoint& entry_point,
+                                         EntryPointCode& form,
                                          std::span<const SamplerTexturePlacement> placements,
                                          std::optional<uint32_t> descriptor_heap_set,
                                          DiagnosticSink& diagnostics);
@@ -60,17 +69,19 @@ namespace
     // more bytes, is a mismatch
     CookError ReconcileEntryPointConstants(const TargetProfile& target,
                                            std::span<const ReflectedBinding> bindings,
-                                           CompiledEntryPoint& entry_point,
+                                           const CompiledEntryPoint& entry_point,
+                                           EntryPointCode& form,
                                            std::optional<uint32_t> push_constant_extent,
                                            DiagnosticSink& diagnostics);
     // the code decides which bindings an entry point uses: an optimizer removes bindings after Slang's metadata
     // marks them used. Removes each bound binding the code does not declare, and each value stored in it
-    void KeepDeclaredBindings(CompiledVariant& variant,
-                              size_t entry_point_index,
+    void KeepDeclaredBindings(std::span<const ReflectedBinding> bindings,
+                              EntryPointCode& form,
                               std::span<const std::pair<uint32_t, uint32_t>> declared_placements);
     CookError ApplyEmittedCodeFacts(const TargetProfile& target,
-                                    CompiledVariant& variant,
-                                    size_t entry_point_index,
+                                    const CompiledVariant& variant,
+                                    const CompiledEntryPoint& entry_point,
+                                    EntryPointCode& form,
                                     const EmittedCodeFacts& facts,
                                     DiagnosticSink& diagnostics);
     void ReportUnreferencedBindings(const CompiledVariant& variant, DiagnosticSink& diagnostics);
@@ -143,10 +154,12 @@ CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& share
                                                     const VariantSet& variants) const
 {
     InternedModule internedModule;
+
     if (!shared_state.Options.DedupeEnabled)
     {
         internedModule.DisableDedupe();
     }
+
     internedModule.Name = module_name;
     internedModule.Space = &space;
     internedModule.SpaceSize = variants.SpaceSize;
@@ -237,7 +250,7 @@ namespace
 
         for (const CompiledEntryPoint& entryPoint : variant.EntryPoints)
         {
-            totalSourceBytesRef += entryPoint.Code.size();
+            totalSourceBytesRef += entryPoint.Delivered.Code.size();
         }
     }
 
@@ -303,93 +316,119 @@ namespace
             {
                 return std::unexpected(CookError::TargetValidatorUnavailable);
             }
+
             return 0u;
         }
 
         uint32_t mismatchCount = 0u;
 
-        for (size_t i = 0u; i < variant.EntryPoints.size(); ++i)
+        for (CompiledEntryPoint& entryPoint : variant.EntryPoints)
         {
-            const CompiledEntryPoint& entryPoint = variant.EntryPoints[i];
-            if (!validate)
+
+            CookResult<bool> matched =
+                ReadEmittedForm(target, validate, variant, entryPoint, entryPoint.Delivered, "delivered", diagnostics);
+            if (matched && entryPoint.Base.has_value())
             {
-                const CookResult<EmittedCodeFacts> facts =
-                    target.Validator->ReadEmittedCodeFacts(entryPoint.Code, diagnostics);
-
-                if (!facts)
-                {
-                    return std::unexpected(facts.error());
-                }
-
-                KeepDeclaredBindings(variant, i, facts->DeclaredPlacements);
-                const CookError applied = ApplyEmittedCodeFacts(target, variant, i, *facts, diagnostics);
-
-                if (applied != CookError::Success)
-                {
-                    return std::unexpected(applied);
-                }
-
-                continue;
+                const CookResult<bool> baseMatched =
+                    ReadEmittedForm(target, validate, variant, entryPoint, *entryPoint.Base, "base", diagnostics);
+                matched = baseMatched ? CookResult<bool>{ *matched && *baseMatched } : baseMatched;
             }
 
-            auto extractBinding = [&variant](const uint32_t binding_index)-> const ReflectedBinding*
+            if (!matched)
             {
-                return &variant.Bindings[binding_index];
-            };
-
-            std::vector<const ReflectedBinding*> used = entryPoint.Reflection.UsedBindingIndices |
-                                                        std::views::transform(extractBinding) |
-                                                        std::ranges::to<std::vector>();
-
-            CookResult<BindingComparison> comparison =
-                target.Validator->ValidateEntryPoint(entryPoint.Code, used, diagnostics);
-
-            if (!comparison)
-            {
-                return std::unexpected(comparison.error());
+                return std::unexpected(matched.error());
             }
 
-            // a reflected binding that the code does not declare is unused, and leaves the visibility below
-            std::erase_if(comparison->Mismatches, [](const BindingMismatch& mismatch)
-            {
-                return mismatch.Kind == BindingMismatchKind::ReflectedOnly;
-            });
+            mismatchCount += *matched ? 0u : 1u;
 
-            if (!comparison->Matches())
-            {
-                ++mismatchCount;
-                std::string warningStr = std::format("REFLECTION MISMATCH in {}{} ({}) for target {}:",
-                                                     entryPoint.Name,
-                                                     entryPoint.VariantSuffix,
-                                                     variant.VariantDescription,
-                                                     target.Name);
-                for (const BindingMismatch& mismatch : comparison->Mismatches)
-                {
-                    warningStr += '\n';
-                    warningStr += FormatBindingMismatch(mismatch);
-                }                ReportWarning(diagnostics, warningStr);
-                continue;
-            }
-
-            KeepDeclaredBindings(variant, i, comparison->Emitted.DeclaredPlacements);
-            const CookError applied = ApplyEmittedCodeFacts(target, variant, i, comparison->Emitted, diagnostics);
-
-            if (applied != CookError::Success)
-            {
-                return std::unexpected(applied);
-            }
         }
 
         return mismatchCount;
     }
 
-    void KeepDeclaredBindings(CompiledVariant& variant,
-                              size_t entry_point_index,
+    CookResult<bool> ReadEmittedForm(const TargetProfile& target,
+                                     bool validate,
+                                     const CompiledVariant& variant,
+                                     const CompiledEntryPoint& entry_point,
+                                     EntryPointCode& form,
+                                     std::string_view form_name,
+                                     DiagnosticSink& diagnostics)
+    {
+        if (!validate)
+        {
+            const CookResult<EmittedCodeFacts> facts = target.Validator->ReadEmittedCodeFacts(form.Code, diagnostics);
+            if (!facts)
+            {
+                return std::unexpected(facts.error());
+            }
+
+            KeepDeclaredBindings(variant.Bindings, form, facts->DeclaredPlacements);
+            const CookError applied = ApplyEmittedCodeFacts(target, variant, entry_point, form, *facts, diagnostics);
+            if (applied != CookError::Success)
+            {
+                return std::unexpected(applied);
+            }
+
+            return true;
+        }
+
+        auto extractBinding = [&variant](const uint32_t binding_index) -> const ReflectedBinding*
+        {
+            return &variant.Bindings[binding_index];
+        };
+
+        std::vector<const ReflectedBinding*> used = form.UsedBindingIndices |
+                                                    std::views::transform(extractBinding) |
+                                                    std::ranges::to<std::vector>();
+
+        CookResult<BindingComparison> comparison = target.Validator->ValidateEntryPoint(form.Code, used, diagnostics);
+        if (!comparison)
+        {
+            return std::unexpected(comparison.error());
+        }
+
+        // a reflected binding that the code does not declare is unused, and leaves the visibility below
+        std::erase_if(comparison->Mismatches, [](const BindingMismatch& mismatch)
+        {
+            return mismatch.Kind == BindingMismatchKind::ReflectedOnly;
+        });
+
+        if (!comparison->Matches())
+        {
+            std::string warningStr = std::format("REFLECTION MISMATCH in {}{} ({}) for target {}, {} form:",
+                                                 entry_point.Name,
+                                                 entry_point.VariantSuffix,
+                                                 variant.VariantDescription,
+                                                 target.Name,
+                                                 form_name);
+            for (const BindingMismatch& mismatch : comparison->Mismatches)
+            {
+                warningStr += '\n';
+                warningStr += FormatBindingMismatch(mismatch);
+            }
+
+            ReportWarning(diagnostics, warningStr);
+
+            return false;
+        }
+
+        KeepDeclaredBindings(variant.Bindings, form, comparison->Emitted.DeclaredPlacements);
+
+        const CookError applied = ApplyEmittedCodeFacts(target, variant, entry_point, form, comparison->Emitted, diagnostics);
+        if (applied != CookError::Success)
+        {
+            return std::unexpected(applied);
+        }
+
+        return true;
+    }
+
+    void KeepDeclaredBindings(std::span<const ReflectedBinding> bindings,
+                              EntryPointCode& form,
                               std::span<const std::pair<uint32_t, uint32_t>> declared_placements)
     {
-        CompiledEntryPoint& entryPoint = variant.EntryPoints[entry_point_index];
-        std::vector<uint32_t>& used = entryPoint.Reflection.UsedBindingIndices;
-        EntryPointConstants& constants = entryPoint.Reflection.Constants;
+        std::vector<uint32_t>& used = form.UsedBindingIndices;
+        EntryPointConstants& constants = form.Constants;
         const std::optional<uint32_t> constantsBuffer =
             constants.Delivery == EntryPointConstantsDelivery::UniformBuffer ? std::optional{ used[constants.Binding] }
                                                                              : std::nullopt;
@@ -399,17 +438,23 @@ namespace
             return std::ranges::find(declared_placements, std::pair{ group, binding }) != declared_placements.end();
         };
 
-        std::erase_if(used, [&](uint32_t binding_index)
+        auto erasePredicate = [&](uint32_t binding_index)
         {
-            const ResourcePlacement& placement = variant.Bindings[binding_index].Placement;
+            const ResourcePlacement& placement = bindings[binding_index].Placement;
+
             if (const BoundPlacement* bound = GetBoundPlacement(placement))
             {
                 return !isDeclared(bound->Group, bound->Binding);
             }
+
             const StoredValuePlacement* stored = GetStoredValuePlacement(placement);
-            return stored != nullptr && stored->Container == StoredValueContainer::UniformBuffer &&
+
+            return stored != nullptr &&
+                   stored->Container == StoredValueContainer::UniformBuffer &&
                    !isDeclared(stored->Block.Group, stored->Block.Binding);
-        });
+        };
+
+        std::erase_if(used, erasePredicate);
 
         if (!constantsBuffer)
         {
@@ -447,63 +492,66 @@ namespace
     }
 
     CookError ApplyEmittedCodeFacts(const TargetProfile& target,
-                                    CompiledVariant& variant,
-                                    size_t entry_point_index,
+                                    const CompiledVariant& variant,
+                                    const CompiledEntryPoint& entry_point,
+                                    EntryPointCode& form,
                                     const EmittedCodeFacts& facts,
                                     DiagnosticSink& diagnostics)
     {
-        const CompiledEntryPoint& entryPoint = variant.EntryPoints[entry_point_index];
-        if (!facts.EntryPointName.empty() && facts.EntryPointName != entryPoint.Name)
+        if (!facts.EntryPointName.empty() && facts.EntryPointName != entry_point.Name)
         {
             return ReportError(diagnostics,
                                CookError::ReflectionMismatch,
                                std::format("{}{} for target {}: the code names its entry point '{}'",
-                                           entryPoint.Name,
-                                           entryPoint.VariantSuffix,
+                                           entry_point.Name,
+                                           entry_point.VariantSuffix,
                                            target.Name,
                                            facts.EntryPointName));
         }
 
-        variant.EntryPoints[entry_point_index].CodeFacts = SourceCodeFacts{
+        form.CodeFacts = SourceCodeFacts{
             .CapabilityNames = WithoutGuaranteedCapabilities(target, facts.CapabilityNames),
             .WorkgroupMemoryBytes = facts.WorkgroupMemoryBytes
         };
 
-        const CookError resolved =
-            ResolveSamplerTexturePairs(variant, entry_point_index, facts.SamplerTexturePairs, target.DescriptorHeapSet, diagnostics);
+        const CookError resolved = ResolveSamplerTexturePairs(variant,
+                                                              entry_point,
+                                                              form,
+                                                              facts.SamplerTexturePairs,
+                                                              target.DescriptorHeapSet,
+                                                              diagnostics);
         if (resolved != CookError::Success)
         {
             return resolved;
         }
 
-        return ReconcileEntryPointConstants(target,
-                                            variant.Bindings,
-                                            variant.EntryPoints[entry_point_index],
-                                            facts.PushConstantExtent,
-                                            diagnostics);
+        return ReconcileEntryPointConstants(target, variant.Bindings, entry_point, form, facts.PushConstantExtent, diagnostics);
     }
 
     CookError ReconcileEntryPointConstants(const TargetProfile& target,
                                            std::span<const ReflectedBinding> bindings,
-                                           CompiledEntryPoint& entry_point,
+                                           const CompiledEntryPoint& entry_point,
+                                           EntryPointCode& form,
                                            std::optional<uint32_t> push_constant_extent,
                                            DiagnosticSink& diagnostics)
     {
-        EntryPointConstants& constants = entry_point.Reflection.Constants;
+        EntryPointConstants& constants = form.Constants;
         const bool reflected = constants.Delivery == EntryPointConstantsDelivery::PushConstant;
         if (!push_constant_extent)
         {
             if (reflected)
             {
                 constants = EntryPointConstants{};
+                auto erasePredicate = [&](uint32_t binding_index)
+                {
+                    const StoredValuePlacement* stored = GetStoredValuePlacement(bindings[binding_index].Placement);
+                    return stored != nullptr && stored->Container == StoredValueContainer::PushConstants;
+                };
+
                 // a value stored in push constants that the code removed is not visible either
-                std::erase_if(entry_point.Reflection.UsedBindingIndices,
-                              [bindings](uint32_t binding_index)
-                              {
-                                  const StoredValuePlacement* stored = GetStoredValuePlacement(bindings[binding_index].Placement);
-                                  return stored != nullptr && stored->Container == StoredValueContainer::PushConstants;
-                              });
+                std::erase_if(form.UsedBindingIndices, erasePredicate);
             }
+
             return CookError::Success;
         }
 
@@ -536,14 +584,14 @@ namespace
         return CookError::Success;
     }
 
-    CookError ResolveSamplerTexturePairs(CompiledVariant& variant,
-                                         size_t entry_point_index,
+    CookError ResolveSamplerTexturePairs(const CompiledVariant& variant,
+                                         const CompiledEntryPoint& entry_point,
+                                         EntryPointCode& form,
                                          std::span<const SamplerTexturePlacement> placements,
                                          std::optional<uint32_t> descriptor_heap_set,
                                          DiagnosticSink& diagnostics)
     {
-        CompiledEntryPoint& entryPoint = variant.EntryPoints[entry_point_index];
-        const std::vector<uint32_t>& used = entryPoint.Reflection.UsedBindingIndices;
+        const std::vector<uint32_t>& used = form.UsedBindingIndices;
 
         auto findPosition = [&](uint32_t group, uint32_t binding, BindingKind kind) -> std::optional<uint32_t>
         {
@@ -583,8 +631,8 @@ namespace
                 const std::string errStr =
                     std::format("{}{} ({}): the emitted code samples the texture at ({}, {}) with the sampler at "
                                 "({}, {}), and reflection has no used {} at that placement",
-                                entryPoint.Name,
-                                entryPoint.VariantSuffix,
+                                entry_point.Name,
+                                entry_point.VariantSuffix,
                                 variant.VariantDescription,
                                 placement.TextureGroup,
                                 placement.TextureBinding,
@@ -598,9 +646,12 @@ namespace
         }
 
         std::ranges::sort(pairs);
+
         const auto duplicates = std::ranges::unique(pairs);
         pairs.erase(duplicates.begin(), duplicates.end());
-        entryPoint.SamplerTexturePairs = std::move(pairs);
+        
+        form.SamplerTexturePairs = std::move(pairs);
+
         return CookError::Success;
     }
 
@@ -609,7 +660,7 @@ namespace
         std::vector<uint8_t> used(variant.Bindings.size(), uint8_t{ 0 });
         for (const CompiledEntryPoint& entryPoint : variant.EntryPoints)
         {
-            for (const auto& bindingIndex : entryPoint.Reflection.UsedBindingIndices)
+            for (const auto& bindingIndex : entryPoint.Delivered.UsedBindingIndices)
             {
                 used[bindingIndex] = static_cast<uint8_t>(true);
             }

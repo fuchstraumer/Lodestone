@@ -837,13 +837,13 @@ std::string DumpResolvedModule(std::string_view module_name, std::span<const Com
             writer.KeyUInt("y", entryPoint.Reflection.Workgroup.Y);
             writer.KeyUInt("z", entryPoint.Reflection.Workgroup.Z);
             writer.EndObject();
-            writer.KeyUInt("targetTextByteLength", entryPoint.Code.size());
-            writer.KeyUInt("targetTextHash", HashSourceCode(entryPoint.Code));
-            WriteIndexArray(writer, "usedBindingIndices", entryPoint.Reflection.UsedBindingIndices);
-            WriteSamplerPairs(writer, "samplerTexturePairs", entryPoint.SamplerTexturePairs);
+            writer.KeyUInt("targetTextByteLength", entryPoint.Delivered.Code.size());
+            writer.KeyUInt("targetTextHash", HashSourceCode(entryPoint.Delivered.Code));
+            WriteIndexArray(writer, "usedBindingIndices", entryPoint.Delivered.UsedBindingIndices);
+            WriteSamplerPairs(writer, "samplerTexturePairs", entryPoint.Delivered.SamplerTexturePairs);
             writer.Key("constants");
             writer.BeginObject();
-            WriteEntryPointConstants(writer, entryPoint.Reflection.Constants);
+            WriteEntryPointConstants(writer, entryPoint.Delivered.Constants);
             writer.EndObject();
             WriteVertexInputs(writer, entryPoint.Reflection.Raster);
             WriteColorTargets(writer, entryPoint.Reflection.Raster);

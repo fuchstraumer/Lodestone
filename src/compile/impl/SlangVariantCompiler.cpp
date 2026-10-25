@@ -24,7 +24,6 @@ namespace
 {
 using namespace lodestone;
 
-constexpr SlangInt k_TargetIndex = 0;
 constexpr uint32_t k_SpirvMagicNumber = 0x07230203u;
 constexpr size_t k_SpirvHeaderBytes = 5u * sizeof(uint32_t);
 
@@ -48,12 +47,12 @@ struct GeneratedEntryPoint
     bool CallFailed{ false };
 };
 
-GeneratedEntryPoint GenerateOneEntryPoint(slang::IComponentType* linked_program, size_t index)
+GeneratedEntryPoint GenerateOneEntryPoint(slang::IComponentType* linked_program, size_t index, SlangInt target_index)
 {
     Slang::ComPtr<slang::IBlob> code;
     Slang::ComPtr<slang::IBlob> diagnostics;
     const bool failed = SLANG_FAILED(linked_program->getEntryPointCode(
-        static_cast<SlangInt>(index), k_TargetIndex, code.writeRef(), diagnostics.writeRef()));
+        static_cast<SlangInt>(index), target_index, code.writeRef(), diagnostics.writeRef()));
 
     return GeneratedEntryPoint{ .Code = failed ? std::vector<std::byte>{} : BlobToBytes(code.get()),
                                 .Diagnostics = BlobToString(diagnostics.get()),
@@ -62,6 +61,7 @@ GeneratedEntryPoint GenerateOneEntryPoint(slang::IComponentType* linked_program,
 
 CookResult<std::vector<LinkedVariant::EpCode>> GenerateEntryPointCode(SlangModuleContext& context,
                                                                       Slang::ComPtr<slang::IComponentType> linked_program,
+                                                                      SlangInt target_index,
                                                                       DiagnosticSink& sink)
 {
     // Slang can report an error with a success code (E55205 for a spec constant in numthreads on WGSL)
@@ -71,7 +71,7 @@ CookResult<std::vector<LinkedVariant::EpCode>> GenerateEntryPointCode(SlangModul
 
     for (size_t i = 0; i < entryPointCount; ++i)
     {
-        GeneratedEntryPoint result = GenerateOneEntryPoint(linked_program, i);
+        GeneratedEntryPoint result = GenerateOneEntryPoint(linked_program, i, target_index);
         const int32_t failureCount = result.Diagnostics.empty()
                                          ? 0
                                          : ParseSlangDiagnostics(result.Diagnostics, "getEntryPointCode", sink);
@@ -171,7 +171,7 @@ CookResult<LinkedVariant> SlangVariantCompiler::CompileVariant(SlangModuleContex
 
     Slang::ComPtr<slang::IComponentType> linkedProgram = linkResult.value();
     result.LinkedProgram = linkedProgram;
-    slang::ProgramLayout* programLayout = linkedProgram->getLayout(k_TargetIndex);
+    slang::ProgramLayout* programLayout = linkedProgram->getLayout(k_BaseTargetIndex);
     if (programLayout == nullptr)
     {
         return std::unexpected(CookError::ReflectionUnavailable);
@@ -179,18 +179,30 @@ CookResult<LinkedVariant> SlangVariantCompiler::CompileVariant(SlangModuleContex
 
     result.ProgramLayout = programLayout;
 
-    CookResult<std::vector<LinkedVariant::EpCode>> generatedCode = GenerateEntryPointCode(context, linkedProgram, sink);
+    CookResult<std::vector<LinkedVariant::EpCode>> generatedCode =
+        GenerateEntryPointCode(context, linkedProgram, k_BaseTargetIndex, sink);
     if (!generatedCode)
     {
         return std::unexpected(generatedCode.error());
     }
     std::vector<LinkedVariant::EpCode> entryPointCode = std::move(*generatedCode);
 
+    if (context.CompilesDeliveredForm())
+    {
+        CookResult<std::vector<LinkedVariant::EpCode>> deliveredCode =
+            GenerateEntryPointCode(context, linkedProgram, k_DeliveredTargetIndex, sink);
+        if (!deliveredCode)
+        {
+            return std::unexpected(deliveredCode.error());
+        }
+        result.DeliveredEntryPointCode = std::move(*deliveredCode);
+    }
+
     for (size_t i = 0; i < entryPointCode.size(); ++i)
     {
         const auto castIndex = static_cast<int64_t>(i);
         Slang::ComPtr<slang::IMetadata> metadata;
-        linkedProgram->getEntryPointMetadata(castIndex, k_TargetIndex, metadata.writeRef());
+        linkedProgram->getEntryPointMetadata(castIndex, k_BaseTargetIndex, metadata.writeRef());
         result.EntryPointMetadata.push_back(metadata);
     }
 

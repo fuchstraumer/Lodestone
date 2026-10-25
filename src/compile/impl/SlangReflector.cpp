@@ -629,7 +629,20 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
                                  });
 
         rawEntryPoint.VariantSuffix = rawVariant.VariantSuffix;
-        rawEntryPoint.TargetCode = std::move(linked_variant.EntryPointCode[static_cast<size_t>(i)]);
+        
+        // If there is no delivered entry point code, the base code is used as the target code.
+        // Otherwise, the delivered code is used as the target code, and the base code is stored separately.
+        std::vector<std::byte>& baseCode = linked_variant.EntryPointCode[static_cast<size_t>(i)];
+        if (linked_variant.DeliveredEntryPointCode.empty())
+        {
+            rawEntryPoint.TargetCode = std::move(baseCode);
+        }
+        else
+        {
+            rawEntryPoint.TargetCode = std::move(linked_variant.DeliveredEntryPointCode[static_cast<size_t>(i)]);
+            rawEntryPoint.BaseTargetCode = std::move(baseCode);
+        }
+
         rawVariant.EntryPoints.emplace_back(std::move(*entryPointResult));
     }
 

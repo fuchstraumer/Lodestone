@@ -376,7 +376,7 @@ void TestEntryPoints(TestRunner& runner, DiagnosticSink& sink)
     }
 
     const auto& entryPoint = resolved.value().EntryPoints.front();
-    runner.CheckEqual(entryPoint.Code, lodestone::tests::BytesOf("@compute fn SpectrumUpdate() {}"),
+    runner.CheckEqual(entryPoint.Delivered.Code, lodestone::tests::BytesOf("@compute fn SpectrumUpdate() {}"),
                       "the target text becomes the code, unread and unchanged");
     runner.CheckEqual(entryPoint.Name, "SpectrumUpdate",
                       "the entry point name reaches both the record and its reflection");
@@ -391,6 +391,26 @@ void TestEntryPoints(TestRunner& runner, DiagnosticSink& sink)
     {
         runner.CheckEqual(entryPoint.Reflection.UsedBindingIndices.front(), 0u,
                           "visibility passes through as indices into the shared binding list");
+    }
+    runner.CheckEqual(entryPoint.Delivered.UsedBindingIndices, entryPoint.Reflection.UsedBindingIndices,
+                      "the delivered form starts from reflection's visibility");
+    runner.Check(!entryPoint.Base.has_value(), "a raw entry point with no base code gives no base form");
+    runner.CheckEqual(lodestone::BaseForm(entryPoint).Code, entryPoint.Delivered.Code,
+                      "with one compile, the base form is the delivered form");
+
+    const std::vector<std::byte> baseCode = lodestone::tests::BytesOf("@compute fn SpectrumUpdate() { /* base */ }");
+    RawVariant twoFormVariant = variant;
+    twoFormVariant.EntryPoints.front().BaseTargetCode = baseCode;
+    const CookResult<CompiledVariant> twoForms = ResolveVariant(twoFormVariant, MakeContext(), sink);
+    if (runner.CheckOk(twoForms, "a variant with base code resolves"))
+    {
+        const lodestone::CompiledEntryPoint& twoFormEntryPoint = twoForms->EntryPoints.front();
+        if (runner.Check(twoFormEntryPoint.Base.has_value(), "base code gives a base form"))
+        {
+            runner.CheckEqual(twoFormEntryPoint.Base->Code, baseCode, "the base code passes through");
+            runner.CheckEqual(twoFormEntryPoint.Base->UsedBindingIndices, twoFormEntryPoint.Reflection.UsedBindingIndices,
+                              "the base form starts from reflection's visibility");
+        }
     }
 }
 

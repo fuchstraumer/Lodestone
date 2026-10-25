@@ -104,6 +104,7 @@ struct RawEntryPoint
     ShaderStageKind Stage{ ShaderStageKind::Invalid };
     WorkgroupSize Workgroup;
     std::vector<std::byte> TargetCode;
+    std::optional<std::vector<std::byte>> BaseTargetCode;
     /** Visibility, in placement order. */
     std::vector<uint32_t> UsedBindingIndices;
     ReflectedRasterState Raster;

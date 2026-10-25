@@ -395,6 +395,20 @@ constexpr SlangOptimizationLevel ToSlangOptimizationLevel(uint32_t level) noexce
 slang::CompilerOptionEntry ToOptionEntry(const CompilerOptionRow& row) noexcept;
 
 std::vector<slang::CompilerOptionEntry> MakeCompilerOptions(uint32_t optimization_level, uint32_t debug_level);
+/** Returns the optimization and debug information options alone, which a target can set over the session's. */
+std::array<slang::CompilerOptionEntry, 2u> MakeFlagOptions(uint32_t optimization_level, uint32_t debug_level) noexcept;
+
+// the base form: no optimizer and no debug information, so the measurements do not depend on the cook's flags
+constexpr uint32_t k_BaseOptimizationLevel = 0u;
+constexpr uint32_t k_BaseDebugLevel = 0u;
+// the base target is always present and gives the reflection. The delivered target exists only for other flags
+constexpr SlangInt k_BaseTargetIndex = 0;
+constexpr SlangInt k_DeliveredTargetIndex = 1;
+
+constexpr bool AreBaseFlags(uint32_t optimization_level, uint32_t debug_level) noexcept
+{
+    return optimization_level == k_BaseOptimizationLevel && debug_level == k_BaseDebugLevel;
+}
 
 std::vector<std::byte> BlobToBytes(slang::IBlob* blob);
 std::string BlobToString(slang::IBlob* blob);

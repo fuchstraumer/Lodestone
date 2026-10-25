@@ -57,11 +57,12 @@ CompiledVariant MakeVariant(uint64_t index, const std::string& suffix, std::stri
     CompiledEntryPoint entryPoint;
     entryPoint.Name = "MainCS";
     entryPoint.VariantSuffix = suffix;
-    entryPoint.Code = lodestone::tests::BytesOf(code);
+    entryPoint.Delivered.Code = lodestone::tests::BytesOf(code);
     entryPoint.Reflection.Name = "MainCS";
     entryPoint.Reflection.Stage = ShaderStageKind::Compute;
     entryPoint.Reflection.Workgroup = WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u };
     entryPoint.Reflection.UsedBindingIndices.push_back(0u);
+    entryPoint.Delivered.UsedBindingIndices.push_back(0u);
 
     CompiledVariant variant;
     variant.VariantIndex = index;

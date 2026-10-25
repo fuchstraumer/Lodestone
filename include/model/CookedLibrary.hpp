@@ -41,6 +41,8 @@ struct LibraryVariant
     uint32_t ResourceListIndex{ 0u };
     uint32_t FootprintListIndex{ 0u };
     std::vector<uint32_t> SourceIndices;
+    /** If the target and base cooks use same flags, this is empty (and `SourceIndices` is base code). */
+    std::vector<uint32_t> BaseSourceIndices;
     std::vector<uint32_t> VisibilityIndices;
     std::vector<uint32_t> RasterIndices;
     std::vector<WorkgroupSize> Workgroups;
@@ -90,6 +92,8 @@ struct InternedModule
     std::vector<VariantKey> VariantKeys;
     std::vector<LibraryVariant> Variants;
     ContentInterner<std::vector<std::byte>> SourceInterner{ &HashSourceCode, k_HashName };
+    /** The base code, which the measurements read and the manifest does not hold. */
+    ContentInterner<std::vector<std::byte>> BaseSourceInterner{ &HashSourceCode, k_HashName };
     ContentInterner<ReflectedBinding> ResourceInterner{ &HashReflectedBinding, k_HashName };
     ContentInterner<ResourceList> ResourceListInterner{ &HashResourceList, k_HashName };
     ContentInterner<FootprintList> FootprintListInterner{ &HashFootprintList, k_HashName };
@@ -107,6 +111,7 @@ struct InternedModule
     void DisableDedupe() noexcept
     {
         SourceInterner.Disable();
+        BaseSourceInterner.Disable();
         ResourceInterner.Disable();
         ResourceListInterner.Disable();
         FootprintListInterner.Disable();
@@ -126,6 +131,8 @@ struct CookedModule
     uint64_t SpaceSize{ 0u };
     std::vector<LibraryEntryPoint> EntryPoints;
     std::vector<std::vector<std::byte>> Sources;
+    /** Empty when the cook compiled once. */
+    std::vector<std::vector<std::byte>> BaseSources;
     std::vector<ReflectedBinding> Resources;
     std::vector<ResourceList> ResourceLists;
     std::vector<FootprintList> FootprintLists;
@@ -142,6 +149,7 @@ struct CookedModule
     std::vector<FootprintAxisDeclaration> FootprintDeclarations;
 
     TableStatistics SourceTable;
+    TableStatistics BaseSourceTable;
     TableStatistics ResourceTable;
     TableStatistics ResourceListTable;
     TableStatistics FootprintListTable;
@@ -194,6 +202,10 @@ CookedModule FreezeModuleTables(InternedModule&& interned);
 std::span<const std::byte> ResolveSource(const CookedModule& module,
                                          const LibraryVariant& variant,
                                          size_t entry_point_index) noexcept;
+/** @brief Returns the base code of one entry point of one variant, which the measurements compare. */
+std::span<const std::byte> ResolveBaseSource(const CookedModule& module,
+                                             const LibraryVariant& variant,
+                                             size_t entry_point_index) noexcept;
 
 CookResult<ShaderLayout> ResolveLayout(const CookedModule& module,
                                        const LibraryVariant& variant,

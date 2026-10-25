@@ -110,7 +110,6 @@ namespace
         CompiledEntryPoint entryPoint;
         entryPoint.Name = raw_entry_point.Name;
         entryPoint.VariantSuffix = raw_entry_point.VariantSuffix;
-        entryPoint.Code = raw_entry_point.TargetCode;
         entryPoint.Reflection.Name = raw_entry_point.Name;
         entryPoint.Reflection.Stage = raw_entry_point.Stage;
         entryPoint.Reflection.Workgroup = raw_entry_point.Workgroup;
@@ -131,7 +130,23 @@ namespace
             constants.Binding =
                 static_cast<uint32_t>(std::distance(raw_entry_point.UsedBindingIndices.begin(), container));
         }
+
+        // each form starts from reflection, and the reader removes what its code does not declare
+        auto makeForm = [&entryPoint](const std::vector<std::byte>& code)
+        {
+            return EntryPointCode{ .Code = code,
+                                   .UsedBindingIndices = entryPoint.Reflection.UsedBindingIndices,
+                                   .Constants = entryPoint.Reflection.Constants,
+                                   .SamplerTexturePairs = {},
+                                   .CodeFacts = {} };
+        };
         
+        entryPoint.Delivered = makeForm(raw_entry_point.TargetCode);
+        if (raw_entry_point.BaseTargetCode.has_value())
+        {
+            entryPoint.Base = makeForm(*raw_entry_point.BaseTargetCode);
+        }
+
         return entryPoint;
     }
 

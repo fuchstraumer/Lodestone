@@ -277,12 +277,19 @@ CookError AppendVariantToModule(InternedModule& module,
                                        .VariantDescription = variant.VariantDescription,
                                        .VariantIndex = variant.VariantIndex };
 
-        const InternResult source = module.SourceInterner.Intern(entryPoint.Code, origin);
+        const EntryPointCode& delivered = entryPoint.Delivered;
+        const InternResult source = module.SourceInterner.Intern(delivered.Code, origin);
         record.SourceIndices.push_back(source.Index);
+        
+        if (entryPoint.Base.has_value())
+        {
+            record.BaseSourceIndices.push_back(module.BaseSourceInterner.Intern(entryPoint.Base->Code, origin).Index);
+        }
+
         if (source.WasNew)
         {
-            module.SourceFacts.push_back(entryPoint.CodeFacts);
-            for (const std::string& name : entryPoint.CodeFacts.CapabilityNames)
+            module.SourceFacts.push_back(delivered.CodeFacts);
+            for (const std::string& name : delivered.CodeFacts.CapabilityNames)
             {
                 const auto position = std::ranges::lower_bound(module.ObservedCapabilities, name);
                 if (position == module.ObservedCapabilities.end() || *position != name)
@@ -293,7 +300,7 @@ CookError AppendVariantToModule(InternedModule& module,
         }
 
         const InternResult visibility =
-            module.VisibilityInterner.Intern(entryPoint.Reflection.UsedBindingIndices, origin);
+            module.VisibilityInterner.Intern(delivered.UsedBindingIndices, origin);
         record.VisibilityIndices.push_back(visibility.Index);
 
         const InternResult raster = module.RasterInterner.Intern(entryPoint.Reflection.Raster, origin);
@@ -301,10 +308,10 @@ CookError AppendVariantToModule(InternedModule& module,
 
         record.Workgroups.push_back(entryPoint.Reflection.Workgroup);
 
-        const InternResult samplerPairs = module.SamplerPairInterner.Intern(entryPoint.SamplerTexturePairs, origin);
+        const InternResult samplerPairs = module.SamplerPairInterner.Intern(delivered.SamplerTexturePairs, origin);
         record.SamplerPairIndices.push_back(samplerPairs.Index);
 
-        const InternResult constants = module.ConstantsInterner.Intern(entryPoint.Reflection.Constants, origin);
+        const InternResult constants = module.ConstantsInterner.Intern(delivered.Constants, origin);
         record.ConstantsIndices.push_back(constants.Index);
     }
 
@@ -337,6 +344,7 @@ CookedModule FreezeModuleTables(InternedModule&& interned)
     module.VariantKeys = std::move(interned.VariantKeys);
 
     module.Sources = interned.SourceInterner.ConsumeTable();
+    module.BaseSources = interned.BaseSourceInterner.ConsumeTable();
     module.Resources = interned.ResourceInterner.ConsumeTable();
     module.ResourceLists = interned.ResourceListInterner.ConsumeTable();
     module.FootprintLists = interned.FootprintListInterner.ConsumeTable();
@@ -349,6 +357,7 @@ CookedModule FreezeModuleTables(InternedModule&& interned)
     module.FootprintDeclarations = std::move(interned.FootprintDeclarations);
 
     module.SourceTable = DescribeTable(interned.SourceInterner);
+    module.BaseSourceTable = DescribeTable(interned.BaseSourceInterner);
     module.ResourceTable = DescribeTable(interned.ResourceInterner);
     module.ResourceListTable = DescribeTable(interned.ResourceListInterner);
     module.FootprintListTable = DescribeTable(interned.FootprintListInterner);
@@ -376,6 +385,18 @@ std::span<const std::byte> ResolveSource(const CookedModule& module,
     }
 
     return module.Sources[sourceIndex];
+}
+
+std::span<const std::byte> ResolveBaseSource(const CookedModule& module,
+                                             const LibraryVariant& variant,
+                                             size_t entry_point_index) noexcept
+{
+    if (variant.BaseSourceIndices.empty())
+    {
+        return ResolveSource(module, variant, entry_point_index);
+    }
+
+    return module.BaseSources[variant.BaseSourceIndices[entry_point_index]];
 }
 
 CookResult<ShaderLayout> ResolveLayout(const CookedModule& module,

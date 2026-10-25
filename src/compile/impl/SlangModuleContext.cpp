@@ -108,6 +108,8 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
     diagnosticSink = &sink;
     bufferForm = create_info.Forms.Buffer;
     language = create_info.Language;
+    compilesDeliveredForm = !AreBaseFlags(create_info.OptimizationLevel, create_info.DebugLevel);
+    
     if (k_UseSlangWorkaround)
     {
         const SlangResult created = slang_createGlobalSessionWithoutCoreModule(SLANG_API_VERSION, globalSession.writeRef());
@@ -184,14 +186,14 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
     slang::TargetDesc target{};
     target.format = ToSlangCompileTarget(create_info.Language);
     // with no index, the heap takes the next free set, which can differ between the variants of one module
-    slang::CompilerOptionEntry heapSet{};
+    std::vector<slang::CompilerOptionEntry> deliveredOptions;
     if (create_info.DescriptorHeapSet.has_value())
     {
+        slang::CompilerOptionEntry heapSet{};
         heapSet.name = slang::CompilerOptionName::BindlessSpaceIndex;
         heapSet.value.kind = slang::CompilerOptionValueKind::Int;
         heapSet.value.intValue0 = static_cast<int32_t>(*create_info.DescriptorHeapSet);
-        target.compilerOptionEntries = &heapSet;
-        target.compilerOptionEntryCount = 1u;
+        deliveredOptions.push_back(heapSet);
     }
 
     if (!create_info.SlangProfileName.empty())
@@ -205,10 +207,25 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
                                std::format("Slang has no profile named '{}'", create_info.SlangProfileName));
         }
     }
-    
+
+    // a target's options override the session's, so the base target restates the base flags
+    std::vector<slang::CompilerOptionEntry> baseOptions = deliveredOptions;
+    if (compilesDeliveredForm)
+    {
+        baseOptions.append_range(MakeFlagOptions(k_BaseOptimizationLevel, k_BaseDebugLevel));
+    }
+
+    std::array<slang::TargetDesc, 2u> targets{ target, target };
+    slang::TargetDesc& baseTarget = targets[static_cast<size_t>(k_BaseTargetIndex)];
+    slang::TargetDesc& deliveredTarget = targets[static_cast<size_t>(k_DeliveredTargetIndex)];
+    baseTarget.compilerOptionEntries = baseOptions.data();
+    baseTarget.compilerOptionEntryCount = static_cast<uint32_t>(baseOptions.size());
+    deliveredTarget.compilerOptionEntries = deliveredOptions.data();
+    deliveredTarget.compilerOptionEntryCount = static_cast<uint32_t>(deliveredOptions.size());
+
     slang::SessionDesc sessionDesc{};
-    sessionDesc.targets = &target;
-    sessionDesc.targetCount = 1;
+    sessionDesc.targets = targets.data();
+    sessionDesc.targetCount = compilesDeliveredForm ? 2 : 1;
     sessionDesc.searchPaths = searchPaths.data();
     sessionDesc.searchPathCount = static_cast<SlangInt>(searchPaths.size());
     sessionDesc.fileSystem = &GetEmbeddedFileSystem();
@@ -480,6 +497,11 @@ AccessModel SlangModuleContext::BufferForm() const noexcept
 TargetLanguage SlangModuleContext::Language() const noexcept
 {
     return language;
+}
+
+bool SlangModuleContext::CompilesDeliveredForm() const noexcept
+{
+    return compilesDeliveredForm;
 }
 
 std::vector<SerializedModule> SlangModuleContext::SerializeModules() const
