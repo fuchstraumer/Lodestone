@@ -10,7 +10,7 @@ namespace lodestone
 
 namespace
 {
-    // Pointer and Indexed cells stay empty until phase F step F4.1 adds their implementations
+    // a buffer device address addresses buffers only, so textures have no Pointer form, and buffers use no Handle
     constexpr std::array<ShimInterface, 5u> k_ShimInterfaces
     {
         ShimInterface
@@ -19,8 +19,8 @@ namespace
             .Class = ShimResourceClass::Buffer,
             .TypeParameterCount = 1u,
             .Bound = "BoundReadBuffer",
-            .Indexed = {},
-            .Pointer = {},
+            .Handle = {},
+            .Pointer = "PointerReadBuffer",
             .ImplementationTakesFormat = false,
         },
         ShimInterface
@@ -29,8 +29,8 @@ namespace
             .Class = ShimResourceClass::Buffer,
             .TypeParameterCount = 1u,
             .Bound = "BoundReadWriteBuffer",
-            .Indexed = {},
-            .Pointer = {},
+            .Handle = {},
+            .Pointer = "PointerReadWriteBuffer",
             .ImplementationTakesFormat = false,
         },
         ShimInterface
@@ -39,7 +39,7 @@ namespace
             .Class = ShimResourceClass::Texture,
             .TypeParameterCount = 0u,
             .Bound = "BoundTexture2D",
-            .Indexed = {},
+            .Handle = "HandleTexture2D",
             .Pointer = {},
             .ImplementationTakesFormat = false,
         },
@@ -49,7 +49,7 @@ namespace
             .Class = ShimResourceClass::Sampler,
             .TypeParameterCount = 0u,
             .Bound = "BoundSampler",
-            .Indexed = {},
+            .Handle = "HandleSampler",
             .Pointer = {},
             .ImplementationTakesFormat = false,
         },
@@ -59,7 +59,7 @@ namespace
             .Class = ShimResourceClass::StorageTexture,
             .TypeParameterCount = 0u,
             .Bound = "BoundWriteStorageTexture2D",
-            .Indexed = {},
+            .Handle = "HandleWriteStorageTexture2D",
             .Pointer = {},
             .ImplementationTakesFormat = true,
         },
@@ -83,14 +83,32 @@ std::string_view ShimImplName(const ShimInterface& shim_interface, AccessModel a
     {
     case AccessModel::Bound:
         return shim_interface.Bound;
-    case AccessModel::Indexed:
-        return shim_interface.Indexed;
+    case AccessModel::Handle:
+        return shim_interface.Handle;
     case AccessModel::Pointer:
         return shim_interface.Pointer;
     case AccessModel::Invalid:
         break;
     }
     return {};
+}
+
+AccessModel ShimFormOf(const ShimForms& forms, ShimResourceClass resource_class) noexcept
+{
+    switch (resource_class)
+    {
+    case ShimResourceClass::Buffer:
+        return forms.Buffer;
+    case ShimResourceClass::Texture:
+        return forms.Texture;
+    case ShimResourceClass::Sampler:
+        return forms.Sampler;
+    case ShimResourceClass::StorageTexture:
+        return forms.StorageTexture;
+    case ShimResourceClass::Invalid:
+        break;
+    }
+    return AccessModel::Invalid;
 }
 
 std::string_view ToString(ShimResourceClass resource_class) noexcept

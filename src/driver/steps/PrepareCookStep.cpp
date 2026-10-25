@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <expected>
 #include <filesystem>
+#include <format>
 #include <memory>
 #include <span>
 #include <string>
@@ -131,6 +132,14 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input, Diag
         if (!targetResult)
         {
             return std::unexpected(CookError::TargetProfileNotFound);
+        }
+        if (!targetResult->IncompleteReason.empty())
+        {
+            return std::unexpected(ReportError(diagnostics,
+                                               CookError::TargetProfileIncomplete,
+                                               std::format("target profile '{}' is not complete: {}",
+                                                           targetName,
+                                                           targetResult->IncompleteReason)));
         }
         result.TargetProfiles[targetName] = *targetResult;
     }

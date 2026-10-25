@@ -27,7 +27,7 @@ struct ShimInterface
     /** @brief The number of type arguments of the interface and of each implementation. */
     uint32_t TypeParameterCount{ 0u };
     std::string_view Bound;
-    std::string_view Indexed;
+    std::string_view Handle;
     std::string_view Pointer;
     /** @brief The implementations take the Slang type of a storage format (`RGBA16F`) as their only type argument, and the
      * interface has none. A format axis chooses it for each variant. */
@@ -41,6 +41,9 @@ const ShimInterface* FindShimInterface(std::string_view name) noexcept;
 
 /** @brief Empty when the cell has no implementation. */
 std::string_view ShimImplName(const ShimInterface& shim_interface, AccessModel access) noexcept;
+
+/** @brief The form that `forms` gives to `resource_class`. */
+AccessModel ShimFormOf(const ShimForms& forms, ShimResourceClass resource_class) noexcept;
 
 std::string_view ToString(ShimResourceClass resource_class) noexcept;
 

@@ -22,12 +22,25 @@ enum class AccessModel : uint8_t
 {
     Invalid = 0,
     Bound,
-    Indexed,
-    /** Buffers only. Textures use Indexed. */
+    /** A descriptor handle into a descriptor heap. Textures and samplers. */
+    Handle,
+    /** A buffer device address. Buffers only. */
     Pointer,
 };
 
 std::string_view ToString(AccessModel model) noexcept;
+
+/** @brief The access model of each class of shim resource. A profile has one form for each class. */
+struct ShimForms
+{
+    AccessModel Buffer{ AccessModel::Invalid };
+    AccessModel Texture{ AccessModel::Invalid };
+    AccessModel Sampler{ AccessModel::Invalid };
+    AccessModel StorageTexture{ AccessModel::Invalid };
+};
+
+/** @brief The form of every class when all classes agree, and `Invalid` when they do not. */
+AccessModel SingleForm(const ShimForms& forms) noexcept;
 
 enum class TargetLanguage : uint8_t
 {
@@ -143,13 +156,17 @@ struct TargetProfile
     TargetLanguage Language{ TargetLanguage::Invalid };
     /** @brief Such as `spirv_1_5`. Empty sets no profile. */
     std::string_view SlangProfileName;
-    AccessModel Access{ AccessModel::Invalid };
+    ShimForms Forms;
+    /** @brief The descriptor set of the descriptor heap that handles index. No value without a Handle form. */
+    std::optional<uint32_t> DescriptorHeapSet;
     /** @brief Null when this target cannot check its own output. */
     const ResolvedLibraryValidator* Validator{ nullptr };
     /** @brief The push constant bytes every device supports: 128 for Vulkan. Zero without push constants. */
     uint32_t MaxPushConstantBytes{ 0u };
     /** @brief The guaranteed Vulkan version, as `VK_MAKE_API_VERSION(0, major, minor, 0)`. Zero if not Vulkan. */
     uint32_t VulkanApiVersion{ 0u };
+    /** @brief What the profile still lacks. A cook for a profile with a reason fails with `TargetProfileIncomplete`. */
+    std::string_view IncompleteReason;
 };
 
 /** @brief A compiled-in table, since each target needs its own validation code. */

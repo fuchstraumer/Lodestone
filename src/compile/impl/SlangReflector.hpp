@@ -7,6 +7,7 @@
 #include "compile/RawLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "permute/PermutationSpace.hpp"
+#include "target/TargetProfile.hpp"
 #include "slang.h"
 #include <cstdint>
 #include <span>
@@ -24,7 +25,7 @@ public:
     SlangReflector(std::span<const std::string> entry_point_names,
                    DiagnosticSink* sink,
                    slang::IGlobalSession* global_session,
-                   PlacementKind active_placement_kind) noexcept;
+                   AccessModel buffer_form) noexcept;
     ~SlangReflector() noexcept = default;
     SlangReflector(const SlangReflector&) noexcept = delete;
     SlangReflector& operator=(const SlangReflector&) noexcept = delete;
@@ -88,7 +89,7 @@ private:
     std::span<const std::string> entryPointNames;
     DiagnosticSink* sink{ nullptr };
     slang::IGlobalSession* globalSession;
-    PlacementKind activePlacementKind;
+    AccessModel bufferForm;
 };
 
 } // namespace lodestone

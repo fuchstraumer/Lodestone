@@ -34,7 +34,7 @@ CookResult<PreparedCompiler> PrepareModuleStep::operator()(const SharedCookState
     
     createInfo.Language = targetProfileResult->Language;
     createInfo.SlangProfileName = targetProfileResult->SlangProfileName;
-    createInfo.AccessModel = PlacementKindFromAccessModel(targetProfileResult->Access);
+    createInfo.Forms = targetProfileResult->Forms;
     createInfo.TargetName = target_name;
 
     PreparedCompiler result{ std::make_unique<SlangCompiler>() };

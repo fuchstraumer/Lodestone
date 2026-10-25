@@ -40,8 +40,14 @@ namespace
 
     constexpr std::string_view k_WgslName = "wgsl";
     constexpr std::string_view k_SpirvName = "spirv";
+    constexpr std::string_view k_SpirvModernName = "spirv-modern";
 
     static SpvValidator k_SpvValidator;
+
+    constexpr ShimForms k_AllBound{ .Buffer = AccessModel::Bound,
+                                    .Texture = AccessModel::Bound,
+                                    .Sampler = AccessModel::Bound,
+                                    .StorageTexture = AccessModel::Bound };
 
 #if LODESTONE_ENABLE_WGSL
     static WgslValidator k_WgslValidator;
@@ -51,26 +57,42 @@ namespace
 #endif
 
     // Slang has no WGSL profile, and ignores one that does not imply the target. Vulkan 1.2 guarantees SPIR-V 1.5
-    const std::array<TargetProfile, 2u> k_TargetProfiles
+    const std::array<TargetProfile, 3u> k_TargetProfiles
     {
         TargetProfile{ .Name = k_WgslName,
                            .Language = TargetLanguage::Wgsl,
                            .SlangProfileName = "",
-                           .Access = AccessModel::Bound,
+                           .Forms = k_AllBound,
                            .Validator = k_WgslProfileValidator },
         TargetProfile{ .Name = k_SpirvName,
                            .Language = TargetLanguage::Spirv,
                            .SlangProfileName = "spirv_1_5",
-                           .Access = AccessModel::Bound,
+                           .Forms = k_AllBound,
                            .Validator = &k_SpvValidator,
                            .MaxPushConstantBytes = 128u,
                            .VulkanApiVersion = (1u << 22u) | (2u << 12u) },
+        // buffers through buffer device addresses and textures and samplers through descriptor handles. Vulkan guarantees
+        // 4 descriptor sets, so set 3 is the last one that every device has
+        TargetProfile{ .Name = k_SpirvModernName,
+                           .Language = TargetLanguage::Spirv,
+                           .SlangProfileName = "spirv_1_5",
+                           .Forms = ShimForms{ .Buffer = AccessModel::Pointer,
+                                               .Texture = AccessModel::Handle,
+                                               .Sampler = AccessModel::Handle,
+                                               .StorageTexture = AccessModel::Handle },
+                           .DescriptorHeapSet = 3u,
+                           .Validator = &k_SpvValidator,
+                           .MaxPushConstantBytes = 128u,
+                           .VulkanApiVersion = (1u << 22u) | (2u << 12u),
+                           .IncompleteReason = "the reflection of Pointer and Handle members, their placements in the manifest, "
+                                               "and the validator's descriptor heap are not built yet" },
     };
 
-    constexpr std::array<std::string_view, 2u> k_TargetProfileNames
+    constexpr std::array<std::string_view, 3u> k_TargetProfileNames
     {
         k_WgslName,
         k_SpirvName,
+        k_SpirvModernName,
     };
 
 } // namespace
@@ -150,8 +172,8 @@ std::string_view ToString(AccessModel model) noexcept
     {
     case AccessModel::Bound:
         return "bound";
-    case AccessModel::Indexed:
-        return "indexed";
+    case AccessModel::Handle:
+        return "handle";
     case AccessModel::Pointer:
         return "pointer";
     case AccessModel::Invalid:
@@ -159,6 +181,12 @@ std::string_view ToString(AccessModel model) noexcept
     }
 
     return "invalid";
+}
+
+AccessModel SingleForm(const ShimForms& forms) noexcept
+{
+    const bool agree = forms.Texture == forms.Buffer && forms.Sampler == forms.Buffer && forms.StorageTexture == forms.Buffer;
+    return agree ? forms.Buffer : AccessModel::Invalid;
 }
 
 CookResult<TargetProfile> FindTargetProfile(std::string_view name) noexcept
@@ -185,8 +213,8 @@ PlacementKind PlacementKindFromAccessModel(AccessModel model) noexcept
     {
     case AccessModel::Bound:
         return PlacementKind::Bound;
-    case AccessModel::Indexed:
-        return PlacementKind::Indexed;
+    case AccessModel::Handle:
+        return PlacementKind::Handle;
     case AccessModel::Pointer:
         return PlacementKind::Pointer;
     case AccessModel::Invalid:
@@ -202,8 +230,8 @@ AccessModel AccessModelFromPlacementKind(PlacementKind kind) noexcept
     {
     case PlacementKind::Bound:
         return AccessModel::Bound;
-    case PlacementKind::Indexed:
-        return AccessModel::Indexed;
+    case PlacementKind::Handle:
+        return AccessModel::Handle;
     case PlacementKind::Pointer:
         return AccessModel::Pointer;
     default:

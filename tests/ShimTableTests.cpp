@@ -25,7 +25,7 @@ namespace
 
 using namespace lodestone;
 
-constexpr std::array<AccessModel, 3u> k_AccessModels{ AccessModel::Bound, AccessModel::Indexed, AccessModel::Pointer };
+constexpr std::array<AccessModel, 3u> k_AccessModels{ AccessModel::Bound, AccessModel::Handle, AccessModel::Pointer };
 
 /** `Name<float4, ...>` with the type arguments of the row, or the bare name. */
 std::string Spell(std::string_view name, uint32_t type_parameter_count)
@@ -122,8 +122,15 @@ int main()
     runner.Check(readBuffer != nullptr && readBuffer->Class == ShimResourceClass::Buffer && readBuffer->TypeParameterCount == 1u &&
                      ShimImplName(*readBuffer, AccessModel::Bound) == "BoundReadBuffer",
                  "an interface is found by name with its class, arity, and Bound implementation");
-    runner.Check(ShimImplName(*readBuffer, AccessModel::Pointer).empty() && ShimImplName(*readBuffer, AccessModel::Indexed).empty(),
-                 "the Pointer and Indexed cells are empty until phase F step F4.1");
+    // a buffer device address addresses buffers only, and buffers take no descriptor handle
+    for (const ShimInterface& row : table)
+    {
+        const bool buffer = row.Class == ShimResourceClass::Buffer;
+        runner.Check(buffer != ShimImplName(row, AccessModel::Pointer).empty() &&
+                         buffer == ShimImplName(row, AccessModel::Handle).empty(),
+                     std::format("{}: a buffer has a Pointer cell and no Handle cell, and every other class the reverse", row.Name));
+    }
+    runner.CheckEqual(ShimImplName(*readBuffer, AccessModel::Pointer), "PointerReadBuffer", "IReadBuffer has the Pointer form");
     const ShimInterface* writeStorage = FindShimInterface("IWriteStorageTexture2D");
     runner.Check(writeStorage != nullptr && writeStorage->Class == ShimResourceClass::StorageTexture &&
                      writeStorage->TypeParameterCount == 0u && writeStorage->ImplementationTakesFormat &&

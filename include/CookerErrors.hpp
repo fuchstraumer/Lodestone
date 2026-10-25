@@ -27,6 +27,7 @@ enum class CookError : uint16_t
     VariantNotCompiled = 21,
     TargetProfileNotFound = 22,
     WorkerSetupFailed = 23, // no worker could prepare its Slang session, so no variant of the batch compiled
+    TargetProfileIncomplete = 24, // the profile exists, and its lowering is not finished, so a cook would be wrong
 
     ReflectionUnavailable = 40,
     ReflectionMismatch = 41,

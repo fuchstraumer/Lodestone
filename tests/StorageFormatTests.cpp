@@ -1,4 +1,5 @@
 #include "TestHarness.hpp"
+#include "target/TargetProfile.hpp"
 
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
@@ -44,7 +45,10 @@ std::vector<std::string> ReadEnumCases(const std::filesystem::path& module_path,
     createInfo.ExpectedBatchSize = 1u;
     createInfo.Language = TargetLanguage::Spirv;
     createInfo.SlangProfileName = "spirv_1_5";
-    createInfo.AccessModel = PlacementKind::Bound;
+    createInfo.Forms = ShimForms{ .Buffer = AccessModel::Bound,
+                                  .Texture = AccessModel::Bound,
+                                  .Sampler = AccessModel::Bound,
+                                  .StorageTexture = AccessModel::Bound };
     if (compiler.Initialize(createInfo, sink) != CookError::Success)
     {
         return {};

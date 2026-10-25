@@ -492,11 +492,11 @@ namespace lodestone
 SlangReflector::SlangReflector(std::span<const std::string> entry_point_names,
                                DiagnosticSink* _sink,
                                slang::IGlobalSession* global_session,
-                               PlacementKind active_placement_kind) noexcept
+                               AccessModel buffer_form) noexcept
     : entryPointNames(entry_point_names),
       sink(_sink),
       globalSession(global_session),
-      activePlacementKind(active_placement_kind)
+      bufferForm(buffer_form)
 {
 }
 
@@ -840,12 +840,12 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
             stride = static_cast<uint16_t>(leaf.Type->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM));
         }
         const bool isPointerType = leaf.Type->getKind() == slang::TypeReflection::Kind::Pointer;
-        if (isPointerType && (activePlacementKind == PlacementKind::Bound))
+        if (isPointerType && (bufferForm != AccessModel::Pointer))
         {
             result = ReportError(
                 *sink,
                 CookError::PointerTypeNotSupported,
-                std::format("Bound placement of resource with name {} cannot be a pointer.", name));
+                std::format("member {} is a pointer, and the buffers of this profile use the {} form", name, ToString(bufferForm)));
         }
         const bool isMatrix = leaf.Type->getKind() == slang::TypeReflection::Kind::Matrix;
         MatrixLayout layout{ MatrixLayout::Invalid };

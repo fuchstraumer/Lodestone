@@ -43,7 +43,7 @@ CookError SlangCompiler::Initialize(SlangCompilerCreateInfo create_info, Diagnos
 {
     diagnosticSink = &sink;
     targetName = std::string{ create_info.TargetName };
-    shimAccessModel = AccessModelFromPlacementKind(create_info.AccessModel);
+    shimForms = create_info.Forms;
     compilePool = std::make_unique<ThreadPool>();
     bootstrapContext = std::make_unique<SlangModuleContext>();
     if (create_info.InheritedSymbolTable)
@@ -196,14 +196,14 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
     }
 
     CookResult<std::string> linkSource =
-        MakeShimLinkSource(module.ShimExterns, shimAccessModel, module.Name, targetName, *diagnosticSink);
+        MakeShimLinkSource(module.ShimExterns, shimForms, module.Name, targetName, *diagnosticSink);
     if (!linkSource)
     {
         return std::unexpected(linkSource.error());
     }
     
     CookResult<std::vector<ShimFormatLinkSource>> formatSources =
-        MakeShimFormatLinkSources(module.ShimExterns, space, shimAccessModel, module.Name, *diagnosticSink);
+        MakeShimFormatLinkSources(module.ShimExterns, space, shimForms, module.Name, *diagnosticSink);
     if (!formatSources)
     {
         return std::unexpected(formatSources.error());

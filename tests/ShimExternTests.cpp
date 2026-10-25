@@ -59,7 +59,10 @@ CookError Prepare(const std::filesystem::path& module_path,
     createInfo.ExpectedBatchSize = 1u;
     createInfo.Language = TargetLanguage::Spirv;
     createInfo.SlangProfileName = "spirv_1_5";
-    createInfo.AccessModel = PlacementKind::Bound;
+    createInfo.Forms = ShimForms{ .Buffer = AccessModel::Bound,
+                                  .Texture = AccessModel::Bound,
+                                  .Sampler = AccessModel::Bound,
+                                  .StorageTexture = AccessModel::Bound };
     return compiler.Initialize(createInfo, sink);
 }
 

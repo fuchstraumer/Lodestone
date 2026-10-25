@@ -39,7 +39,7 @@ struct SlangCompilerCreateInfo
     std::optional<SymbolTable> InheritedSymbolTable;
     TargetLanguage Language{ TargetLanguage::Invalid };
     std::string_view SlangProfileName;
-    PlacementKind AccessModel;
+    ShimForms Forms;
     std::string_view TargetName;
 };
 
@@ -77,7 +77,7 @@ private:
     std::string shimLinkSource;
     std::vector<ShimFormatLinkSource> shimFormatSources;
     std::string targetName;
-    ::lodestone::AccessModel shimAccessModel{ ::lodestone::AccessModel::Invalid };
+    ShimForms shimForms;
     std::unique_ptr<ThreadPool> compilePool{ nullptr };
     std::unique_ptr<SlangModuleContext> bootstrapContext{ nullptr };
 };

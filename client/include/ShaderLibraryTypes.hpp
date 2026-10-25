@@ -21,7 +21,7 @@ enum class PlacementKind : uint8_t
 {
     None = 0,
     Bound,
-    Indexed,
+    Handle,
     Pointer,
 };
 

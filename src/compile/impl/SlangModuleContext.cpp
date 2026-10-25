@@ -106,7 +106,7 @@ constexpr bool k_UseSlangWorkaround = true;
 CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink)
 {
     diagnosticSink = &sink;
-    placementKind = create_info.AccessModel;
+    bufferForm = create_info.Forms.Buffer;
     language = create_info.Language;
     if (k_UseSlangWorkaround)
     {
@@ -460,9 +460,9 @@ std::vector<std::string_view> SlangModuleContext::ModuleSourceStringViews() cons
            std::ranges::to<std::vector<std::string_view>>();
 }
 
-PlacementKind SlangModuleContext::PlacementKindForTarget() const noexcept
+AccessModel SlangModuleContext::BufferForm() const noexcept
 {
-    return placementKind;
+    return bufferForm;
 }
 
 TargetLanguage SlangModuleContext::Language() const noexcept

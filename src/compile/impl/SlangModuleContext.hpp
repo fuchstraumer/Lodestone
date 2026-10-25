@@ -7,6 +7,7 @@
 #include "compile/RawLibrary.hpp"
 #include "compile/ShimLinkSource.hpp"
 #include "compile/SlangCompiler.hpp"
+#include "target/TargetProfile.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "slang.h"
 #include "slang-com-ptr.h"
@@ -63,7 +64,8 @@ public:
     [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
     /** @brief The file paths for the depfile, excluding embedded builtins. */
     [[nodiscard]] const std::vector<std::string>& DependencyFilePaths() const noexcept;
-    [[nodiscard]] PlacementKind PlacementKindForTarget() const noexcept;
+    /** @brief The form of the profile's buffers. Only the Pointer form permits a pointer member. */
+    [[nodiscard]] AccessModel BufferForm() const noexcept;
     [[nodiscard]] TargetLanguage Language() const noexcept;
 
     /** @brief Returns every loaded module, serialized in dependency order. */
@@ -126,7 +128,7 @@ private:
     std::vector<std::string> moduleSourceStrings;
     std::vector<std::string> moduleSourcePaths;
     std::vector<std::string> dependencyFilePaths;
-    PlacementKind placementKind{ PlacementKind::None };
+    AccessModel bufferForm{ AccessModel::Invalid };
     TargetLanguage language{ TargetLanguage::Invalid };
     DiagnosticSink* diagnosticSink{ nullptr };
 };

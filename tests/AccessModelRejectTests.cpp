@@ -186,6 +186,24 @@ int main(int argc, char** argv)
         }
     }
 
+    // the profile fails before any module, so its error names the profile and not a module
+    runner.BeginSection("a profile that is not complete fails the cook");
+    {
+        const RowOutcome outcome = CookOneModule(assetDirectory / k_Cases[3].ModuleFile, "spirv-modern");
+        runner.CheckEqual(outcome.Result, CookError::TargetProfileIncomplete, "spirv-modern does not cook a module that cooks elsewhere");
+        const bool named = runner.Check(std::ranges::any_of(outcome.Records,
+                                                            [](const Diagnostic& record)
+                                                            {
+                                                                return record.Severity == DiagnosticSeverity::Error &&
+                                                                       record.Message.contains("spirv-modern");
+                                                            }),
+                                        "an error record names the profile");
+        if (!named)
+        {
+            PrintRecords(outcome.Records);
+        }
+    }
+
     runner.BeginSection("a failed cook leaves no manifest of an earlier cook");
     // a reader that finds an old manifest takes it for the output of the cook that failed
     const std::filesystem::path outputDirectory = std::filesystem::temp_directory_path() / "LodestoneStaleManifestTest";

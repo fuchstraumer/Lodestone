@@ -375,7 +375,7 @@ int main()
     runner.CheckOk(wgslProfile, "the build has a wgsl profile");
     if (runner.CheckOk(wgslProfile, "wgsl places a resource by group and binding"))
     {
-        runner.CheckEqual(wgslProfile->Access, lodestone::AccessModel::Bound,
+        runner.CheckEqual(lodestone::SingleForm(wgslProfile->Forms), lodestone::AccessModel::Bound,
                           "wgsl places a resource by group and binding");
     }
     runner.Check(wgslProfile.has_value() && wgslProfile->Validator != nullptr,
