@@ -1,5 +1,6 @@
 #include "ShaderManifestLayout.hpp"
 #include "ShaderManifest.hpp"
+#include "ShaderManifestDevice.hpp"
 #include "ShaderManifestFormat.hpp"
 #include "ShaderManifestRead.hpp"
 #include "EnumClassUtils.hpp"
@@ -30,7 +31,8 @@ namespace lodestone::manifest
 #pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
 #endif
 
-using detail::BoundPlacementKey;
+using detail::PlacementOrderKey;
+using detail::PlacementOrderKeyOf;
 using detail::k_AxisMaskWordBits;
 using detail::RunOf;
 
@@ -158,6 +160,16 @@ PlacementKind ResolvedResource::Placement() const noexcept
 PlacementPayload ResolvedResource::PlacementValue() const noexcept
 {
     return record->Placement;
+}
+
+StoredValueContainer ResolvedResource::ValueContainer() const noexcept
+{
+    return static_cast<StoredValueContainer>(record->ValueContainer);
+}
+
+uint32_t ResolvedResource::ValueOffset() const noexcept
+{
+    return record->ValueOffset;
 }
 
 BindingKind ResolvedResource::Kind() const noexcept
@@ -606,22 +618,22 @@ const Variant& VariantView::Record() const noexcept
 
 namespace
 {
-    constexpr uint64_t k_NoPlacement = std::numeric_limits<uint64_t>::max();
+    constexpr PlacementOrderKey k_NoPlacement{ .Rank = std::numeric_limits<uint32_t>::max() };
 
     /** The next key of the N-way merge over the stages' sorted layout ranges. */
-    uint64_t NextPlacement(std::span<const LayoutRange> ranges,
-                           std::span<const uint32_t> stage_layout_positions) noexcept
+    PlacementOrderKey NextPlacement(std::span<const LayoutRange> ranges,
+                                    std::span<const uint32_t> stage_layout_positions) noexcept
     {
-        uint64_t next = k_NoPlacement;
-        for (const auto&& [i, range] : std::views::enumerate(ranges))
+        PlacementOrderKey next = k_NoPlacement;
+        for (const auto&& [idx, range] : std::views::enumerate(ranges))
         {
-            if (stage_layout_positions[i] >= range.Size())
+            if (stage_layout_positions[idx] >= range.Size())
             {
                 continue;
             }
 
-            const ResolvedResource& resource = range[stage_layout_positions[i]];
-            next = std::min(next, BoundPlacementKey(resource.PlacementValue()));
+            const ResolvedResource& resource = range[stage_layout_positions[idx]];
+            next = std::min(next, PlacementOrderKeyOf(resource.Record()));
         }
         
         return next;
@@ -630,7 +642,7 @@ namespace
     /** Writes the stages whose current position is at `key` into `out_stages`, and returns their count. */
     uint32_t StagesAtPlacement(std::span<const LayoutRange> ranges,
                                std::span<const uint32_t> stage_layout_positions,
-                               uint64_t key,
+                               const PlacementOrderKey& key,
                                std::span<uint32_t> out_stages) noexcept
     {
         uint32_t count = 0u;
@@ -642,7 +654,7 @@ namespace
             }
 
             const ResolvedResource& resource = range[stage_layout_positions[i]];
-            if (BoundPlacementKey(resource.PlacementValue()) == key)
+            if (PlacementOrderKeyOf(resource.Record()) == key)
             {
                 out_stages[count] = static_cast<uint32_t>(i);
                 ++count;
@@ -753,7 +765,7 @@ ManifestResult<MergedLayoutView> MergedLayoutView::Merge(std::span<const EntryPo
 
     std::array<uint32_t, k_MaxPipelineStages> stagesAtKey{};
 
-    for (uint64_t key = NextPlacement(ranges, stageLayoutPositions); key != k_NoPlacement;
+    for (PlacementOrderKey key = NextPlacement(ranges, stageLayoutPositions); key != k_NoPlacement;
          key = NextPlacement(ranges, stageLayoutPositions))
     {
         const uint32_t matchCount = StagesAtPlacement(ranges, stageLayoutPositions, key, stagesAtKey);
@@ -820,7 +832,7 @@ MergedResource MergedLayoutView::Iterator::operator*() const noexcept
 {
     const std::span<const LayoutRange> ranges = std::span{ layout->layoutRanges }.first(layout->stageCount);
     const std::span<const uint32_t> activePositions = std::span{ positions }.first(layout->stageCount);
-    const uint64_t key = NextPlacement(ranges, activePositions);
+    const PlacementOrderKey key = NextPlacement(ranges, activePositions);
     assert(key != k_NoPlacement);
 
     std::array<uint32_t, k_MaxPipelineStages> stagesAtKey{};
@@ -841,7 +853,7 @@ MergedLayoutView::Iterator& MergedLayoutView::Iterator::operator++() noexcept
 {
     const std::span<const LayoutRange> ranges = std::span{ layout->layoutRanges }.first(layout->stageCount);
     const std::span<uint32_t> activePositions = std::span{ positions }.first(layout->stageCount);
-    const uint64_t key = NextPlacement(ranges, activePositions);
+    const PlacementOrderKey key = NextPlacement(ranges, activePositions);
 
     std::array<uint32_t, k_MaxPipelineStages> stagesAtKey{};
     const uint32_t matchCount = StagesAtPlacement(ranges, activePositions, key, stagesAtKey);
@@ -982,10 +994,8 @@ namespace
                            const LayoutRange& rhs_layout,
                            const SamplerTexturePair& rhs) noexcept
     {
-        return BoundPlacementKey(lhs_layout[lhs.Texture].PlacementValue()) ==
-                   BoundPlacementKey(rhs_layout[rhs.Texture].PlacementValue()) &&
-               BoundPlacementKey(lhs_layout[lhs.Sampler].PlacementValue()) ==
-                   BoundPlacementKey(rhs_layout[rhs.Sampler].PlacementValue());
+        return PlacementOrderKeyOf(lhs_layout[lhs.Texture].Record()) == PlacementOrderKeyOf(rhs_layout[rhs.Texture].Record()) &&
+               PlacementOrderKeyOf(lhs_layout[lhs.Sampler].Record()) == PlacementOrderKeyOf(rhs_layout[rhs.Sampler].Record());
     }
 
     bool TagsEqual(const ResolvedResource& lhs, const ResolvedResource& rhs) noexcept

@@ -795,3 +795,33 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
     interface come from the shim table and the extern, and the format from the format axis. First measure: does reflection
     read a user attribute on an ordinary-data member of a struct from another module? Open: F4.2 needs a cook of
     `spirv-modern` that the incomplete profile refuses.
+- 2026-10-24. **F4.2 and F4.3 done as one step, with the core of F4.4**, not committed. 46 of 46 tests, 60 of 60 known-good
+  dumps. The author approved `StoredValuePlacement` in the `ResourcePlacement` variant, one step for F4.2 and F4.3, and
+  visibility through the container.
+  - Measured first, with a probe against the cooker's `slang-compiler.dll` on the cooker's link path: a user attribute on a
+    member of a linked impl from another module is visible through reflection; the shim field's type is the impl's own name
+    (`HandleWriteStorageTexture2D<RGBA16F>` keeps its type argument); a `Ptr`'s full name keeps its access; a handle is a
+    `vector<uint,2>`, like user data; `BindlessSpaceIndex` moves the heap and reflection follows.
+  - The test-only switch `CookerOptions::AllowIncompleteProfiles` (no flag), the heap set given to Slang, and the marker
+    `[ls_shim_value]` on the five Pointer and Handle members.
+  - Schema: `StoredValuePlacement` (form, `StoredValueContainer`, the container's `BoundPlacement`, byte offset), and
+    `PlacementLess` orders bound, then stored, then none.
+  - Reflector: the walk of ordinary data collects marked members (`StoredValueLeaf`), and the block container, a
+    `ConstantBuffer` range, and the entry point constants write one binding for each, from the row's `ShimResource`. Errors
+    `ShimStoredValueUnsupported` = 183 (an array of these shims, or one in a storage buffer element) and
+    `ShimPointerAccessMismatch` = 184 (a second opinion on the access). Visibility through the container; the reconcile of
+    push constants removes the values it held.
+  - Manifest format 17: `Binding::ValueOffset` and `ValueContainer`, the payload names the container by group and binding (a
+    record index would break interning across variants), `Profile::Forms` replaces the one access model, errors
+    `InvalidStoredValue` and `StoredValueContainerMissing`, and `PlacementOrderKey` for the visibility order and the merge.
+  - **F4.4 in this step, because no cook could pass without it:** `SpvValidator` takes the profile's heap set and compares the
+    heap's variables with the mutable descriptor lowering (`BindingMismatchKind::DescriptorHeap`); the SPIR-V reader sizes a
+    `PhysicalStorageBuffer` pointer (8 bytes) in a push constant block.
+  - **Known gap, recorded:** sampler pairs through the heap are not recorded. `ResolveSamplerTexturePairs` skips a pair in the
+    heap set, and the cross-profile pair check skips an entry point that reads a texture or a sampler through a handle, as it
+    skips a combined texture sampler.
+  - Proof: `ShimPlacementTest` (103 checks), rows in `ShaderManifestRejectTest` and `SpvValidatorTest`.
+  - Not covered by a test: `ShimPointerAccessMismatch` (the builtin impls agree with their rows, and a test cannot swap the
+    shim module), and a stored value in a `ConstantBuffer` range.
+  - `spirv-modern` still refuses to cook. It lacks: the descriptor heap in the manifest (its set and lowering, so a renderer
+    can build it), the offset cross-check against the SPIR-V `Offset` decorations (F4.5), and the sampler pairs of handles.

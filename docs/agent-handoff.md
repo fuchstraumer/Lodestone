@@ -17,13 +17,13 @@ fixed, remove it; when a task is done, add one line to section 7 and remove its 
 - RelWithDebInfo, `ninja-msvc`: build green, 45 of 45 tests (after F4.0, not committed). Known-good dumps: 60 of 60
   (checked 2026-10-24).
 - Debug: do not run it unattended (section 2, item 2).
-- Manifest format version 16. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
-- Phases D and E are complete. Phase F has F0, F1, F2, F3.1 to F3.4c, F3.5, C11, F4.0, F4.A, and F4.1 done; F4, F5, and F6 are open.
+- Manifest format version 17. `CLAUDE.md` ("One output form") holds the layout of each version's addition.
+- Phases D and E are complete. Phase F has F0, F1, F2, F3.1 to F3.4c, F3.5, C11, F4.0, F4.A, F4.1, F4.2, F4.3, and most of F4.4 done; F4, F5, and F6 are open.
 - **Phase F is the current work.** The VeloxRhi rendergraph tasks (`docs/rendergraph-integration-tasks.md`) are done
   except L11 (optional dispatch extent) and a JSON writer for the resource report. L5 and L6 became phase F slice F3:
-  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: F4.2**
-  (reflect Pointer and Handle members as placements; `spirv-modern` exists and fails with `TargetProfileIncomplete` until
-  F4.4), then F4.3 to F4.6 (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
+  F3.1 to F3.4c are done (format 15, committed), and F3.5 (the capability-axis check) is done. **Next: the rest of F4 for `spirv-modern`**
+  (the heap in the manifest, F4.5 offsets against the code, sampler pairs of handles; then the profile is complete and the
+  test-only `AllowIncompleteProfiles` goes), then F4.6 (plan in `docs/phase-f-plan.md`). F3.4d (bindings per stage and
   bind groups) waits for a consumer to name its limits. After F3: F2 (the shim module and the two tables), F4 (Pointer and
   Handle placements, and unbounded binding arrays), F5 (binding-time lowering), and F6. `docs/phase-f-plan.md` has the
   slices and a progress log. The author calls phase F the last major feature work.
@@ -283,3 +283,5 @@ One line for each step. Git history holds the full text.
 - **2026-10-24 (F4.1).** The Pointer and Handle shim impls, `ShimForms` on the profile, `Indexed` renamed to `Handle`,
   `spirv-modern` (heap set 3) failing with `TargetProfileIncomplete`. The spike: reflection gives a pointer as kind `pointer` and
   a handle as a `uint2`, and no heap variable.
+- **2026-10-24 (F4.2 to F4.4).** Format 17: stored values (`StoredValuePlacement`, `Binding::ValueOffset` and `ValueContainer`,
+  `Profile::Forms`, `PlacementOrderKey`), `[ls_shim_value]`, the heap compared with the mutable lowering, `ShimPlacementTest`.

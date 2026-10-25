@@ -1,9 +1,8 @@
 #pragma once
 #ifndef LODESTONE_CLIENT_SHADER_MANIFEST_READ_HPP
 #define LODESTONE_CLIENT_SHADER_MANIFEST_READ_HPP
-#include "ShaderManifest.hpp"
 #include "ShaderLibraryTypes.hpp"
-#include "VariantKey.hpp"
+#include "ShaderManifestFormat.hpp"
 
 #include <bit>
 #include <cstddef>
@@ -23,10 +22,44 @@ namespace lodestone::manifest::detail
 
     inline constexpr ErrorState k_ManifestOk{ .Code = ErrorCode::Success };
 
-    /** Group in the high half, binding in the low half: the order of the cooker's `PlacementLess`. */
-    inline constexpr uint64_t BoundPlacementKey(const PlacementPayload& placement) noexcept
+    /** The order of the cooker's `PlacementLess`: bound placements by group and binding, then stored values by container,
+     * block, and offset, then no placement. */
+    struct PlacementOrderKey
     {
-        return (static_cast<uint64_t>(placement.Word0) << 32u) | static_cast<uint64_t>(placement.Word1);
+        uint32_t Rank{ 0u };
+        uint32_t Container{ 0u };
+        uint32_t Word0{ 0u };
+        uint32_t Word1{ 0u };
+        uint32_t Offset{ 0u };
+
+        friend constexpr auto operator<=>(const PlacementOrderKey&, const PlacementOrderKey&) = default;
+    };
+
+    inline constexpr PlacementOrderKey PlacementOrderKeyOf(const Binding& record) noexcept
+    {
+        const bool bound = record.PlacementKind == std::to_underlying(PlacementKind::Bound);
+        const bool stored = record.PlacementKind == std::to_underlying(PlacementKind::Handle) ||
+                            record.PlacementKind == std::to_underlying(PlacementKind::Pointer);
+        
+        uint32_t rank = 0u;
+        if (bound)
+        {
+            rank = 0u;
+        }
+        else if (stored)
+        {
+            rank = 1u;
+        }
+        else
+        {
+            rank = 2u;
+        }
+
+        return PlacementOrderKey{ .Rank = rank,
+                                  .Container = record.ValueContainer,
+                                  .Word0 = record.Placement.Word0,
+                                  .Word1 = record.Placement.Word1,
+                                  .Offset = record.ValueOffset };
     }
 
     // the reader reinterprets bytes as records, so a record must be a bag of bytes

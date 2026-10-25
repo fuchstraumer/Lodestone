@@ -13,7 +13,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 16u;
+inline constexpr uint32_t k_ShaderManifestVersion = 17u;
 
 // NOLINTBEGIN(readability-enum-initial-value, performance-enum-size)
 enum class ErrorCode : uint32_t
@@ -81,6 +81,8 @@ enum class ErrorCode : uint32_t
     InvalidFootprintAxes = 59,
     InvalidCapabilityNames = 60,
     InvalidSourceCapabilities = 61,
+    InvalidStoredValue = 62,
+    StoredValueContainerMissing = 63,
     Count
 };
 
@@ -207,13 +209,13 @@ struct alignas(8) SourceRef
     uint32_t Reserved{ 0u };
 };
 
-/** @brief One cooked form: a target and an access model. */
+/** @brief One cooked form: a target and the placement of each class of shim resource. */
 struct alignas(8) Profile
 {
     uint32_t TargetNameString{ 0u };
-    uint32_t Reserved{ 0u };
-    PlacementKind AccessModel{ PlacementKind::None };
+    PlacementForms Forms{};
     ShaderCodeFormat CodeFormat{ ShaderCodeFormat::None };
+    uint8_t Reserved{ 0u };
     uint16_t Flags{ 0u };
     uint32_t Reserved2{ 0u };
 };
@@ -319,8 +321,8 @@ struct alignas(8) Variant
     uint32_t Reserved{ 0u };
 };
 
-/** @brief Where a shader finds a resource.
- *  Bound: group, binding. Handle and Pointer are not written yet. */
+/** @brief Where a shader finds a resource. Bound: group, binding. Handle and Pointer: the group and binding of the uniform
+ * buffer that stores the value, or 0 and 0 for push constants (`Binding::ValueContainer`). */
 struct alignas(8) PlacementPayload
 {
     uint32_t Word0{ 0u };
@@ -351,6 +353,10 @@ struct alignas(8) Binding
     uint8_t SampleType{ 0u };
     // a `ResourceRoleFlags`
     uint16_t Roles{ 0u };
+    // Handle and Pointer: the byte offset of the value in its container
+    uint32_t ValueOffset{ 0u };
+    // a `StoredValueContainer`, `None` for a bound resource
+    uint32_t ValueContainer{ 0u };
     uint32_t Reserved2{ 0u };
 };
 

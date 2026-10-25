@@ -116,7 +116,13 @@ public:
     [[nodiscard]] std::string_view Name() const noexcept;
     [[nodiscard]] std::string_view ScopeName() const noexcept;
     [[nodiscard]] PlacementKind Placement() const noexcept;
+    /** @brief Bound: the group and binding. Handle and Pointer: the group and binding of the uniform buffer that stores the
+     * value, which is in the same layout, or 0 and 0 when the value is in push constants. */
     [[nodiscard]] PlacementPayload PlacementValue() const noexcept;
+    /** @brief Where a descriptor handle or a buffer device address is stored. `None` for a bound resource. */
+    [[nodiscard]] StoredValueContainer ValueContainer() const noexcept;
+    /** @brief The byte offset of a descriptor handle (8 bytes) or a buffer device address (8 bytes) in its container. */
+    [[nodiscard]] uint32_t ValueOffset() const noexcept;
     [[nodiscard]] BindingKind Kind() const noexcept;
     [[nodiscard]] ResourceShape Shape() const noexcept;
     [[nodiscard]] ResourceAccess Access() const noexcept;

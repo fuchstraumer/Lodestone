@@ -314,12 +314,16 @@ namespace
                          .Detail = profile.TargetNameString };
             }
 
-            if (profile.AccessModel < PlacementKind::Bound || profile.AccessModel > PlacementKind::Pointer)
+            for (const PlacementKind form :
+                 { profile.Forms.Buffer, profile.Forms.Texture, profile.Forms.Sampler, profile.Forms.StorageTexture })
             {
-                return { .Code = ErrorCode::InvalidProfileAccessModel,
-                         .Table = ShaderManifestTable::Profiles,
-                         .RecordIndex = static_cast<uint32_t>(i),
-                         .Detail = static_cast<uint32_t>(profile.AccessModel) };
+                if (form < PlacementKind::Bound || form > PlacementKind::Pointer)
+                {
+                    return { .Code = ErrorCode::InvalidProfileAccessModel,
+                             .Table = ShaderManifestTable::Profiles,
+                             .RecordIndex = static_cast<uint32_t>(i),
+                             .Detail = static_cast<uint32_t>(form) };
+                }
             }
 
             if (profile.CodeFormat < ShaderCodeFormat::Wgsl || profile.CodeFormat > ShaderCodeFormat::Spirv)
@@ -599,6 +603,23 @@ namespace
                          .RecordIndex = static_cast<uint32_t>(i) };
             }
 
+            // a stored value names its container; push constants have no group and binding
+            const bool stored = binding.PlacementKind == std::to_underlying(PlacementKind::Handle) ||
+                                binding.PlacementKind == std::to_underlying(PlacementKind::Pointer);
+            const bool storedValid =
+                (binding.ValueContainer == std::to_underlying(StoredValueContainer::UniformBuffer)) ||
+                (binding.ValueContainer == std::to_underlying(StoredValueContainer::PushConstants) &&
+                 binding.Placement.Word0 == 0u && binding.Placement.Word1 == 0u);
+            const bool notStoredValid = binding.ValueContainer == 0u && binding.ValueOffset == 0u &&
+                                        binding.PlacementKind <= std::to_underlying(PlacementKind::Bound);
+            if (stored ? !storedValid : !notStoredValid)
+            {
+                return { .Code = ErrorCode::InvalidStoredValue,
+                         .Table = ShaderManifestTable::Bindings,
+                         .RecordIndex = static_cast<uint32_t>(i),
+                         .Detail = binding.ValueContainer };
+            }
+
             if ((binding.Roles & ~std::to_underlying(ResourceRoleFlags::All)) != 0u)
             {
                 return { .Code = ErrorCode::InvalidBindingRoles,
@@ -863,10 +884,11 @@ namespace
                     RunOf(visibilityLists, visibilityIndices, slot.Visibility);
                 const uint32_t runOffset = static_cast<uint32_t>(slotVisibilityIndices.data() - visibilityIndices.data());
 
-                // checked per instance, not per list: two variants can share a list with different resource lists
-                bool hasPreviousBound = false;
-                bool seenNotBound = false;
-                uint64_t previousKey = 0u;
+                // checked per instance, not per list: two variants can share a list with different resource lists. Bound
+                // placements come first, then stored values by container, block, and offset, then no placement
+                bool hasPrevious = false;
+                bool seenNone = false;
+                PlacementOrderKey previousKey{};
                 for (int32_t j = 0; j < std::ssize(slotVisibilityIndices); ++j)
                 {
                     const uint32_t local = slotVisibilityIndices[j];
@@ -880,14 +902,14 @@ namespace
 
                     const uint32_t bindingIndex = variantResourceIndices[local];
                     const Binding& binding = bindingSpan[bindingIndex];
-                    if (binding.PlacementKind != std::to_underlying(PlacementKind::Bound))
+                    if (binding.PlacementKind == std::to_underlying(PlacementKind::None))
                     {
-                        seenNotBound = true;
+                        seenNone = true;
                         continue;
                     }
 
-                    const uint64_t key = BoundPlacementKey(binding.Placement);
-                    if (seenNotBound || (hasPreviousBound && key <= previousKey))
+                    const PlacementOrderKey key = PlacementOrderKeyOf(binding);
+                    if (seenNone || (hasPrevious && key <= previousKey))
                     {
                         return { .Code = ErrorCode::InvalidVisibilityListOrder,
                                  .Table = ShaderManifestTable::VisibilityIndices,
@@ -896,7 +918,7 @@ namespace
                     }
 
                     previousKey = key;
-                    hasPreviousBound = true;
+                    hasPrevious = true;
                 }
 
                 // pair positions are local to the instance, so this is checked per instance too
@@ -940,6 +962,37 @@ namespace
                                  .Table = ShaderManifestTable::EntryPointConstants,
                                  .RecordIndex = slot.Constants,
                                  .Detail = constants.Binding };
+                    }
+                }
+
+                // a stored value is visible with its container, so the container must be in the same instance
+                for (int32_t j = 0; j < std::ssize(slotVisibilityIndices); ++j)
+                {
+                    const Binding& value = bindingSpan[variantResourceIndices[slotVisibilityIndices[j]]];
+                    bool found = true;
+                    if (value.ValueContainer == std::to_underlying(StoredValueContainer::PushConstants))
+                    {
+                        found = constants.Delivery == std::to_underlying(EntryPointConstantsDelivery::PushConstant);
+                    }
+                    else if (value.ValueContainer == std::to_underlying(StoredValueContainer::UniformBuffer))
+                    {
+                        found = std::ranges::any_of(slotVisibilityIndices,
+                                                    [&](uint32_t local)
+                                                    {
+                                                        const Binding& candidate = bindingSpan[variantResourceIndices[local]];
+                                                        return candidate.PlacementKind == std::to_underlying(PlacementKind::Bound) &&
+                                                               candidate.Kind == std::to_underlying(BindingKind::UniformBuffer) &&
+                                                               candidate.Placement.Word0 == value.Placement.Word0 &&
+                                                               candidate.Placement.Word1 == value.Placement.Word1;
+                                                    });
+                    }
+
+                    if (!found)
+                    {
+                        return { .Code = ErrorCode::StoredValueContainerMissing,
+                                 .Table = ShaderManifestTable::VisibilityIndices,
+                                 .RecordIndex = runOffset + static_cast<uint32_t>(j),
+                                 .Detail = value.ValueContainer };
                     }
                 }
             }

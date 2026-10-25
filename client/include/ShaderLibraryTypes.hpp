@@ -16,13 +16,34 @@ enum class MatrixLayout : uint8_t
     ColumnMajor,
 };
 
-/** @brief How a shader reaches a resource. Only `Bound` is produced today. */
+/** @brief How a shader reaches a resource: a binding, a descriptor handle, or a buffer device address. */
 enum class PlacementKind : uint8_t
 {
     None = 0,
     Bound,
     Handle,
     Pointer,
+};
+
+/** @brief The placement of each class of shim resource in one profile. */
+struct PlacementForms
+{
+    PlacementKind Buffer{ PlacementKind::None };
+    PlacementKind Texture{ PlacementKind::None };
+    PlacementKind Sampler{ PlacementKind::None };
+    PlacementKind StorageTexture{ PlacementKind::None };
+
+    friend bool operator==(const PlacementForms&, const PlacementForms&) = default;
+};
+
+/** @brief Where a descriptor handle or a buffer device address is stored. */
+enum class StoredValueContainer : uint8_t
+{
+    None = 0,
+    /** A uniform buffer: the ordinary data of a parameter block, or the entry point constants on WGSL. */
+    UniformBuffer,
+    /** The push constant block of the entry point. */
+    PushConstants,
 };
 
 /** @brief The code form of a profile. Each SPIR-V source is whole 32-bit words, aligned to 4 bytes. */

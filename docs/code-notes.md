@@ -330,3 +330,87 @@ Files: [OutputSink.cpp](../src/emit/OutputSink.cpp), [DepFile.cpp](../src/emit/D
 Each artifact is written to a temporary file and renamed into place, and the size is read back, so a write the stream
 accepted and the disk lost fails. A cook removes the artifacts of an earlier cook before it starts. In the depfile, Make
 reads spaces as separators and `#` as comments, so both take a backslash, and Make and Ninja spell a literal `$` as `$$`.
+
+## 14. The validators
+
+Moved from `CLAUDE.md` on 2026-10-25. Each bullet is one validator of the cook.
+
+- **The reflection cross-check**, after stage 4. `ReadEmittedCode` (in `BuildModuleStep.cpp`) asks the target
+  profile for a validator. The WGSL profile parses the emitted text with Tint (`WgslValidator`) and reads the
+  bindings from Tint's inspector, then compares that against the bindings the entry point uses. Tint
+  also proves the emitted WGSL parses and resolves, which the old text scanner could not. A mismatch
+  increments a counter, and a nonzero counter fails the cook with `CookError::ReflectionMismatch`. A
+  target that supplies no validator fails the cook with `TargetValidatorUnavailable`. `--no-validate`
+  skips the check, and only on purpose.
+
+  The same parse also produces data (task L7): the sampler and texture pairs of each entry point. Reflection
+  cannot state which sampler a texture is sampled with, so the emitted code is the only source. Tint's inspector
+  gives the WGSL pairs (`GetSamplerTextureUses`), and the SPIR-V reader follows each `OpSampledImage` back through
+  the loads to its variables. `ResolveSamplerTexturePairs` maps each placement to a position in the entry point's
+  used bindings, and fails with `ReflectionSamplerPairUnresolved` when reflection has no texture or sampler there.
+  The pairs are cook output, so `--no-validate` still reads them (`ReadEmittedCodeFacts`, no comparison). A
+  profile with no reader cooks with no pairs, and the manifest records that they were not read.
+
+  The same read settles the entry point constants (task L14): the `uniform` parameters of ordinary data. Slang
+  puts them in a uniform buffer named `entryPointParams` on WGSL, which stage 3 drafts as a binding, and in a push
+  constant block on SPIR-V, which has no placement. Slang's metadata does not track push constants, so stage 3
+  states a block whenever the layout has data, and `ReconcileEntryPointConstants` (in `BuildModuleStep.cpp`) clears
+  it when the SPIR-V declares no block, because Slang removes data that the entry point does not read. A block
+  that reflection does not state, or that covers more bytes than reflection's size, is a `ReflectionMismatch`. A
+  block above the profile's `MaxPushConstantBytes` (128 for `spirv`, the Vulkan minimum) fails with
+  `EntryPointConstantsTooLarge`.
+
+  A known limit, measured on 2026-10-19: when an entry point has ordinary data, Slang's metadata marks every slot of
+  the parameters' constant buffer as used once any part is used (`collectMetadataFromInst` in
+  `slang-ir-metadata.cpp` inserts the whole slot range of the parameter). A resource parameter beside that data
+  that the entry point does not read is then visible to reflection and absent from the code. Reported as
+  shader-slang/slang#13789. `ApplySlangWorkaround13789` (in `BuildModuleStep.cpp`) removes such a resource from the
+  visibility when the emitted code does not declare it, and prints a warning for each one. It reads only the
+  resources in the constants element (`ConstantsElementBindings`), so every other binding keeps the full
+  cross-check. `SlangMetadataCanaryTest` fails when Slang fixes the issue, so the workaround cannot outlive it.
+
+  A second Slang fault, measured on 2026-10-23: the direct SPIR-V emitter gives an array of write-only storage images no
+  `NonReadable` (`maybeEmitWriteOnlyImageDecoration` in `slang-emit-spirv.cpp` does not unwrap the array, shader-slang/slang#13895), so the code
+  declares `ReadWrite` and reflection reads `WriteOnly`. `IsSlangNonReadableArrayFault` (in `SpvValidator.cpp`) accepts
+  that one difference, for an array of storage images only, and prints a warning. `SlangNonReadableCanaryTest` fails when
+  Slang decorates the array.
+- **The sampler pair cross-check**, after the last module and before the emit. `VerifySamplerPairsAcrossProfiles`
+  (in `model/CookedLibrary.cpp`) compares the pairs of each variant that two profiles cooked, by resource scope
+  and name. The two readers are independent, so agreement is a second opinion. It skips an entry point with a
+  combined texture sampler, which SPIR-V samples with no `OpSampledImage`. A difference fails the cook with
+  `SamplerPairsTargetMismatch`.
+- **The source facts cross-check**, next to it. `VerifySourceFactsAcrossProfiles` (in `model/CookedLibrary.cpp`)
+  compares the workgroup memory bytes, and a portable subset of the capability names, of each entry point that two
+  profiles cooked for one variant. The map is `f16` with `Float16`, and `subgroups` with the `GroupNonUniform` family.
+  A name that only one target spells (`StorageInputOutput16`, `DrawParameters`) is not compared. A profile with no
+  reader (`CookedProfile::CodeFactsRead` false) is skipped, because it stores empty facts. A difference fails the
+  cook with `SourceFactsTargetMismatch`. Both cross-profile checks share `VisitSharedVariants`.
+- **The capability axis check**, next to it. `VerifyCapabilityAxes` (in `model/AxisInfluence`) reads the capability
+  names that each profile's reader measured, for each axis of kind `capability` that no other axis gates. A one-axis pair
+  must differ in the names of some entry point, or the cook fails with `CapabilityAxisInert`: the "off" path still needs
+  what the axis claims to turn on. For a boolean axis the off variant's names must be a subset of the on variant's
+  (`CapabilityAxisInverted`). The author declares nothing but the kind. A gated axis (a wave size) refines another axis and
+  is not checked, and a profile with no reader (`CodeFactsRead` false) is skipped. An axis that controls two capabilities
+  and leaves one of them in the off path still passes, because the pair differs in the other one.
+- **The footprint axis cross-check**, after stage 7. `VerifyFootprintAxes` (in `model/AxisInfluence`) compares the
+  axes that change each resource's footprint, measured from the cooked tables, with the axes that its size
+  attributes name. Stage 4 reads the named axes from the expression text, through the derived constants
+  (`CollectDeclaredFootprintAxes`), so the two sides share no code. Only an axis that a one-axis pair proves is
+  compared, because the closing pass can mark an axis that a sparse cook cannot separate. A proven axis that no
+  attribute names fails the cook with `FootprintAxisUndeclared`.
+- **The library round trip**, after stage 7. `VerifyLibraryRoundTrip` replays every variant through
+  the finished tables and compares the result against the text the compiler produced. It covers the
+  **source text** only.
+- **The layout round trip**, after stage 7. `VerifyLayoutRoundTrip` replays every (variant, entry
+  point) through the resource, footprint, and visibility tables and compares the result against
+  `BuildEntryPointLayout`. Phase D step D8b built it, because the step that collapses the layout
+  tables owes the repository a check that a collapse was correct. `EnforceModulePolicy` then checks
+  the measured axis influence against the `ModulePolicyEntry` the driver read from the policy file.
+- **The manifest round trip**, inside stage 8. `VerifyManifestRoundTrip` reads each manifest back and
+  compares it against the module it came from. `CheckSourceFacts` reads the capability names of each source back by
+  their text, and its workgroup memory (`ManifestSourceFactsMismatch`). `CheckManifestLayout` walks the manifest the way a
+  consumer walks it, from variant to resource list to footprint list to visibility list, and compares the
+  sampler and texture pairs (`ManifestSamplerPairMismatch`).
+  `VerifyAxisRelevance` derives the axis relevance a second time from the written environment alone, through
+  the client views, with both passes of `model/AxisInfluence`, and compares content, not record indices. It
+  fails the cook when the derived mask differs from the stored one (`ManifestAxisRelevanceMismatch`).
