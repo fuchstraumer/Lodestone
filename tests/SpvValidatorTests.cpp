@@ -383,7 +383,7 @@ int main()
 {
     lodestone::tests::TestRunner runner{ "SpvValidatorTests" };
 
-    const SpvValidator validator;
+    const SpvValidator validator{ std::nullopt };
     lodestone::StderrDiagnosticSink sink;
     const std::vector<std::byte> shadeCs = Assemble(k_ShadeCs);
     runner.Check(!shadeCs.empty(), "the fixture assembles");
@@ -651,6 +651,34 @@ int main()
                      std::ranges::find(dynamicUnboundedIndex->CapabilityNames, "StorageImageArrayDynamicIndexing") !=
                          dynamicUnboundedIndex->CapabilityNames.end(),
                  "a dynamic index into an unbounded array adds the feature too");
+
+    // reflection does not state the descriptor heap, so its variables are compared with the mutable descriptor lowering
+    runner.BeginSection("the descriptor heap is compared with the heap lowering, not with reflection");
+    const SpvValidator heapValidator{ 3u };
+    const std::string heapText = Replace(Replace(Replace(k_ImageArrayCs, "%Levels DescriptorSet 0", "%Levels DescriptorSet 3"),
+                                                 "%Levels Binding 3",
+                                                 "%Levels Binding 2"),
+                                         "OpTypeArray %image %uint_4",
+                                         "OpTypeRuntimeArray %image");
+    const std::vector<std::byte> heap = Assemble(heapText);
+    runner.Check(!heap.empty(), "the heap fixture assembles");
+    std::vector<const ReflectedBinding*> noReflection;
+    const CookResult<BindingComparison> heapMatch = heapValidator.ValidateEntryPoint(heap, noReflection, sink);
+    runner.Check(heapMatch.has_value() && heapMatch->Matches(),
+                 "an unbounded array of storage images at binding 2 of the heap set needs no reflection");
+    runner.Check(Mismatches(validator.ValidateEntryPoint(heap, noReflection, sink), BindingMismatchKind::EmittedOnly),
+                 "a validator with no heap set compares the same variable with reflection, and finds none");
+    const std::vector<std::byte> heapAtSamplers = Assemble(Replace(heapText, "%Levels Binding 2", "%Levels Binding 0"));
+    runner.Check(Mismatches(heapValidator.ValidateEntryPoint(heapAtSamplers, noReflection, sink), BindingMismatchKind::DescriptorHeap),
+                 "images at the sampler binding of the heap are a mismatch");
+    const std::vector<std::byte> sizedHeap = Assemble(Replace(heapText, "OpTypeRuntimeArray %image", "OpTypeArray %image %uint_4"));
+    runner.Check(Mismatches(heapValidator.ValidateEntryPoint(sizedHeap, noReflection, sink), BindingMismatchKind::DescriptorHeap),
+                 "a sized array in the heap set is a mismatch");
+    const std::vector<ReflectedBinding> inHeapSet{ MakeReflected("Stray", 3u, 5u, BindingKind::Sampler, ResourceShape::Invalid,
+                                                                 ResourceAccess::ReadOnly) };
+    std::vector<const ReflectedBinding*> inHeapSetPointers = PointersTo(inHeapSet);
+    runner.Check(Mismatches(heapValidator.ValidateEntryPoint(heap, inHeapSetPointers, sink), BindingMismatchKind::DescriptorHeap),
+                 "a reflected resource in the heap set is a mismatch");
 
     return runner.Report();
 }

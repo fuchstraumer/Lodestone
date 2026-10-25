@@ -11,6 +11,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <magic_enum/magic_enum.hpp>
 #include <utility>
 
@@ -280,22 +281,34 @@ const BoundPlacement* GetBoundPlacement(const ResourcePlacement& placement) noex
     return std::get_if<BoundPlacement>(&placement);
 }
 
+const StoredValuePlacement* GetStoredValuePlacement(const ResourcePlacement& placement) noexcept
+{
+    return std::get_if<StoredValuePlacement>(&placement);
+}
+
 bool PlacementLess(const ResourcePlacement& lhs, const ResourcePlacement& rhs) noexcept
 {
-    const BoundPlacement* left = GetBoundPlacement(lhs);
-    const BoundPlacement* right = GetBoundPlacement(rhs);
-
-    if (left == nullptr || right == nullptr)
+    // std::monostate is index 0, so it is moved past the other alternatives
+    const auto rank = [](const ResourcePlacement& placement) { return placement.index() == 0u ? size_t{ 3u } : placement.index(); };
+    if (rank(lhs) != rank(rhs))
     {
-        return left != nullptr;
+        return rank(lhs) < rank(rhs);
     }
 
-    if (left->Group != right->Group)
+    if (const BoundPlacement* left = GetBoundPlacement(lhs); left != nullptr)
     {
-        return left->Group < right->Group;
+        const BoundPlacement* right = GetBoundPlacement(rhs);
+        return std::tie(left->Group, left->Binding) < std::tie(right->Group, right->Binding);
     }
 
-    return left->Binding < right->Binding;
+    if (const StoredValuePlacement* left = GetStoredValuePlacement(lhs); left != nullptr)
+    {
+        const StoredValuePlacement* right = GetStoredValuePlacement(rhs);
+        return std::tie(left->Container, left->Block.Group, left->Block.Binding, left->ByteOffset) <
+               std::tie(right->Container, right->Block.Group, right->Block.Binding, right->ByteOffset);
+    }
+
+    return false;
 }
 
 uint32_t GroupOf(const ReflectedBinding& binding) noexcept
@@ -405,6 +418,18 @@ std::string DescribeBinding(const ReflectedBinding& binding)
                                           BindingOf(binding),
                                           binding.Name,
                                           ToString(binding.Kind));
+    if (const StoredValuePlacement* stored = GetStoredValuePlacement(binding.Placement); stored != nullptr)
+    {
+        const std::string container = stored->Container == StoredValueContainer::PushConstants
+                                          ? std::string{ "push constants" }
+                                          : std::format("@group({}) @binding({})", stored->Block.Group, stored->Block.Binding);
+        description = std::format("{} at {} + {} {} : {}",
+                                  magic_enum::enum_name(stored->Kind),
+                                  container,
+                                  stored->ByteOffset,
+                                  binding.Name,
+                                  ToString(binding.Kind));
+    }
 
     if (binding.Shape != ResourceShape::Invalid)
     {

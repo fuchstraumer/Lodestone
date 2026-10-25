@@ -43,8 +43,14 @@ private:
     [[nodiscard]] CookError collectBindingRangeDrafts(slang::TypeLayoutReflection* containing_layout,
                                                       const BindingScope& scope,
                                                       std::vector<RawBindingDraft>& out_drafts) const;
-    [[nodiscard]] CookResult<RawBindingDraft> readBlockContainer(const ParameterBlockInfo& block,
-                                                                 std::string_view scope_name) const;
+    [[nodiscard]] CookError readBlockContainer(const ParameterBlockInfo& block,
+                                               std::string_view scope_name,
+                                               std::vector<RawBindingDraft>& out_drafts) const;
+    [[nodiscard]] CookError appendStoredValueDrafts(std::span<const StoredValueLeaf> values,
+                                                    StoredValueContainer container,
+                                                    BoundPlacement block,
+                                                    std::string_view scope_name,
+                                                    std::vector<RawBindingDraft>& out_drafts) const;
     [[nodiscard]] CookError collectSubObjectDrafts(slang::TypeLayoutReflection* containing_layout,
                                                    const BindingScope& scope,
                                                    std::vector<RawBindingDraft>& out_drafts) const;
@@ -64,14 +70,17 @@ private:
     [[nodiscard]] CookError collectRawSizeAttributes(slang::VariableReflection* leaf_variable,
                                                      std::string_view binding_name,
                                                      std::vector<RawSizeAttribute>& out_attributes) const;
+    /** Null `out_values` means the struct cannot store a shim value, and a marked member there is an error. */
     [[nodiscard]] CookError collectStructMembers(slang::TypeLayoutReflection* struct_layout,
-                                                  std::vector<ReflectedUniformMember>& members) const;
+                                                  std::vector<ReflectedUniformMember>& members,
+                                                  std::vector<StoredValueLeaf>* out_values) const;
     [[nodiscard]] CookError applyLeafTypeSamplerLayout(slang::TypeReflection* leaf_type,
                                                        RawBinding& binding) const;
     [[nodiscard]] CookError applyLeafTypeTextureLayout(slang::TypeReflection* leaf_type,
                                                        RawBinding& binding) const;
     [[nodiscard]] CookError applyLeafTypeUniformBufferLayout(slang::TypeLayoutReflection* leaf_layout,
-                                                             RawBinding& binding) const;
+                                                             RawBinding& binding,
+                                                             std::vector<StoredValueLeaf>& out_values) const;
     [[nodiscard]] CookError applyLeafTypeStorageBufferLayout(slang::TypeLayoutReflection* leaf_layout,
                                                              RawBinding& binding) const;
     [[nodiscard]] CookError applyLeafTypeTexelBufferLayout(slang::TypeLayoutReflection* containing_layout,
@@ -80,7 +89,8 @@ private:
                                                            RawBinding& binding) const;
     [[nodiscard]] CookError applyLeafTypeLayout(slang::TypeLayoutReflection* containing_layout,
                                                 SlangInt range_index,
-                                                RawBinding& binding) const;
+                                                RawBinding& binding,
+                                                std::vector<StoredValueLeaf>& out_values) const;
 
     static void extractRasterState(slang::EntryPointReflection* entry_point_layout,
                                    ShaderStageKind stage,

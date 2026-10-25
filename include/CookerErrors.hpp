@@ -131,6 +131,8 @@ enum class CookError : uint16_t
     ShimStorageFormatMissing = 180, // a shim extern whose implementation takes a storage format has no `ls_storage_format`
     ShimStorageFormatAxisUnknown = 181, // `ls_storage_format` names no axis of the module's permutation space
     ShimStorageFormatAxisInvalid = 182, // the axis of `ls_storage_format` is not an ungated enum axis over `StorageFormat`
+    ShimStoredValueUnsupported = 183, // a Handle or Pointer shim where the cooker cannot read it: an array, or a storage buffer
+    ShimPointerAccessMismatch = 184, // the access of a Pointer shim's `Ptr` differs from the access of its interface
 
     SystemError = 200,
     DirectoryDoesNotExist = 201,

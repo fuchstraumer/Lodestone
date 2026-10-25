@@ -29,12 +29,26 @@ struct BoundPlacement
     friend bool operator==(const BoundPlacement&, const BoundPlacement&) = default;
 };
 
+/** @brief A resource that a shader reaches through a value stored in a block: a descriptor handle (`Handle`) or a buffer
+ * device address (`Pointer`). `Block` is the uniform buffer that stores it, and is unused for push constants. */
+struct StoredValuePlacement
+{
+    PlacementKind Kind{ PlacementKind::None };
+    StoredValueContainer Container{ StoredValueContainer::None };
+    BoundPlacement Block;
+    uint32_t ByteOffset{ 0u };
+
+    friend bool operator==(const StoredValuePlacement&, const StoredValuePlacement&) = default;
+};
+
 /** @brief `std::monostate` means the target reported no placement, which differs from group 0, binding 0. */
-using ResourcePlacement = std::variant<std::monostate, BoundPlacement>;
+using ResourcePlacement = std::variant<std::monostate, BoundPlacement, StoredValuePlacement>;
 
 const BoundPlacement* GetBoundPlacement(const ResourcePlacement& placement) noexcept;
+const StoredValuePlacement* GetStoredValuePlacement(const ResourcePlacement& placement) noexcept;
 
-/** @brief Resources with no placement sort last. */
+/** @brief Bound placements sort first, by group and binding, then stored values by container, block, and offset, and
+ * resources with no placement last. */
 bool PlacementLess(const ResourcePlacement& lhs, const ResourcePlacement& rhs) noexcept;
 
 struct BufferFootprint

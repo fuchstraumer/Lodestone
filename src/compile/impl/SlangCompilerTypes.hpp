@@ -260,6 +260,17 @@ struct RawBindingDraft
     std::vector<RawSizeAttribute> Attributes;
 };
 
+/** One member that `[ls_shim_value]` marks: the descriptor handle or the buffer device address of a shim. */
+struct StoredValueLeaf
+{
+    /** The fields from the root of the block to the shim, joined with underscores as Slang joins scopes. */
+    std::string Scope;
+    std::string Name;
+    uint32_t ByteOffset{ 0u };
+    slang::TypeLayoutReflection* Member{ nullptr };
+    slang::TypeReflection* Implementation{ nullptr };
+};
+
 /** One parameter block. `UniformSize` is zero for a block of resources alone, which has no constant buffer. */
 struct ParameterBlockInfo
 {

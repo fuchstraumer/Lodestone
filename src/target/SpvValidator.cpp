@@ -35,9 +35,14 @@ namespace
     BindingComparison CompareBindings(std::span<const DeclaredBinding> declared,
                                       std::span<const ReflectedBinding*> reflected,
                                       DiagnosticSink& sink);
+    std::vector<BindingMismatch> CompareDescriptorHeap(std::span<const DeclaredBinding> heap,
+                                                       std::span<const ReflectedBinding*> reflected,
+                                                       uint32_t heap_set);
 }
 
-SpvValidator::SpvValidator() : context{ spvContextCreate(SPV_ENV_VULKAN_1_2) }
+SpvValidator::SpvValidator(std::optional<uint32_t> descriptor_heap_set)
+    : context{ spvContextCreate(SPV_ENV_VULKAN_1_2) },
+      descriptorHeapSet{ descriptor_heap_set }
 {
 }
 
@@ -67,7 +72,20 @@ CookResult<BindingComparison> SpvValidator::validateEntryPoint(std::span<const s
         return std::make_tuple(binding.Group, binding.Binding);
     });
 
+    // the descriptor heap is not in reflection, so its variables are compared with the heap lowering instead
+    std::vector<BindingMismatch> heapMismatches;
+    if (descriptorHeapSet.has_value())
+    {
+        const auto heapBegin = std::ranges::remove_if(declared, [this](const DeclaredBinding& binding)
+        {
+            return binding.Group == *descriptorHeapSet;
+        });
+        heapMismatches = CompareDescriptorHeap(std::span{ heapBegin.begin(), heapBegin.end() }, bindings, *descriptorHeapSet);
+        declared.erase(heapBegin.begin(), heapBegin.end());
+    }
+
     BindingComparison comparison = CompareBindings(declared, bindings, sink);
+    comparison.Mismatches.append_range(std::move(heapMismatches));
 
     CookResult<EmittedCodeFacts> facts = CollectEmittedCodeFacts(state, sink);
     if (!facts)
@@ -188,6 +206,68 @@ namespace
                    std::string{ magic_enum::enum_name(declared.Access) },
                    std::string{ magic_enum::enum_name(reflected.Access) });
         }
+    }
+
+    /** The mutable descriptor lowering: samplers at 0, combined image samplers at 1, and every other resource at 2. */
+    bool HeapBindingAllows(uint32_t binding, BindingKind kind) noexcept
+    {
+        switch (binding)
+        {
+        case 0u:
+            return kind == BindingKind::Sampler;
+        case 1u:
+            return kind == BindingKind::CombinedTextureSampler;
+        case 2u:
+            return kind == BindingKind::Texture || kind == BindingKind::StorageTexture || kind == BindingKind::TexelBuffer ||
+                   kind == BindingKind::StorageBuffer || kind == BindingKind::UniformBuffer;
+        default:
+            return false;
+        }
+    }
+
+    std::vector<BindingMismatch> CompareDescriptorHeap(std::span<const DeclaredBinding> heap,
+                                                       std::span<const ReflectedBinding*> reflected,
+                                                       uint32_t heap_set)
+    {
+        std::vector<BindingMismatch> mismatches;
+        for (const DeclaredBinding& variable : heap)
+        {
+            std::string reason;
+            if (!variable.Array || variable.ArrayCount != 0u)
+            {
+                reason = "a variable in the descriptor heap set that is not an unbounded array";
+            }
+            else if (!HeapBindingAllows(variable.Binding, variable.Kind))
+            {
+                reason = std::format("a heap of {} at a binding that the mutable descriptor lowering gives to other kinds",
+                                     ToString(variable.Kind));
+            }
+
+            if (!reason.empty())
+            {
+                mismatches.push_back(BindingMismatch{ .Kind = BindingMismatchKind::DescriptorHeap,
+                                                      .Group = variable.Group,
+                                                      .Binding = variable.Binding,
+                                                      .Name = std::string{ variable.Name },
+                                                      .Emitted = std::move(reason),
+                                                      .Reflected = {} });
+            }
+        }
+
+        for (const ReflectedBinding* binding : reflected)
+        {
+            if (GroupOf(*binding) == heap_set)
+            {
+                mismatches.push_back(BindingMismatch{ .Kind = BindingMismatchKind::DescriptorHeap,
+                                                      .Group = GroupOf(*binding),
+                                                      .Binding = BindingOf(*binding),
+                                                      .Name = binding->Name,
+                                                      .Emitted = "reflection places a resource in the descriptor heap set",
+                                                      .Reflected = {} });
+            }
+        }
+
+        return mismatches;
     }
 
     void ReportDeclaredOnly(BindingComparison& comparison, const DeclaredBinding& declared)

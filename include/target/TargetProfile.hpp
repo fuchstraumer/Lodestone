@@ -42,6 +42,8 @@ struct ShimForms
 /** @brief The form of every class when all classes agree, and `Invalid` when they do not. */
 AccessModel SingleForm(const ShimForms& forms) noexcept;
 
+PlacementForms PlacementFormsOf(const ShimForms& forms) noexcept;
+
 enum class TargetLanguage : uint8_t
 {
     Invalid = 0,
@@ -92,6 +94,9 @@ enum class BindingMismatchKind : uint8_t
     Shape,
     StorageFormat,
     Access,
+    /** The code declares a variable in the descriptor heap set that the heap lowering does not allow, or reflection places a
+     * resource in that set. `Emitted` holds the reason. */
+    DescriptorHeap,
 };
 
 std::string_view ToString(BindingMismatchKind kind) noexcept;

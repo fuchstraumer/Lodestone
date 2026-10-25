@@ -283,7 +283,7 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
                                                  : uint16_t{ 0u }) |
             (profile.CodeFactsRead ? std::to_underlying(manifest::ProfileFlags::CodeFactsRead) : uint16_t{ 0u });
         profiles.push_back(manifest::Profile{ .TargetNameString = strings.Add(profile.TargetName),
-                                              .AccessModel = profile.AccessModel,
+                                              .Forms = profile.Forms,
                                               .CodeFormat = profile.CodeFormat,
                                               .Flags = flags });
     }
@@ -467,11 +467,19 @@ namespace
         record.NameString = strings.Add(binding.Name);
         record.ScopeString = strings.Add(binding.ScopeName);
         record.Placement = manifest::PlacementPayload{ .Word0 = GroupOf(binding), .Word1 = BindingOf(binding) };
+        if (const StoredValuePlacement* stored = GetStoredValuePlacement(binding.Placement); stored != nullptr)
+        {
+            record.Placement = manifest::PlacementPayload{ .Word0 = stored->Block.Group, .Word1 = stored->Block.Binding };
+            record.ValueOffset = stored->ByteOffset;
+            record.ValueContainer = static_cast<uint32_t>(stored->Container);
+        }
         record.ElementStride = binding.ElementStride;
         record.ArrayCount = binding.ArrayCount;
         record.StorageFormat = static_cast<uint32_t>(binding.StorageFormat);
-        record.PlacementKind = static_cast<uint8_t>(
-            GetBoundPlacement(binding.Placement) != nullptr ? PlacementKind::Bound : PlacementKind::None);
+        const StoredValuePlacement* storedValue = GetStoredValuePlacement(binding.Placement);
+        record.PlacementKind = static_cast<uint8_t>(GetBoundPlacement(binding.Placement) != nullptr ? PlacementKind::Bound
+                                                    : storedValue != nullptr                         ? storedValue->Kind
+                                                                                                     : PlacementKind::None);
         record.Kind = static_cast<uint8_t>(binding.Kind);
         record.Shape = static_cast<uint8_t>(binding.Shape);
         record.IsComparisonSampler = static_cast<uint8_t>(binding.IsComparisonSampler);

@@ -236,7 +236,7 @@ std::vector<std::byte> EmitBytes(const lodestone::CookedLibrary& library)
 lodestone::CookedProfile MakeProfile(std::string target_name)
 {
     return lodestone::CookedProfile{ .TargetName = std::move(target_name),
-                                     .AccessModel = lodestone::PlacementKind::Bound,
+                                     .Forms = lodestone::PlacementForms{ .Buffer = lodestone::PlacementKind::Bound, .Texture = lodestone::PlacementKind::Bound, .Sampler = lodestone::PlacementKind::Bound, .StorageTexture = lodestone::PlacementKind::Bound },
                                      .CodeFormat = lodestone::ShaderCodeFormat::Wgsl };
 }
 

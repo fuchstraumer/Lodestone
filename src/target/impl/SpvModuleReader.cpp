@@ -835,6 +835,11 @@ namespace
             }
             return extent;
         }
+        case spv::Op::OpTypePointer:
+            // a buffer device address, which the Pointer form of a shim stores
+            return type.StorageClass == static_cast<uint32_t>(spv::StorageClass::PhysicalStorageBuffer)
+                       ? std::optional<uint64_t>{ 8u }
+                       : std::nullopt;
         default:
             return std::nullopt;
         }

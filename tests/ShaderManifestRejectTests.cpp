@@ -112,10 +112,10 @@ CookedLibrary MakeSmallLibrary()
     CookedLibrary library;
     library.ModuleNames = { "TestModule" };
     library.Profiles = { CookedProfile{ .TargetName = "wgsl",
-                                        .AccessModel = lodestone::PlacementKind::Bound,
+                                        .Forms = lodestone::PlacementForms{ .Buffer = lodestone::PlacementKind::Bound, .Texture = lodestone::PlacementKind::Bound, .Sampler = lodestone::PlacementKind::Bound, .StorageTexture = lodestone::PlacementKind::Bound },
                                         .CodeFormat = lodestone::ShaderCodeFormat::Wgsl },
                          CookedProfile{ .TargetName = "spirv",
-                                        .AccessModel = lodestone::PlacementKind::Bound,
+                                        .Forms = lodestone::PlacementForms{ .Buffer = lodestone::PlacementKind::Bound, .Texture = lodestone::PlacementKind::Bound, .Sampler = lodestone::PlacementKind::Bound, .StorageTexture = lodestone::PlacementKind::Bound },
                                         .CodeFormat = lodestone::ShaderCodeFormat::Spirv } };
     library.Environments.emplace_back(MakeSmallModule());
     library.Environments.emplace_back(std::nullopt);
@@ -766,6 +766,34 @@ int main()
         tagsPastTable.TagCount = 100u;
         runner.CheckEqual(rejectBinding(tagsPastTable), ErrorCode::InvalidBindingTags,
                           "a tag run past the tag table is rejected");
+
+        // a stored value names its container by group and binding, and the container must be in the same instance
+        lodestone::manifest::Binding boundWithOffset = goodBinding;
+        boundWithOffset.ValueOffset = 16u;
+        runner.CheckEqual(rejectBinding(boundWithOffset), ErrorCode::InvalidStoredValue,
+                          "a bound binding with a value offset is rejected");
+        lodestone::manifest::Binding unknownContainer = goodBinding;
+        unknownContainer.PlacementKind = std::to_underlying(lodestone::PlacementKind::Handle);
+        unknownContainer.ValueContainer = 7u;
+        runner.CheckEqual(rejectBinding(unknownContainer), ErrorCode::InvalidStoredValue,
+                          "a handle with an unknown container is rejected");
+        lodestone::manifest::Binding pushWithBlock = goodBinding;
+        pushWithBlock.PlacementKind = std::to_underlying(lodestone::PlacementKind::Pointer);
+        pushWithBlock.ValueContainer = std::to_underlying(lodestone::StoredValueContainer::PushConstants);
+        runner.CheckEqual(rejectBinding(pushWithBlock), ErrorCode::InvalidStoredValue,
+                          "a pointer in push constants that names a group and binding is rejected");
+        lodestone::manifest::Binding absentBlock = goodBinding;
+        absentBlock.PlacementKind = std::to_underlying(lodestone::PlacementKind::Handle);
+        absentBlock.ValueContainer = std::to_underlying(lodestone::StoredValueContainer::UniformBuffer);
+        absentBlock.Placement = lodestone::manifest::PlacementPayload{ .Word0 = 9u, .Word1 = 9u };
+        runner.CheckEqual(rejectBinding(absentBlock), ErrorCode::StoredValueContainerMissing,
+                          "a handle whose uniform buffer is not in the instance is rejected");
+        lodestone::manifest::Binding absentPushConstants = goodBinding;
+        absentPushConstants.PlacementKind = std::to_underlying(lodestone::PlacementKind::Pointer);
+        absentPushConstants.ValueContainer = std::to_underlying(lodestone::StoredValueContainer::PushConstants);
+        absentPushConstants.Placement = lodestone::manifest::PlacementPayload{};
+        runner.CheckEqual(rejectBinding(absentPushConstants), ErrorCode::StoredValueContainerMissing,
+                          "a pointer in push constants of an instance with no push constants is rejected");
 
         const size_t tagOffset = taggedEntry.ExtentOffset + taggedHeader.ResourceTags.Offset;
         std::vector<std::byte> repeatedTag = taggedBytes;

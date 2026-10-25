@@ -192,7 +192,7 @@ std::vector<std::byte> EmitBytes(const PermutationSpace& space,
     lodestone::CookedLibrary library;
     library.ModuleNames = { "MergeTestModule" };
     library.Profiles = { lodestone::CookedProfile{ .TargetName = "wgsl",
-                                                   .AccessModel = lodestone::PlacementKind::Bound,
+                                                   .Forms = lodestone::PlacementForms{ .Buffer = lodestone::PlacementKind::Bound, .Texture = lodestone::PlacementKind::Bound, .Sampler = lodestone::PlacementKind::Bound, .StorageTexture = lodestone::PlacementKind::Bound },
                                                    .CodeFormat = lodestone::ShaderCodeFormat::Wgsl } };
     library.Environments.emplace_back(BuildModule(space, std::move(visibility_lists), visibility));
 
@@ -381,7 +381,7 @@ void TestSamplerPairs(lodestone::tests::TestRunner& runner, const PermutationSpa
     lodestone::CookedLibrary library;
     library.ModuleNames = { "MergeTestModule" };
     library.Profiles = { lodestone::CookedProfile{ .TargetName = "wgsl",
-                                                   .AccessModel = lodestone::PlacementKind::Bound,
+                                                   .Forms = lodestone::PlacementForms{ .Buffer = lodestone::PlacementKind::Bound, .Texture = lodestone::PlacementKind::Bound, .Sampler = lodestone::PlacementKind::Bound, .StorageTexture = lodestone::PlacementKind::Bound },
                                                    .CodeFormat = lodestone::ShaderCodeFormat::Wgsl,
                                                    .SamplerTexturePairsRecorded = true } };
     library.Environments.emplace_back(std::move(module));
@@ -480,7 +480,7 @@ void TestPushConstants(lodestone::tests::TestRunner& runner, const PermutationSp
     lodestone::CookedLibrary library;
     library.ModuleNames = { "MergeTestModule" };
     library.Profiles = { lodestone::CookedProfile{ .TargetName = "wgsl",
-                                                   .AccessModel = lodestone::PlacementKind::Bound,
+                                                   .Forms = lodestone::PlacementForms{ .Buffer = lodestone::PlacementKind::Bound, .Texture = lodestone::PlacementKind::Bound, .Sampler = lodestone::PlacementKind::Bound, .StorageTexture = lodestone::PlacementKind::Bound },
                                                    .CodeFormat = lodestone::ShaderCodeFormat::Wgsl,
                                                    .SamplerTexturePairsRecorded = true } };
     library.Environments.emplace_back(std::move(module));
@@ -548,7 +548,7 @@ void TestTagConflict(lodestone::tests::TestRunner& runner, const PermutationSpac
     lodestone::CookedLibrary library;
     library.ModuleNames = { "MergeTestModule" };
     library.Profiles = { lodestone::CookedProfile{ .TargetName = "wgsl",
-                                                   .AccessModel = lodestone::PlacementKind::Bound,
+                                                   .Forms = lodestone::PlacementForms{ .Buffer = lodestone::PlacementKind::Bound, .Texture = lodestone::PlacementKind::Bound, .Sampler = lodestone::PlacementKind::Bound, .StorageTexture = lodestone::PlacementKind::Bound },
                                                    .CodeFormat = lodestone::ShaderCodeFormat::Wgsl,
                                                    .SamplerTexturePairsRecorded = true } };
     library.Environments.emplace_back(std::move(module));

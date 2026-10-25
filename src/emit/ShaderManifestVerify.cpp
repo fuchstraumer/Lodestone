@@ -219,7 +219,7 @@ namespace
         {
             const CookedProfile& expected = library.Profiles[static_cast<size_t>(profileIndex)];
             if (bundle.String(profile.TargetNameString) != expected.TargetName ||
-                profile.AccessModel != expected.AccessModel)
+                profile.Forms != expected.Forms)
             {
                 return ReportError(
                     sink,
@@ -825,11 +825,28 @@ namespace
                record.ExtentX == 0u && record.ExtentY == 0u && record.ExtentZ == 0u;
     }
 
+    bool RecordMatchesPlacement(const manifest::Binding& record, const ReflectedBinding& binding) noexcept
+    {
+        if (const BoundPlacement* bound = std::get_if<BoundPlacement>(&binding.Placement); bound != nullptr)
+        {
+            return record.PlacementKind == std::to_underlying(PlacementKind::Bound) && record.Placement.Word0 == bound->Group &&
+                   record.Placement.Word1 == bound->Binding && record.ValueOffset == 0u && record.ValueContainer == 0u;
+        }
+
+        if (const StoredValuePlacement* stored = std::get_if<StoredValuePlacement>(&binding.Placement); stored != nullptr)
+        {
+            return record.PlacementKind == std::to_underlying(stored->Kind) && record.Placement.Word0 == stored->Block.Group &&
+                   record.Placement.Word1 == stored->Block.Binding && record.ValueOffset == stored->ByteOffset &&
+                   record.ValueContainer == std::to_underlying(stored->Container);
+        }
+
+        return record.PlacementKind == std::to_underlying(PlacementKind::None);
+    }
+
     bool RecordMatchesBinding(const manifest::Binding& record, const ReflectedBinding& binding) noexcept
     {
         return record.ByteSize == binding.ByteSize &&
-               record.Placement.Word0 == GroupOf(binding) &&
-               record.Placement.Word1 == BindingOf(binding) &&
+               RecordMatchesPlacement(record, binding) &&
                record.ElementStride == binding.ElementStride &&
                record.ArrayCount == binding.ArrayCount &&
                record.StorageFormat == static_cast<uint32_t>(binding.StorageFormat) &&

@@ -1,0 +1,293 @@
+#include "TestHarness.hpp"
+
+#include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
+#include "ShaderLibraryTypes.hpp"
+#include "ShaderManifest.hpp"
+#include "ShaderManifestIndex.hpp"
+#include "VariantKey.hpp"
+#include "driver/CookerDriver.hpp"
+#include "driver/CookerOptions.hpp"
+#include "emit/OutputSink.hpp"
+#include "emit/ShaderManifestEmitter.hpp"
+#include "target/StorageFormatTable.hpp"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <expected>
+#include <filesystem>
+#include <format>
+#include <optional>
+#include <print>
+#include <span>
+#include <string>
+#include <string_view>
+#include <vector>
+
+// spirv-modern is not complete, so this test cooks it through `CookerOptions::AllowIncompleteProfiles`. Delete that use
+// when the profile is complete.
+
+namespace
+{
+
+using namespace lodestone;
+
+struct CookOutcome
+{
+    CookError Result{ CookError::Invalid };
+    std::vector<std::byte> Bytes;
+    std::vector<Diagnostic> Records;
+};
+
+CookOutcome Cook(const std::filesystem::path& module_path, std::string_view target)
+{
+    CookerOptions options;
+    options.ModulePaths.push_back(module_path);
+    options.TargetNames.emplace_back(target);
+    options.OutputPath = "ShimPlacement";
+    options.VerifyDeterministic = true;
+    options.AllowIncompleteProfiles = true;
+
+    MemoryOutputSink sink;
+    RecordingDiagnosticSink diagnostics;
+    const CookResult<CookStatistics> cooked = RunCook(options, sink, diagnostics);
+    CookOutcome outcome{ .Result = cooked.has_value() ? CookError::Success : cooked.error(),
+                         .Records = std::move(diagnostics.Records()) };
+    const auto manifest = sink.GetArtifacts().find(std::string{ k_ManifestFileName });
+    if (manifest != sink.GetArtifacts().end())
+    {
+        outcome.Bytes.resize(manifest->second.size());
+        std::memcpy(outcome.Bytes.data(), manifest->second.data(), outcome.Bytes.size());
+    }
+    return outcome;
+}
+
+void PrintErrors(const CookOutcome& outcome)
+{
+    for (const Diagnostic& record : outcome.Records)
+    {
+        if (record.Severity == DiagnosticSeverity::Error || record.Severity == DiagnosticSeverity::Warning)
+        {
+            std::println(stderr, "      record: {} {}", record.File, record.Message);
+        }
+    }
+}
+
+std::optional<manifest::ResolvedResource> FindResource(const manifest::LayoutRange& layout,
+                                                       std::string_view scope,
+                                                       std::string_view name)
+{
+    for (const manifest::ResolvedResource resource : layout)
+    {
+        if (resource.ScopeName() == scope && resource.Name() == name)
+        {
+            return resource;
+        }
+    }
+    return std::nullopt;
+}
+
+struct ExpectedValue
+{
+    std::string_view EntryPoint;
+    std::string_view Scope;
+    std::string_view Name;
+    PlacementKind Kind;
+    StoredValueContainer Container;
+    uint32_t ByteOffset;
+};
+
+// each shim of a block takes 16 bytes in the std140 layout, and the push constants take 8
+constexpr ExpectedValue k_Expected[] = {
+    { "BlockCS", "material_Points", "data", PlacementKind::Pointer, StoredValueContainer::UniformBuffer, 0u },
+    { "BlockCS", "material_Surface", "texture", PlacementKind::Handle, StoredValueContainer::UniformBuffer, 16u },
+    { "BlockCS", "material_Filter", "sampler", PlacementKind::Handle, StoredValueContainer::UniformBuffer, 32u },
+    { "EntryCS", "entryPointParams_scratch", "data", PlacementKind::Pointer, StoredValueContainer::PushConstants, 0u },
+};
+
+} // namespace
+
+int main(int argc, char** argv)
+{
+    const std::filesystem::path assetDirectory{ argc > 1 ? argv[1] : LODESTONE_TEST_ASSET_DIR };
+    tests::TestRunner runner{ "ShimPlacement" };
+
+    runner.BeginSection("the shim material cooks for spirv-modern, with every round trip and two identical cooks");
+    const CookOutcome modern = Cook(assetDirectory / "ShimMaterial.slang", "spirv-modern");
+    const CookOutcome bound = Cook(assetDirectory / "ShimMaterial.slang", "spirv");
+    if (!runner.CheckEqual(modern.Result, CookError::Success, "the spirv-modern cook succeeds"))
+    {
+        PrintErrors(modern);
+    }
+    runner.CheckEqual(bound.Result, CookError::Success, "the spirv cook of the same module succeeds");
+
+    const manifest::ManifestResult<manifest::BundleView> modernBundle = manifest::BundleView::Open(modern.Bytes);
+    const manifest::ManifestResult<manifest::BundleView> boundBundle = manifest::BundleView::Open(bound.Bytes);
+    const manifest::ManifestResult<manifest::EnvironmentView> modernEnvironment =
+        modernBundle.has_value() ? modernBundle->OpenEnvironment(0u, 0u) : std::unexpected(modernBundle.error());
+    const manifest::ManifestResult<manifest::EnvironmentView> boundEnvironment =
+        boundBundle.has_value() ? boundBundle->OpenEnvironment(0u, 0u) : std::unexpected(boundBundle.error());
+    if (!runner.CheckOk(modernEnvironment, "the spirv-modern environment opens, with every stored value checked") ||
+        !runner.CheckOk(boundEnvironment, "the spirv environment opens"))
+    {
+        return runner.Report();
+    }
+
+    runner.BeginSection("the profile records the form of each class");
+    const PlacementForms forms = modernBundle->Profiles()[0].Forms;
+    runner.CheckEqual(forms.Buffer, PlacementKind::Pointer, "buffers are Pointer");
+    runner.Check(forms.Texture == PlacementKind::Handle && forms.Sampler == PlacementKind::Handle &&
+                     forms.StorageTexture == PlacementKind::Handle,
+                 "textures, samplers, and storage textures are Handle");
+
+    for (const ExpectedValue& expected : k_Expected)
+    {
+        runner.BeginSection(std::format("{}: {}.{} is a stored value", expected.EntryPoint, expected.Scope, expected.Name));
+        const manifest::ManifestResult<uint32_t> modernEntry = modernBundle->Module(0u).FindEntryPointIndex(expected.EntryPoint);
+        const manifest::ManifestResult<uint32_t> boundEntry = boundBundle->Module(0u).FindEntryPointIndex(expected.EntryPoint);
+        if (!runner.CheckOk(modernEntry, "the entry point exists") || !runner.CheckOk(boundEntry, "the entry point exists"))
+        {
+            continue;
+        }
+
+        const manifest::EntryPointInstanceView modernInstance = modernEnvironment->VariantAt(0u).EntryPoint(*modernEntry);
+        const manifest::LayoutRange modernLayout = modernInstance.Layout();
+        const std::optional<manifest::ResolvedResource> value = FindResource(modernLayout, expected.Scope, expected.Name);
+        if (!runner.Check(value.has_value(), "the entry point reads it"))
+        {
+            continue;
+        }
+
+        runner.CheckEqual(value->Placement(), expected.Kind, "its form");
+        runner.CheckEqual(value->ValueContainer(), expected.Container, "its container");
+        runner.CheckEqual(value->ValueOffset(), expected.ByteOffset, "its byte offset in the container");
+        if (expected.Container == StoredValueContainer::UniformBuffer)
+        {
+            bool containerFound = false;
+            for (const manifest::ResolvedResource candidate : modernLayout)
+            {
+                containerFound = containerFound ||
+                                 (candidate.Placement() == PlacementKind::Bound && candidate.Kind() == BindingKind::UniformBuffer &&
+                                  candidate.PlacementValue().Word0 == value->PlacementValue().Word0 &&
+                                  candidate.PlacementValue().Word1 == value->PlacementValue().Word1);
+            }
+            runner.Check(containerFound, "its uniform buffer is in the same layout");
+        }
+        else
+        {
+            runner.CheckEqual(modernInstance.Constants().Delivery(), EntryPointConstantsDelivery::PushConstant,
+                              "the entry point has push constants");
+        }
+
+        // the row of the shim table states the resource, and reflection of the Bound form is the second opinion
+        const std::optional<manifest::ResolvedResource> boundResource =
+            FindResource(boundEnvironment->VariantAt(0u).EntryPoint(*boundEntry).Layout(), expected.Scope, expected.Name);
+        if (runner.Check(boundResource.has_value(), "the Bound cook has the same shim resource"))
+        {
+            runner.CheckEqual(boundResource->Placement(), PlacementKind::Bound, "the Bound cook binds it");
+            runner.CheckEqual(value->Kind(), boundResource->Kind(), "the same kind as the Bound form");
+            runner.CheckEqual(value->Shape(), boundResource->Shape(), "the same shape as the Bound form");
+            runner.CheckEqual(value->Access(), boundResource->Access(), "the same access as the Bound form");
+            runner.CheckEqual(value->SampleType(), boundResource->SampleType(), "the same sample type as the Bound form");
+            runner.CheckEqual(value->ElementStride(), boundResource->ElementStride(), "the same element stride as the Bound form");
+        }
+    }
+
+    runner.BeginSection("a storage handle takes the format of each variant");
+    const CookOutcome storage = Cook(assetDirectory / "ShimStorageAxis.slang", "spirv-modern");
+    if (!runner.CheckEqual(storage.Result, CookError::Success, "the format axis module cooks for spirv-modern"))
+    {
+        PrintErrors(storage);
+    }
+    const manifest::ManifestResult<manifest::BundleView> storageBundle = manifest::BundleView::Open(storage.Bytes);
+    const manifest::ManifestResult<manifest::EnvironmentView> storageEnvironment =
+        storageBundle.has_value() ? storageBundle->OpenEnvironment(0u, 0u) : std::unexpected(storageBundle.error());
+    if (runner.CheckOk(storageEnvironment, "the environment opens"))
+    {
+        const ManifestIndex index{ *storageEnvironment };
+        for (const StorageFormatInfo& format : GetStorageFormats())
+        {
+            const std::expected<VariantKey, QueryError> key =
+                index.Query().Where("LEVEL_FORMAT", AxisValueDomain::Enum, format.EnumCase).Single();
+            const std::optional<uint32_t> variant = key.has_value() ? storageEnvironment->FindVariant(*key) : std::nullopt;
+            if (!runner.Check(variant.has_value(), std::format("{}: the variant exists", format.EnumCase)))
+            {
+                continue;
+            }
+            const std::optional<manifest::ResolvedResource> target =
+                FindResource(storageEnvironment->VariantAt(*variant).EntryPoint(0u).Layout(), "level_target", "texture");
+            if (runner.Check(target.has_value(), std::format("{}: the storage handle is in the layout", format.EnumCase)))
+            {
+                runner.CheckEqual(target->Placement(), PlacementKind::Handle, std::format("{}: a Handle", format.EnumCase));
+                runner.CheckEqual(target->StorageFormat(), format.Format, std::format("{}: the format of the variant", format.EnumCase));
+                runner.CheckEqual(target->Access(), ResourceAccess::WriteOnly, std::format("{}: write-only", format.EnumCase));
+            }
+        }
+    }
+
+    runner.BeginSection("a pipeline merges each stored value once, apart from the uniform buffer that stores it");
+    const CookOutcome stages = Cook(assetDirectory / "ShimStages.slang", "spirv-modern");
+    if (!runner.CheckEqual(stages.Result, CookError::Success, "the vertex and fragment module cooks for spirv-modern"))
+    {
+        PrintErrors(stages);
+    }
+    const manifest::ManifestResult<manifest::BundleView> stagesBundle = manifest::BundleView::Open(stages.Bytes);
+    const manifest::ManifestResult<manifest::EnvironmentView> stagesEnvironment =
+        stagesBundle.has_value() ? stagesBundle->OpenEnvironment(0u, 0u) : std::unexpected(stagesBundle.error());
+    if (runner.CheckOk(stagesEnvironment, "the environment opens"))
+    {
+        const manifest::ManifestResult<uint32_t> vertex = stagesBundle->Module(0u).FindEntryPointIndex("MainVS");
+        const manifest::ManifestResult<uint32_t> fragment = stagesBundle->Module(0u).FindEntryPointIndex("MainFS");
+        if (runner.CheckOk(vertex, "the vertex stage exists") && runner.CheckOk(fragment, "the fragment stage exists"))
+        {
+            const std::array<manifest::EntryPointInstanceView, 2u> pipeline{ stagesEnvironment->VariantAt(0u).EntryPoint(*vertex),
+                                                                             stagesEnvironment->VariantAt(0u).EntryPoint(*fragment) };
+            const manifest::ManifestResult<manifest::MergedLayoutView> merged = manifest::MergedLayoutView::Merge(pipeline);
+            if (runner.CheckOk(merged, "the stages merge, so a handle does not collide with its uniform buffer"))
+            {
+                uint32_t uniformBuffers = 0u;
+                uint32_t handles = 0u;
+                for (const manifest::MergedResource resource : *merged)
+                {
+                    const bool bothStages = resource.Stages == (ShaderStageKind::Vertex | ShaderStageKind::Fragment);
+                    uniformBuffers += resource.Resource.Placement() == PlacementKind::Bound && bothStages ? 1u : 0u;
+                    handles += resource.Resource.Placement() == PlacementKind::Handle && bothStages ? 1u : 0u;
+                }
+                runner.CheckEqual(uniformBuffers, 1u, "the uniform buffer appears once, for both stages");
+                runner.CheckEqual(handles, 2u, "the texture and the sampler handle appear once each, for both stages");
+            }
+        }
+    }
+
+    runner.BeginSection("wgsl and spirv-modern cook together");
+    {
+        CookerOptions options;
+        options.ModulePaths.push_back(assetDirectory / "ShimMaterial.slang");
+        options.TargetNames = { "wgsl", "spirv-modern" };
+        options.OutputPath = "ShimPlacementTogether";
+        options.AllowIncompleteProfiles = true;
+        MemoryOutputSink sink;
+        RecordingDiagnosticSink diagnostics;
+        const CookResult<CookStatistics> together = RunCook(options, sink, diagnostics);
+        if (!runner.CheckOk(together, "the cross-profile checks accept a Bound profile beside a Handle profile"))
+        {
+            PrintErrors(CookOutcome{ .Records = std::move(diagnostics.Records()) });
+        }
+    }
+
+    runner.BeginSection("without the test switch, spirv-modern still refuses to cook");
+    {
+        CookerOptions options;
+        options.ModulePaths.push_back(assetDirectory / "ShimMaterial.slang");
+        options.TargetNames.emplace_back("spirv-modern");
+        options.OutputPath = "ShimPlacementRefused";
+        MemoryOutputSink sink;
+        RecordingDiagnosticSink diagnostics;
+        runner.CheckError(RunCook(options, sink, diagnostics), CookError::TargetProfileIncomplete,
+                          "a cook with no switch fails with TargetProfileIncomplete");
+    }
+
+    return runner.Report();
+}

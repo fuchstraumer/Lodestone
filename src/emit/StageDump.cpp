@@ -160,9 +160,22 @@ namespace
         writer.BeginObject();
         writer.KeyString("name", binding.Name);
         writer.KeyString("scope", binding.ScopeName);
-        writer.KeyString("placementKind", GetBoundPlacement(binding.Placement) != nullptr ? "bound" : "none");
-        writer.KeyUInt("group", GroupOf(binding));
-        writer.KeyUInt("binding", BindingOf(binding));
+        const StoredValuePlacement* stored = GetStoredValuePlacement(binding.Placement);
+        if (stored != nullptr)
+        {
+            // a bound binding keeps its earlier keys, so that the known-good dumps do not change
+            writer.KeyString("placementKind", stored->Kind == PlacementKind::Handle ? "handle" : "pointer");
+            writer.KeyString("container", magic_enum::enum_name(stored->Container));
+            writer.KeyUInt("group", stored->Block.Group);
+            writer.KeyUInt("binding", stored->Block.Binding);
+            writer.KeyUInt("valueOffset", stored->ByteOffset);
+        }
+        else
+        {
+            writer.KeyString("placementKind", GetBoundPlacement(binding.Placement) != nullptr ? "bound" : "none");
+            writer.KeyUInt("group", GroupOf(binding));
+            writer.KeyUInt("binding", BindingOf(binding));
+        }
         writer.KeyString("kind", magic_enum::enum_name(binding.Kind));
         writer.KeyUInt("elementStride", binding.ElementStride);
         writer.KeyUInt("byteSize", binding.ByteSize);
@@ -517,6 +530,18 @@ namespace
     void WriteRawPlacement(JsonWriter& writer, const RawPlacement& placement)
     {
         writer.Key("placement");
+        if (const StoredValuePlacement* stored = GetStoredValuePlacement(placement); stored != nullptr)
+        {
+            writer.BeginObject();
+            writer.KeyString("model", magic_enum::enum_name(stored->Kind));
+            writer.KeyString("container", magic_enum::enum_name(stored->Container));
+            writer.KeyUInt("group", stored->Block.Group);
+            writer.KeyUInt("binding", stored->Block.Binding);
+            writer.KeyUInt("valueOffset", stored->ByteOffset);
+            writer.EndObject();
+            return;
+        }
+
         const BoundPlacement* bound = GetBoundPlacement(placement);
         if (bound == nullptr)
         {

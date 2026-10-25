@@ -142,7 +142,7 @@ std::vector<std::byte> EmitBytes(const CookedModule& module)
     CookedLibrary library;
     library.ModuleNames = { module.Name };
     library.Profiles = { CookedProfile{ .TargetName = "wgsl",
-                                        .AccessModel = PlacementKind::Bound,
+                                        .Forms = PlacementForms{ .Buffer = PlacementKind::Bound, .Texture = PlacementKind::Bound, .Sampler = PlacementKind::Bound, .StorageTexture = PlacementKind::Bound },
                                         .CodeFormat = ShaderCodeFormat::Wgsl } };
     library.Environments.emplace_back(module);
     CookResult<std::vector<std::byte>> bytes = EmitShaderManifest(library, manifestDiagnostics);

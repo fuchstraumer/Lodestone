@@ -177,6 +177,11 @@ target_compile_definitions(StorageFormatAxisTest PRIVATE
 add_lodestone_unit_test(ShimArrayTest ShimArrayTests.cpp)
 target_compile_definitions(ShimArrayTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/ShimArrays")
+# Shim resources in the Pointer and Handle forms, cooked for spirv-modern through the test-only switch: each stored value
+# reads back with its container and offset, and the resource of each equals the reflection of its Bound form.
+add_lodestone_unit_test(ShimPlacementTest ShimPlacementTests.cpp)
+target_compile_definitions(ShimPlacementTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/Shims")
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
 # A canary for shader-slang/slang#13895, the missing NonReadable on an array of write-only storage images: it fails when Slang decorates the array,

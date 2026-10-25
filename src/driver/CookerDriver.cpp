@@ -401,7 +401,7 @@ namespace
         {
             const TargetProfile& profile = cook_state.TargetProfiles.at(targetName);
             library.Profiles.push_back(CookedProfile{ .TargetName = targetName,
-                                                          .AccessModel = PlacementKindFromAccessModel(SingleForm(profile.Forms)),
+                                                          .Forms = PlacementFormsOf(profile.Forms),
                                                           .CodeFormat = CodeFormatFromLanguage(profile.Language),
                                                           .SamplerTexturePairsRecorded = profile.Validator != nullptr,
                                                           .CodeFactsRead = profile.Validator != nullptr });

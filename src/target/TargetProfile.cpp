@@ -42,7 +42,11 @@ namespace
     constexpr std::string_view k_SpirvName = "spirv";
     constexpr std::string_view k_SpirvModernName = "spirv-modern";
 
-    static SpvValidator k_SpvValidator;
+    // Vulkan guarantees 4 descriptor sets, so set 3 is the last one that every device has
+    constexpr uint32_t k_SpirvModernHeapSet = 3u;
+
+    static SpvValidator k_SpvValidator{ std::nullopt };
+    static SpvValidator k_SpvModernValidator{ k_SpirvModernHeapSet };
 
     constexpr ShimForms k_AllBound{ .Buffer = AccessModel::Bound,
                                     .Texture = AccessModel::Bound,
@@ -71,8 +75,7 @@ namespace
                            .Validator = &k_SpvValidator,
                            .MaxPushConstantBytes = 128u,
                            .VulkanApiVersion = (1u << 22u) | (2u << 12u) },
-        // buffers through buffer device addresses and textures and samplers through descriptor handles. Vulkan guarantees
-        // 4 descriptor sets, so set 3 is the last one that every device has
+        // buffers through buffer device addresses, and textures and samplers through descriptor handles
         TargetProfile{ .Name = k_SpirvModernName,
                            .Language = TargetLanguage::Spirv,
                            .SlangProfileName = "spirv_1_5",
@@ -80,12 +83,13 @@ namespace
                                                .Texture = AccessModel::Handle,
                                                .Sampler = AccessModel::Handle,
                                                .StorageTexture = AccessModel::Handle },
-                           .DescriptorHeapSet = 3u,
-                           .Validator = &k_SpvValidator,
+                           .DescriptorHeapSet = k_SpirvModernHeapSet,
+                           .Validator = &k_SpvModernValidator,
                            .MaxPushConstantBytes = 128u,
                            .VulkanApiVersion = (1u << 22u) | (2u << 12u),
-                           .IncompleteReason = "the reflection of Pointer and Handle members, their placements in the manifest, "
-                                               "and the validator's descriptor heap are not built yet" },
+                           .IncompleteReason = "the manifest does not record the descriptor heap, the validator does not compare "
+                                               "the offsets of handles and pointers with the code, and the sampler pairs of "
+                                               "handles are not recorded" },
     };
 
     constexpr std::array<std::string_view, 3u> k_TargetProfileNames
@@ -101,7 +105,11 @@ CookResult<BindingComparison> ResolvedLibraryValidator::ValidateEntryPoint(std::
                                                                            std::span<const ReflectedBinding*> used,
                                                                            DiagnosticSink& sink) const
 {
-    std::vector<const ReflectedBinding*> sortedUsed(used.begin(), used.end());
+    std::vector<const ReflectedBinding*> sortedUsed;
+    sortedUsed.reserve(used.size());
+    std::ranges::copy_if(used,
+                         std::back_inserter(sortedUsed),
+                         [](const ReflectedBinding* binding) { return GetBoundPlacement(binding->Placement) != nullptr; });
     std::ranges::sort(sortedUsed, BoundPlacementLess);
     return validateEntryPoint(target_code, sortedUsed, sink);
 }
@@ -134,6 +142,8 @@ std::string_view ToString(BindingMismatchKind kind) noexcept
         return "storage format";
     case BindingMismatchKind::Access:
         return "access";
+    case BindingMismatchKind::DescriptorHeap:
+        return "descriptor heap";
     default:
         return "Invalid";
     }
@@ -154,6 +164,7 @@ std::string FormatBindingMismatch(const BindingMismatch& mismatch)
                            mismatch.Binding,
                            mismatch.Name);
     case BindingMismatchKind::Unsupported:
+    case BindingMismatchKind::DescriptorHeap:
         return std::format("  group {} binding {} {}: {}", mismatch.Group, mismatch.Binding, mismatch.Name, mismatch.Emitted);
     default:
         return std::format("  group {} binding {} {}: {} differs, the code has {} and reflection has {}",
@@ -187,6 +198,14 @@ AccessModel SingleForm(const ShimForms& forms) noexcept
 {
     const bool agree = forms.Texture == forms.Buffer && forms.Sampler == forms.Buffer && forms.StorageTexture == forms.Buffer;
     return agree ? forms.Buffer : AccessModel::Invalid;
+}
+
+PlacementForms PlacementFormsOf(const ShimForms& forms) noexcept
+{
+    return PlacementForms{ .Buffer = PlacementKindFromAccessModel(forms.Buffer),
+                           .Texture = PlacementKindFromAccessModel(forms.Texture),
+                           .Sampler = PlacementKindFromAccessModel(forms.Sampler),
+                           .StorageTexture = PlacementKindFromAccessModel(forms.StorageTexture) };
 }
 
 CookResult<TargetProfile> FindTargetProfile(std::string_view name) noexcept

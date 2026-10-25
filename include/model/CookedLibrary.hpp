@@ -154,7 +154,7 @@ struct CookedModule
 struct CookedProfile
 {
     std::string TargetName;
-    PlacementKind AccessModel{ PlacementKind::None };
+    PlacementForms Forms{};
     ShaderCodeFormat CodeFormat{ ShaderCodeFormat::None };
     /** Whether the pairs were read, not whether any exist. */
     bool SamplerTexturePairsRecorded{ false };

@@ -117,7 +117,13 @@ void WriteProfiles(lodestone::JsonWriter& writer, const manifest::BundleView& bu
     {
         writer.BeginObject();
         writer.KeyString("target", bundle.String(profile.TargetNameString));
-        writer.KeyString("accessModel", magic_enum::enum_name(profile.AccessModel));
+        writer.Key("forms");
+        writer.BeginObject();
+        writer.KeyString("buffer", magic_enum::enum_name(profile.Forms.Buffer));
+        writer.KeyString("texture", magic_enum::enum_name(profile.Forms.Texture));
+        writer.KeyString("sampler", magic_enum::enum_name(profile.Forms.Sampler));
+        writer.KeyString("storageTexture", magic_enum::enum_name(profile.Forms.StorageTexture));
+        writer.EndObject();
         writer.KeyString("codeFormat", magic_enum::enum_name(profile.CodeFormat));
         writer.EndObject();
     }

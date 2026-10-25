@@ -54,10 +54,12 @@ namespace
     CookError ResolveSamplerTexturePairs(CompiledVariant& variant,
                                          size_t entry_point_index,
                                          std::span<const SamplerTexturePlacement> placements,
+                                         std::optional<uint32_t> descriptor_heap_set,
                                          DiagnosticSink& diagnostics);
     // no block in the code means Slang removed unread data. A block that reflection does not state, or that covers
     // more bytes, is a mismatch
     CookError ReconcileEntryPointConstants(const TargetProfile& target,
+                                           std::span<const ReflectedBinding> bindings,
                                            CompiledEntryPoint& entry_point,
                                            std::optional<uint32_t> push_constant_extent,
                                            DiagnosticSink& diagnostics);
@@ -470,19 +472,21 @@ namespace
         };
 
         const CookError resolved =
-            ResolveSamplerTexturePairs(variant, entry_point_index, facts.SamplerTexturePairs, diagnostics);
+            ResolveSamplerTexturePairs(variant, entry_point_index, facts.SamplerTexturePairs, target.DescriptorHeapSet, diagnostics);
         if (resolved != CookError::Success)
         {
             return resolved;
         }
 
         return ReconcileEntryPointConstants(target,
+                                            variant.Bindings,
                                             variant.EntryPoints[entry_point_index],
                                             facts.PushConstantExtent,
                                             diagnostics);
     }
 
     CookError ReconcileEntryPointConstants(const TargetProfile& target,
+                                           std::span<const ReflectedBinding> bindings,
                                            CompiledEntryPoint& entry_point,
                                            std::optional<uint32_t> push_constant_extent,
                                            DiagnosticSink& diagnostics)
@@ -494,6 +498,13 @@ namespace
             if (reflected)
             {
                 constants = EntryPointConstants{};
+                // a value stored in push constants that the code removed is not visible either
+                std::erase_if(entry_point.Reflection.UsedBindingIndices,
+                              [bindings](uint32_t binding_index)
+                              {
+                                  const StoredValuePlacement* stored = GetStoredValuePlacement(bindings[binding_index].Placement);
+                                  return stored != nullptr && stored->Container == StoredValueContainer::PushConstants;
+                              });
             }
             return CookError::Success;
         }
@@ -530,6 +541,7 @@ namespace
     CookError ResolveSamplerTexturePairs(CompiledVariant& variant,
                                          size_t entry_point_index,
                                          std::span<const SamplerTexturePlacement> placements,
+                                         std::optional<uint32_t> descriptor_heap_set,
                                          DiagnosticSink& diagnostics)
     {
         CompiledEntryPoint& entryPoint = variant.EntryPoints[entry_point_index];
@@ -556,6 +568,12 @@ namespace
         pairs.reserve(placements.size());
         for (const SamplerTexturePlacement& placement : placements)
         {
+            // a pair through the descriptor heap names no handle, so the pairs of handles are not recorded yet
+            if (descriptor_heap_set.has_value() &&
+                (placement.TextureGroup == *descriptor_heap_set || placement.SamplerGroup == *descriptor_heap_set))
+            {
+                continue;
+            }
 
             const std::optional<uint32_t> texture =
                 findPosition(placement.TextureGroup, placement.TextureBinding, BindingKind::Texture);

@@ -22,6 +22,7 @@ namespace
             .Handle = {},
             .Pointer = "PointerReadBuffer",
             .ImplementationTakesFormat = false,
+            .Resource = ShimResource{ .Kind = BindingKind::StorageBuffer, .Shape = ResourceShape::StructuredBuffer, .Access = ResourceAccess::ReadOnly },
         },
         ShimInterface
         { 
@@ -32,6 +33,7 @@ namespace
             .Handle = {},
             .Pointer = "PointerReadWriteBuffer",
             .ImplementationTakesFormat = false,
+            .Resource = ShimResource{ .Kind = BindingKind::StorageBuffer, .Shape = ResourceShape::StructuredBuffer, .Access = ResourceAccess::ReadWrite },
         },
         ShimInterface
         { 
@@ -42,6 +44,7 @@ namespace
             .Handle = "HandleTexture2D",
             .Pointer = {},
             .ImplementationTakesFormat = false,
+            .Resource = ShimResource{ .Kind = BindingKind::Texture, .Shape = ResourceShape::Texture2D, .SampleType = TextureSampleType::Float, .Access = ResourceAccess::ReadOnly },
         },
         ShimInterface
         { 
@@ -52,6 +55,7 @@ namespace
             .Handle = "HandleSampler",
             .Pointer = {},
             .ImplementationTakesFormat = false,
+            .Resource = ShimResource{ .Kind = BindingKind::Sampler },
         },
         ShimInterface
         { 
@@ -62,6 +66,7 @@ namespace
             .Handle = "HandleWriteStorageTexture2D",
             .Pointer = {},
             .ImplementationTakesFormat = true,
+            .Resource = ShimResource{ .Kind = BindingKind::StorageTexture, .Shape = ResourceShape::Texture2D, .Access = ResourceAccess::WriteOnly },
         },
     };
 }
@@ -91,6 +96,22 @@ std::string_view ShimImplName(const ShimInterface& shim_interface, AccessModel a
         break;
     }
     return {};
+}
+
+const ShimInterface* FindShimInterfaceByImplementation(std::string_view implementation, AccessModel& out_access) noexcept
+{
+    for (const ShimInterface& row : k_ShimInterfaces)
+    {
+        for (const AccessModel access : { AccessModel::Handle, AccessModel::Pointer })
+        {
+            if (!ShimImplName(row, access).empty() && ShimImplName(row, access) == implementation)
+            {
+                out_access = access;
+                return &row;
+            }
+        }
+    }
+    return nullptr;
 }
 
 AccessModel ShimFormOf(const ShimForms& forms, ShimResourceClass resource_class) noexcept

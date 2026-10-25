@@ -134,10 +134,13 @@ namespace
     using NamedPair = std::array<std::string_view, 4u>;
 
     /** Empty with `has_combined` set for a combined texture sampler. */
+    /** `has_unread_pairs` is set when the code cannot show every pair: a combined texture sampler, which SPIR-V samples
+     * with no `OpSampledImage`, or a texture or a sampler reached through a descriptor handle, whose pairs are not
+     * recorded yet. */
     CookResult<std::vector<NamedPair>> NamePairs(const CookedModule& module,
                                                  const LibraryVariant& variant,
                                                  size_t entry_point_index,
-                                                 bool& has_combined);
+                                                 bool& has_unread_pairs);
 
 } // namespace
 
@@ -452,13 +455,13 @@ CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library, Diagnos
                                {
         for (size_t entryPointIndex = 0u; entryPointIndex < shared.Environment.EntryPoints.size(); ++entryPointIndex)
         {
-            bool combined = false;
-            bool baselineCombined = false;
+            bool unreadPairs = false;
+            bool baselineUnreadPairs = false;
 
             const CookResult<std::vector<NamedPair>> pairs =
-                NamePairs(shared.Environment, shared.Variant, entryPointIndex, combined);
+                NamePairs(shared.Environment, shared.Variant, entryPointIndex, unreadPairs);
             const CookResult<std::vector<NamedPair>> baselinePairs =
-                NamePairs(shared.Baseline, shared.BaselineVariant, entryPointIndex, baselineCombined);
+                NamePairs(shared.Baseline, shared.BaselineVariant, entryPointIndex, baselineUnreadPairs);
 
             if (!pairs || !baselinePairs)
             {
@@ -471,7 +474,7 @@ CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library, Diagnos
                                                shared.Environment.EntryPoints[entryPointIndex].Name));
             }
 
-            if (combined || baselineCombined || *pairs == *baselinePairs)
+            if (unreadPairs || baselineUnreadPairs || *pairs == *baselinePairs)
             {
                 continue;
             }
@@ -539,7 +542,7 @@ namespace
     CookResult<std::vector<NamedPair>> NamePairs(const CookedModule& module,
                                                  const LibraryVariant& variant,
                                                  size_t entry_point_index,
-                                                 bool& has_combined)
+                                                 bool& has_unread_pairs)
     {
         const CookResult<ShaderLayoutView> layout = ResolveLayoutView(module, variant, entry_point_index);
         if (!layout)
@@ -547,12 +550,14 @@ namespace
             return std::unexpected(layout.error());
         }
 
-        auto isCombinedTextureSampler = [](const ResolvedBindingView& binding)
+        auto hidesPairs = [](const ResolvedBindingView& binding)
         {
-            return binding.Resource->Kind == BindingKind::CombinedTextureSampler;
+            const bool handle = GetStoredValuePlacement(binding.Resource->Placement) != nullptr &&
+                                (binding.Resource->Kind == BindingKind::Texture || binding.Resource->Kind == BindingKind::Sampler);
+            return binding.Resource->Kind == BindingKind::CombinedTextureSampler || handle;
         };
 
-        has_combined = std::ranges::any_of(*layout, isCombinedTextureSampler);
+        has_unread_pairs = std::ranges::any_of(*layout, hidesPairs);
 
         std::vector<NamedPair> named;
         const ShaderLayoutView& layout_view = *layout;
