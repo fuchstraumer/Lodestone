@@ -176,12 +176,13 @@ the priming error names `--include-dir`. `lodestone_add_shader_cook` takes `INCL
 name is rejected at the command line and never in the driver, so a name that reaches `CookerOptions` is
 a name `FindTargetProfile` accepts. This build has `wgsl` and `spirv`. Each has a validator:
 `WgslValidator` (Tint) and `SpvValidator` (SPIRV-Tools). A third profile, `spirv-modern` (buffers through buffer device
-addresses, textures and samplers through descriptor handles, phase F step F4), exists. `spirv-modern` cooks. Not yet checked
-against the code: the byte offsets of stored values (F4.5), and the sampler pairs of handles. A profile has one access model for each class of shim resource (`TargetProfile::Forms`, a
+addresses, textures and samplers through descriptor handles, phase F step F4), exists and cooks. A profile has one access
+model for each class of shim resource (`TargetProfile::Forms`, a
 `ShimForms`), and `ShimLinkSource` links each extern in the form of its class. `spirv-modern` gives buffers the Pointer
 form and textures, samplers, and storage textures the Handle form, with the descriptor heap in set 3
 (`TargetProfile::DescriptorHeapSet`, given to Slang as its bindless space index). The manifest records the form of each
-class (`Profile::Forms`, format 17). A name in the policy file can name it.
+class (`Profile::Forms`, format 17), and the heap (`Profile::HeapLowering` and `Profile::DescriptorHeapSet`, format 18). A
+name in the policy file can name it.
 
 A Pointer or Handle member stores a value in a block: `[ls_shim_value]` marks it in `builtins/LodestoneShims.slang`, because
 reflection gives a descriptor handle as a plain `uint2` and a pointer with no resource type. The reflector finds the marked
@@ -191,11 +192,14 @@ table row states the resource (`ShimInterface::Resource`); a storage handle take
 argument, and a pointer its element stride from the pointee. The access in a `Ptr` type's full name must equal the row's
 (`ShimPointerAccessMismatch`). An array of Pointer or Handle shims, and one in a storage buffer element, fail with
 `ShimStoredValueUnsupported`. A stored value is visible to an entry point when its container is: a used uniform buffer, or the
-entry point's own push constants. The validators compare bound placements only. `SpvValidator` compares the descriptor heap
-set with the mutable descriptor lowering instead (`BindingMismatchKind::DescriptorHeap`): unbounded arrays, samplers at
-binding 0, combined image samplers at 1, and every other resource at 2, and no reflected resource in that set. Sampler pairs
-through the heap are not recorded, and the cross-profile pair check skips an entry point that reads a texture or a sampler
-through a handle.
+entry point's own push constants. `ResolvedLibraryValidator::ValidateEntryPoint` gives a validator the bound bindings,
+sorted, and the stored values apart. `SpvValidator` compares the descriptor heap set with the mutable descriptor lowering
+(`BindingMismatchKind::DescriptorHeap`): unbounded arrays, samplers at binding 0, combined image samplers at 1, and every
+other resource at 2, and no reflected resource in that set. It finds the member of each stored value's container that starts
+at its offset, and that member must have the value's name and type: a `uint2` for Handle, a `PhysicalStorageBuffer` pointer
+for Pointer (`BindingMismatchKind::StoredValue`, F4.5). A sampler pair through the heap is traced from `OpSampledImage` back to
+the two handles that index the heap (`SpvModuleReader`, `TraceHeapHandle`), so a pair names two stored values as reflection
+does. A trace that leaves the known shape fails the cook (`ReflectionSamplerPairUnresolved`).
 
 `lodestone` must stay `STATIC`. No header marks a symbol `dllexport`, so a DLL build of this target
 exports nothing and every consumer fails to link. A `SHARED` build is for instrumented performance
@@ -502,7 +506,7 @@ skips, and the Slang workarounds it carries.
   information), workgroup memory, and entry point constants (`DeliveredFormExceedsBase`).
 - **The sampler pair cross-check** (`VerifySamplerPairsAcrossProfiles`, `model/CookedLibrary.cpp`). The pairs that two
   profiles read for one variant must agree (`SamplerPairsTargetMismatch`), in the base form. It skips
-  an entry point whose pairs the code cannot show: a combined texture sampler, or a texture or sampler through a handle.
+  an entry point whose pairs the code cannot show: a combined texture sampler.
 - **The source facts cross-check** (`VerifySourceFactsAcrossProfiles`, same file). Workgroup memory and a portable subset of
   the capability names must agree between profiles (`SourceFactsTargetMismatch`), in the base form (`--O0`, no debug
   information), which the cook compiles beside the delivered form when the flags differ (`docs/base-cook-plan.md`).

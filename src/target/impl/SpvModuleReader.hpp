@@ -96,8 +96,14 @@ struct IdRecord
     uint32_t ArrayStride{ 0u };
     ConstantKind Constant{ ConstantKind::None };
     uint64_t ConstantBits{ 0u };
-    // the source of a load, access chain, or copy, which the pair tracing follows
+    // the source of a load, access chain, extract, or copy, which the pair tracing follows
     uint32_t DerivedFrom{ 0u };
+    // the indices of an access chain (constant ids) or a composite extract (literals), in `ParseState::Indices`
+    uint32_t FirstIndex{ 0u };
+    uint32_t IndexCount{ 0u };
+    bool LiteralIndices{ false };
+    // a Function variable: the value of its one store, or ~0u after a second store
+    uint32_t StoredFrom{ 0u };
 };
 
 struct SampledImageUse
@@ -127,6 +133,24 @@ struct ParseState
     spv::AddressingModel AddressingModel{ spv::AddressingModel::Max };
     std::vector<SampledImageUse> SampledImages;
     std::vector<ChainAccess> ChainAccesses;
+    std::vector<uint32_t> Indices;
+    // the caller sets it after the parse. A sampled image from this set is reached through a handle
+    std::optional<uint32_t> DescriptorHeapSet;
+};
+
+/** Where a stored value lives: the container, its block's group and binding (0 and 0 for push constants), the offset. */
+struct StoredValueLocation
+{
+    StoredValueContainer Container{ StoredValueContainer::None };
+    uint32_t Group{ 0u };
+    uint32_t Binding{ 0u };
+    uint32_t ByteOffset{ 0u };
+};
+
+struct BlockMember
+{
+    std::string_view Name;
+    uint32_t TypeId{ 0u };
 };
 
 /** `Unsupported` marks a form this validator does not read yet. */
@@ -146,6 +170,13 @@ struct DeclaredBinding
 };
 
 std::vector<DeclaredBinding> CollectDeclaredBindings(const ParseState& parse_state);
+/** Returns the pointee struct of the container's variable: a `Block` uniform buffer at the group and binding, or the push
+ * constant block. 0 when the code declares none. */
+uint32_t FindContainerStruct(const ParseState& parse_state, const StoredValueLocation& container);
+/** Returns the member that starts at the offset, through nested structs, or nothing when no member starts there. */
+std::optional<BlockMember> FindMemberAtOffset(const ParseState& parse_state, uint32_t struct_type, uint32_t byte_offset);
+bool IsHandleType(const ParseState& parse_state, uint32_t type_id) noexcept;
+bool IsDevicePointerType(const ParseState& parse_state, uint32_t type_id) noexcept;
 /** The device features that a dynamic index into a binding array needs. Slang does not state them as capabilities. The
  * names repeat when several accesses need one. A texel buffer array is not covered. */
 std::vector<std::string_view> CollectDynamicIndexingCapabilities(const ParseState& parse_state);

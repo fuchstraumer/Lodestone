@@ -19,6 +19,7 @@ public:
 protected:
     [[nodiscard]] CookResult<BindingComparison> validateEntryPoint(std::span<const std::byte> source_code,
                                                                    std::span<const ReflectedBinding*> bindings,
+                                                                   std::span<const ReflectedBinding*> stored,
                                                                    DiagnosticSink& sink) const final;
     [[nodiscard]] CookResult<EmittedCodeFacts> readEmittedCodeFacts(std::span<const std::byte> source_code,
                                                                     DiagnosticSink& sink) const override;

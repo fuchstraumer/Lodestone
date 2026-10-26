@@ -192,6 +192,22 @@ namespace
                                                                       .Name = name });
     }
 
+    void RecordIndices(ParseState& parse_state, uint32_t result_id, std::span<const uint32_t> indices, bool literal)
+    {
+        IdRecord& record = parse_state.Ids[result_id];
+        record.FirstIndex = static_cast<uint32_t>(parse_state.Indices.size());
+        record.IndexCount = static_cast<uint32_t>(indices.size());
+        record.LiteralIndices = literal;
+        parse_state.Indices.append_range(indices);
+    }
+
+    void OnOpStore(ParseState& parse_state, std::span<const uint32_t> words)
+    {
+        // words[1] is the pointer, words[2] the object. A pointer stored twice cannot be traced
+        uint32_t& storedFrom = parse_state.Ids[words[1]].StoredFrom;
+        storedFrom = storedFrom == 0u ? words[2] : ~0u;
+    }
+
     void OnOpTypePointer(ParseState& parse_state,
                          std::span<const uint32_t> words,
                          uint32_t result_id)
@@ -483,11 +499,20 @@ namespace
                 parseState->ChainAccesses.push_back(ChainAccess{ .BaseId = words[3], .FirstIndexId = words[4] });
             }
             parseState->Ids[resultId].DerivedFrom = words[3];
+            RecordIndices(*parseState, resultId, words.subspan(4u), false);
+            break;
+        case spv::Op::OpCompositeExtract:
+            parseState->Ids[resultId].DerivedFrom = words[3];
+            RecordIndices(*parseState, resultId, words.subspan(4u), true);
             break;
         case spv::Op::OpLoad:
         case spv::Op::OpCopyObject:
+        case spv::Op::OpCopyLogical:
             // words[3] is the pointer, or the copied value
             parseState->Ids[resultId].DerivedFrom = words[3];
+            break;
+        case spv::Op::OpStore:
+            OnOpStore(*parseState, words);
             break;
         case spv::Op::OpSampledImage:
             // the function bodies are parsed for this: words[3] is the image, and words[4] the sampler
@@ -621,6 +646,137 @@ namespace
         return 0u;
     }
 
+    std::optional<StoredValueLocation> LocateHandle(const ParseState& parse_state,
+                                                    const IdRecord& variable,
+                                                    std::span<const uint32_t> path)
+    {
+        StoredValueLocation location;
+        const spv::StorageClass storageClass = static_cast<spv::StorageClass>(variable.StorageClass);
+        if (storageClass == spv::StorageClass::Uniform && variable.Group != ~0u)
+        {
+            location = StoredValueLocation{ .Container = StoredValueContainer::UniformBuffer,
+                                            .Group = variable.Group,
+                                            .Binding = variable.Binding };
+        }
+        else if (storageClass == spv::StorageClass::PushConstant)
+        {
+            location.Container = StoredValueContainer::PushConstants;
+        }
+        else
+        {
+            return std::nullopt;
+        }
+
+        uint32_t type = parse_state.Ids[variable.TypeId].PointeeType;
+        for (const uint32_t index : path)
+        {
+            const IdRecord& record = parse_state.Ids[type];
+            // the index of a vector picks a component of the handle, which starts where the vector starts
+            if (record.OpCode == spv::Op::OpTypeVector)
+            {
+                break;
+            }
+            if (record.OpCode != spv::Op::OpTypeStruct || index >= record.MemberCount)
+            {
+                return std::nullopt;
+            }
+
+            const MemberRecord& member = parse_state.Members[record.FirstMember + index];
+            if (member.Offset == ~0u)
+            {
+                return std::nullopt;
+            }
+            location.ByteOffset += member.Offset;
+            type = member.TypeId;
+        }
+
+        if (!IsHandleType(parse_state, type))
+        {
+            return std::nullopt;
+        }
+
+        return location;
+    }
+
+    /** Follows a value back through extracts, loads, copies, access chains with constant indices, and the one store of a
+     * Function variable, to a member of a uniform buffer or push constant block. Any other step gives nothing. */
+    std::optional<StoredValueLocation> TraceHandle(const ParseState& parse_state, uint32_t value_id)
+    {
+        // the indices from the block to the value, gathered from the value back
+        std::vector<uint32_t> path;
+        uint32_t id = value_id;
+        for (size_t step = 0u; step < parse_state.Ids.size() && id != 0u && id < parse_state.Ids.size(); ++step)
+        {
+            const IdRecord& record = parse_state.Ids[id];
+            switch (record.OpCode)
+            {
+            case spv::Op::OpAccessChain:
+            case spv::Op::OpInBoundsAccessChain:
+            case spv::Op::OpCompositeExtract:
+            {
+                std::vector<uint32_t> indices;
+                indices.reserve(record.IndexCount);
+                for (const uint32_t index : std::span{ parse_state.Indices }.subspan(record.FirstIndex, record.IndexCount))
+                {
+                    if (record.LiteralIndices)
+                    {
+                        indices.push_back(index);
+                        continue;
+                    }
+
+                    const IdRecord& constant = parse_state.Ids[index];
+                    if (constant.Constant != ConstantKind::Constant)
+                    {
+                        return std::nullopt;
+                    }
+                    indices.push_back(static_cast<uint32_t>(constant.ConstantBits));
+                }
+
+                path.insert(path.begin(), indices.begin(), indices.end());
+                id = record.DerivedFrom;
+                break;
+            }
+            case spv::Op::OpLoad:
+            case spv::Op::OpCopyObject:
+            case spv::Op::OpCopyLogical:
+                id = record.DerivedFrom;
+                break;
+            case spv::Op::OpVariable:
+                if (static_cast<spv::StorageClass>(record.StorageClass) != spv::StorageClass::Function)
+                {
+                    return LocateHandle(parse_state, record, path);
+                }
+                if (record.StoredFrom == ~0u)
+                {
+                    return std::nullopt;
+                }
+                id = record.StoredFrom;
+                break;
+            default:
+                return std::nullopt;
+            }
+        }
+
+        return std::nullopt;
+    }
+
+    /** Returns the handle that indexes the heap variable on the way from `id` to `heap_variable`, or nothing. */
+    std::optional<StoredValueLocation> TraceHeapHandle(const ParseState& parse_state, uint32_t id, uint32_t heap_variable)
+    {
+        for (size_t step = 0u; step < parse_state.Ids.size() && id != 0u && id < parse_state.Ids.size(); ++step)
+        {
+            const IdRecord& record = parse_state.Ids[id];
+            const bool chain = record.OpCode == spv::Op::OpAccessChain || record.OpCode == spv::Op::OpInBoundsAccessChain;
+            if (chain && record.DerivedFrom == heap_variable && record.IndexCount != 0u)
+            {
+                return TraceHandle(parse_state, parse_state.Indices[record.FirstIndex]);
+            }
+            id = record.DerivedFrom;
+        }
+
+        return std::nullopt;
+    }
+
 } // namespace
 
 CookError ParseModule(spv_context_t* context,
@@ -686,24 +842,146 @@ CookResult<std::vector<SamplerTexturePlacement>> CollectSamplerTexturePairs(cons
         const uint32_t samplerVariable = TraceToVariable(parse_state, use.SamplerId);
         const bool imageBound = imageVariable != 0u && parse_state.Ids[imageVariable].Group != ~0u;
         const bool samplerBound = samplerVariable != 0u && parse_state.Ids[samplerVariable].Group != ~0u;
+        auto unresolved = [&sink, &use](std::string_view reason)
+        {
+            const std::string errStr = std::format("an OpSampledImage of image %{} and sampler %{} {}, so the pair "
+                                                   "cannot be recorded",
+                                                   use.ImageId,
+                                                   use.SamplerId,
+                                                   reason);
+            return std::unexpected(ReportError(sink, CookError::ReflectionSamplerPairUnresolved, errStr));
+        };
+
         if (!imageBound || !samplerBound)
         {
-            const std::string errStr =
-                std::format("an OpSampledImage of image %{} and sampler %{} does not trace back to two bound "
-                            "resource variables, so the pair cannot be recorded",
-                            use.ImageId,
-                            use.SamplerId);
-            return std::unexpected(ReportError(sink, CookError::ReflectionSamplerPairUnresolved, errStr));
+            return unresolved("does not trace back to two bound resource variables");
         }
 
         const IdRecord& image = parse_state.Ids[imageVariable];
         const IdRecord& sampler = parse_state.Ids[samplerVariable];
-        pairs.push_back(SamplerTexturePlacement{ .TextureGroup = image.Group,
-                                                 .TextureBinding = image.Binding,
-                                                 .SamplerGroup = sampler.Group,
-                                                 .SamplerBinding = sampler.Binding });
+        SamplerTexturePlacement pair{ .TextureGroup = image.Group,
+                                      .TextureBinding = image.Binding,
+                                      .SamplerGroup = sampler.Group,
+                                      .SamplerBinding = sampler.Binding };
+
+        // a side in the heap names the handle that indexes it, so the pair names two values as reflection does
+        const std::optional<uint32_t> heapSet = parse_state.DescriptorHeapSet;
+        if (heapSet.has_value() && image.Group == *heapSet)
+        {
+            const std::optional<StoredValueLocation> handle = TraceHeapHandle(parse_state, use.ImageId, imageVariable);
+            if (!handle)
+            {
+                return unresolved("reads an image from the descriptor heap with an index that is not a handle in a block");
+            }
+            pair.TextureGroup = handle->Group;
+            pair.TextureBinding = handle->Binding;
+            pair.TextureContainer = handle->Container;
+            pair.TextureOffset = handle->ByteOffset;
+        }
+
+        if (heapSet.has_value() && sampler.Group == *heapSet)
+        {
+            const std::optional<StoredValueLocation> handle = TraceHeapHandle(parse_state, use.SamplerId, samplerVariable);
+            if (!handle)
+            {
+                return unresolved("reads a sampler from the descriptor heap with an index that is not a handle in a block");
+            }
+            pair.SamplerGroup = handle->Group;
+            pair.SamplerBinding = handle->Binding;
+            pair.SamplerContainer = handle->Container;
+            pair.SamplerOffset = handle->ByteOffset;
+        }
+
+        pairs.push_back(pair);
     }
+
     return pairs;
+}
+
+uint32_t FindContainerStruct(const ParseState& parse_state, const StoredValueLocation& container)
+{
+    for (const IdRecord& record : parse_state.Ids)
+    {
+        if (record.OpCode != spv::Op::OpVariable)
+        {
+            continue;
+        }
+
+        const spv::StorageClass storageClass = static_cast<spv::StorageClass>(record.StorageClass);
+        const bool uniformMatch = container.Container == StoredValueContainer::UniformBuffer &&
+                                  storageClass == spv::StorageClass::Uniform && record.Group == container.Group &&
+                                  record.Binding == container.Binding;
+        const bool pushMatch = container.Container == StoredValueContainer::PushConstants &&
+                               storageClass == spv::StorageClass::PushConstant;
+        if (uniformMatch || pushMatch)
+        {
+            return parse_state.Ids[record.TypeId].PointeeType;
+        }
+    }
+
+    return 0u;
+}
+
+std::optional<BlockMember> FindMemberAtOffset(const ParseState& parse_state, uint32_t struct_type, uint32_t byte_offset)
+{
+    // each step takes the last member that starts at or before the offset, since members are in offset order
+    uint32_t type = struct_type;
+    uint32_t offset = byte_offset;
+    BlockMember found{};
+
+    for (size_t depth = 0u; depth < parse_state.Ids.size(); ++depth)
+    {
+        const IdRecord& record = parse_state.Ids[type];
+        if (record.OpCode != spv::Op::OpTypeStruct)
+        {
+            break;
+        }
+
+        const MemberRecord* chosen = nullptr;
+        const std::span<const MemberRecord> members = std::span{ parse_state.Members }.subspan(record.FirstMember, record.MemberCount);
+        for (const MemberRecord& member : members)
+        {
+            if (member.Offset != ~0u && member.Offset <= offset)
+            {
+                chosen = &member;
+            }
+        }
+
+        if (chosen == nullptr)
+        {
+            return std::nullopt;
+        }
+
+        offset -= chosen->Offset;
+        type = chosen->TypeId;
+        found = BlockMember{ .Name = chosen->Name, .TypeId = chosen->TypeId };
+    }
+
+    if (offset != 0u)
+    {
+        return std::nullopt;
+    }
+
+    return found;
+}
+
+bool IsHandleType(const ParseState& parse_state, uint32_t type_id) noexcept
+{
+    const IdRecord& record = parse_state.Ids[type_id];
+    if (record.OpCode != spv::Op::OpTypeVector || record.ComponentCount != 2u)
+    {
+        return false;
+    }
+
+    const IdRecord& component = parse_state.Ids[record.ElementType];
+    return component.OpCode == spv::Op::OpTypeInt && component.ScalarWidth == 32u && !component.ScalarSigned;
+}
+
+bool IsDevicePointerType(const ParseState& parse_state, uint32_t type_id) noexcept
+{
+    const IdRecord& record = parse_state.Ids[type_id];
+    return record.OpCode == spv::Op::OpTypePointer &&
+           static_cast<spv::StorageClass>(record.StorageClass) == spv::StorageClass::PhysicalStorageBuffer;
 }
 
 std::vector<std::string_view> CollectDynamicIndexingCapabilities(const ParseState& parse_state)

@@ -380,6 +380,15 @@ Moved from `CLAUDE.md` on 2026-10-25. Each bullet is one validator of the cook.
   declares `ReadWrite` and reflection reads `WriteOnly`. `IsSlangNonReadableArrayFault` (in `SpvValidator.cpp`) accepts
   that one difference, for an array of storage images only, and prints a warning. `SlangNonReadableCanaryTest` fails when
   Slang decorates the array.
+- **Stored values in the reflection cross-check** (`spirv-modern`). `ResolvedLibraryValidator::ValidateEntryPoint` passes
+  the stored values apart from the sorted bound bindings. `SpvValidator::CompareStoredValues` finds the container in the
+  code (the `Block` uniform buffer at the stored group and binding, or the push constant block), walks the structs to the
+  member that starts at the value's offset (`FindMemberAtOffset`), and requires the value's name and a `uint2` (Handle) or
+  `PhysicalStorageBuffer` pointer (Pointer). A container the code removed is skipped. The pairs of handles come from
+  `TraceHeapHandle`: from the heap access chain under an `OpSampledImage` operand, back through `OpCompositeExtract`,
+  `OpLoad`, the copies, constant access chains, and the one store of a Function variable, to a block member. The byte
+  offset is the sum of the `Offset` decorations on the way. Measured 2026-10-25: Slang loads the handle with one access
+  chain at `--O2`, and copies the wrapper into a Function variable at `--O0`.
 - **The delivered form check**, after the reflection cross-check of each variant. `VerifyDeliveredForm` (in
   `model/DeliveredForm.cpp`) runs only when the cook compiled a base form beside the delivered form. An optimizer only
   removes code, so the delivered form of each entry point instance must be a subset of the base form in one target: the

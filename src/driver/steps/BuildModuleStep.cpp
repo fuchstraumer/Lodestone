@@ -64,7 +64,6 @@ namespace
                                          const CompiledEntryPoint& entry_point,
                                          EntryPointCode& form,
                                          std::span<const SamplerTexturePlacement> placements,
-                                         std::optional<uint32_t> descriptor_heap_set,
                                          DiagnosticSink& diagnostics);
     // no block in the code means Slang removed unread data. A block that reflection does not state, or that covers
     // more bytes, is a mismatch
@@ -519,7 +518,6 @@ namespace
                                                               entry_point,
                                                               form,
                                                               facts.SamplerTexturePairs,
-                                                              target.DescriptorHeapSet,
                                                               diagnostics);
         if (resolved != CookError::Success)
         {
@@ -589,25 +587,44 @@ namespace
                                          const CompiledEntryPoint& entry_point,
                                          EntryPointCode& form,
                                          std::span<const SamplerTexturePlacement> placements,
-                                         std::optional<uint32_t> descriptor_heap_set,
                                          DiagnosticSink& diagnostics)
     {
         const std::vector<uint32_t>& used = form.UsedBindingIndices;
 
-        auto findPosition = [&](uint32_t group, uint32_t binding, BindingKind kind) -> std::optional<uint32_t>
+        // `None` names a bound binding. Any other container names the handle stored at the offset in that container
+        auto matches = [](const ReflectedBinding& candidate,
+                          StoredValueContainer container,
+                          uint32_t group,
+                          uint32_t binding,
+                          uint32_t offset)
+        {
+            if (container == StoredValueContainer::None)
+            {
+                const BoundPlacement* bound = GetBoundPlacement(candidate.Placement);
+                return bound != nullptr && bound->Group == group && bound->Binding == binding;
+            }
+
+            const StoredValuePlacement* stored = GetStoredValuePlacement(candidate.Placement);
+            return stored != nullptr && stored->Container == container && stored->Block.Group == group &&
+                   stored->Block.Binding == binding && stored->ByteOffset == offset;
+        };
+
+        auto findPosition = [&](StoredValueContainer container,
+                                uint32_t group,
+                                uint32_t binding,
+                                uint32_t offset,
+                                BindingKind kind) -> std::optional<uint32_t>
         {
             for (size_t position = 0u; position < used.size(); ++position)
             {
                 const ReflectedBinding& candidate = variant.Bindings[used[position]];
-                const BoundPlacement* placement = GetBoundPlacement(candidate.Placement);
-
-                if (placement != nullptr && placement->Group == group && placement->Binding == binding)
+                if (matches(candidate, container, group, binding, offset))
                 {
                     return candidate.Kind == kind ? std::optional<uint32_t>{ static_cast<uint32_t>(position) }
                                                   : std::nullopt;
                 }
-
             }
+
             return std::nullopt;
         };
 
@@ -615,17 +632,16 @@ namespace
         pairs.reserve(placements.size());
         for (const SamplerTexturePlacement& placement : placements)
         {
-            // a pair through the descriptor heap names no handle, so the pairs of handles are not recorded yet
-            if (descriptor_heap_set.has_value() &&
-                (placement.TextureGroup == *descriptor_heap_set || placement.SamplerGroup == *descriptor_heap_set))
-            {
-                continue;
-            }
-
-            const std::optional<uint32_t> texture =
-                findPosition(placement.TextureGroup, placement.TextureBinding, BindingKind::Texture);
-            const std::optional<uint32_t> sampler =
-                findPosition(placement.SamplerGroup, placement.SamplerBinding, BindingKind::Sampler);
+            const std::optional<uint32_t> texture = findPosition(placement.TextureContainer,
+                                                                 placement.TextureGroup,
+                                                                 placement.TextureBinding,
+                                                                 placement.TextureOffset,
+                                                                 BindingKind::Texture);
+            const std::optional<uint32_t> sampler = findPosition(placement.SamplerContainer,
+                                                                 placement.SamplerGroup,
+                                                                 placement.SamplerBinding,
+                                                                 placement.SamplerOffset,
+                                                                 BindingKind::Sampler);
 
             if (!texture || !sampler)
             {

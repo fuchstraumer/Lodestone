@@ -135,8 +135,7 @@ namespace
     /** Scope and name. */
 
     /** `has_unread_pairs` is set when the code cannot show every pair: a combined texture sampler, which SPIR-V samples
-     * with no `OpSampledImage`, or a texture or a sampler reached through a descriptor handle, whose pairs are not
-     * recorded yet. */
+     * with no `OpSampledImage`. */
     CookResult<std::vector<NamedPair>> NamePairs(const CookedModule& module,
                                                  const LibraryVariant& variant,
                                                  size_t entry_point_index,
@@ -601,9 +600,7 @@ namespace
 
         auto hidesPairs = [](const ResolvedBindingView& binding)
         {
-            const bool handle = GetStoredValuePlacement(binding.Resource->Placement) != nullptr &&
-                                (binding.Resource->Kind == BindingKind::Texture || binding.Resource->Kind == BindingKind::Sampler);
-            return binding.Resource->Kind == BindingKind::CombinedTextureSampler || handle;
+            return binding.Resource->Kind == BindingKind::CombinedTextureSampler;
         };
 
         has_unread_pairs = std::ranges::any_of(*layout, hidesPairs);

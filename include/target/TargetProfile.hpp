@@ -52,12 +52,17 @@ enum class TargetLanguage : uint8_t
 };
 
 /** @brief A sampled pair by (group, binding), since the emitted code decides placements. */
+/** @brief A side reached through a handle holds its container's group and binding, and the handle's offset. */
 struct SamplerTexturePlacement
 {
     uint32_t TextureGroup{ 0u };
     uint32_t TextureBinding{ 0u };
     uint32_t SamplerGroup{ 0u };
     uint32_t SamplerBinding{ 0u };
+    StoredValueContainer TextureContainer{ StoredValueContainer::None };
+    StoredValueContainer SamplerContainer{ StoredValueContainer::None };
+    uint32_t TextureOffset{ 0u };
+    uint32_t SamplerOffset{ 0u };
 
     friend bool operator==(const SamplerTexturePlacement&, const SamplerTexturePlacement&) = default;
 };
@@ -97,6 +102,9 @@ enum class BindingMismatchKind : uint8_t
     /** The code declares a variable in the descriptor heap set that the heap lowering does not allow, or reflection places a
      * resource in that set. `Emitted` holds the reason. */
     DescriptorHeap,
+    /** No member of the container starts at a stored value's offset, or that member has another name or type. `Emitted`
+     * holds the reason. */
+    StoredValue,
 };
 
 std::string_view ToString(BindingMismatchKind kind) noexcept;
@@ -139,7 +147,7 @@ public:
     ResolvedLibraryValidator(ResolvedLibraryValidator&&) = delete;
     ResolvedLibraryValidator& operator=(ResolvedLibraryValidator&&) = delete;
 
-    /** @brief Sorts `used`, then calls `validateEntryPoint`. */
+    /** @brief Splits `used` into the bound bindings, sorted, and the stored values, then calls `validateEntryPoint`. */
     [[nodiscard]] CookResult<BindingComparison> ValidateEntryPoint(std::span<const std::byte> target_code,
                                                                    std::span<const ReflectedBinding*> used,
                                                                    DiagnosticSink& sink) const;
@@ -149,7 +157,8 @@ public:
 
 protected:
     [[nodiscard]] virtual CookResult<BindingComparison> validateEntryPoint(std::span<const std::byte> target_code,
-                                                                           std::span<const ReflectedBinding*> used,
+                                                                           std::span<const ReflectedBinding*> bound,
+                                                                           std::span<const ReflectedBinding*> stored,
                                                                            DiagnosticSink& sink) const = 0;
     [[nodiscard]] virtual CookResult<EmittedCodeFacts> readEmittedCodeFacts(std::span<const std::byte> target_code,
                                                                             DiagnosticSink& sink) const = 0;

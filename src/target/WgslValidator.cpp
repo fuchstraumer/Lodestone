@@ -114,6 +114,7 @@ WgslValidator::~WgslValidator() = default;
 
 CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::span<const std::byte> source_code,
                                                                 std::span<const ReflectedBinding*> bindings,
+                                                                [[maybe_unused]] std::span<const ReflectedBinding*> stored,
                                                                 DiagnosticSink& sink) const
 {
     CookResult<tint::Program> entrypointProgram = ParseWgsl(source_code, sink);

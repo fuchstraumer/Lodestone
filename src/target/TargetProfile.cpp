@@ -102,13 +102,22 @@ CookResult<BindingComparison> ResolvedLibraryValidator::ValidateEntryPoint(std::
                                                                            std::span<const ReflectedBinding*> used,
                                                                            DiagnosticSink& sink) const
 {
-    std::vector<const ReflectedBinding*> sortedUsed;
-    sortedUsed.reserve(used.size());
-    std::ranges::copy_if(used,
-                         std::back_inserter(sortedUsed),
-                         [](const ReflectedBinding* binding) { return GetBoundPlacement(binding->Placement) != nullptr; });
-    std::ranges::sort(sortedUsed, BoundPlacementLess);
-    return validateEntryPoint(target_code, sortedUsed, sink);
+    std::vector<const ReflectedBinding*> bound;
+    std::vector<const ReflectedBinding*> stored;
+    for (const ReflectedBinding* binding : used)
+    {
+        if (GetBoundPlacement(binding->Placement) != nullptr)
+        {
+            bound.push_back(binding);
+        }
+        else if (GetStoredValuePlacement(binding->Placement) != nullptr)
+        {
+            stored.push_back(binding);
+        }
+    }
+    std::ranges::sort(bound, BoundPlacementLess);
+
+    return validateEntryPoint(target_code, bound, stored, sink);
 }
 
 CookResult<EmittedCodeFacts> ResolvedLibraryValidator::ReadEmittedCodeFacts(std::span<const std::byte> target_code,
@@ -141,6 +150,8 @@ std::string_view ToString(BindingMismatchKind kind) noexcept
         return "access";
     case BindingMismatchKind::DescriptorHeap:
         return "descriptor heap";
+    case BindingMismatchKind::StoredValue:
+        return "stored value";
     default:
         return "Invalid";
     }
@@ -162,6 +173,7 @@ std::string FormatBindingMismatch(const BindingMismatch& mismatch)
                            mismatch.Name);
     case BindingMismatchKind::Unsupported:
     case BindingMismatchKind::DescriptorHeap:
+    case BindingMismatchKind::StoredValue:
         return std::format("  group {} binding {} {}: {}", mismatch.Group, mismatch.Binding, mismatch.Name, mismatch.Emitted);
     default:
         return std::format("  group {} binding {} {}: {} differs, the code has {} and reflection has {}",

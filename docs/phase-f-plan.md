@@ -825,3 +825,22 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
     shim module), and a stored value in a `ConstantBuffer` range.
   - `spirv-modern` still refuses to cook. It lacks: the descriptor heap in the manifest (its set and lowering, so a renderer
     can build it), the offset cross-check against the SPIR-V `Offset` decorations (F4.5), and the sampler pairs of handles.
+- 2026-10-25. **F4 finished, except F4.6**, not committed. 49 of 49 tests, 60 of 60 known-good dumps. The base cook (B0 to
+  B5, `docs/base-cook-plan.md`) came first.
+  - The descriptor heap is in the manifest (format 18): `Profile::HeapLowering` (`MutableDescriptor`) and
+    `Profile::DescriptorHeapSet`, with `k_MutableHeap*Binding` constants that `SpvValidator` now uses too. `Open` rejects an
+    unknown lowering and a set with no lowering (`InvalidProfileDescriptorHeap`).
+  - `IncompleteReason`, `TargetProfileIncomplete`, and `AllowIncompleteProfiles` are removed. `spirv-modern` cooks.
+  - F4.5: `SpvValidator` finds the member of each stored value's container at its offset (`FindMemberAtOffset`), and
+    compares its name and type (`BindingMismatchKind::StoredValue`). The author approved the path from `UniformMembers`;
+    the check finds the member by offset instead, because the validator receives no container binding for push constants.
+    `ResolvedLibraryValidator::ValidateEntryPoint` dropped every stored value before, so the check first ran on nothing;
+    the `SpvValidatorTest` fixtures found that, and the wrapper now passes the stored values apart.
+  - Handle pairs: `SpvModuleReader` traces a heap side of `OpSampledImage` back to its handle (`TraceHeapHandle`), through
+    extracts, loads, copies, constant access chains, and the one store of a Function variable (the `--O0` shape). Any other
+    step fails the cook (`ReflectionSamplerPairUnresolved`, author's choice). `SamplerTexturePlacement` has a stored form, and
+    the cross-profile pair check no longer skips handles.
+  - Measured shape (spike, Slang of 2026-10-25): every stored value is a block member that holds a wrapper struct with one
+    member at offset 0. Not measured: arrays of shims (they fail with `ShimStoredValueUnsupported`), storage textures through
+    the heap, comparison samplers, `--O1` and `--O3`.
+  - Next: F4.6 (the per-descriptor-type lowering), then phase F's remaining slices.

@@ -30,6 +30,12 @@ using spirv::CollectEmittedCodeFacts;
 using spirv::DeclaredBinding;
 using spirv::ParseModule;
 using spirv::ParseState;
+using spirv::BlockMember;
+using spirv::FindContainerStruct;
+using spirv::FindMemberAtOffset;
+using spirv::IsDevicePointerType;
+using spirv::IsHandleType;
+using spirv::StoredValueLocation;
 
 namespace
 {
@@ -39,6 +45,9 @@ namespace
     std::vector<BindingMismatch> CompareDescriptorHeap(std::span<const DeclaredBinding> heap,
                                                        std::span<const ReflectedBinding*> reflected,
                                                        uint32_t heap_set);
+    // compares the offset of each stored value with the member of its container that starts there
+    std::vector<BindingMismatch> CompareStoredValues(const ParseState& parse_state,
+                                                     std::span<const ReflectedBinding*> reflected);
 }
 
 SpvValidator::SpvValidator(std::optional<uint32_t> descriptor_heap_set)
@@ -58,6 +67,7 @@ SpvValidator::~SpvValidator()
 
 CookResult<BindingComparison> SpvValidator::validateEntryPoint(std::span<const std::byte> source_code,
                                                                std::span<const ReflectedBinding*> bindings,
+                                                               std::span<const ReflectedBinding*> stored,
                                                                DiagnosticSink& sink) const
 {
     ParseState state;
@@ -66,6 +76,7 @@ CookResult<BindingComparison> SpvValidator::validateEntryPoint(std::span<const s
     {
         return std::unexpected(parsed);
     }
+    state.DescriptorHeapSet = descriptorHeapSet;
 
     std::vector<DeclaredBinding> declared = CollectDeclaredBindings(state);
     std::ranges::sort(declared, {}, [](const DeclaredBinding& binding)
@@ -87,6 +98,7 @@ CookResult<BindingComparison> SpvValidator::validateEntryPoint(std::span<const s
 
     BindingComparison comparison = CompareBindings(declared, bindings, sink);
     comparison.Mismatches.append_range(std::move(heapMismatches));
+    comparison.Mismatches.append_range(CompareStoredValues(state, stored));
 
     CookResult<EmittedCodeFacts> facts = CollectEmittedCodeFacts(state, sink);
     if (!facts)
@@ -106,6 +118,7 @@ CookResult<EmittedCodeFacts> SpvValidator::readEmittedCodeFacts(std::span<const 
     {
         return std::unexpected(parsed);
     }
+    state.DescriptorHeapSet = descriptorHeapSet;
     return CollectEmittedCodeFacts(state, sink);
 }
 
@@ -223,6 +236,61 @@ namespace
         default:
             return false;
         }
+    }
+
+    std::vector<BindingMismatch> CompareStoredValues(const ParseState& parse_state,
+                                                     std::span<const ReflectedBinding*> reflected)
+    {
+        std::vector<BindingMismatch> mismatches;
+        for (const ReflectedBinding* binding : reflected)
+        {
+            const StoredValuePlacement* stored = GetStoredValuePlacement(binding->Placement);
+            if (stored == nullptr)
+            {
+                continue;
+            }
+
+            // a container the code removed takes its values out of the visibility, which is no mismatch
+            const StoredValueLocation container{ .Container = stored->Container,
+                                                 .Group = stored->Block.Group,
+                                                 .Binding = stored->Block.Binding };
+            const uint32_t structType = FindContainerStruct(parse_state, container);
+            if (structType == 0u)
+            {
+                continue;
+            }
+
+            std::string reason;
+            const std::optional<BlockMember> member = FindMemberAtOffset(parse_state, structType, stored->ByteOffset);
+            const bool typeMatches = member.has_value() && (stored->Kind == PlacementKind::Handle
+                                                                ? IsHandleType(parse_state, member->TypeId)
+                                                                : IsDevicePointerType(parse_state, member->TypeId));
+            if (!member)
+            {
+                reason = std::format("no member of the container starts at byte {}", stored->ByteOffset);
+            }
+            else if (member->Name != binding->Name)
+            {
+                reason = std::format("the member at byte {} is named '{}'", stored->ByteOffset, member->Name);
+            }
+            else if (!typeMatches)
+            {
+                reason = std::format("the member at byte {} is not a {}",
+                                     stored->ByteOffset,
+                                     stored->Kind == PlacementKind::Handle ? "uint2 handle" : "PhysicalStorageBuffer pointer");
+            }
+
+            if (!reason.empty())
+            {
+                mismatches.push_back(BindingMismatch{ .Kind = BindingMismatchKind::StoredValue,
+                                                      .Group = stored->Block.Group,
+                                                      .Binding = stored->Block.Binding,
+                                                      .Name = binding->Name,
+                                                      .Emitted = std::move(reason) });
+            }
+        }
+
+        return mismatches;
     }
 
     std::vector<BindingMismatch> CompareDescriptorHeap(std::span<const DeclaredBinding> heap,

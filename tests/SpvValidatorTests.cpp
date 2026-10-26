@@ -377,6 +377,154 @@ bool Mismatches(const CookResult<BindingComparison>& comparison, BindingMismatch
            std::ranges::any_of(comparison->Mismatches, [kind](const lodestone::BindingMismatch& mismatch) { return mismatch.Kind == kind; });
 }
 
+// The shape of Slang's spirv-modern output for a block of two handles: the block at set 1 binding 0 holds the texture
+// handle at byte 0 and the sampler handle at byte 16, and the heap variables are at set 3 binding 2 (images) and binding 0
+// (samplers). A third member, `Scale`, is not a handle. The prologue ends at the function; a body supplies %texIndex and
+// %samplerIndex, and the tail samples.
+constexpr std::string_view k_HandlePrologue = R"(
+               OpCapability Shader
+               OpCapability RuntimeDescriptorArray
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %SampleCS "main" %heapImages %heapSamplers %material
+               OpExecutionMode %SampleCS LocalSize 8 1 1
+               OpName %HandleTexture "HandleTexture"
+               OpMemberName %HandleTexture 0 "texture"
+               OpName %HandleSampler "HandleSampler"
+               OpMemberName %HandleSampler 0 "sampler"
+               OpName %Material "Material"
+               OpMemberName %Material 0 "Surface"
+               OpMemberName %Material 1 "Filter"
+               OpMemberName %Material 2 "Scale"
+               OpName %material "material"
+               OpDecorate %Material Block
+               OpMemberDecorate %HandleTexture 0 Offset 0
+               OpMemberDecorate %HandleSampler 0 Offset 0
+               OpMemberDecorate %Material 0 Offset 0
+               OpMemberDecorate %Material 1 Offset 16
+               OpMemberDecorate %Material 2 Offset 32
+               OpDecorate %material DescriptorSet 1
+               OpDecorate %material Binding 0
+               OpDecorate %heapImages DescriptorSet 3
+               OpDecorate %heapImages Binding 2
+               OpDecorate %heapSamplers DescriptorSet 3
+               OpDecorate %heapSamplers Binding 0
+       %void = OpTypeVoid
+     %fnVoid = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+        %int = OpTypeInt 32 1
+      %float = OpTypeFloat 32
+     %v2uint = OpTypeVector %uint 2
+    %v2float = OpTypeVector %float 2
+    %v4float = OpTypeVector %float 4
+      %int_0 = OpConstant %int 0
+      %int_1 = OpConstant %int 1
+     %uint_0 = OpConstant %uint 0
+    %float_0 = OpConstant %float 0
+      %coord = OpConstantComposite %v2float %float_0 %float_0
+%HandleTexture = OpTypeStruct %v2uint
+%HandleSampler = OpTypeStruct %v2uint
+   %Material = OpTypeStruct %HandleTexture %HandleSampler %v2float
+%HandleTextureLogical = OpTypeStruct %v2uint
+%HandleSamplerLogical = OpTypeStruct %v2uint
+%ptrMaterial = OpTypePointer Uniform %Material
+%ptrTexture = OpTypePointer Uniform %HandleTexture
+%ptrSampler = OpTypePointer Uniform %HandleSampler
+%ptrHandle = OpTypePointer Uniform %v2uint
+%ptrFnTexture = OpTypePointer Function %HandleTextureLogical
+%ptrFnSampler = OpTypePointer Function %HandleSamplerLogical
+%ptrFnHandle = OpTypePointer Function %v2uint
+      %image = OpTypeImage %float 2D 0 0 0 1 Unknown
+ %imageArray = OpTypeRuntimeArray %image
+%ptrImageArray = OpTypePointer UniformConstant %imageArray
+   %ptrImage = OpTypePointer UniformConstant %image
+%samplerType = OpTypeSampler
+%samplerArray = OpTypeRuntimeArray %samplerType
+%ptrSamplerArray = OpTypePointer UniformConstant %samplerArray
+%ptrSamplerType = OpTypePointer UniformConstant %samplerType
+    %sampled = OpTypeSampledImage %image
+   %material = OpVariable %ptrMaterial Uniform
+ %heapImages = OpVariable %ptrImageArray UniformConstant
+%heapSamplers = OpVariable %ptrSamplerArray UniformConstant
+   %SampleCS = OpFunction %void None %fnVoid
+)";
+
+// The block members are read in place, as an optimized module does.
+constexpr std::string_view k_HandleBodyDirect = R"(
+      %entry = OpLabel
+    %surface = OpAccessChain %ptrTexture %material %int_0
+%surfaceHandle = OpAccessChain %ptrHandle %surface %int_0
+%surfaceValue = OpLoad %v2uint %surfaceHandle
+   %texIndex = OpCompositeExtract %uint %surfaceValue 0
+     %filter = OpAccessChain %ptrSampler %material %int_1
+%filterHandle = OpAccessChain %ptrHandle %filter %int_0
+%filterValue = OpLoad %v2uint %filterHandle
+%samplerIndex = OpCompositeExtract %uint %filterValue 0
+)";
+
+// Each wrapper is loaded whole, copied to a Function variable of the logical type, and read from there, as an unoptimized
+// module does.
+constexpr std::string_view k_HandleBodyCopied = R"(
+      %entry = OpLabel
+ %surfaceVar = OpVariable %ptrFnTexture Function
+  %filterVar = OpVariable %ptrFnSampler Function
+    %surface = OpAccessChain %ptrTexture %material %int_0
+%surfaceLoaded = OpLoad %HandleTexture %surface
+%surfaceCopy = OpCopyLogical %HandleTextureLogical %surfaceLoaded
+               OpStore %surfaceVar %surfaceCopy
+%surfaceHandle = OpAccessChain %ptrFnHandle %surfaceVar %int_0
+%surfaceValue = OpLoad %v2uint %surfaceHandle
+   %texIndex = OpCompositeExtract %uint %surfaceValue 0
+     %filter = OpAccessChain %ptrSampler %material %int_1
+%filterLoaded = OpLoad %HandleSampler %filter
+ %filterCopy = OpCopyLogical %HandleSamplerLogical %filterLoaded
+               OpStore %filterVar %filterCopy
+%filterHandle = OpAccessChain %ptrFnHandle %filterVar %int_0
+%filterValue = OpLoad %v2uint %filterHandle
+%samplerIndex = OpCompositeExtract %uint %filterValue 0
+)";
+
+constexpr std::string_view k_HandleTail = R"(
+   %imagePtr = OpAccessChain %ptrImage %heapImages %texIndex
+ %samplerPtr = OpAccessChain %ptrSamplerType %heapSamplers %samplerIndex
+%loadedImage = OpLoad %image %imagePtr
+%loadedSampler = OpLoad %samplerType %samplerPtr
+   %combined = OpSampledImage %sampled %loadedImage %loadedSampler
+      %texel = OpImageSampleExplicitLod %v4float %combined %coord Lod %float_0
+               OpReturn
+               OpFunctionEnd
+)";
+
+std::string MakeHandleFixture(std::string_view body)
+{
+    std::string text{ k_HandlePrologue };
+    text += body;
+    text += k_HandleTail;
+    return text;
+}
+
+ReflectedBinding MakeHandleValue(std::string_view name, BindingKind kind, uint32_t byte_offset)
+{
+    ReflectedBinding reflected;
+    reflected.Name = std::string{ name };
+    reflected.Placement = lodestone::StoredValuePlacement{ .Kind = lodestone::PlacementKind::Handle,
+                                                           .Container = lodestone::StoredValueContainer::UniformBuffer,
+                                                           .Block = lodestone::BoundPlacement{ .Group = 1u, .Binding = 0u },
+                                                           .ByteOffset = byte_offset };
+    reflected.Kind = kind;
+    reflected.Access = ResourceAccess::ReadOnly;
+    return reflected;
+}
+
+std::vector<ReflectedBinding> MakeHandleReflection()
+{
+    std::vector<ReflectedBinding> reflected;
+    reflected.push_back(MakeReflected("material", 1u, 0u, BindingKind::UniformBuffer, ResourceShape::Invalid,
+                                      ResourceAccess::ReadOnly));
+    reflected.push_back(MakeHandleValue("texture", BindingKind::Texture, 0u));
+    reflected.push_back(MakeHandleValue("sampler", BindingKind::Sampler, 16u));
+    return reflected;
+}
+
 } // namespace
 
 int main()
@@ -679,6 +827,77 @@ int main()
     std::vector<const ReflectedBinding*> inHeapSetPointers = PointersTo(inHeapSet);
     runner.Check(Mismatches(heapValidator.ValidateEntryPoint(heap, inHeapSetPointers, sink), BindingMismatchKind::DescriptorHeap),
                  "a reflected resource in the heap set is a mismatch");
+
+    runner.BeginSection("a handle read from a block indexes the heap, and its place is compared with reflection");
+    const std::vector<std::byte> handles = Assemble(MakeHandleFixture(k_HandleBodyDirect));
+    runner.Check(!handles.empty(), "the handle fixture assembles");
+    const std::vector<ReflectedBinding> handleReflection = MakeHandleReflection();
+    std::vector<const ReflectedBinding*> handlePointers = PointersTo(handleReflection);
+    const CookResult<BindingComparison> handleMatch = heapValidator.ValidateEntryPoint(handles, handlePointers, sink);
+    runner.CheckOk(handleMatch, "the handle fixture passes spirv-val");
+    runner.Check(handleMatch.has_value() && handleMatch->Matches(),
+                 "stored values at the offsets of the handle members match the module");
+    const std::vector<SamplerTexturePlacement> handlePairs
+    {
+        SamplerTexturePlacement{ .TextureGroup = 1u,
+                                 .TextureBinding = 0u,
+                                 .SamplerGroup = 1u,
+                                 .SamplerBinding = 0u,
+                                 .TextureContainer = lodestone::StoredValueContainer::UniformBuffer,
+                                 .SamplerContainer = lodestone::StoredValueContainer::UniformBuffer,
+                                 .TextureOffset = 0u,
+                                 .SamplerOffset = 16u },
+    };
+    if (runner.CheckOk(handleMatch, "the pair names the block and the offset of each handle"))
+    {
+        runner.CheckEqual(handleMatch->Emitted.SamplerTexturePairs, handlePairs,
+                          "the pair names the block and the offset of each handle");
+    }
+
+    auto storedMismatch = [&](std::vector<ReflectedBinding> reflected)
+    {
+        std::vector<const ReflectedBinding*> pointers = PointersTo(reflected);
+        return Mismatches(heapValidator.ValidateEntryPoint(handles, pointers, sink), BindingMismatchKind::StoredValue);
+    };
+    std::vector<ReflectedBinding> insideMember = MakeHandleReflection();
+    std::get<lodestone::StoredValuePlacement>(insideMember[1].Placement).ByteOffset = 8u;
+    runner.Check(storedMismatch(insideMember), "a stored value at a byte where no member starts is a mismatch");
+
+    std::vector<ReflectedBinding> otherName = MakeHandleReflection();
+    otherName[1].Name = "other";
+    runner.Check(storedMismatch(otherName), "a stored value of another name than the member is a mismatch");
+
+    std::vector<ReflectedBinding> notAHandle = MakeHandleReflection();
+    notAHandle[1].Name = "Scale";
+    std::get<lodestone::StoredValuePlacement>(notAHandle[1].Placement).ByteOffset = 32u;
+    runner.Check(storedMismatch(notAHandle), "a Handle stored value on a member that is not a uint2 is a mismatch");
+
+    // the pointer form tests the same member against another type
+    std::vector<ReflectedBinding> asPointer = MakeHandleReflection();
+    std::get<lodestone::StoredValuePlacement>(asPointer[1].Placement).Kind = lodestone::PlacementKind::Pointer;
+    runner.Check(storedMismatch(asPointer), "a Pointer stored value on a uint2 member is a mismatch");
+
+    const std::vector<std::byte> constantIndexHandle =
+        Assemble(Replace(MakeHandleFixture(k_HandleBodyDirect), "%heapImages %texIndex", "%heapImages %uint_0"));
+    runner.Check(!constantIndexHandle.empty(), "the fixture with a constant heap index assembles");
+    runner.CheckError(heapValidator.ReadEmittedCodeFacts(constantIndexHandle, sink),
+                      CookError::ReflectionSamplerPairUnresolved,
+                      "a heap index that is a constant and not a handle in a block fails with ReflectionSamplerPairUnresolved");
+    const std::vector<std::byte> constantSamplerIndex =
+        Assemble(Replace(MakeHandleFixture(k_HandleBodyDirect), "%heapSamplers %samplerIndex", "%heapSamplers %uint_0"));
+    runner.CheckError(heapValidator.ReadEmittedCodeFacts(constantSamplerIndex, sink),
+                      CookError::ReflectionSamplerPairUnresolved,
+                      "the same holds for a sampler");
+
+    const std::vector<std::byte> copiedHandles = Assemble(MakeHandleFixture(k_HandleBodyCopied));
+    runner.Check(!copiedHandles.empty(), "the fixture with copied wrappers assembles");
+    const CookResult<BindingComparison> copiedMatch = heapValidator.ValidateEntryPoint(copiedHandles, handlePointers, sink);
+    runner.CheckOk(copiedMatch, "the copied fixture passes spirv-val");
+    if (runner.CheckOk(copiedMatch, "a wrapper copied to a Function variable gives the same pair"))
+    {
+        runner.CheckEqual(copiedMatch->Emitted.SamplerTexturePairs, handlePairs,
+                          "a wrapper copied to a Function variable gives the same pair");
+    }
 
     return runner.Report();
 }

@@ -191,6 +191,25 @@ int main(int argc, char** argv)
         }
     }
 
+    runner.BeginSection("a texture sampled through two handles gives one pair of the two stored values");
+    {
+        const manifest::ManifestResult<uint32_t> blockEntry = modernBundle->Module(0u).FindEntryPointIndex("BlockCS");
+        if (runner.CheckOk(blockEntry, "BlockCS exists"))
+        {
+            const manifest::EntryPointInstanceView instance = modernEnvironment->VariantAt(0u).EntryPoint(*blockEntry);
+            const std::span<const manifest::SamplerTexturePair> pairs = instance.SamplerTexturePairs();
+            if (runner.CheckEqual(pairs.size(), 1u, "one pair"))
+            {
+                const manifest::ResolvedResource texture = instance.Layout()[pairs[0].Texture];
+                const manifest::ResolvedResource sampler = instance.Layout()[pairs[0].Sampler];
+                runner.CheckEqual(texture.ScopeName(), "material_Surface", "the texture is the handle in material.Surface");
+                runner.CheckEqual(texture.Placement(), PlacementKind::Handle, "the texture side is a Handle");
+                runner.CheckEqual(sampler.ScopeName(), "material_Filter", "the sampler is the handle in material.Filter");
+                runner.CheckEqual(sampler.Placement(), PlacementKind::Handle, "the sampler side is a Handle");
+            }
+        }
+    }
+
     runner.BeginSection("a storage handle takes the format of each variant");
     const CookOutcome storage = Cook(assetDirectory / "ShimStorageAxis.slang", "spirv-modern");
     if (!runner.CheckEqual(storage.Result, CookError::Success, "the format axis module cooks for spirv-modern"))
