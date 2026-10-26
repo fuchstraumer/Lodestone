@@ -29,7 +29,78 @@ namespace
     constexpr int32_t k_MessageField = 7;
     using FieldStrArray = std::array<std::string_view, k_FieldCount>;
 
+    class RecordBuilder final
+    {
+    public:
+        explicit RecordBuilder(std::string_view context) noexcept;
+        void AddLine(std::string_view line);
+        std::vector<Diagnostic> Take() noexcept;
+
+    private:
+        std::string_view context;
+        std::vector<Diagnostic> records;
+    };
+
     /** Splits into exactly `k_FieldCount` fields, so tabs in the message cannot shift columns. */
+    std::optional<FieldStrArray> SplitFields(std::string_view line);
+
+    int32_t ParseInt(std::string_view text) noexcept;
+
+    SourceRange ParseRange(const FieldStrArray& fields) noexcept;
+
+    /** The names of `getSeverityName` in `slang-diagnostic-sink.h`. */
+    std::optional<DiagnosticSeverity> ToSeverity(std::string_view name) noexcept;
+
+    bool IsAttachment(std::string_view severity_name) noexcept;
+
+    std::string_view StripCarriageReturn(std::string_view line) noexcept;
+
+    /** A bare `E` means no code, and becomes empty. */
+    std::string ParseCode(std::string_view field);
+
+    /** The one thing this parser must never do is lose a line. */
+    Diagnostic MakeUnreadableRecord(std::string_view line, std::string_view context);
+
+    Diagnostic MakeRecord(const std::array<std::string_view, k_FieldCount>& fields, std::string_view context);
+
+    DiagnosticNote MakeNote(const std::array<std::string_view, k_FieldCount>& fields);
+
+} // namespace
+
+int32_t ParseSlangDiagnostics(std::string_view text, std::string_view context, DiagnosticSink& sink)
+{
+    RecordBuilder builder{ context };
+
+    while (!text.empty())
+    {
+        const size_t newline = text.find('\n');
+        const std::string_view line = StripCarriageReturn(text.substr(0u, std::min(newline, text.size())));
+        text = newline == std::string_view::npos ? std::string_view{} : text.substr(newline + 1u);
+
+        if (line.empty())
+        {
+            continue;
+        }
+
+        builder.AddLine(line.starts_with(k_AbortPrefix) ? line.substr(k_AbortPrefix.size()) : line);
+    }
+
+    int32_t failureCount = 0;
+    for (const Diagnostic& record : builder.Take())
+    {
+        if (IsFailure(record.Severity))
+        {
+            ++failureCount;
+        }
+        sink.Report(record);
+    }
+
+    return failureCount;
+}
+
+namespace
+{
+
     std::optional<FieldStrArray> SplitFields(std::string_view line)
     {
         FieldStrArray fields;
@@ -68,7 +139,6 @@ namespace
                             .EndColumn = ParseInt(fields[k_StartLineField + 3]) };
     }
 
-    /** The names of `getSeverityName` in `slang-diagnostic-sink.h`. */
     std::optional<DiagnosticSeverity> ToSeverity(std::string_view name) noexcept
     {
         if (name == "note")
@@ -105,13 +175,11 @@ namespace
         return line;
     }
 
-    /** A bare `E` means no code, and becomes empty. */
     std::string ParseCode(std::string_view field)
     {
         return field.size() > 1u && field.front() == 'E' ? std::string{ field } : std::string{};
     }
 
-    /** The one thing this parser must never do is lose a line. */
     Diagnostic MakeUnreadableRecord(std::string_view line, std::string_view context)
     {
         return Diagnostic{ .Severity = DiagnosticSeverity::Error,
@@ -150,75 +218,36 @@ namespace
                                .Message = std::string{ fields[k_MessageField] } };
     }
 
-    class RecordBuilder final
+    RecordBuilder::RecordBuilder(std::string_view context) noexcept
+        : context{ context }
     {
-    public:
-        explicit RecordBuilder(std::string_view context) noexcept
-            : context{ context }
+    }
+
+    void RecordBuilder::AddLine(std::string_view line)
+    {
+        const std::optional<FieldStrArray> fields = SplitFields(line);
+        if (!fields)
         {
+            records.emplace_back(MakeUnreadableRecord(line, context));
+            return;
         }
 
-        void AddLine(std::string_view line)
+        // an attachment with nothing to attach to becomes its own record
+        if (IsAttachment((*fields)[k_SeverityField]) && !records.empty())
         {
-            const std::optional<FieldStrArray> fields = SplitFields(line);
-            if (!fields)
-            {
-                records.emplace_back(MakeUnreadableRecord(line, context));
-                return;
-            }
-
-            // an attachment with nothing to attach to becomes its own record
-            if (IsAttachment((*fields)[k_SeverityField]) && !records.empty())
-            {
-                Diagnostic& prevDiag = records.back();
-                prevDiag.Related.emplace_back(MakeNote(*fields));
-                return;
-            }
-
-            records.emplace_back(MakeRecord(*fields, context));
+            Diagnostic& prevDiag = records.back();
+            prevDiag.Related.emplace_back(MakeNote(*fields));
+            return;
         }
 
-        std::vector<Diagnostic> Take() noexcept
-        {
-            return std::move(records);
-        }
+        records.emplace_back(MakeRecord(*fields, context));
+    }
 
-    private:
-        std::string_view context;
-        std::vector<Diagnostic> records;
-    };
+    std::vector<Diagnostic> RecordBuilder::Take() noexcept
+    {
+        return std::move(records);
+    }
 
 } // namespace
-
-int32_t ParseSlangDiagnostics(std::string_view text, std::string_view context, DiagnosticSink& sink)
-{
-    RecordBuilder builder{ context };
-
-    while (!text.empty())
-    {
-        const size_t newline = text.find('\n');
-        const std::string_view line = StripCarriageReturn(text.substr(0u, std::min(newline, text.size())));
-        text = newline == std::string_view::npos ? std::string_view{} : text.substr(newline + 1u);
-
-        if (line.empty())
-        {
-            continue;
-        }
-
-        builder.AddLine(line.starts_with(k_AbortPrefix) ? line.substr(k_AbortPrefix.size()) : line);
-    }
-
-    int32_t failureCount = 0;
-    for (const Diagnostic& record : builder.Take())
-    {
-        if (IsFailure(record.Severity))
-        {
-            ++failureCount;
-        }
-        sink.Report(record);
-    }
-
-    return failureCount;
-}
 
 } // namespace lodestone

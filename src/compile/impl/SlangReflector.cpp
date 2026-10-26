@@ -31,6 +31,7 @@
 #include <utility>
 #include <vector>
 
+
 namespace
 {
 
@@ -47,65 +48,6 @@ constexpr std::array<RawSizeAttributeKind, 4u> k_SizeAttributeKinds{ RawSizeAttr
                                                                      RawSizeAttributeKind::Extent2d,
                                                                      RawSizeAttributeKind::Extent3d };
 
-/** Returns an error when the argument is not a string literal: an annotation the author wrote must not be skipped. */
-CookResult<std::string> ReadStringArgument(DiagnosticSink& sink,
-                                           slang::Attribute* attribute,
-                                           uint32_t argument_index,
-                                           std::string_view binding_name)
-{
-    size_t length = 0u;
-    const char* text = attribute->getArgumentValueString(argument_index, &length);
-    if (text == nullptr)
-    {
-        return std::unexpected(ReportError(sink,
-                                           CookError::AttributeExpressionParseFailed,
-                                           std::format("argument {} of [{}] on '{}' is not a string literal",
-                                                       argument_index,
-                                                       attribute->getName(),
-                                                       binding_name)));
-    }
-
-    // some paths include the quotes
-    std::string_view value{ text, length };
-    if (value.size() >= 2u && value.front() == '"' && value.back() == '"')
-    {
-        value = value.substr(1u, value.size() - 2u);
-    }
-
-    return std::string{ value };
-}
-
-/** Splits one varying into a scalar type and a component count. A scalar counts as one component. */
-void ReadVaryingShape(slang::TypeLayoutReflection* type_layout,
-                      VertexScalarType& out_scalar_type,
-                      uint32_t& out_component_count) noexcept
-{
-    out_scalar_type = VertexScalarType::Invalid;
-    out_component_count = 0u;
-
-    if (type_layout == nullptr)
-    {
-        return;
-    }
-
-    if (type_layout->getKind() == slang::TypeReflection::Kind::Vector)
-    {
-        slang::TypeLayoutReflection* elementLayout = type_layout->getElementTypeLayout();
-        out_component_count = static_cast<uint32_t>(type_layout->getElementCount());
-        if (elementLayout != nullptr)
-        {
-            out_scalar_type = FromSlangVertexScalarType(elementLayout->getType()->getScalarType());
-        }
-        return;
-    }
-
-    if (type_layout->getKind() == slang::TypeReflection::Kind::Scalar)
-    {
-        out_component_count = 1u;
-        out_scalar_type = FromSlangVertexScalarType(type_layout->getType()->getScalarType());
-    }
-}
-
 /** One leaf of a varying or uniform tree. `Path` lists the var layouts from the root to the leaf. */
 struct LeafVisit
 {
@@ -116,145 +58,88 @@ struct LeafVisit
     std::span<slang::VariableLayoutReflection* const> Path;
 };
 
+/** Returns an error when the argument is not a string literal: an annotation the author wrote must not be skipped. */
+CookResult<std::string> ReadStringArgument(DiagnosticSink& sink,
+                                           slang::Attribute* attribute,
+                                           uint32_t argument_index,
+                                           std::string_view binding_name);
+
+/** Splits one varying into a scalar type and a component count. A scalar counts as one component. */
+void ReadVaryingShape(slang::TypeLayoutReflection* type_layout,
+                      VertexScalarType& out_scalar_type,
+                      uint32_t& out_component_count) noexcept;
+
 /** Calls `visit` for each leaf of one tree. Slang offsets are relative to the parent, so the walker sums them. */
-template<typename LeafVisitor> // NOLINTNEXTLINE(misc-no-recursion)
 void VisitLeaves(slang::VariableLayoutReflection* var_layout,
                  SlangParameterCategory category,
                  uint32_t base_offset,
                  std::vector<slang::VariableLayoutReflection*>& path,
-                 const LeafVisitor& visit)
-{
-    if (var_layout == nullptr)
-    {
-        return;
-    }
-
-    slang::TypeLayoutReflection* typeLayout = var_layout->getTypeLayout();
-    if (typeLayout == nullptr)
-    {
-        return;
-    }
-
-    const uint32_t offset = base_offset + static_cast<uint32_t>(var_layout->getOffset(category));
-    path.push_back(var_layout);
-
-    if (typeLayout->getKind() == slang::TypeReflection::Kind::Struct)
-    {
-        const unsigned int fieldCount = typeLayout->getFieldCount();
-        for (unsigned int i = 0u; i < fieldCount; ++i)
-        {
-            VisitLeaves(typeLayout->getFieldByIndex(i), category, offset, path, visit);
-        }
-    }
-    else
-    {
-        visit(LeafVisit{ .Var = var_layout,
-                         .Type = typeLayout,
-                         .Offset = offset,
-                         .Path = std::span{ std::as_const(path) } });
-    }
-
-    path.pop_back();
-}
+                 const std::function<void(const LeafVisit&)>& visit);
 
 /** Walks the tree under one var layout, including that var layout's offset. */
-template<typename LeafVisitor>
 void WalkVaryingTree(slang::VariableLayoutReflection* var_layout,
                      SlangParameterCategory category,
-                     const LeafVisitor& visit)
-{
-    std::vector<slang::VariableLayoutReflection*> path;
-    VisitLeaves(var_layout, category, 0u, path, visit);
-}
+                     const std::function<void(const LeafVisit&)>& visit);
 
 /** Joins the field names of a path with dots. Returns an empty string when any field has no name. */
-std::string JoinFieldNames(std::span<slang::VariableLayoutReflection* const> path)
-{
-    if (path.empty())
-    {
-        return std::string{};
-    }
+std::string JoinFieldNames(std::span<slang::VariableLayoutReflection* const> path);
 
-    std::string result;
-
-    for (auto* field : path)
-    {
-        if (!result.empty())
-        {
-            result.append(".");
-        }
-
-        result.append(field->getName());
-    }
-
-    return result;
-}
-
-std::string_view ReadSemanticName(slang::VariableLayoutReflection* var_layout) noexcept
-{
-    const char* name = var_layout->getSemanticName();
-    return name == nullptr ? std::string_view{} : std::string_view{ name };
-}
+std::string_view ReadSemanticName(slang::VariableLayoutReflection* var_layout) noexcept;
 
 /** Records every attribute a vertex buffer must supply. */
-void CollectVertexInputs(slang::VariableLayoutReflection* var_layout, ReflectedRasterState& raster)
-{
-    auto vertexInputVisitor = [&raster](const LeafVisit& leaf)
-    {
-        const std::string_view semantic = ReadSemanticName(leaf.Var);
-        if (semantic.empty() || IsSystemSemantic(semantic))
-        {
-            return;
-        }
-
-        ReflectedVertexInput input;
-        input.SemanticName = std::string{ semantic };
-        input.Data.SemanticIndex = static_cast<uint32_t>(leaf.Var->getSemanticIndex());
-        input.Data.Location = leaf.Offset;
-        ReadVaryingShape(leaf.Type, input.Data.ScalarType, input.Data.ComponentCount);
-
-        raster.VertexInputs.emplace_back(std::move(input));
-    };
-    WalkVaryingTree(var_layout, SLANG_PARAMETER_CATEGORY_VARYING_INPUT, vertexInputVisitor);
-}
+void CollectVertexInputs(slang::VariableLayoutReflection* var_layout, ReflectedRasterState& raster);
 
 /** Records every color target the fragment result declares, and whether it writes depth itself. */
-void CollectColorTargets(slang::VariableLayoutReflection* var_layout, ReflectedRasterState& raster)
-{
-    auto varyingVisitor = [&raster](const LeafVisit& leaf)
-    {
-        if (IsDepthSemantic(ReadSemanticName(leaf.Var)))
-        {
-            raster.WritesFragDepth = true;
-            return;
-        }
-
-        ReflectedColorTarget target;
-        target.Location = leaf.Offset;
-        ReadVaryingShape(leaf.Type, target.ScalarType, target.ComponentCount);
-
-        if (target.ComponentCount != 0u)
-        {
-            raster.ColorTargets.emplace_back(target);
-        }
-    };
-    WalkVaryingTree(var_layout, SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT, varyingVisitor);
-}
+void CollectColorTargets(slang::VariableLayoutReflection* var_layout, ReflectedRasterState& raster);
 
 /** Depth can also be written through an `out` parameter, so that tree gets its own walk. */
-void CollectDepthWrites(slang::VariableLayoutReflection* var_layout, ReflectedRasterState& raster)
-{
-    auto varyingVisitor = [&raster](const LeafVisit& leaf)
-    {
-        if (IsDepthSemantic(ReadSemanticName(leaf.Var)))
-        {
-            raster.WritesFragDepth = true;
-        }
-    };
-    WalkVaryingTree(var_layout,
-                    SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT,
-                    varyingVisitor);
-}
+void CollectDepthWrites(slang::VariableLayoutReflection* var_layout, ReflectedRasterState& raster);
+
+std::optional<uint32_t> ReadOffset(slang::VariableLayoutReflection* var_layout,
+                                   SlangParameterCategory category);
+
+void ReportUnresolvedLocation(DiagnosticSink& sink, std::string_view range_kind, SlangInt range_index);
+
+/** Joins a scope and a name with an underscore, as Slang does. */
+std::string JoinScopeName(std::string_view prefix, const char* name);
+
+void CollectScopeNames(slang::TypeLayoutReflection* layout,
+                       const std::string& prefix,
+                       SlangInt base,
+                       std::vector<std::string>& out_names);
+
+/** Reads one sub-object range as a parameter block, or returns no value when the range is not one. */
+std::optional<ParameterBlockInfo> ReadParameterBlock(DiagnosticSink& sink,
+                                                     slang::TypeLayoutReflection* containing_layout,
+                                                     SlangInt sub_object_index,
+                                                     const BindingScope& scope);
+
+/** Moves the drafts into the binding list. The caller sorts them first, because `BindingIndex` is the position. */
+void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
+                         std::vector<RawBinding>& out_bindings,
+                         std::vector<RawSizeAttribute>& out_attributes);
+
+/** Returns the global bindings that one entry point reads. Each entry point is its own artifact, so two can place
+ * different resources at one (group, binding), and the query must not cross entry points. */
+std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_variant,
+                                                SlangInt entry_point_index,
+                                                std::span<const RawBinding> global_bindings,
+                                                uint32_t index_offset);
+
+/** Adds the stored values whose container the entry point reads: a used uniform buffer, or the push constants of the
+ * entry point itself. A value that the code does not read is visible too, which costs the renderer one write. */
+void AddVisibleStoredValues(std::span<const RawBinding> bindings,
+                            size_t global_count,
+                            size_t first_owned,
+                            bool reads_push_constants,
+                            std::vector<uint32_t>& used);
+
+/** The type argument of an implementation's full name, such as `RGBA16F` in `HandleWriteStorageTexture2D<RGBA16F>`. */
+std::string_view TypeArgumentOf(std::string_view full_name) noexcept;
+
+std::string FullNameOf(slang::TypeReflection* type);
+
+ResourceAccess FromSlangAccessType(SlangResourceAccess access);
 
 /** Returns no value for `SLANG_UNKNOWN_SIZE` (an unresolved generic or link-time constant). Every placement read
  * goes through this, so that no binding is placed where no shader uses it. */
@@ -266,287 +151,6 @@ constexpr std::optional<uint32_t> ResolvedNumber(size_t value) noexcept
     }
 
     return static_cast<uint32_t>(value);
-}
-
-std::optional<uint32_t> ReadOffset(slang::VariableLayoutReflection* var_layout,
-                                   SlangParameterCategory category)
-{
-    return var_layout != nullptr ? ResolvedNumber(var_layout->getOffset(category)) : std::nullopt;
-}
-
-void ReportUnresolvedLocation(DiagnosticSink& sink, std::string_view range_kind, SlangInt range_index)
-{
-    ReportWarning(sink,
-                  std::format("{} range {} has an unresolved location: link-time constants are affecting reflection output",
-                              range_kind,
-                              range_index));
-}
-
-/** Joins a scope and a name with an underscore, as Slang does. */
-std::string JoinScopeName(std::string_view prefix, const char* name)
-{
-    if (name == nullptr)
-    {
-        return std::string{ prefix };
-    }
-
-    std::string joined{ prefix };
-    joined += joined.empty() ? "" : "_";
-    joined += name;
-    return joined;
-}
-
-// NOLINTNEXTLINE(misc-no-recursion)
-void CollectScopeNames(slang::TypeLayoutReflection* layout,
-                       const std::string& prefix,
-                       SlangInt base,
-                       std::vector<std::string>& out_names)
-{
-    const unsigned int fieldCount = layout->getFieldCount();
-    for (unsigned int fieldIndex = 0u; fieldIndex < fieldCount; ++fieldIndex)
-    {
-        slang::VariableLayoutReflection* field = layout->getFieldByIndex(fieldIndex);
-        slang::TypeLayoutReflection* fieldLayout = field != nullptr ? field->getTypeLayout() : nullptr;
-        if (fieldLayout == nullptr)
-        {
-            continue;
-        }
-
-        const SlangInt fieldBase = base + layout->getFieldBindingRangeOffset(fieldIndex);
-        const SlangInt fieldRangeCount = fieldLayout->getBindingRangeCount();
-        if (fieldRangeCount <= 0 || fieldBase < 0)
-        {
-            continue;
-        }
-
-        if (fieldLayout->getKind() == slang::TypeReflection::Kind::Struct)
-        {
-            CollectScopeNames(fieldLayout, JoinScopeName(prefix, field->getName()), fieldBase, out_names);
-            continue;
-        }
-
-        const SlangInt last =
-            std::min<SlangInt>(fieldBase + fieldRangeCount, static_cast<SlangInt>(out_names.size()));
-        std::fill(out_names.begin() + static_cast<std::ptrdiff_t>(fieldBase),
-                  out_names.begin() + static_cast<std::ptrdiff_t>(last),
-                  prefix);
-    }
-}
-
-/** Reads one sub-object range as a parameter block, or returns no value when the range is not one. */
-std::optional<ParameterBlockInfo> ReadParameterBlock(DiagnosticSink& sink,
-                                                     slang::TypeLayoutReflection* containing_layout,
-                                                     SlangInt sub_object_index,
-                                                     const BindingScope& scope)
-{
-    const SlangInt rangeIndex = containing_layout->getSubObjectRangeBindingRangeIndex(sub_object_index);
-    slang::TypeLayoutReflection* leafLayout = containing_layout->getBindingRangeLeafTypeLayout(rangeIndex);
-    if (leafLayout->getKind() != slang::TypeReflection::Kind::ParameterBlock)
-    {
-        return std::nullopt;
-    }
-
-    const slang::BindingType bindingType = containing_layout->getBindingRangeType(rangeIndex);
-    if (bindingType != slang::BindingType::ParameterBlock &&
-        bindingType != slang::BindingType::ConstantBuffer)
-    {
-        return std::nullopt;
-    }
-
-    slang::TypeLayoutReflection* blockLayout = containing_layout->getBindingRangeLeafTypeLayout(rangeIndex);
-    slang::VariableLayoutReflection* spaceOffset =
-        containing_layout->getSubObjectRangeOffset(sub_object_index);
-    if (blockLayout == nullptr || spaceOffset == nullptr || blockLayout->getElementTypeLayout() == nullptr)
-    {
-        return std::nullopt;
-    }
-
-    const std::optional<uint32_t> space =
-        ReadOffset(spaceOffset, SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE);
-    if (!space)
-    {
-        ReportUnresolvedLocation(sink, "parameter block", rangeIndex);
-        return std::nullopt;
-    }
-
-    slang::VariableReflection* blockVariable = containing_layout->getBindingRangeLeafVariable(rangeIndex);
-    const char* blockName = blockVariable != nullptr ? blockVariable->getName() : nullptr;
-
-    ParameterBlockInfo block;
-    block.ElementLayout = blockLayout->getElementTypeLayout();
-    block.Container = blockLayout->getContainerVarLayout();
-    block.Name = blockName != nullptr ? std::string_view{ blockName } : std::string_view{};
-    block.Scope.Base.Group = scope.SpaceBase + *space;
-    // A block inside a block takes a space of its own, and it counts from the space of this one.
-    block.Scope.SpaceBase = block.Scope.Base.Group;
-    block.Scope.Name = JoinScopeName(scope.Name, blockName);
-
-    // an unresolved size drafts no container, as a block sized by a link-time constant has no fixed one
-    block.UniformSize =
-        ResolvedNumber(block.ElementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM)).value_or(0u);
-    return block;
-}
-
-
-/** Moves the drafts into the binding list. The caller sorts them first, because `BindingIndex` is the position. */
-void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
-                         std::vector<RawBinding>& out_bindings,
-                         std::vector<RawSizeAttribute>& out_attributes)
-{
-    const auto baseIndex = static_cast<uint32_t>(out_bindings.size());
-    for (auto&& [offset, draft] : std::views::enumerate(drafts))
-    {
-        for (RawSizeAttribute& attribute : draft.Attributes)
-        {
-            attribute.BindingIndex = baseIndex + static_cast<uint32_t>(offset);
-        }
-    }
-
-    out_bindings.insert_range(out_bindings.end(), drafts | std::views::transform(&RawBindingDraft::Binding));
-    // todo-ship: either find a way to get cache_latest in here or just stop doing this
-    // its sad but ranges just don't produce the best assembly used like this
-    const size_t attributesCount = std::ranges::fold_left(drafts | std::views::transform(
-                                                                       [](const RawBindingDraft& draft)
-                                                                       {
-                                                                           return draft.Attributes.size();
-                                                                       }),
-                                                          size_t{ 0u },
-                                                          std::plus<size_t>{});
-    out_attributes.reserve(out_attributes.size() + attributesCount);
-    out_attributes.append_range(drafts | std::views::transform(&RawBindingDraft::Attributes) |
-                                std::views::join | std::views::as_rvalue);
-}
-
-/** Returns the global bindings that one entry point reads. Each entry point is its own artifact, so two can place
- * different resources at one (group, binding), and the query must not cross entry points. */
-std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_variant,
-                                                SlangInt entry_point_index,
-                                                std::span<const RawBinding> global_bindings,
-                                                uint32_t index_offset)
-{
-    const auto epIndex = static_cast<size_t>(entry_point_index);
-    const Slang::ComPtr<slang::IMetadata>& metadata = linked_variant.EntryPointMetadata[epIndex];
-
-    // todo-ship: this will need to be modified per-binding-model
-    auto isPlacementUsed = [&metadata](const RawPlacement& placement) -> bool
-    {
-        const BoundPlacement* boundPlacement = GetBoundPlacement(placement);
-        if (boundPlacement == nullptr)
-        {
-            return false;
-        }
-        // calling across the dll boundary means no inlining this :(
-        bool isUsed = false;
-        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
-                                          boundPlacement->Group,
-                                          boundPlacement->Binding,
-                                          isUsed);
-        return isUsed;
-    };
-
-    std::vector<uint32_t> usedBindingIndices;
-    usedBindingIndices.reserve(global_bindings.size());
-
-    for (const auto&& [index, binding] : std::views::enumerate(global_bindings))
-    {
-        if (!isPlacementUsed(binding.Placement))
-        {
-            continue;
-        }
-
-        usedBindingIndices.emplace_back(index_offset + static_cast<uint32_t>(index));
-
-    }
-
-    usedBindingIndices.shrink_to_fit();
-    return usedBindingIndices;
-}
-
-/** Adds the stored values whose container the entry point reads: a used uniform buffer, or the push constants of the
- * entry point itself. A value that the code does not read is visible too, which costs the renderer one write. */
-void AddVisibleStoredValues(std::span<const RawBinding> bindings,
-                            size_t global_count,
-                            size_t first_owned,
-                            bool reads_push_constants,
-                            std::vector<uint32_t>& used)
-{
-    // we test against this span during each iteration, and it should only include the elements that were present before this function call,
-    // ensuring that we do not consider any newly added used indices within the same iteration loop.
-    const std::span<const uint32_t> testSpan{ used };
-    for (size_t index = 0u; index < bindings.size(); ++index)
-    {
-        const StoredValuePlacement* stored = GetStoredValuePlacement(bindings[index].Placement);
-        if (stored == nullptr || (index >= global_count && index < first_owned))
-        {
-            continue;
-        }
-
-        bool visible = false;
-        if (stored->Container == StoredValueContainer::PushConstants)
-        {
-            visible = reads_push_constants && index >= first_owned;
-        }
-        else
-        {
-            auto placementUsed = [&](uint32_t used_index)
-            {
-                const BoundPlacement* block = GetBoundPlacement(bindings[used_index].Placement);
-                return block != nullptr && *block == stored->Block;
-            };
-            visible = std::ranges::any_of(testSpan, placementUsed);
-        }
-
-        if (visible)
-        {
-            used.push_back(static_cast<uint32_t>(index));
-        }
-    }
-}
-
-/** The type argument of an implementation's full name, such as `RGBA16F` in `HandleWriteStorageTexture2D<RGBA16F>`. */
-std::string_view TypeArgumentOf(std::string_view full_name) noexcept
-{
-    const size_t open = full_name.find('<');
-    const size_t close = full_name.rfind('>');
-    return (open == std::string_view::npos || close == std::string_view::npos || close <= open)
-               ? std::string_view{}
-               : full_name.substr(open + 1u, close - open - 1u);
-}
-
-std::string FullNameOf(slang::TypeReflection* type)
-{
-    Slang::ComPtr<slang::IBlob> fullName;
-    if (type == nullptr || SLANG_FAILED(type->getFullName(fullName.writeRef())) || fullName == nullptr)
-    {
-        return {};
-    }
-    return std::string{ static_cast<const char*>(fullName->getBufferPointer()) };
-}
-
-ResourceAccess FromSlangAccessType(SlangResourceAccess access)
-{
-    switch (access)
-    {
-    case SLANG_RESOURCE_ACCESS_NONE:
-        return ResourceAccess::Invalid;
-    case SLANG_RESOURCE_ACCESS_READ:
-        return ResourceAccess::ReadOnly;
-    case SLANG_RESOURCE_ACCESS_READ_WRITE:
-        return ResourceAccess::ReadWrite;
-    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
-        return ResourceAccess::RasterizerOrdered;
-    case SLANG_RESOURCE_ACCESS_APPEND:
-        return ResourceAccess::Append;
-    case SLANG_RESOURCE_ACCESS_CONSUME:
-        return ResourceAccess::Consume;
-    case SLANG_RESOURCE_ACCESS_WRITE:
-        return ResourceAccess::WriteOnly;
-    case SLANG_RESOURCE_ACCESS_FEEDBACK:
-        return ResourceAccess::Feedback;
-    case SLANG_RESOURCE_ACCESS_UNKNOWN:
-        return ResourceAccess::Invalid;
-    }
-    return ResourceAccess::Invalid;
 }
 
 } // namespace
@@ -1562,3 +1166,473 @@ void SlangReflector::extractRasterState(slang::EntryPointReflection* entry_point
 #endif
 
 } // namespace lodestone
+
+namespace
+{
+
+using namespace lodestone;
+
+CookResult<std::string> ReadStringArgument(DiagnosticSink& sink,
+                                           slang::Attribute* attribute,
+                                           uint32_t argument_index,
+                                           std::string_view binding_name)
+{
+    size_t length = 0u;
+    const char* text = attribute->getArgumentValueString(argument_index, &length);
+    if (text == nullptr)
+    {
+        return std::unexpected(ReportError(sink,
+                                           CookError::AttributeExpressionParseFailed,
+                                           std::format("argument {} of [{}] on '{}' is not a string literal",
+                                                       argument_index,
+                                                       attribute->getName(),
+                                                       binding_name)));
+    }
+
+    // some paths include the quotes
+    std::string_view value{ text, length };
+    if (value.size() >= 2u && value.front() == '"' && value.back() == '"')
+    {
+        value = value.substr(1u, value.size() - 2u);
+    }
+
+    return std::string{ value };
+}
+
+void ReadVaryingShape(slang::TypeLayoutReflection* type_layout,
+                      VertexScalarType& out_scalar_type,
+                      uint32_t& out_component_count) noexcept
+{
+    out_scalar_type = VertexScalarType::Invalid;
+    out_component_count = 0u;
+
+    if (type_layout == nullptr)
+    {
+        return;
+    }
+
+    if (type_layout->getKind() == slang::TypeReflection::Kind::Vector)
+    {
+        slang::TypeLayoutReflection* elementLayout = type_layout->getElementTypeLayout();
+        out_component_count = static_cast<uint32_t>(type_layout->getElementCount());
+        if (elementLayout != nullptr)
+        {
+            out_scalar_type = FromSlangVertexScalarType(elementLayout->getType()->getScalarType());
+        }
+        return;
+    }
+
+    if (type_layout->getKind() == slang::TypeReflection::Kind::Scalar)
+    {
+        out_component_count = 1u;
+        out_scalar_type = FromSlangVertexScalarType(type_layout->getType()->getScalarType());
+    }
+}
+
+// NOLINTNEXTLINE(misc-no-recursion)
+void VisitLeaves(slang::VariableLayoutReflection* var_layout,
+                 SlangParameterCategory category,
+                 uint32_t base_offset,
+                 std::vector<slang::VariableLayoutReflection*>& path,
+                 const std::function<void(const LeafVisit&)>& visit)
+{
+    if (var_layout == nullptr)
+    {
+        return;
+    }
+
+    slang::TypeLayoutReflection* typeLayout = var_layout->getTypeLayout();
+    if (typeLayout == nullptr)
+    {
+        return;
+    }
+
+    const uint32_t offset = base_offset + static_cast<uint32_t>(var_layout->getOffset(category));
+    path.push_back(var_layout);
+
+    if (typeLayout->getKind() == slang::TypeReflection::Kind::Struct)
+    {
+        const unsigned int fieldCount = typeLayout->getFieldCount();
+        for (unsigned int i = 0u; i < fieldCount; ++i)
+        {
+            VisitLeaves(typeLayout->getFieldByIndex(i), category, offset, path, visit);
+        }
+    }
+    else
+    {
+        visit(LeafVisit{ .Var = var_layout,
+                         .Type = typeLayout,
+                         .Offset = offset,
+                         .Path = std::span{ std::as_const(path) } });
+    }
+
+    path.pop_back();
+}
+
+void WalkVaryingTree(slang::VariableLayoutReflection* var_layout,
+                     SlangParameterCategory category,
+                     const std::function<void(const LeafVisit&)>& visit)
+{
+    std::vector<slang::VariableLayoutReflection*> path;
+    VisitLeaves(var_layout, category, 0u, path, visit);
+}
+
+std::string JoinFieldNames(std::span<slang::VariableLayoutReflection* const> path)
+{
+    if (path.empty())
+    {
+        return std::string{};
+    }
+
+    std::string result;
+
+    for (auto* field : path)
+    {
+        if (!result.empty())
+        {
+            result.append(".");
+        }
+
+        result.append(field->getName());
+    }
+
+    return result;
+}
+
+std::string_view ReadSemanticName(slang::VariableLayoutReflection* var_layout) noexcept
+{
+    const char* name = var_layout->getSemanticName();
+    return name == nullptr ? std::string_view{} : std::string_view{ name };
+}
+
+void CollectVertexInputs(slang::VariableLayoutReflection* var_layout, ReflectedRasterState& raster)
+{
+    auto vertexInputVisitor = [&raster](const LeafVisit& leaf)
+    {
+        const std::string_view semantic = ReadSemanticName(leaf.Var);
+        if (semantic.empty() || IsSystemSemantic(semantic))
+        {
+            return;
+        }
+
+        ReflectedVertexInput input;
+        input.SemanticName = std::string{ semantic };
+        input.Data.SemanticIndex = static_cast<uint32_t>(leaf.Var->getSemanticIndex());
+        input.Data.Location = leaf.Offset;
+        ReadVaryingShape(leaf.Type, input.Data.ScalarType, input.Data.ComponentCount);
+
+        raster.VertexInputs.emplace_back(std::move(input));
+    };
+    WalkVaryingTree(var_layout, SLANG_PARAMETER_CATEGORY_VARYING_INPUT, vertexInputVisitor);
+}
+
+void CollectColorTargets(slang::VariableLayoutReflection* var_layout, ReflectedRasterState& raster)
+{
+    auto varyingVisitor = [&raster](const LeafVisit& leaf)
+    {
+        if (IsDepthSemantic(ReadSemanticName(leaf.Var)))
+        {
+            raster.WritesFragDepth = true;
+            return;
+        }
+
+        ReflectedColorTarget target;
+        target.Location = leaf.Offset;
+        ReadVaryingShape(leaf.Type, target.ScalarType, target.ComponentCount);
+
+        if (target.ComponentCount != 0u)
+        {
+            raster.ColorTargets.emplace_back(target);
+        }
+    };
+    WalkVaryingTree(var_layout, SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT, varyingVisitor);
+}
+
+void CollectDepthWrites(slang::VariableLayoutReflection* var_layout, ReflectedRasterState& raster)
+{
+    auto varyingVisitor = [&raster](const LeafVisit& leaf)
+    {
+        if (IsDepthSemantic(ReadSemanticName(leaf.Var)))
+        {
+            raster.WritesFragDepth = true;
+        }
+    };
+    WalkVaryingTree(var_layout,
+                    SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT,
+                    varyingVisitor);
+}
+
+std::optional<uint32_t> ReadOffset(slang::VariableLayoutReflection* var_layout,
+                                   SlangParameterCategory category)
+{
+    return var_layout != nullptr ? ResolvedNumber(var_layout->getOffset(category)) : std::nullopt;
+}
+
+void ReportUnresolvedLocation(DiagnosticSink& sink, std::string_view range_kind, SlangInt range_index)
+{
+    ReportWarning(sink,
+                  std::format("{} range {} has an unresolved location: link-time constants are affecting reflection output",
+                              range_kind,
+                              range_index));
+}
+
+std::string JoinScopeName(std::string_view prefix, const char* name)
+{
+    if (name == nullptr)
+    {
+        return std::string{ prefix };
+    }
+
+    std::string joined{ prefix };
+    joined += joined.empty() ? "" : "_";
+    joined += name;
+    return joined;
+}
+
+// NOLINTNEXTLINE(misc-no-recursion)
+void CollectScopeNames(slang::TypeLayoutReflection* layout,
+                       const std::string& prefix,
+                       SlangInt base,
+                       std::vector<std::string>& out_names)
+{
+    const unsigned int fieldCount = layout->getFieldCount();
+    for (unsigned int fieldIndex = 0u; fieldIndex < fieldCount; ++fieldIndex)
+    {
+        slang::VariableLayoutReflection* field = layout->getFieldByIndex(fieldIndex);
+        slang::TypeLayoutReflection* fieldLayout = field != nullptr ? field->getTypeLayout() : nullptr;
+        if (fieldLayout == nullptr)
+        {
+            continue;
+        }
+
+        const SlangInt fieldBase = base + layout->getFieldBindingRangeOffset(fieldIndex);
+        const SlangInt fieldRangeCount = fieldLayout->getBindingRangeCount();
+        if (fieldRangeCount <= 0 || fieldBase < 0)
+        {
+            continue;
+        }
+
+        if (fieldLayout->getKind() == slang::TypeReflection::Kind::Struct)
+        {
+            CollectScopeNames(fieldLayout, JoinScopeName(prefix, field->getName()), fieldBase, out_names);
+            continue;
+        }
+
+        const SlangInt last =
+            std::min<SlangInt>(fieldBase + fieldRangeCount, static_cast<SlangInt>(out_names.size()));
+        std::fill(out_names.begin() + static_cast<std::ptrdiff_t>(fieldBase),
+                  out_names.begin() + static_cast<std::ptrdiff_t>(last),
+                  prefix);
+    }
+}
+
+std::optional<ParameterBlockInfo> ReadParameterBlock(DiagnosticSink& sink,
+                                                     slang::TypeLayoutReflection* containing_layout,
+                                                     SlangInt sub_object_index,
+                                                     const BindingScope& scope)
+{
+    const SlangInt rangeIndex = containing_layout->getSubObjectRangeBindingRangeIndex(sub_object_index);
+    slang::TypeLayoutReflection* leafLayout = containing_layout->getBindingRangeLeafTypeLayout(rangeIndex);
+    if (leafLayout->getKind() != slang::TypeReflection::Kind::ParameterBlock)
+    {
+        return std::nullopt;
+    }
+
+    const slang::BindingType bindingType = containing_layout->getBindingRangeType(rangeIndex);
+    if (bindingType != slang::BindingType::ParameterBlock &&
+        bindingType != slang::BindingType::ConstantBuffer)
+    {
+        return std::nullopt;
+    }
+
+    slang::TypeLayoutReflection* blockLayout = containing_layout->getBindingRangeLeafTypeLayout(rangeIndex);
+    slang::VariableLayoutReflection* spaceOffset =
+        containing_layout->getSubObjectRangeOffset(sub_object_index);
+    if (blockLayout == nullptr || spaceOffset == nullptr || blockLayout->getElementTypeLayout() == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    const std::optional<uint32_t> space =
+        ReadOffset(spaceOffset, SLANG_PARAMETER_CATEGORY_SUB_ELEMENT_REGISTER_SPACE);
+    if (!space)
+    {
+        ReportUnresolvedLocation(sink, "parameter block", rangeIndex);
+        return std::nullopt;
+    }
+
+    slang::VariableReflection* blockVariable = containing_layout->getBindingRangeLeafVariable(rangeIndex);
+    const char* blockName = blockVariable != nullptr ? blockVariable->getName() : nullptr;
+
+    ParameterBlockInfo block;
+    block.ElementLayout = blockLayout->getElementTypeLayout();
+    block.Container = blockLayout->getContainerVarLayout();
+    block.Name = blockName != nullptr ? std::string_view{ blockName } : std::string_view{};
+    block.Scope.Base.Group = scope.SpaceBase + *space;
+    // A block inside a block takes a space of its own, and it counts from the space of this one.
+    block.Scope.SpaceBase = block.Scope.Base.Group;
+    block.Scope.Name = JoinScopeName(scope.Name, blockName);
+
+    // an unresolved size drafts no container, as a block sized by a link-time constant has no fixed one
+    block.UniformSize =
+        ResolvedNumber(block.ElementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM)).value_or(0u);
+    return block;
+}
+
+void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
+                         std::vector<RawBinding>& out_bindings,
+                         std::vector<RawSizeAttribute>& out_attributes)
+{
+    const auto baseIndex = static_cast<uint32_t>(out_bindings.size());
+    for (auto&& [offset, draft] : std::views::enumerate(drafts))
+    {
+        for (RawSizeAttribute& attribute : draft.Attributes)
+        {
+            attribute.BindingIndex = baseIndex + static_cast<uint32_t>(offset);
+        }
+    }
+
+    out_bindings.insert_range(out_bindings.end(), drafts | std::views::transform(&RawBindingDraft::Binding));
+    // todo-ship: either find a way to get cache_latest in here or just stop doing this
+    // its sad but ranges just don't produce the best assembly used like this
+    const size_t attributesCount = std::ranges::fold_left(drafts | std::views::transform(
+                                                                       [](const RawBindingDraft& draft)
+                                                                       {
+                                                                           return draft.Attributes.size();
+                                                                       }),
+                                                          size_t{ 0u },
+                                                          std::plus<size_t>{});
+    out_attributes.reserve(out_attributes.size() + attributesCount);
+    out_attributes.append_range(drafts | std::views::transform(&RawBindingDraft::Attributes) |
+                                std::views::join | std::views::as_rvalue);
+}
+
+std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_variant,
+                                                SlangInt entry_point_index,
+                                                std::span<const RawBinding> global_bindings,
+                                                uint32_t index_offset)
+{
+    const auto epIndex = static_cast<size_t>(entry_point_index);
+    const Slang::ComPtr<slang::IMetadata>& metadata = linked_variant.EntryPointMetadata[epIndex];
+
+    // todo-ship: this will need to be modified per-binding-model
+    auto isPlacementUsed = [&metadata](const RawPlacement& placement) -> bool
+    {
+        const BoundPlacement* boundPlacement = GetBoundPlacement(placement);
+        if (boundPlacement == nullptr)
+        {
+            return false;
+        }
+        // calling across the dll boundary means no inlining this :(
+        bool isUsed = false;
+        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
+                                          boundPlacement->Group,
+                                          boundPlacement->Binding,
+                                          isUsed);
+        return isUsed;
+    };
+
+    std::vector<uint32_t> usedBindingIndices;
+    usedBindingIndices.reserve(global_bindings.size());
+
+    for (const auto&& [index, binding] : std::views::enumerate(global_bindings))
+    {
+        if (!isPlacementUsed(binding.Placement))
+        {
+            continue;
+        }
+
+        usedBindingIndices.emplace_back(index_offset + static_cast<uint32_t>(index));
+
+    }
+
+    usedBindingIndices.shrink_to_fit();
+    return usedBindingIndices;
+}
+
+void AddVisibleStoredValues(std::span<const RawBinding> bindings,
+                            size_t global_count,
+                            size_t first_owned,
+                            bool reads_push_constants,
+                            std::vector<uint32_t>& used)
+{
+    // we test against this span during each iteration, and it should only include the elements that were present before this function call,
+    // ensuring that we do not consider any newly added used indices within the same iteration loop.
+    const std::span<const uint32_t> testSpan{ used };
+    for (size_t index = 0u; index < bindings.size(); ++index)
+    {
+        const StoredValuePlacement* stored = GetStoredValuePlacement(bindings[index].Placement);
+        if (stored == nullptr || (index >= global_count && index < first_owned))
+        {
+            continue;
+        }
+
+        bool visible = false;
+        if (stored->Container == StoredValueContainer::PushConstants)
+        {
+            visible = reads_push_constants && index >= first_owned;
+        }
+        else
+        {
+            auto placementUsed = [&](uint32_t used_index)
+            {
+                const BoundPlacement* block = GetBoundPlacement(bindings[used_index].Placement);
+                return block != nullptr && *block == stored->Block;
+            };
+            visible = std::ranges::any_of(testSpan, placementUsed);
+        }
+
+        if (visible)
+        {
+            used.push_back(static_cast<uint32_t>(index));
+        }
+    }
+}
+
+std::string_view TypeArgumentOf(std::string_view full_name) noexcept
+{
+    const size_t open = full_name.find('<');
+    const size_t close = full_name.rfind('>');
+    return (open == std::string_view::npos || close == std::string_view::npos || close <= open)
+               ? std::string_view{}
+               : full_name.substr(open + 1u, close - open - 1u);
+}
+
+std::string FullNameOf(slang::TypeReflection* type)
+{
+    Slang::ComPtr<slang::IBlob> fullName;
+    if (type == nullptr || SLANG_FAILED(type->getFullName(fullName.writeRef())) || fullName == nullptr)
+    {
+        return {};
+    }
+    return std::string{ static_cast<const char*>(fullName->getBufferPointer()) };
+}
+
+ResourceAccess FromSlangAccessType(SlangResourceAccess access)
+{
+    switch (access)
+    {
+    case SLANG_RESOURCE_ACCESS_NONE:
+        return ResourceAccess::Invalid;
+    case SLANG_RESOURCE_ACCESS_READ:
+        return ResourceAccess::ReadOnly;
+    case SLANG_RESOURCE_ACCESS_READ_WRITE:
+        return ResourceAccess::ReadWrite;
+    case SLANG_RESOURCE_ACCESS_RASTER_ORDERED:
+        return ResourceAccess::RasterizerOrdered;
+    case SLANG_RESOURCE_ACCESS_APPEND:
+        return ResourceAccess::Append;
+    case SLANG_RESOURCE_ACCESS_CONSUME:
+        return ResourceAccess::Consume;
+    case SLANG_RESOURCE_ACCESS_WRITE:
+        return ResourceAccess::WriteOnly;
+    case SLANG_RESOURCE_ACCESS_FEEDBACK:
+        return ResourceAccess::Feedback;
+    case SLANG_RESOURCE_ACCESS_UNKNOWN:
+        return ResourceAccess::Invalid;
+    }
+    return ResourceAccess::Invalid;
+}
+
+} // namespace
+

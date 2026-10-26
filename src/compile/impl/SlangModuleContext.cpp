@@ -41,64 +41,25 @@ namespace lodestone
 
 namespace
 {
-    std::string BuildCachedModulePath(std::string_view cache_directory, std::string_view module_name)
-    {
-        std::string result{ cache_directory };
-        result += "/";
-        result += module_name;
-        result += ".slang-module";
-        return result;
-    }
+    std::string BuildCachedModulePath(std::string_view cache_directory, std::string_view module_name);
 
     /** Returns `<Slang build tag>-<configuration>`, with path-unsafe characters replaced. */
-    std::string BuildCacheFolderName(std::string_view slang_build_tag)
-    {
-        std::string name = std::format("{}-{}", slang_build_tag, LODESTONE_BUILD_CONFIG);
-        for (char& character : name)
-        {
-            const bool isAlNum = std::isalnum(static_cast<unsigned char>(character)) != 0;
-            const bool allowed = isAlNum ||
-                                 character == '.' ||
-                                 character == '-';
-            if (!allowed)
-            {
-                character = '_';
-            }
-        }
-        return name;
-    }
+    std::string BuildCacheFolderName(std::string_view slang_build_tag);
 
     /** Writes through a temporary file and a rename: Slang reads the cache folder as a search path, so readers must
      * never see a partial file. */
-    CookError WriteFileAtomically(const std::filesystem::path& path, std::span<const std::byte> bytes)
-    {
-        std::random_device random;
-        std::filesystem::path temporaryPath = path;
-        temporaryPath += std::format(".{:08x}{:08x}.tmp", random(), random());
-        {
-            std::ofstream stream(temporaryPath, std::ios::binary | std::ios::trunc);
-            stream.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-            if (!stream)
-            {
-                std::error_code ignored;
-                std::filesystem::remove(temporaryPath, ignored);
-                return CookError::FileWriteFailed;
-            }
-        }
+    CookError WriteFileAtomically(const std::filesystem::path& path, std::span<const std::byte> bytes);
 
-        std::error_code renameError;
-        std::filesystem::rename(temporaryPath, path, renameError);
-        if (renameError)
-        {
-            // on Windows an open reader blocks the replace, which costs one cache miss
-            std::error_code ignored;
-            std::filesystem::remove(temporaryPath, ignored);
-            return CookError::FileWriteFailed;
-        }
-        return CookError::Success;
-    }
+    // only `__include` fragments are walked into: their declarations are still at module scope
+    void VisitModuleScopeDecls(slang::DeclReflection* reflection,
+                               slang::DeclReflection::Kind kind,
+                               const std::function<void(slang::DeclReflection*)>& visit);
 
+    void VisitLoadedModuleScopeDecls(slang::ISession* session,
+                                     slang::DeclReflection::Kind kind,
+                                     const std::function<void(slang::DeclReflection*)>& visit);
 
+    std::vector<std::string> BuildModuleScopeNames(slang::ISession* session, slang::DeclReflection::Kind kind);
 }
 
 constexpr bool k_UseSlangWorkaround = true;
@@ -271,74 +232,6 @@ CookError SlangModuleContext::RunBootstrap()
     return bootstrapResult;
 }
 
-
-namespace
-{
-    // NOLINTBEGIN(misc-no-recursion)
-    // only `__include` fragments are walked into: their declarations are still at module scope
-    void VisitModuleScopeDecls(slang::DeclReflection* reflection,
-                               slang::DeclReflection::Kind kind,
-                               const std::function<void(slang::DeclReflection*)>& visit)
-    {
-        const unsigned int childCount = reflection->getChildrenCount();
-        for (unsigned int i = 0u; i < childCount; ++i)
-        {
-            slang::DeclReflection* child = reflection->getChild(i);
-            if (child == nullptr)
-            {
-                continue;
-            }
-
-            if (child->getKind() == kind)
-            {
-                visit(child);
-            }
-            else if (child->getKind() == slang::DeclReflection::Kind::Unsupported && child->getChildrenCount() > 0u)
-            {
-                VisitModuleScopeDecls(child, kind, visit);
-            }
-        }
-    }
-    // NOLINTEND(misc-no-recursion)
-
-    void VisitLoadedModuleScopeDecls(slang::ISession* session,
-                                     slang::DeclReflection::Kind kind,
-                                     const std::function<void(slang::DeclReflection*)>& visit)
-    {
-        const int64_t loadedModuleCount = static_cast<int64_t>(session->getLoadedModuleCount());
-        for (int64_t i = 0; i < loadedModuleCount; ++i)
-        {
-            slang::DeclReflection* moduleReflection = session->getLoadedModule(i)->getModuleReflection();
-            if (moduleReflection != nullptr)
-            {
-                VisitModuleScopeDecls(moduleReflection, kind, visit);
-            }
-        }
-    }
-
-    std::vector<std::string> BuildModuleScopeNames(slang::ISession* session, slang::DeclReflection::Kind kind)
-    {
-        std::vector<std::string> names;
-
-        auto scopeNameVisitor = [&](slang::DeclReflection* decl)
-        {
-            const char* name = decl->getName();
-            if (name != nullptr)
-            {
-                names.emplace_back(name);
-            }
-        };
-
-        VisitLoadedModuleScopeDecls(session,
-                                    kind,
-                                    scopeNameVisitor);
-
-        std::ranges::sort(names);
-        const auto [duplicatesBegin, duplicatesEnd] = std::ranges::unique(names);
-        names.erase(duplicatesBegin, duplicatesEnd);
-        return names;
-    }
-}
 
 CookError SlangModuleContext::LoadShimLinkModule(std::string_view source)
 {
@@ -684,6 +577,128 @@ CookError SlangModuleContext::buildSlangComponents()
     }
 
     return CookError::Success;
+}
+
+
+namespace
+{
+    std::string BuildCachedModulePath(std::string_view cache_directory, std::string_view module_name)
+    {
+        std::string result{ cache_directory };
+        result += "/";
+        result += module_name;
+        result += ".slang-module";
+        return result;
+    }
+
+    std::string BuildCacheFolderName(std::string_view slang_build_tag)
+    {
+        std::string name = std::format("{}-{}", slang_build_tag, LODESTONE_BUILD_CONFIG);
+        for (char& character : name)
+        {
+            const bool isAlNum = std::isalnum(static_cast<unsigned char>(character)) != 0;
+            const bool allowed = isAlNum ||
+                                 character == '.' ||
+                                 character == '-';
+            if (!allowed)
+            {
+                character = '_';
+            }
+        }
+        return name;
+    }
+
+    CookError WriteFileAtomically(const std::filesystem::path& path, std::span<const std::byte> bytes)
+    {
+        std::random_device random;
+        std::filesystem::path temporaryPath = path;
+        temporaryPath += std::format(".{:08x}{:08x}.tmp", random(), random());
+        {
+            std::ofstream stream(temporaryPath, std::ios::binary | std::ios::trunc);
+            stream.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+            if (!stream)
+            {
+                std::error_code ignored;
+                std::filesystem::remove(temporaryPath, ignored);
+                return CookError::FileWriteFailed;
+            }
+        }
+
+        std::error_code renameError;
+        std::filesystem::rename(temporaryPath, path, renameError);
+        if (renameError)
+        {
+            // on Windows an open reader blocks the replace, which costs one cache miss
+            std::error_code ignored;
+            std::filesystem::remove(temporaryPath, ignored);
+            return CookError::FileWriteFailed;
+        }
+        return CookError::Success;
+    }
+
+    // NOLINTBEGIN(misc-no-recursion)
+    void VisitModuleScopeDecls(slang::DeclReflection* reflection,
+                               slang::DeclReflection::Kind kind,
+                               const std::function<void(slang::DeclReflection*)>& visit)
+    {
+        const unsigned int childCount = reflection->getChildrenCount();
+        for (unsigned int i = 0u; i < childCount; ++i)
+        {
+            slang::DeclReflection* child = reflection->getChild(i);
+            if (child == nullptr)
+            {
+                continue;
+            }
+
+            if (child->getKind() == kind)
+            {
+                visit(child);
+            }
+            else if (child->getKind() == slang::DeclReflection::Kind::Unsupported && child->getChildrenCount() > 0u)
+            {
+                VisitModuleScopeDecls(child, kind, visit);
+            }
+        }
+    }
+    // NOLINTEND(misc-no-recursion)
+
+    void VisitLoadedModuleScopeDecls(slang::ISession* session,
+                                     slang::DeclReflection::Kind kind,
+                                     const std::function<void(slang::DeclReflection*)>& visit)
+    {
+        const int64_t loadedModuleCount = static_cast<int64_t>(session->getLoadedModuleCount());
+        for (int64_t i = 0; i < loadedModuleCount; ++i)
+        {
+            slang::DeclReflection* moduleReflection = session->getLoadedModule(i)->getModuleReflection();
+            if (moduleReflection != nullptr)
+            {
+                VisitModuleScopeDecls(moduleReflection, kind, visit);
+            }
+        }
+    }
+
+    std::vector<std::string> BuildModuleScopeNames(slang::ISession* session, slang::DeclReflection::Kind kind)
+    {
+        std::vector<std::string> names;
+
+        auto scopeNameVisitor = [&](slang::DeclReflection* decl)
+        {
+            const char* name = decl->getName();
+            if (name != nullptr)
+            {
+                names.emplace_back(name);
+            }
+        };
+
+        VisitLoadedModuleScopeDecls(session,
+                                    kind,
+                                    scopeNameVisitor);
+
+        std::ranges::sort(names);
+        const auto [duplicatesBegin, duplicatesEnd] = std::ranges::unique(names);
+        names.erase(duplicatesBegin, duplicatesEnd);
+        return names;
+    }
 }
 
 } // namespace lodestone

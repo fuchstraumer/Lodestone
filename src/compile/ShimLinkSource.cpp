@@ -32,50 +32,11 @@ namespace
     constexpr std::string_view k_ShimModuleName = "LodestoneShims";
     constexpr std::string_view k_StorageFormatEnumName = "StorageFormat";
 
-    std::string_view Trim(std::string_view text) noexcept
-    {
-        constexpr std::string_view k_Whitespace = " \t\r\n";
-
-        const size_t first = text.find_first_not_of(k_Whitespace);
-        if (first == std::string_view::npos)
-        {
-            return {};
-        }
-
-        return text.substr(first, text.find_last_not_of(k_Whitespace) - first + 1u);
-    }
-
-    bool IsPlainIdentifier(std::string_view text) noexcept
-    {
-        if (text.empty() || std::isdigit(static_cast<unsigned char>(text.front())) != 0)
-        {
-            return false;
-        }
-        return std::ranges::all_of(text,
-                                   [](char character)
-                                   { return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_'; });
-    }
-
-    std::string Spell(std::string_view name, std::string_view type_arguments)
-    {
-        return type_arguments.empty() ? std::string{ name } : std::format("{}<{}>", name, type_arguments);
-    }
-
-    ShaderLocation LocationOf(const RawShimExtern& shim_extern) noexcept
-    {
-        return ShaderLocation{ .File = shim_extern.SourceFile, .Line = shim_extern.SourceLine };
-    }
-
-    std::string Join(const std::vector<std::string_view>& parts)
-    {
-        std::string joined;
-        for (const std::string_view part : parts)
-        {
-            joined += joined.empty() ? "" : ", ";
-            joined += part;
-        }
-        return joined;
-    }
+    std::string_view Trim(std::string_view text) noexcept;
+    bool IsPlainIdentifier(std::string_view text) noexcept;
+    std::string Spell(std::string_view name, std::string_view type_arguments);
+    ShaderLocation LocationOf(const RawShimExtern& shim_extern) noexcept;
+    std::string Join(const std::vector<std::string_view>& parts);
 }
 
 std::vector<std::string_view> SplitShimTypeArguments(std::string_view type_arguments)
@@ -285,6 +246,54 @@ CookResult<std::vector<ShimFormatLinkSource>> MakeShimFormatLinkSources(std::spa
     }
 
     return sources;
+}
+
+namespace
+{
+    std::string_view Trim(std::string_view text) noexcept
+    {
+        constexpr std::string_view k_Whitespace = " \t\r\n";
+
+        const size_t first = text.find_first_not_of(k_Whitespace);
+        if (first == std::string_view::npos)
+        {
+            return {};
+        }
+
+        return text.substr(first, text.find_last_not_of(k_Whitespace) - first + 1u);
+    }
+
+    bool IsPlainIdentifier(std::string_view text) noexcept
+    {
+        if (text.empty() || std::isdigit(static_cast<unsigned char>(text.front())) != 0)
+        {
+            return false;
+        }
+        return std::ranges::all_of(text,
+                                   [](char character)
+                                   { return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_'; });
+    }
+
+    std::string Spell(std::string_view name, std::string_view type_arguments)
+    {
+        return type_arguments.empty() ? std::string{ name } : std::format("{}<{}>", name, type_arguments);
+    }
+
+    ShaderLocation LocationOf(const RawShimExtern& shim_extern) noexcept
+    {
+        return ShaderLocation{ .File = shim_extern.SourceFile, .Line = shim_extern.SourceLine };
+    }
+
+    std::string Join(const std::vector<std::string_view>& parts)
+    {
+        std::string joined;
+        for (const std::string_view part : parts)
+        {
+            joined += joined.empty() ? "" : ", ";
+            joined += part;
+        }
+        return joined;
+    }
 }
 
 } // namespace lodestone

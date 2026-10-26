@@ -17,6 +17,42 @@ namespace lodestone
     namespace
     {
 
+        /** @brief Flags, so the keywords combine in any order, as in C. */
+        enum class DeclarationKeyword : uint8_t
+        {
+            None = 0,
+            Extern = 1u << 0u,
+            Static = 1u << 1u,
+            Const = 1u << 2u,
+            Struct = 1u << 3u,
+        };
+        MAKE_ENUM_CLASS_FLAGS(DeclarationKeyword)
+
+        /** @brief Returns the part of `line` that is code. A `//` comment ends the line, a block comment that opens the line is
+         * dropped, a block comment inside a declaration stays, and a block comment that does not close on the line starts a
+         * comment that `in_block_comment` carries to the next lines. Views keep pointing into the source. */
+        std::string_view StripComments(std::string_view line, bool& in_block_comment) noexcept;
+
+        /** @brief Matches whole tokens, so a type named `staticconst_buffer` sets no flag. */
+        DeclarationKeyword ScanDeclarationKeywords(std::string_view declaration) noexcept;
+
+        ExternConstantDeclaration ExtractExternConst(std::string_view line, size_t assignment_index);
+
+        /** @brief Reads `static const <Type> <Name> = <Expression>;` on one line. No value for arrays. */
+        std::optional<DerivedConstantDeclaration> ExtractDerivedConstant(std::string_view line,
+                                                                          size_t assignment_index,
+                                                                          std::string_view source_path,
+                                                                          uint32_t source_line);
+
+        /** @brief Reads `extern struct <Name> : <Interface><<Arguments>> [= <Default>];`. The declaration ends at the first
+         * `=`, `;`, or `{`, and a line comment is ignored. */
+        std::optional<ExternStructDeclaration> ExtractExternStruct(std::string_view line,
+                                                                   std::string_view source_path,
+                                                                   uint32_t source_line);
+
+        /** @brief Reads `extern struct <Name> : <Interface> = <Default>;`. The name follows `struct`. */
+        std::optional<ExternConstantDeclaration> ExtractExternTypeDefault(std::string_view line, size_t assignment_index);
+
         constexpr bool IsIdentifierStartCharacter(char character) noexcept
         {
             return (character >= 'A' && character <= 'Z') ||
@@ -86,221 +122,6 @@ namespace lodestone
                                         line.substr(valueStartIdx) :
                                         line.substr(valueStartIdx, valueEndIdx - valueStartIdx);
             return TrimWhitespace(valueStr);
-        }
-
-        /** @brief Returns the part of `line` that is code. A `//` comment ends the line, a block comment that opens the line is
-         * dropped, a block comment inside a declaration stays, and a block comment that does not close on the line starts a
-         * comment that `in_block_comment` carries to the next lines. Views keep pointing into the source. */
-        std::string_view StripComments(std::string_view line, bool& in_block_comment) noexcept
-        {
-            if (in_block_comment)
-            {
-                const size_t close = line.find("*/");
-                if (close == std::string_view::npos)
-                {
-                    return {};
-                }
-                in_block_comment = false;
-                line = line.substr(close + 2u);
-            }
-
-            bool inString = false;
-            for (size_t i = 0u; i < line.size(); ++i)
-            {
-
-                const char character = line[i];
-                if (character == '"')
-                {
-                    inString = !inString;
-                }
-                else if (!inString && character == '/' && i + 1u < line.size())
-                {
-                    if (line[i + 1u] == '/')
-                    {
-                        return line.substr(0u, i);
-                    }
-
-                    if (line[i + 1u] == '*')
-                    {
-                        const size_t close = line.find("*/", i + 2u);
-                        if (close == std::string_view::npos)
-                        {
-                            in_block_comment = true;
-                            return line.substr(0u, i);
-                        }
-
-                        // a comment that opens the line is dropped, and code may follow it
-                        const std::string_view beforeComment = line.substr(0u, i);
-                        const size_t beforeCommentNonWhitespace = beforeComment.find_first_not_of(" \t\r");
-                        const bool opensLine = beforeCommentNonWhitespace == std::string_view::npos;
-                        if (opensLine)
-                        {
-                            return StripComments(line.substr(close + 2u), in_block_comment);
-                        }
-                        
-                        i = close + 1u;
-                    }
-                }
-
-            }
-
-            return line;
-        }
-
-        /** @brief Flags, so the keywords combine in any order, as in C. */
-        enum class DeclarationKeyword : uint8_t
-        {
-            None = 0,
-            Extern = 1u << 0u,
-            Static = 1u << 1u,
-            Const = 1u << 2u,
-            Struct = 1u << 3u,
-        };
-        MAKE_ENUM_CLASS_FLAGS(DeclarationKeyword)
-
-        /** @brief Matches whole tokens, so a type named `staticconst_buffer` sets no flag. */
-        DeclarationKeyword ScanDeclarationKeywords(std::string_view declaration) noexcept
-        {
-            DeclarationKeyword keywords = DeclarationKeyword::None;
-            for (auto chunk : declaration | std::views::chunk_by(ChunkSeparator))
-            {
-                const std::string_view token(std::ranges::data(chunk), std::ranges::size(chunk));
-                if (token == "extern")
-                {
-                    keywords |= DeclarationKeyword::Extern;
-                }
-                else if (token == "static")
-                {
-                    keywords |= DeclarationKeyword::Static;
-                }
-                else if (token == "const")
-                {
-                    keywords |= DeclarationKeyword::Const;
-                }
-                else if (token == "struct")
-                {
-                    keywords |= DeclarationKeyword::Struct;
-                }
-            }
-            return keywords;
-        }
-
-        ExternConstantDeclaration ExtractExternConst(std::string_view line, size_t assignment_index)
-        {
-            const std::string_view identifier = ExtractIdentifier(line, assignment_index);
-            const std::string_view value = ExtractValueAssignment(line, assignment_index);
-            return ExternConstantDeclaration{ .Name=identifier, .Value=value };
-        }
-
-        /** @brief Reads `static const <Type> <Name> = <Expression>;` on one line. No value for arrays. */
-        std::optional<DerivedConstantDeclaration> ExtractDerivedConstant(std::string_view line,
-                                                                          size_t assignment_index,
-                                                                          std::string_view source_path,
-                                                                          uint32_t source_line)
-        {
-            const std::string_view name = ExtractIdentifier(line, assignment_index);
-            const std::string_view expression = ExtractValueAssignment(line, assignment_index);
-            if (!IsValidIdentifier(name) || expression.empty())
-            {
-                return std::nullopt;
-            }
-            return DerivedConstantDeclaration{ .Name = name,
-                                               .Expression = expression,
-                                               .SourcePath = source_path,
-                                               .SourceLine = source_line };
-        }
-
-        /** @brief Reads `extern struct <Name> : <Interface><<Arguments>> [= <Default>];`. The declaration ends at the first
-         * `=`, `;`, or `{`, and a line comment is ignored. */
-        std::optional<ExternStructDeclaration> ExtractExternStruct(std::string_view line,
-                                                                   std::string_view source_path,
-                                                                   uint32_t source_line)
-        {
-            const size_t commentIndex = line.find("//");
-            const std::string_view code = commentIndex == std::string_view::npos ? line : line.substr(0, commentIndex);
-            const size_t endIndex = code.find_first_of("=;{");
-            const std::string_view header = endIndex == std::string_view::npos ? code : code.substr(0, endIndex);
-            if (!HasAllFlags(ScanDeclarationKeywords(header), DeclarationKeyword::Extern | DeclarationKeyword::Struct))
-            {
-                return std::nullopt;
-            }
-
-            const size_t colonIndex = header.find(':');
-            if (colonIndex == std::string_view::npos)
-            {
-                return std::nullopt;
-            }
-
-            std::string_view name;
-            bool sawStruct = false;
-            for (auto chunk : header.substr(0, colonIndex) | std::views::chunk_by(ChunkSeparator))
-            {
-                const std::string_view token(std::ranges::data(chunk), std::ranges::size(chunk));
-                if (!IsValidIdentifier(token))
-                {
-                    continue;
-                }
-
-                if (sawStruct)
-                {
-                    name = token;
-                    break;
-                }
-
-                sawStruct = token == "struct";
-            }
-
-            if (name.empty())
-            {
-                return std::nullopt;
-            }
-
-            const std::string_view conformance = TrimWhitespace(header.substr(colonIndex + 1u));
-            const size_t openIndex = conformance.find('<');
-            
-            const std::string_view interfaceName = TrimWhitespace(conformance.substr(0, openIndex));
-            if (!IsValidIdentifier(interfaceName))
-            {
-                return std::nullopt;
-            }
-
-            std::string_view typeArguments;
-            if (openIndex != std::string_view::npos)
-            {
-                const size_t closeIndex = conformance.rfind('>');
-                if (closeIndex == std::string_view::npos || closeIndex < openIndex)
-                {
-                    return std::nullopt;
-                }
-                typeArguments = TrimWhitespace(conformance.substr(openIndex + 1u, closeIndex - openIndex - 1u));
-            }
-
-            return ExternStructDeclaration{ .Name = name,
-                                            .Interface = interfaceName,
-                                            .TypeArguments = typeArguments,
-                                            .SourcePath = source_path,
-                                            .SourceLine = source_line };
-        }
-
-        /** @brief Reads `extern struct <Name> : <Interface> = <Default>;`. The name follows `struct`. */
-        std::optional<ExternConstantDeclaration> ExtractExternTypeDefault(std::string_view line, size_t assignment_index)
-        {
-            bool sawStruct = false;
-            for (auto chunk : line.substr(0, assignment_index) | std::views::chunk_by(ChunkSeparator))
-            {
-                const std::string_view token(std::ranges::data(chunk), std::ranges::size(chunk));
-                if (!IsValidIdentifier(token))
-                {
-                    continue;
-                }
-                if (sawStruct)
-                {
-                    return ExternConstantDeclaration{ .Name = token,
-                                                      .Value = ExtractValueAssignment(line, assignment_index) };
-                }
-                sawStruct = token == "struct";
-            }
-            return std::nullopt;
         }
     }
 
@@ -492,5 +313,204 @@ namespace lodestone
         }
 
         return {};
+    }
+
+    namespace
+    {
+        std::string_view StripComments(std::string_view line, bool& in_block_comment) noexcept
+        {
+            if (in_block_comment)
+            {
+                const size_t close = line.find("*/");
+                if (close == std::string_view::npos)
+                {
+                    return {};
+                }
+                in_block_comment = false;
+                line = line.substr(close + 2u);
+            }
+
+            bool inString = false;
+            for (size_t i = 0u; i < line.size(); ++i)
+            {
+
+                const char character = line[i];
+                if (character == '"')
+                {
+                    inString = !inString;
+                }
+                else if (!inString && character == '/' && i + 1u < line.size())
+                {
+                    if (line[i + 1u] == '/')
+                    {
+                        return line.substr(0u, i);
+                    }
+
+                    if (line[i + 1u] == '*')
+                    {
+                        const size_t close = line.find("*/", i + 2u);
+                        if (close == std::string_view::npos)
+                        {
+                            in_block_comment = true;
+                            return line.substr(0u, i);
+                        }
+
+                        // a comment that opens the line is dropped, and code may follow it
+                        const std::string_view beforeComment = line.substr(0u, i);
+                        const size_t beforeCommentNonWhitespace = beforeComment.find_first_not_of(" \t\r");
+                        const bool opensLine = beforeCommentNonWhitespace == std::string_view::npos;
+                        if (opensLine)
+                        {
+                            return StripComments(line.substr(close + 2u), in_block_comment);
+                        }
+                        
+                        i = close + 1u;
+                    }
+                }
+
+            }
+
+            return line;
+        }
+
+        DeclarationKeyword ScanDeclarationKeywords(std::string_view declaration) noexcept
+        {
+            DeclarationKeyword keywords = DeclarationKeyword::None;
+            for (auto chunk : declaration | std::views::chunk_by(ChunkSeparator))
+            {
+                const std::string_view token(std::ranges::data(chunk), std::ranges::size(chunk));
+                if (token == "extern")
+                {
+                    keywords |= DeclarationKeyword::Extern;
+                }
+                else if (token == "static")
+                {
+                    keywords |= DeclarationKeyword::Static;
+                }
+                else if (token == "const")
+                {
+                    keywords |= DeclarationKeyword::Const;
+                }
+                else if (token == "struct")
+                {
+                    keywords |= DeclarationKeyword::Struct;
+                }
+            }
+            return keywords;
+        }
+
+        ExternConstantDeclaration ExtractExternConst(std::string_view line, size_t assignment_index)
+        {
+            const std::string_view identifier = ExtractIdentifier(line, assignment_index);
+            const std::string_view value = ExtractValueAssignment(line, assignment_index);
+            return ExternConstantDeclaration{ .Name=identifier, .Value=value };
+        }
+
+        std::optional<DerivedConstantDeclaration> ExtractDerivedConstant(std::string_view line,
+                                                                          size_t assignment_index,
+                                                                          std::string_view source_path,
+                                                                          uint32_t source_line)
+        {
+            const std::string_view name = ExtractIdentifier(line, assignment_index);
+            const std::string_view expression = ExtractValueAssignment(line, assignment_index);
+            if (!IsValidIdentifier(name) || expression.empty())
+            {
+                return std::nullopt;
+            }
+            return DerivedConstantDeclaration{ .Name = name,
+                                               .Expression = expression,
+                                               .SourcePath = source_path,
+                                               .SourceLine = source_line };
+        }
+
+        std::optional<ExternStructDeclaration> ExtractExternStruct(std::string_view line,
+                                                                   std::string_view source_path,
+                                                                   uint32_t source_line)
+        {
+            const size_t commentIndex = line.find("//");
+            const std::string_view code = commentIndex == std::string_view::npos ? line : line.substr(0, commentIndex);
+            const size_t endIndex = code.find_first_of("=;{");
+            const std::string_view header = endIndex == std::string_view::npos ? code : code.substr(0, endIndex);
+            if (!HasAllFlags(ScanDeclarationKeywords(header), DeclarationKeyword::Extern | DeclarationKeyword::Struct))
+            {
+                return std::nullopt;
+            }
+
+            const size_t colonIndex = header.find(':');
+            if (colonIndex == std::string_view::npos)
+            {
+                return std::nullopt;
+            }
+
+            std::string_view name;
+            bool sawStruct = false;
+            for (auto chunk : header.substr(0, colonIndex) | std::views::chunk_by(ChunkSeparator))
+            {
+                const std::string_view token(std::ranges::data(chunk), std::ranges::size(chunk));
+                if (!IsValidIdentifier(token))
+                {
+                    continue;
+                }
+
+                if (sawStruct)
+                {
+                    name = token;
+                    break;
+                }
+
+                sawStruct = token == "struct";
+            }
+
+            if (name.empty())
+            {
+                return std::nullopt;
+            }
+
+            const std::string_view conformance = TrimWhitespace(header.substr(colonIndex + 1u));
+            const size_t openIndex = conformance.find('<');
+            
+            const std::string_view interfaceName = TrimWhitespace(conformance.substr(0, openIndex));
+            if (!IsValidIdentifier(interfaceName))
+            {
+                return std::nullopt;
+            }
+
+            std::string_view typeArguments;
+            if (openIndex != std::string_view::npos)
+            {
+                const size_t closeIndex = conformance.rfind('>');
+                if (closeIndex == std::string_view::npos || closeIndex < openIndex)
+                {
+                    return std::nullopt;
+                }
+                typeArguments = TrimWhitespace(conformance.substr(openIndex + 1u, closeIndex - openIndex - 1u));
+            }
+
+            return ExternStructDeclaration{ .Name = name,
+                                            .Interface = interfaceName,
+                                            .TypeArguments = typeArguments,
+                                            .SourcePath = source_path,
+                                            .SourceLine = source_line };
+        }
+
+        std::optional<ExternConstantDeclaration> ExtractExternTypeDefault(std::string_view line, size_t assignment_index)
+        {
+            bool sawStruct = false;
+            for (auto chunk : line.substr(0, assignment_index) | std::views::chunk_by(ChunkSeparator))
+            {
+                const std::string_view token(std::ranges::data(chunk), std::ranges::size(chunk));
+                if (!IsValidIdentifier(token))
+                {
+                    continue;
+                }
+                if (sawStruct)
+                {
+                    return ExternConstantDeclaration{ .Name = token,
+                                                      .Value = ExtractValueAssignment(line, assignment_index) };
+                }
+                sawStruct = token == "struct";
+            }
+            return std::nullopt;
+        }
     }
 }

@@ -29,149 +29,20 @@ namespace lodestone
 
 namespace
 {
-    EnumTagKind ScalarTypeToEnumTagKind(slang::TypeReflection::ScalarType scalar)
-    {
-        using slang::TypeReflection;
-        switch (scalar)
-        {
-        case TypeReflection::ScalarType::Int8:
-            return EnumTagKind::Int8;
-        case TypeReflection::ScalarType::UInt8:
-            return EnumTagKind::UInt8;
-        case TypeReflection::ScalarType::Int16:
-            return EnumTagKind::Int16;
-        case TypeReflection::ScalarType::UInt16:
-            return EnumTagKind::UInt16;
-        case TypeReflection::ScalarType::Int32:
-            return EnumTagKind::Int32;
-        case TypeReflection::ScalarType::UInt32:
-            return EnumTagKind::UInt32;
-        case TypeReflection::ScalarType::Int64:
-            return EnumTagKind::Int64;
-        case TypeReflection::ScalarType::UInt64:
-            return EnumTagKind::UInt64;
-        default:
-            assert(false && "Unsupported scalar type for enum case blob");
-            return EnumTagKind::Int32;
-        }
-    }
+    EnumTagKind ScalarTypeToEnumTagKind(slang::TypeReflection::ScalarType scalar);
 
     // an imported enum reflects with ScalarType::None, but its blob has the real width. Slang enums default to int
     EnumTagKind EnumTagKindFromByteWidth(size_t byte_width);
 
     /** Returns the initializer as reflection reads it: literals only, so no value means "unreadable", not "no default".
      * The source text is the primary reader. */
-    std::optional<int64_t> ReadReflectedDefault(slang::VariableReflection* variable)
-    {
-        Slang::ComPtr<slang::IBlob> defaultBlob;
-        if (SLANG_FAILED(variable->getDefaultValueBlob(defaultBlob.writeRef())) || defaultBlob == nullptr)
-        {
-            return std::nullopt;
-        }
-
-        const size_t byteWidth = defaultBlob->getBufferSize();
-        const auto* bytes = static_cast<const std::byte*>(defaultBlob->getBufferPointer());
-        slang::TypeReflection* type = variable->getType();
-        const slang::TypeReflection::ScalarType scalarType =
-            type != nullptr ? type->getScalarType() : slang::TypeReflection::ScalarType::None;
-        switch (scalarType)
-        {
-        case slang::TypeReflection::ScalarType::Bool:
-        {
-            auto isNonZero = [](std::byte value) { return value != std::byte{ 0 }; };
-            return std::ranges::any_of(std::span<const std::byte>{ bytes, byteWidth }, isNonZero) ? 1 : 0;
-        }
-        case slang::TypeReflection::ScalarType::Int8:
-        case slang::TypeReflection::ScalarType::UInt8:
-        case slang::TypeReflection::ScalarType::Int16:
-        case slang::TypeReflection::ScalarType::UInt16:
-        case slang::TypeReflection::ScalarType::Int32:
-        case slang::TypeReflection::ScalarType::UInt32:
-        case slang::TypeReflection::ScalarType::Int64:
-        case slang::TypeReflection::ScalarType::UInt64:
-            if (byteWidth < EnumTagByteWidth(ScalarTypeToEnumTagKind(scalarType)))
-            {
-                return std::nullopt;
-            }
-            return DecodeEnumTag(ScalarTypeToEnumTagKind(scalarType), bytes);
-        case slang::TypeReflection::ScalarType::None:
-            if (byteWidth == 1u || byteWidth == 2u || byteWidth == 4u || byteWidth == 8u)
-            {
-                return DecodeEnumTag(EnumTagKindFromByteWidth(byteWidth), bytes);
-            }
-            return std::nullopt;
-        default:
-            return std::nullopt;
-        }
-    }
-
-    EnumTagKind EnumTagKindFromByteWidth(size_t byte_width)
-    {
-        switch (byte_width)
-        {
-        case 1u:
-            return EnumTagKind::Int8;
-        case 2u:
-            return EnumTagKind::Int16;
-        case 4u:
-            return EnumTagKind::Int32;
-        case 8u:
-            return EnumTagKind::Int64;
-        default:
-            assert(false && "Unexpected enum tag byte width");
-            return EnumTagKind::Int32;
-        }
-    }
+    std::optional<int64_t> ReadReflectedDefault(slang::VariableReflection* variable);
 
     // matches by pointer: Slang interns one TypeReflection per type per session, across modules
-    //NOLINTBEGIN(misc-no-recursion)
-    bool BelongsToModule(slang::TypeReflection* type, slang::DeclReflection* reflection)
-    {
-        const int64_t childCount = reflection->getChildrenCount();
-        for (int64_t i = 0; i < childCount; ++i)
-        {
-            slang::DeclReflection* child = reflection->getChild(i);
-            if (child->getType() == type)
-            {
-                return true;
-            }
-            if (child->getChildrenCount() > 0 && BelongsToModule(type, child))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-    //NOLINTEND(misc-no-recursion)
+    bool BelongsToModule(slang::TypeReflection* type, slang::DeclReflection* reflection);
 
     // the enum's declaring module can differ from the axis variable's when the enum arrives through an import
-    std::string_view FindDeclaringModule(slang::ISession* session, slang::TypeReflection* type)
-    {
-        if (type == nullptr)
-        {
-            return {};
-        }
-
-        for (int64_t i = 0; i < session->getLoadedModuleCount(); ++i)
-        {
-            slang::IModule* module = session->getLoadedModule(i);
-            if (module == nullptr)
-            {
-                continue;
-            }
-            slang::DeclReflection* moduleReflection = module->getModuleReflection();
-            if (moduleReflection == nullptr)
-            {
-                // precompiled and builtin modules can report no reflection
-                continue;
-            }
-            if (BelongsToModule(type, moduleReflection))
-            {
-                return module->getName();
-            }
-        }
-        return {};
-    }
+    std::string_view FindDeclaringModule(slang::ISession* session, slang::TypeReflection* type);
 }
 
 std::optional<std::string> SlangModuleContext::FindTypeDeclaringModule(std::string_view type_name) const
@@ -676,6 +547,147 @@ CookError SlangModuleContext::rejectResourceMembers(slang::TypeReflection* type,
         }
     }
     return CookError::Success;
+}
+
+
+namespace
+{
+    EnumTagKind ScalarTypeToEnumTagKind(slang::TypeReflection::ScalarType scalar)
+    {
+        using slang::TypeReflection;
+        switch (scalar)
+        {
+        case TypeReflection::ScalarType::Int8:
+            return EnumTagKind::Int8;
+        case TypeReflection::ScalarType::UInt8:
+            return EnumTagKind::UInt8;
+        case TypeReflection::ScalarType::Int16:
+            return EnumTagKind::Int16;
+        case TypeReflection::ScalarType::UInt16:
+            return EnumTagKind::UInt16;
+        case TypeReflection::ScalarType::Int32:
+            return EnumTagKind::Int32;
+        case TypeReflection::ScalarType::UInt32:
+            return EnumTagKind::UInt32;
+        case TypeReflection::ScalarType::Int64:
+            return EnumTagKind::Int64;
+        case TypeReflection::ScalarType::UInt64:
+            return EnumTagKind::UInt64;
+        default:
+            assert(false && "Unsupported scalar type for enum case blob");
+            return EnumTagKind::Int32;
+        }
+    }
+
+    EnumTagKind EnumTagKindFromByteWidth(size_t byte_width)
+    {
+        switch (byte_width)
+        {
+        case 1u:
+            return EnumTagKind::Int8;
+        case 2u:
+            return EnumTagKind::Int16;
+        case 4u:
+            return EnumTagKind::Int32;
+        case 8u:
+            return EnumTagKind::Int64;
+        default:
+            assert(false && "Unexpected enum tag byte width");
+            return EnumTagKind::Int32;
+        }
+    }
+
+    std::optional<int64_t> ReadReflectedDefault(slang::VariableReflection* variable)
+    {
+        Slang::ComPtr<slang::IBlob> defaultBlob;
+        if (SLANG_FAILED(variable->getDefaultValueBlob(defaultBlob.writeRef())) || defaultBlob == nullptr)
+        {
+            return std::nullopt;
+        }
+
+        const size_t byteWidth = defaultBlob->getBufferSize();
+        const auto* bytes = static_cast<const std::byte*>(defaultBlob->getBufferPointer());
+        slang::TypeReflection* type = variable->getType();
+        const slang::TypeReflection::ScalarType scalarType =
+            type != nullptr ? type->getScalarType() : slang::TypeReflection::ScalarType::None;
+        switch (scalarType)
+        {
+        case slang::TypeReflection::ScalarType::Bool:
+        {
+            auto isNonZero = [](std::byte value) { return value != std::byte{ 0 }; };
+            return std::ranges::any_of(std::span<const std::byte>{ bytes, byteWidth }, isNonZero) ? 1 : 0;
+        }
+        case slang::TypeReflection::ScalarType::Int8:
+        case slang::TypeReflection::ScalarType::UInt8:
+        case slang::TypeReflection::ScalarType::Int16:
+        case slang::TypeReflection::ScalarType::UInt16:
+        case slang::TypeReflection::ScalarType::Int32:
+        case slang::TypeReflection::ScalarType::UInt32:
+        case slang::TypeReflection::ScalarType::Int64:
+        case slang::TypeReflection::ScalarType::UInt64:
+            if (byteWidth < EnumTagByteWidth(ScalarTypeToEnumTagKind(scalarType)))
+            {
+                return std::nullopt;
+            }
+            return DecodeEnumTag(ScalarTypeToEnumTagKind(scalarType), bytes);
+        case slang::TypeReflection::ScalarType::None:
+            if (byteWidth == 1u || byteWidth == 2u || byteWidth == 4u || byteWidth == 8u)
+            {
+                return DecodeEnumTag(EnumTagKindFromByteWidth(byteWidth), bytes);
+            }
+            return std::nullopt;
+        default:
+            return std::nullopt;
+        }
+    }
+
+    //NOLINTBEGIN(misc-no-recursion)
+    bool BelongsToModule(slang::TypeReflection* type, slang::DeclReflection* reflection)
+    {
+        const int64_t childCount = reflection->getChildrenCount();
+        for (int64_t i = 0; i < childCount; ++i)
+        {
+            slang::DeclReflection* child = reflection->getChild(i);
+            if (child->getType() == type)
+            {
+                return true;
+            }
+            if (child->getChildrenCount() > 0 && BelongsToModule(type, child))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    //NOLINTEND(misc-no-recursion)
+
+    std::string_view FindDeclaringModule(slang::ISession* session, slang::TypeReflection* type)
+    {
+        if (type == nullptr)
+        {
+            return {};
+        }
+
+        for (int64_t i = 0; i < session->getLoadedModuleCount(); ++i)
+        {
+            slang::IModule* module = session->getLoadedModule(i);
+            if (module == nullptr)
+            {
+                continue;
+            }
+            slang::DeclReflection* moduleReflection = module->getModuleReflection();
+            if (moduleReflection == nullptr)
+            {
+                // precompiled and builtin modules can report no reflection
+                continue;
+            }
+            if (BelongsToModule(type, moduleReflection))
+            {
+                return module->getName();
+            }
+        }
+        return {};
+    }
 }
 
 } // namespace lodestone

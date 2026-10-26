@@ -27,6 +27,85 @@ using namespace lodestone;
 constexpr uint32_t k_SpirvMagicNumber = 0x07230203u;
 constexpr size_t k_SpirvHeaderBytes = 5u * sizeof(uint32_t);
 
+bool IsSpirvModule(const std::vector<std::byte>& code) noexcept;
+
+/** Codegen output, with its diagnostics, so that worker threads never touch a sink. */
+struct GeneratedEntryPoint
+{
+    std::vector<std::byte> Code;
+    std::string Diagnostics;
+    bool CallFailed{ false };
+};
+
+GeneratedEntryPoint GenerateOneEntryPoint(slang::IComponentType* linked_program, size_t index, SlangInt target_index);
+CookResult<std::vector<LinkedVariant::EpCode>> GenerateEntryPointCode(SlangModuleContext& context, Slang::ComPtr<slang::IComponentType> linked_program, SlangInt target_index, DiagnosticSink& sink);
+CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext& context, const VariantDescriptor& descriptor, DiagnosticSink& sink);
+
+} // namespace
+
+namespace lodestone
+{
+
+CookResult<LinkedVariant> SlangVariantCompiler::CompileVariant(SlangModuleContext& context,
+                                                               const VariantDescriptor& descriptor,
+                                                               DiagnosticSink& sink)
+{
+    LinkedVariant result;
+
+    CookResult<Slang::ComPtr<slang::IComponentType>> linkResult = LinkVariant(context, descriptor, sink);
+    if (!linkResult)
+    {
+        return std::unexpected(linkResult.error());
+    }
+
+    Slang::ComPtr<slang::IComponentType> linkedProgram = linkResult.value();
+    result.LinkedProgram = linkedProgram;
+    slang::ProgramLayout* programLayout = linkedProgram->getLayout(k_BaseTargetIndex);
+    if (programLayout == nullptr)
+    {
+        return std::unexpected(CookError::ReflectionUnavailable);
+    }
+
+    result.ProgramLayout = programLayout;
+
+    CookResult<std::vector<LinkedVariant::EpCode>> generatedCode =
+        GenerateEntryPointCode(context, linkedProgram, k_BaseTargetIndex, sink);
+    if (!generatedCode)
+    {
+        return std::unexpected(generatedCode.error());
+    }
+    std::vector<LinkedVariant::EpCode> entryPointCode = std::move(*generatedCode);
+
+    if (context.CompilesDeliveredForm())
+    {
+        CookResult<std::vector<LinkedVariant::EpCode>> deliveredCode =
+            GenerateEntryPointCode(context, linkedProgram, k_DeliveredTargetIndex, sink);
+        if (!deliveredCode)
+        {
+            return std::unexpected(deliveredCode.error());
+        }
+        result.DeliveredEntryPointCode = std::move(*deliveredCode);
+    }
+
+    for (size_t i = 0; i < entryPointCode.size(); ++i)
+    {
+        const auto castIndex = static_cast<int64_t>(i);
+        Slang::ComPtr<slang::IMetadata> metadata;
+        linkedProgram->getEntryPointMetadata(castIndex, k_BaseTargetIndex, metadata.writeRef());
+        result.EntryPointMetadata.push_back(metadata);
+    }
+
+    result.EntryPointCode = std::move(entryPointCode);
+
+    return result;
+}
+
+} // namespace lodestone
+
+namespace
+{
+using namespace lodestone;
+
 bool IsSpirvModule(const std::vector<std::byte>& code) noexcept
 {
     if (code.size() < k_SpirvHeaderBytes || (code.size() % sizeof(uint32_t)) != 0u)
@@ -38,14 +117,6 @@ bool IsSpirvModule(const std::vector<std::byte>& code) noexcept
     std::memcpy(&magic, code.data(), sizeof(magic));
     return magic == k_SpirvMagicNumber;
 }
-
-/** Codegen output, with its diagnostics, so that worker threads never touch a sink. */
-struct GeneratedEntryPoint
-{
-    std::vector<std::byte> Code;
-    std::string Diagnostics;
-    bool CallFailed{ false };
-};
 
 GeneratedEntryPoint GenerateOneEntryPoint(slang::IComponentType* linked_program, size_t index, SlangInt target_index)
 {
@@ -153,62 +224,3 @@ CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext&
 }
 
 } // namespace
-
-namespace lodestone
-{
-
-CookResult<LinkedVariant> SlangVariantCompiler::CompileVariant(SlangModuleContext& context,
-                                                               const VariantDescriptor& descriptor,
-                                                               DiagnosticSink& sink)
-{
-    LinkedVariant result;
-
-    CookResult<Slang::ComPtr<slang::IComponentType>> linkResult = LinkVariant(context, descriptor, sink);
-    if (!linkResult)
-    {
-        return std::unexpected(linkResult.error());
-    }
-
-    Slang::ComPtr<slang::IComponentType> linkedProgram = linkResult.value();
-    result.LinkedProgram = linkedProgram;
-    slang::ProgramLayout* programLayout = linkedProgram->getLayout(k_BaseTargetIndex);
-    if (programLayout == nullptr)
-    {
-        return std::unexpected(CookError::ReflectionUnavailable);
-    }
-
-    result.ProgramLayout = programLayout;
-
-    CookResult<std::vector<LinkedVariant::EpCode>> generatedCode =
-        GenerateEntryPointCode(context, linkedProgram, k_BaseTargetIndex, sink);
-    if (!generatedCode)
-    {
-        return std::unexpected(generatedCode.error());
-    }
-    std::vector<LinkedVariant::EpCode> entryPointCode = std::move(*generatedCode);
-
-    if (context.CompilesDeliveredForm())
-    {
-        CookResult<std::vector<LinkedVariant::EpCode>> deliveredCode =
-            GenerateEntryPointCode(context, linkedProgram, k_DeliveredTargetIndex, sink);
-        if (!deliveredCode)
-        {
-            return std::unexpected(deliveredCode.error());
-        }
-        result.DeliveredEntryPointCode = std::move(*deliveredCode);
-    }
-
-    for (size_t i = 0; i < entryPointCode.size(); ++i)
-    {
-        const auto castIndex = static_cast<int64_t>(i);
-        Slang::ComPtr<slang::IMetadata> metadata;
-        linkedProgram->getEntryPointMetadata(castIndex, k_BaseTargetIndex, metadata.writeRef());
-        result.EntryPointMetadata.push_back(metadata);
-    }
-
-    result.EntryPointCode = std::move(entryPointCode);
-
-    return result;
-}
-
-} // namespace lodestone
