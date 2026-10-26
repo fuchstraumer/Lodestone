@@ -12,14 +12,7 @@ namespace lodestone
 namespace
 {
     // `::` is not legal in module names, so enum values join with `_`
-    std::string ValueNameToken(const PermutationAxis& axis, const PermutationValue& value)
-    {
-        if (value.GetType() == PermutationValue::Type::Enum)
-        {
-            return std::format("{}_{}", axis.EnumTypeName(), value.AsEnumCase(axis));
-        }
-        return ValueToSlangLiteral(axis, value);
-    }
+    std::string ValueNameToken(const PermutationAxis& axis, const PermutationValue& value);
 }
 
 PermutationValue PermutationValue::MakeEnum(uint32_t ordinal) noexcept
@@ -195,6 +188,18 @@ std::string MakeVariantModuleName(const PermutationAxis& axis, const Permutation
 std::string MakeVariantModulePath(const PermutationAxis& axis, const PermutationValue& value)
 {
     return std::format("{}_{}.slang", axis.Name, ValueNameToken(axis, value));
+}
+
+namespace
+{
+    std::string ValueNameToken(const PermutationAxis& axis, const PermutationValue& value)
+    {
+        if (value.GetType() == PermutationValue::Type::Enum)
+        {
+            return std::format("{}_{}", axis.EnumTypeName(), value.AsEnumCase(axis));
+        }
+        return ValueToSlangLiteral(axis, value);
+    }
 }
 
 } // namespace lodestone

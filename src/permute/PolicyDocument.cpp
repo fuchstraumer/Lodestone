@@ -31,6 +31,7 @@ namespace lodestone
 namespace
 {
 
+    // toml++ records a source region per node, so errors give the line and column
     PolicyParseError ErrorAt(const toml::node& node, std::string message);
     PolicyDocResult<StringMap<std::vector<std::string>>> ReadInertAxes(const toml::table& module_table);
     PolicyDocResult<AxisCookValues> ReadAxisCookValues(std::string_view axis_name,
@@ -228,7 +229,6 @@ CookError PolicyDocument::ValidateTargetNames(std::span<const std::string_view> 
 
 namespace
 {
-    // toml++ records a source region per node, so errors give the line and column
     PolicyParseError ErrorAt(const toml::node& node, std::string message)
     {
         const toml::source_region& region = node.source();

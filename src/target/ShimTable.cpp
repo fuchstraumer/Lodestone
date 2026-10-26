@@ -1,4 +1,5 @@
 #include "target/ShimTable.hpp"
+#include "ShaderLibraryTypes.hpp"
 #include "target/TargetProfile.hpp"
 #include <algorithm>
 #include <array>
@@ -22,7 +23,12 @@ namespace
             .Handle = {},
             .Pointer = "PointerReadBuffer",
             .ImplementationTakesFormat = false,
-            .Resource = ShimResource{ .Kind = BindingKind::StorageBuffer, .Shape = ResourceShape::StructuredBuffer, .Access = ResourceAccess::ReadOnly },
+            .Resource = ShimResource
+            {
+                .Kind = BindingKind::StorageBuffer,
+                .Shape = ResourceShape::StructuredBuffer,
+                .Access = ResourceAccess::ReadOnly
+            },
         },
         ShimInterface
         { 
@@ -33,7 +39,12 @@ namespace
             .Handle = {},
             .Pointer = "PointerReadWriteBuffer",
             .ImplementationTakesFormat = false,
-            .Resource = ShimResource{ .Kind = BindingKind::StorageBuffer, .Shape = ResourceShape::StructuredBuffer, .Access = ResourceAccess::ReadWrite },
+            .Resource = ShimResource
+            {
+                .Kind = BindingKind::StorageBuffer,
+                .Shape = ResourceShape::StructuredBuffer,
+                .Access = ResourceAccess::ReadWrite
+            },
         },
         ShimInterface
         { 
@@ -44,7 +55,13 @@ namespace
             .Handle = "HandleTexture2D",
             .Pointer = {},
             .ImplementationTakesFormat = false,
-            .Resource = ShimResource{ .Kind = BindingKind::Texture, .Shape = ResourceShape::Texture2D, .SampleType = TextureSampleType::Float, .Access = ResourceAccess::ReadOnly },
+            .Resource = ShimResource
+            {
+                .Kind = BindingKind::Texture,
+                .Shape = ResourceShape::Texture2D,
+                .SampleType = TextureSampleType::Float,
+                .Access = ResourceAccess::ReadOnly
+            },
         },
         ShimInterface
         { 
@@ -55,7 +72,10 @@ namespace
             .Handle = "HandleSampler",
             .Pointer = {},
             .ImplementationTakesFormat = false,
-            .Resource = ShimResource{ .Kind = BindingKind::Sampler },
+            .Resource = ShimResource
+            {
+                .Kind = BindingKind::Sampler
+            },
         },
         ShimInterface
         { 
@@ -66,7 +86,12 @@ namespace
             .Handle = "HandleWriteStorageTexture2D",
             .Pointer = {},
             .ImplementationTakesFormat = true,
-            .Resource = ShimResource{ .Kind = BindingKind::StorageTexture, .Shape = ResourceShape::Texture2D, .Access = ResourceAccess::WriteOnly },
+            .Resource = ShimResource
+            { 
+                .Kind = BindingKind::StorageTexture,
+                .Shape = ResourceShape::Texture2D,
+                .Access = ResourceAccess::WriteOnly
+            },
         },
     };
 }

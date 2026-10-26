@@ -25,89 +25,42 @@ namespace lodestone
 namespace
 {
 
-    /** @brief One merge walk over both lists, which must be sorted by placement. */
-    BindingComparison CompareBindings(std::span<const tint::inspector::ResourceBinding> wgsl_bindings,
-                                      std::span<const ReflectedBinding*> reflected_bindings) noexcept;
-
     /** @brief Allows every extension: the compiler knew what to emit. Invalid WGSL is a parse error, not a mismatch. */
-    CookResult<tint::Program> ParseWgsl(std::span<const std::byte> source_code, DiagnosticSink& sink)
-    {
-        using namespace tint;
-        wgsl::reader::Options readerOptions;
-        readerOptions.allowed_features = wgsl::AllowedFeatures::Everything();
-        std::string_view source_code_view(reinterpret_cast<const char*>(source_code.data()), source_code.size());
-        Source::File entrypointSource("source.wgsl", source_code_view);
-
-        Program entrypointProgram = wgsl::reader::Parse(&entrypointSource, readerOptions);
-        if (!entrypointProgram.IsValid())
-        {
-            std::string tintDiagnostics; tintDiagnostics.reserve(1024);
-            for (const auto& diag : entrypointProgram.Diagnostics())
-            {
-                tintDiagnostics += ToString(diag.source);
-                tintDiagnostics += diag.message.Plain() + "\n";
-            }
-            std::string fullMessage = std::format("WGSL program could not be constructed from given source. Diagnostics:\n{}", tintDiagnostics);
-            return std::unexpected(ReportError(sink,
-                                               CookError::TargetValidationEntryPointParseFailed,
-                                               fullMessage));
-        }
-
-        return entrypointProgram;
-    }
+    CookResult<tint::Program> ParseWgsl(std::span<const std::byte> source_code, DiagnosticSink& sink);
 
     /** @brief Workgroup memory comes from Tint's `GetWorkgroupInfo`, Dawn's own rule. It fails without a workgroup
      * size, so only compute entry points read it. */
     CookError ReadCodeFacts(const tint::Program& program,
                             tint::inspector::Inspector& inspector,
                             EmittedCodeFacts& facts,
-                            DiagnosticSink& sink)
-    {
-        facts.CapabilityNames = inspector.GetUsedExtensionNames();
-        std::ranges::sort(facts.CapabilityNames);
-        const auto repeated = std::ranges::unique(facts.CapabilityNames);
-        facts.CapabilityNames.erase(repeated.begin(), repeated.end());
-
-        const bool compute = std::ranges::any_of(inspector.GetEntryPoints(),
-                                                 [](const tint::inspector::EntryPoint& entry_point)
-                                                 { return entry_point.stage == tint::inspector::PipelineStage::kCompute; });
-        if (!compute)
-        {
-            return CookError::Success;
-        }
-
-        auto ir = tint::wgsl::reader::ProgramToLoweredIR(program);
-        if (ir != tint::Success)
-        {
-            return ReportError(sink,
-                               CookError::TargetValidationEntryPointInvalid,
-                               std::format("Tint cannot lower the WGSL to IR: {}", ir.Failure().reason));
-        }
-        auto workgroup = tint::core::ir::GetWorkgroupInfo(ir.Get());
-        if (workgroup != tint::Success)
-        {
-            return ReportError(sink,
-                               CookError::TargetValidationEntryPointInvalid,
-                               std::format("Tint cannot read the workgroup of the WGSL: {}", workgroup.Failure().reason));
-        }
-        facts.WorkgroupMemoryBytes = static_cast<uint32_t>(workgroup.Get().storage_size);
-        return CookError::Success;
-    }
+                            DiagnosticSink& sink);
 
     /** @brief Texture uses with no sampler (textureLoad) are not pairs. */
-    std::vector<SamplerTexturePlacement> ReadPairs(tint::inspector::Inspector& inspector, const std::string& entry_point)
-    {
-        std::vector<SamplerTexturePlacement> pairs;
-        for (const tint::inspector::SamplerTexturePair& use : inspector.GetSamplerTextureUses(entry_point))
-        {
-            pairs.push_back(SamplerTexturePlacement{ .TextureGroup = use.texture_binding_point.group,
-                                                     .TextureBinding = use.texture_binding_point.binding,
-                                                     .SamplerGroup = use.sampler_binding_point.group,
-                                                     .SamplerBinding = use.sampler_binding_point.binding });
-        }
-        return pairs;
-    }
-}
+    std::vector<SamplerTexturePlacement> ReadPairs(tint::inspector::Inspector& inspector, const std::string& entry_point);
+
+    tint::inspector::ResourceBinding::ResourceType ToTintStorageTextureType(ResourceAccess access);
+
+    tint::inspector::ResourceBinding::ResourceType TintTypeForBindingKind(BindingKind kind, ResourceShape shape, ResourceAccess access);
+
+    bool TintTypeAgreesWithReflectionKind(tint::inspector::ResourceBinding::ResourceType tint_kind,
+                                          BindingKind kind,
+                                          ResourceShape shape,
+                                          ResourceAccess access);
+
+    /** Maps the curated set of `FromSlangImageFormat`. Other formats are Invalid on both sides. */
+    TextureFormat TextureFormatFromTint(tint::inspector::ResourceBinding::TexelFormat format) noexcept;
+
+    std::string_view TintTypeToString(tint::inspector::ResourceBinding::ResourceType tint_kind);
+
+    void ReportDeclaredOnly(BindingComparison& comparison, const tint::inspector::ResourceBinding& declared);
+
+    void ReportReflectedOnly(BindingComparison& comparison, const ReflectedBinding& reflected);
+
+    /** @brief One merge walk over both lists, which must be sorted by placement. */
+    BindingComparison CompareBindings(std::span<const tint::inspector::ResourceBinding> wgsl_bindings,
+                                      std::span<const ReflectedBinding*> reflected_bindings) noexcept;
+
+} // namespace
 
 WgslValidator::WgslValidator() = default;
 WgslValidator::~WgslValidator() = default;
@@ -188,6 +141,82 @@ CookResult<EmittedCodeFacts> WgslValidator::readEmittedCodeFacts(std::span<const
 
 namespace
 {
+
+    CookResult<tint::Program> ParseWgsl(std::span<const std::byte> source_code, DiagnosticSink& sink)
+    {
+        using namespace tint;
+        wgsl::reader::Options readerOptions;
+        readerOptions.allowed_features = wgsl::AllowedFeatures::Everything();
+        std::string_view source_code_view(reinterpret_cast<const char*>(source_code.data()), source_code.size());
+        Source::File entrypointSource("source.wgsl", source_code_view);
+
+        Program entrypointProgram = wgsl::reader::Parse(&entrypointSource, readerOptions);
+        if (!entrypointProgram.IsValid())
+        {
+            std::string tintDiagnostics; tintDiagnostics.reserve(1024);
+            for (const auto& diag : entrypointProgram.Diagnostics())
+            {
+                tintDiagnostics += ToString(diag.source);
+                tintDiagnostics += diag.message.Plain() + "\n";
+            }
+            std::string fullMessage = std::format("WGSL program could not be constructed from given source. Diagnostics:\n{}", tintDiagnostics);
+            return std::unexpected(ReportError(sink,
+                                               CookError::TargetValidationEntryPointParseFailed,
+                                               fullMessage));
+        }
+
+        return entrypointProgram;
+    }
+
+    CookError ReadCodeFacts(const tint::Program& program,
+                            tint::inspector::Inspector& inspector,
+                            EmittedCodeFacts& facts,
+                            DiagnosticSink& sink)
+    {
+        facts.CapabilityNames = inspector.GetUsedExtensionNames();
+        std::ranges::sort(facts.CapabilityNames);
+        const auto repeated = std::ranges::unique(facts.CapabilityNames);
+        facts.CapabilityNames.erase(repeated.begin(), repeated.end());
+
+        const bool compute = std::ranges::any_of(inspector.GetEntryPoints(),
+                                                 [](const tint::inspector::EntryPoint& entry_point)
+                                                 { return entry_point.stage == tint::inspector::PipelineStage::kCompute; });
+        if (!compute)
+        {
+            return CookError::Success;
+        }
+
+        auto ir = tint::wgsl::reader::ProgramToLoweredIR(program);
+        if (ir != tint::Success)
+        {
+            return ReportError(sink,
+                               CookError::TargetValidationEntryPointInvalid,
+                               std::format("Tint cannot lower the WGSL to IR: {}", ir.Failure().reason));
+        }
+        auto workgroup = tint::core::ir::GetWorkgroupInfo(ir.Get());
+        if (workgroup != tint::Success)
+        {
+            return ReportError(sink,
+                               CookError::TargetValidationEntryPointInvalid,
+                               std::format("Tint cannot read the workgroup of the WGSL: {}", workgroup.Failure().reason));
+        }
+        facts.WorkgroupMemoryBytes = static_cast<uint32_t>(workgroup.Get().storage_size);
+        return CookError::Success;
+    }
+
+    std::vector<SamplerTexturePlacement> ReadPairs(tint::inspector::Inspector& inspector, const std::string& entry_point)
+    {
+        std::vector<SamplerTexturePlacement> pairs;
+        for (const tint::inspector::SamplerTexturePair& use : inspector.GetSamplerTextureUses(entry_point))
+        {
+            pairs.push_back(SamplerTexturePlacement{ .TextureGroup = use.texture_binding_point.group,
+                                                     .TextureBinding = use.texture_binding_point.binding,
+                                                     .SamplerGroup = use.sampler_binding_point.group,
+                                                     .SamplerBinding = use.sampler_binding_point.binding });
+        }
+        return pairs;
+    }
+
     tint::inspector::ResourceBinding::ResourceType ToTintStorageTextureType(ResourceAccess access)
     {
         using tResourceType = tint::inspector::ResourceBinding::ResourceType;
@@ -273,7 +302,6 @@ namespace
         return reflectionTintType == tint_kind;
     }
 
-    /** Maps the curated set of `FromSlangImageFormat`. Other formats are Invalid on both sides. */
     TextureFormat TextureFormatFromTint(tint::inspector::ResourceBinding::TexelFormat format) noexcept
     {
         using tTexelFormat = tint::inspector::ResourceBinding::TexelFormat;
@@ -455,6 +483,7 @@ namespace
 
         return comparison;
     }
-}
 
-}
+} // namespace
+
+} // namespace lodestone

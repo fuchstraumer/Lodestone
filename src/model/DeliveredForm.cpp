@@ -1,6 +1,7 @@
 #include "model/DeliveredForm.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
+#include "ShaderLibraryTypes.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include <algorithm>
 #include <array>
@@ -17,8 +18,45 @@ namespace lodestone
 namespace
 {
 
+    std::vector<std::pair<uint32_t, uint32_t>> PairsByBinding(const EntryPointCode& form);
+
+    // returns the first fact the delivered form needs and the base form does not, or nothing
+    std::string FindExcess(const EntryPointCode& delivered, const EntryPointCode& base);
+
     // debug information is the one reason the delivered code may need a name that the base code does not
     constexpr std::array<std::string_view, 1u> k_DebugInformationCapabilities{ "SPV_KHR_non_semantic_info" };
+
+} // namespace
+
+CookError VerifyDeliveredForm(const CompiledVariant& variant, std::string_view target_name, DiagnosticSink& sink)
+{
+    for (const CompiledEntryPoint& entryPoint : variant.EntryPoints)
+    {
+        if (!entryPoint.Base.has_value())
+        {
+            continue;
+        }
+
+        const std::string excess = FindExcess(entryPoint.Delivered, *entryPoint.Base);
+        if (!excess.empty())
+        {
+            return ReportError(sink,
+                               CookError::DeliveredFormExceedsBase,
+                               std::format("{}{} ({}) for target {}: the delivered code needs {} that the base code "
+                                           "(--O0, no debug information) does not",
+                                           entryPoint.Name,
+                                           entryPoint.VariantSuffix,
+                                           variant.VariantDescription,
+                                           target_name,
+                                           excess));
+        }
+    }
+
+    return CookError::Success;
+}
+
+namespace
+{
 
     std::vector<std::pair<uint32_t, uint32_t>> PairsByBinding(const EntryPointCode& form)
     {
@@ -33,7 +71,6 @@ namespace
         return pairs;
     }
 
-    // returns the first fact the delivered form needs and the base form does not, or nothing
     std::string FindExcess(const EntryPointCode& delivered, const EntryPointCode& base)
     {
         std::vector<uint32_t> deliveredBindings = delivered.UsedBindingIndices;
@@ -79,32 +116,5 @@ namespace
     }
 
 } // namespace
-
-CookError VerifyDeliveredForm(const CompiledVariant& variant, std::string_view target_name, DiagnosticSink& sink)
-{
-    for (const CompiledEntryPoint& entryPoint : variant.EntryPoints)
-    {
-        if (!entryPoint.Base.has_value())
-        {
-            continue;
-        }
-
-        const std::string excess = FindExcess(entryPoint.Delivered, *entryPoint.Base);
-        if (!excess.empty())
-        {
-            return ReportError(sink,
-                               CookError::DeliveredFormExceedsBase,
-                               std::format("{}{} ({}) for target {}: the delivered code needs {} that the base code "
-                                           "(--O0, no debug information) does not",
-                                           entryPoint.Name,
-                                           entryPoint.VariantSuffix,
-                                           variant.VariantDescription,
-                                           target_name,
-                                           excess));
-        }
-    }
-
-    return CookError::Success;
-}
 
 } // namespace lodestone

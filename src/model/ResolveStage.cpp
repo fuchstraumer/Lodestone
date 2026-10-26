@@ -60,6 +60,54 @@ namespace
     /** A raw buffer counts as stride 4. Indirect roles take their command's stride, or stride 4 with whole commands. */
     CookError CheckRoles(const ReflectedBinding& binding, const ResourceFootprint& footprint, DiagnosticSink& sink);
 
+
+    uint32_t IndirectCommandBytes(ResourceRoleFlags role) noexcept;
+
+    ShaderLocation LocationOf(const RawDerivedConstant& constant) noexcept;
+
+    DiagnosticNote NoteOf(const RawDerivedConstant& constant);
+
+    enum class VisitColor : uint8_t
+    {
+        White, // unvisited
+        Gray, // visiting (on the current path)
+        Black, // finished (value is in the symbol table)
+    };
+
+    std::optional<uint32_t> FindDerivedConstant(const DerivedConstantTable& table, std::string_view name);
+
+    /** Depth-first walk from the size attribute arguments through the identifiers of each expression. Constants are
+     * evaluated in post-order, and black constants are skipped, so diamonds evaluate once. A gray constant is a cycle. */
+    // NOLINTBEGIN(misc-no-recursion): the recursion depth is the length of one chain of derived constants
+    class DerivedConstantWalk
+    {
+    public:
+        DerivedConstantWalk(const DerivedConstantTable& table, ResolveContext& context, DiagnosticSink& sink)
+            : table(table), context(context), sink(sink), colors(table.Constants.size(), VisitColor::White)
+        {}
+
+        CookError VisitRoot(std::string_view argument, std::string_view root);
+
+    private:
+
+        [[nodiscard]] CookError visitIdentifiers(std::span<const std::string> identifiers);
+        [[nodiscard]] CookError visit(uint32_t index);
+        [[nodiscard]] std::optional<uint32_t> findByName(std::string_view name) const;
+        [[nodiscard]] std::vector<DiagnosticNote> notesForPath(std::span<const uint32_t> nodes) const;
+        [[nodiscard]] CookError reportCycle(uint32_t index) const;
+        [[nodiscard]] CookError reportUnreadable(const RawDerivedConstant& constant,
+                                                 std::string_view failure) const;
+
+        const DerivedConstantTable& table;
+        ResolveContext& context;
+        DiagnosticSink& sink;
+        std::vector<VisitColor> colors;
+        std::vector<uint32_t> path;
+        std::string_view rootDescription;
+    };
+    // NOLINTEND(misc-no-recursion)
+
+
     constexpr bool IsTagCharacter(char character) noexcept
     {
         return (character >= 'a' && character <= 'z') ||
@@ -69,21 +117,6 @@ namespace
                character == '.' ||
                character == ':' ||
                character == '-';
-    }
-
-    uint32_t IndirectCommandBytes(ResourceRoleFlags role) noexcept
-    {
-        switch (role)
-        {
-        case ResourceRoleFlags::IndirectDispatch:
-            return 12u;
-        case ResourceRoleFlags::IndirectDraw:
-            return 16u;
-        case ResourceRoleFlags::IndirectDrawIndexed:
-            return 20u;
-        default:
-            return 0u;
-        }
     }
 
     constexpr ReflectedBinding ResolveBinding(const RawBinding& raw_binding) noexcept
@@ -149,82 +182,6 @@ namespace
 
         return entryPoint;
     }
-
-    ShaderLocation LocationOf(const RawDerivedConstant& constant) noexcept
-    {
-        return ShaderLocation{ .File = constant.SourceFile, .Line = static_cast<uint32_t>(constant.SourceLine) };
-    }
-
-    DiagnosticNote NoteOf(const RawDerivedConstant& constant)
-    {
-        return DiagnosticNote{ .File = constant.SourceFile,
-                               .Range = ToSourceRange(LocationOf(constant)),
-                               .Message = std::format("'{}' = '{}'", constant.Name, constant.Expression) };
-    }
-
-    enum class VisitColor : uint8_t
-    {
-        White, // unvisited
-        Gray, // visiting (on the current path)
-        Black, // finished (value is in the symbol table)
-    };
-
-    std::optional<uint32_t> FindDerivedConstant(const DerivedConstantTable& table, std::string_view name)
-    {
-        auto extractNameView = [&](uint32_t index) -> std::string_view
-        {
-            return std::string_view{ table.Constants[index].Name };
-        };
-
-        const auto found = std::ranges::lower_bound(table.ByName, name, std::less{}, extractNameView);
-        if (found == table.ByName.end() || table.Constants[*found].Name != name)
-        {
-            return std::nullopt;
-        }
-
-        return *found;
-    }
-
-    /** Depth-first walk from the size attribute arguments through the identifiers of each expression. Constants are
-     * evaluated in post-order, and black constants are skipped, so diamonds evaluate once. A gray constant is a cycle. */
-    // NOLINTBEGIN(misc-no-recursion): the recursion depth is the length of one chain of derived constants
-    class DerivedConstantWalk
-    {
-    public:
-        DerivedConstantWalk(const DerivedConstantTable& table, ResolveContext& context, DiagnosticSink& sink)
-            : table(table), context(context), sink(sink), colors(table.Constants.size(), VisitColor::White)
-        {}
-
-        CookError VisitRoot(std::string_view argument, std::string_view root)
-        {
-            rootDescription = root;
-            const CookResult<std::vector<std::string>> identifiers = CollectExpressionIdentifiers(argument, sink);
-            if (!identifiers)
-            {
-                const std::string message = std::format("{}: the argument '{}' does not parse", root, argument);
-                return ReportError(sink, identifiers.error(), message);
-            }
-            return visitIdentifiers(identifiers.value());
-        }
-
-    private:
-
-        [[nodiscard]] CookError visitIdentifiers(std::span<const std::string> identifiers);
-        [[nodiscard]] CookError visit(uint32_t index);
-        [[nodiscard]] std::optional<uint32_t> findByName(std::string_view name) const;
-        [[nodiscard]] std::vector<DiagnosticNote> notesForPath(std::span<const uint32_t> nodes) const;
-        [[nodiscard]] CookError reportCycle(uint32_t index) const;
-        [[nodiscard]] CookError reportUnreadable(const RawDerivedConstant& constant,
-                                                 std::string_view failure) const;
-
-        const DerivedConstantTable& table;
-        ResolveContext& context;
-        DiagnosticSink& sink;
-        std::vector<VisitColor> colors;
-        std::vector<uint32_t> path;
-        std::string_view rootDescription;
-    };
-    // NOLINTEND(misc-no-recursion)
 
 } // namespace
 
@@ -453,6 +410,62 @@ CookResult<CompiledVariant> ResolveVariant(const RawVariant& raw, const ResolveC
 
 namespace
 {
+
+    uint32_t IndirectCommandBytes(ResourceRoleFlags role) noexcept
+    {
+        switch (role)
+        {
+        case ResourceRoleFlags::IndirectDispatch:
+            return 12u;
+        case ResourceRoleFlags::IndirectDraw:
+            return 16u;
+        case ResourceRoleFlags::IndirectDrawIndexed:
+            return 20u;
+        default:
+            return 0u;
+        }
+    }
+
+    ShaderLocation LocationOf(const RawDerivedConstant& constant) noexcept
+    {
+        return ShaderLocation{ .File = constant.SourceFile, .Line = static_cast<uint32_t>(constant.SourceLine) };
+    }
+
+    DiagnosticNote NoteOf(const RawDerivedConstant& constant)
+    {
+        return DiagnosticNote{ .File = constant.SourceFile,
+                               .Range = ToSourceRange(LocationOf(constant)),
+                               .Message = std::format("'{}' = '{}'", constant.Name, constant.Expression) };
+    }
+
+    std::optional<uint32_t> FindDerivedConstant(const DerivedConstantTable& table, std::string_view name)
+    {
+        auto extractNameView = [&](uint32_t index) -> std::string_view
+        {
+            return std::string_view{ table.Constants[index].Name };
+        };
+
+        const auto found = std::ranges::lower_bound(table.ByName, name, std::less{}, extractNameView);
+        if (found == table.ByName.end() || table.Constants[*found].Name != name)
+        {
+            return std::nullopt;
+        }
+
+        return *found;
+    }
+
+    CookError DerivedConstantWalk::VisitRoot(std::string_view argument, std::string_view root)
+    {
+        rootDescription = root;
+        const CookResult<std::vector<std::string>> identifiers = CollectExpressionIdentifiers(argument, sink);
+        if (!identifiers)
+        {
+            const std::string message = std::format("{}: the argument '{}' does not parse", root, argument);
+            return ReportError(sink, identifiers.error(), message);
+        }
+        return visitIdentifiers(identifiers.value());
+    }
+
     CookResult<uint32_t> EvaluateExtentArgument(const RawSizeAttribute& attribute,
                                                 uint32_t argument_index,
                                                 std::string_view binding_name,
@@ -495,10 +508,10 @@ namespace
                                                const ResolveContext& context,
                                                DiagnosticSink& sink)
     {
-        const uint32_t argumentCount = ArgumentCountOf(attribute.Kind);
+        const int32_t argumentCount = ArgumentCountOf(attribute.Kind);
         std::array<uint32_t, 3u> axes{ 1u, 1u, 1u };
 
-        for (uint32_t i = 0u; i < argumentCount && i < axes.size(); ++i)
+        for (int32_t i = 0u; i < argumentCount && i < std::ssize(axes); ++i)
         {
             const CookResult<uint32_t> value = EvaluateExtentArgument(attribute, i, binding_name, context, sink);
             if (!value)
@@ -506,7 +519,7 @@ namespace
                 return std::unexpected(value.error());
             }
 
-            axes.at(i) = value.value();
+            axes[i] = value.value();
         }
 
         return TextureFootprint{ .ExtentX = axes[0],
@@ -900,6 +913,7 @@ namespace
                            std::format("derived constant '{}' {}, reached from {}", constant.Name, failure, rootDescription),
                            notesForPath(path));
     }
+
 
 } // namespace
 

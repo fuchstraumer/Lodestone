@@ -39,173 +39,77 @@ namespace
         std::vector<ContentHashValue> Hashes;
         std::vector<ShaderLayoutView> Layouts;
 
-        [[nodiscard]] size_t Slot(size_t variant_index, size_t entry_point_index) const noexcept
-        {
-            return (variant_index * EntryPointCount) + entry_point_index;
-        }
+        [[nodiscard]] size_t Slot(size_t variant_index, size_t entry_point_index) const noexcept;
+    };
+
+    struct FootprintTable
+    {
+        /** Sorted and unique. */
+        std::vector<std::pair<std::string_view, std::string_view>> Identities;
+        /** Strided by the identity count. Null where the variant does not declare the resource. */
+        std::vector<const ResourceFootprint*> Footprints;
+
+        [[nodiscard]] const ResourceFootprint* At(size_t variant_index, size_t identity_index) const noexcept;
+    };
+
+    /** A boolean capability axis whose off variant needs a capability name that its on variant does not. */
+    struct InvertedCapabilityPair
+    {
+        uint32_t OffVariant{ 0u };
+        uint32_t OnVariant{ 0u };
+        size_t EntryPoint{ 0u };
+    };
+
+    /** What the capability names of one module show about one axis. `FoundPair` is false when no two cooked variants
+     * differ in that axis alone, and then the axis cannot be judged. */
+    struct CapabilityAxisOutcome
+    {
+        bool FoundPair{ false };
+        bool Changed{ false };
+        std::optional<InvertedCapabilityPair> Inverted;
     };
 
     ContentHashValue HashInstance(const CookedModule& module,
                                   const LibraryVariant& variant,
                                   size_t entry_point_index,
-                                  const ShaderLayoutView& layout)
-    {
-        thread_local StreamingHash hasher;
-        hasher.Reset();
+                                  const ShaderLayoutView& layout);
 
-        hasher.Append(ResolveSource(module, variant, CodeForm::Base, entry_point_index));
-
-        hasher.Append(static_cast<uint64_t>(layout.size()));
-        for (const ResolvedBindingView& binding : layout)
-        {
-            hasher.Append(HashReflectedBinding(*binding.Resource));
-            // no footprint and an empty footprint are different facts
-            hasher.Append(static_cast<uint32_t>(binding.Footprint != nullptr));
-            if (binding.Footprint != nullptr)
-            {
-                AppendFootprintHash(hasher, *binding.Footprint);
-            }
-        }
-
-        hasher.Append(HashReflectedRasterState(module.RasterStates[variant.RasterIndices[entry_point_index]]));
-
-        const WorkgroupSize& workgroup = variant.Workgroups[entry_point_index];
-        hasher.Append(workgroup.X);
-        hasher.Append(workgroup.Y);
-        hasher.Append(workgroup.Z);
-
-        const CodeFormTables& tables = FormTables(module, CodeForm::Base);
-        const CodeFormIndices& indices = FormIndices(variant, CodeForm::Base);
-
-        hasher.Append(HashSamplerPairList(tables.SamplerPairLists[indices.SamplerPairIndices[entry_point_index]]));
-        hasher.Append(
-            HashEntryPointConstants(tables.EntryPointConstantsTable[indices.ConstantsIndices[entry_point_index]]));
-
-        return hasher.Finalize();
-    }
-
-    CookResult<InstanceTable> BuildInstanceTable(const CookedModule& module)
-    {
-        InstanceTable table;
-        table.EntryPointCount = module.EntryPoints.size();
-        table.Hashes.reserve(module.Variants.size() * table.EntryPointCount);
-        table.Layouts.reserve(module.Variants.size() * table.EntryPointCount);
-
-        for (const LibraryVariant& variant : module.Variants)
-        {
-            for (size_t entryPointIndex = 0u; entryPointIndex < table.EntryPointCount; ++entryPointIndex)
-            {
-                CookResult<ShaderLayoutView> layout = ResolveLayoutView(module, variant, CodeForm::Base, entryPointIndex);
-                if (!layout)
-                {
-                    return std::unexpected(layout.error());
-                }
-
-                table.Hashes.push_back(HashInstance(module, variant, entryPointIndex, layout.value()));
-                table.Layouts.push_back(std::move(layout.value()));
-            }
-        }
-
-        return table;
-    }
+    CookResult<InstanceTable> BuildInstanceTable(const CookedModule& module);
 
     /** Hashes pick candidates, and this decides. */
     bool InstancesEqual(const CookedModule& module,
                         const InstanceTable& instances,
                         uint32_t lhs_variant,
                         uint32_t rhs_variant,
-                        size_t entry_point_index)
-    {
-        const LibraryVariant& lhs = module.Variants[lhs_variant];
-        const LibraryVariant& rhs = module.Variants[rhs_variant];
-
-        const WorkgroupSize& lhsWorkgroup = lhs.Workgroups[entry_point_index];
-        const WorkgroupSize& rhsWorkgroup = rhs.Workgroups[entry_point_index];
-        
-        const bool workgroupsEqual = lhsWorkgroup.X == rhsWorkgroup.X &&
-                                     lhsWorkgroup.Y == rhsWorkgroup.Y &&
-                                     lhsWorkgroup.Z == rhsWorkgroup.Z;
-
-        const bool rasterStatesEqual = module.RasterStates[lhs.RasterIndices[entry_point_index]] ==
-                                       module.RasterStates[rhs.RasterIndices[entry_point_index]];
-        const bool layoutsEqual = instances.Layouts[instances.Slot(lhs_variant, entry_point_index)] ==
-                                  instances.Layouts[instances.Slot(rhs_variant, entry_point_index)];
-        const bool sourcesEqual = std::ranges::equal(ResolveSource(module, lhs, CodeForm::Base, entry_point_index),
-                                                     ResolveSource(module, rhs, CodeForm::Base, entry_point_index));
-
-        const CodeFormTables& tables = FormTables(module, CodeForm::Base);
-        const CodeFormIndices& lhsIndices = FormIndices(lhs, CodeForm::Base);
-        const CodeFormIndices& rhsIndices = FormIndices(rhs, CodeForm::Base);
-
-        const bool pairsEqual = tables.SamplerPairLists[lhsIndices.SamplerPairIndices[entry_point_index]] ==
-                                tables.SamplerPairLists[rhsIndices.SamplerPairIndices[entry_point_index]];
-        const bool constantsEqual = tables.EntryPointConstantsTable[lhsIndices.ConstantsIndices[entry_point_index]] ==
-                                    tables.EntryPointConstantsTable[rhsIndices.ConstantsIndices[entry_point_index]];
-
-        return workgroupsEqual &&
-               rasterStatesEqual &&
-               layoutsEqual &&
-               sourcesEqual &&
-               pairsEqual &&
-               constantsEqual;
-    }
+                        size_t entry_point_index);
 
     bool GroupSharesOneInstance(const CookedModule& module,
                                 const InstanceTable& instances,
                                 std::span<const uint32_t> group,
-                                size_t entry_point_index)
-    {
-        const ContentHashValue firstHash = instances.Hashes[instances.Slot(group.front(), entry_point_index)];
-        auto hashCheck = [&instances, &entry_point_index, &firstHash](uint32_t variant_index)
-        {
-            return instances.Hashes[instances.Slot(variant_index, entry_point_index)] == firstHash;
-        };
-
-        const bool hashesAgree = std::ranges::all_of(group.subspan(1u), hashCheck);
-
-        if (!hashesAgree)
-        {
-            return false;
-        }
-
-        auto predicate = [&](uint32_t variant_index)
-        {
-            return InstancesEqual(module, instances, group.front(), variant_index, entry_point_index);
-        };
-
-        return std::ranges::all_of(group.subspan(1u), predicate);
-    }
+                                size_t entry_point_index);
 
     bool AssignmentComparatorExcludingAxis(const PermutationAssignment& lhs,
                                            const PermutationAssignment& rhs,
-                                           size_t excluded_axis_index) noexcept
-    {
-        for (std::ptrdiff_t k = 0; k < std::ssize(lhs); ++k)
-        {
-            if (std::cmp_not_equal(k , excluded_axis_index) &&
-                lhs[k].Value != rhs[k].Value)
-            {
-                return lhs[k].Value < rhs[k].Value;
-            }
-        }
-
-        return false;
-    }
+                                           size_t excluded_axis_index) noexcept;
 
     /** Makes variants that agree on every axis except `axis_index` adjacent. */
-    std::vector<uint32_t> OrderByOtherAxes(const CookedModule& module, const size_t axis_index)
-    {
-        std::vector<uint32_t> order(module.Variants.size());
-        std::ranges::iota(order, 0u);
-        std::ranges::stable_sort(order,
-                                 [&](uint32_t lhs, uint32_t rhs)
-                                 {
-                                     return AssignmentComparatorExcludingAxis(module.Variants[lhs].Canonical,
-                                                                              module.Variants[rhs].Canonical,
-                                                                              axis_index);
-                                 });
-        return order;
-    }
+    std::vector<uint32_t> OrderByOtherAxes(const CookedModule& module, const size_t axis_index);
+
+    FootprintTable BuildFootprintTable(const CookedModule& module);
+
+    bool GroupSharesOneFootprint(const FootprintTable& table, std::span<const uint32_t> group, size_t identity_index);
+
+    const std::vector<std::string>& CapabilityNamesOf(const CookedModule& module,
+                                                      uint32_t variant_index,
+                                                      size_t entry_point_index);
+
+    /** The group holds the two values of a boolean axis, and each name list is sorted. */
+    std::optional<InvertedCapabilityPair> FindInvertedPair(const CookedModule& module,
+                                                           std::span<const uint32_t> group,
+                                                           size_t axis_index,
+                                                           size_t entry_point_index);
+
+    CapabilityAxisOutcome MeasureCapabilityAxis(const CookedModule& module, size_t axis_index);
 
     /** The closing pass: groups variants by their relevant axes, and marks every axis that varies within a group of
      * more than one value, until no group has one. It marks sets and never picks pairs, so the result does not depend
@@ -219,27 +123,27 @@ namespace
         const size_t axisCount = axes.size();
         std::vector<uint32_t> order(module.Variants.size());
         std::vector<uint8_t> marked(axisCount, uint8_t{ 0u });
-        std::vector<std::ptrdiff_t> active_indices;
-        active_indices.reserve(axisCount);
-        std::vector<std::ptrdiff_t> inactive_indices;
-        inactive_indices.reserve(axisCount);
+        std::vector<std::ptrdiff_t> activeIndices;
+        activeIndices.reserve(axisCount);
+        std::vector<std::ptrdiff_t> inactiveIndices;
+        inactiveIndices.reserve(axisCount);
 
         while (true)
         {
             std::ranges::fill(marked, 0u);
-            active_indices.clear();
-            inactive_indices.clear();
+            activeIndices.clear();
+            inactiveIndices.clear();
 
             // one less branch in the hot comparison
             for (std::ptrdiff_t k = 0u; k < std::ssize(axes); ++k)
             {
                 if (IsAxisRelevant(axes[k]))
                 {
-                    active_indices.push_back(k);
+                    activeIndices.push_back(k);
                 }
                 else
                 {
-                    inactive_indices.push_back(k);
+                    inactiveIndices.push_back(k);
                 }
             }
 
@@ -247,7 +151,7 @@ namespace
             {
                 const CanonicalAssignment& lhsValues = module.Variants[lhs].Canonical;
                 const CanonicalAssignment& rhsValues = module.Variants[rhs].Canonical;
-                for (std::ptrdiff_t k : active_indices)
+                for (std::ptrdiff_t k : activeIndices)
                 {
                     if (lhsValues[k].Value != rhsValues[k].Value)
                     {
@@ -280,10 +184,10 @@ namespace
 
                 const CanonicalAssignment& first = module.Variants[group.front()].Canonical;
                 // load each variant once, then check all of its axes
-                for (uint32_t variant_index : group.subspan(1u))
+                for (uint32_t variantIndex : group.subspan(1u))
                 {
-                    const CanonicalAssignment& current = module.Variants[variant_index].Canonical;
-                    for (std::ptrdiff_t k : inactive_indices)
+                    const CanonicalAssignment& current = module.Variants[variantIndex].Canonical;
+                    for (std::ptrdiff_t k : inactiveIndices)
                     {
                         if (marked[k] == 0u &&
                             (current[k].Value != first[k].Value))
@@ -355,7 +259,7 @@ namespace
     {
         const size_t axisCount = module.Space->AxisCount();
         std::vector<std::vector<AxisInfluence>> subjects(subject_count,
-                                                         std::vector<AxisInfluence>(axisCount, AxisInfluence::Inert));
+                                                          std::vector<AxisInfluence>(axisCount, AxisInfluence::Inert));
 
         for (size_t k = 0u; k < axisCount; ++k)
         {
@@ -385,167 +289,6 @@ namespace
         return subjects;
     }
 
-    struct FootprintTable
-    {
-        /** Sorted and unique. */
-        std::vector<std::pair<std::string_view, std::string_view>> Identities;
-        /** Strided by the identity count. Null where the variant does not declare the resource. */
-        std::vector<const ResourceFootprint*> Footprints;
-
-        [[nodiscard]] const ResourceFootprint* At(size_t variant_index, size_t identity_index) const noexcept
-        {
-            return Footprints[(variant_index * Identities.size()) + identity_index];
-        }
-    };
-
-    FootprintTable BuildFootprintTable(const CookedModule& module)
-    {
-        FootprintTable table;
-        table.Identities.reserve(module.Resources.size());
-        for (const ReflectedBinding& resource : module.Resources)
-        {
-            table.Identities.emplace_back(resource.ScopeName, resource.Name);
-        }
-        std::ranges::sort(table.Identities);
-        const auto [uniqueEnd, rangeEnd] = std::ranges::unique(table.Identities);
-        table.Identities.erase(uniqueEnd, rangeEnd);
-
-        std::vector<uint32_t> identityOfResource;
-        identityOfResource.reserve(module.Resources.size());
-        for (const ReflectedBinding& resource : module.Resources)
-        {
-            const auto found = std::ranges::lower_bound(table.Identities,
-                                                        std::pair<std::string_view, std::string_view>{
-                                                            resource.ScopeName, resource.Name });
-            identityOfResource.push_back(static_cast<uint32_t>(found - table.Identities.begin()));
-        }
-
-        table.Footprints.assign(module.Variants.size() * table.Identities.size(), nullptr);
-        for (auto&& [variantIndex, variant] : std::views::enumerate(module.Variants))
-        {
-            const ResourceList& resources = module.ResourceLists[variant.ResourceListIndex];
-            const FootprintList& footprints = module.FootprintLists[variant.FootprintListIndex];
-            for (size_t position = 0u; position < resources.size(); ++position)
-            {
-                const size_t slot = (static_cast<size_t>(variantIndex) * table.Identities.size()) +
-                                    identityOfResource[resources[position]];
-                table.Footprints[slot] = &footprints[position];
-            }
-        }
-
-        return table;
-    }
-
-    bool GroupSharesOneFootprint(const FootprintTable& table, std::span<const uint32_t> group, size_t identity_index)
-    {
-        const ResourceFootprint* first = nullptr;
-        for (const uint32_t variantIndex : group)
-        {
-            const ResourceFootprint* footprint = table.At(variantIndex, identity_index);
-            if (footprint == nullptr)
-            {
-                continue;
-            }
-
-            if (first == nullptr)
-            {
-                first = footprint;
-            }
-            else if (!(*footprint == *first))
-            {
-                return false;
-            }
-
-        }
-
-        return true;
-    }
-
-
-    /** A boolean capability axis whose off variant needs a capability name that its on variant does not. */
-    struct InvertedCapabilityPair
-    {
-        uint32_t OffVariant{ 0u };
-        uint32_t OnVariant{ 0u };
-        size_t EntryPoint{ 0u };
-    };
-
-    /** What the capability names of one module show about one axis. `FoundPair` is false when no two cooked variants
-     * differ in that axis alone, and then the axis cannot be judged. */
-    struct CapabilityAxisOutcome
-    {
-        bool FoundPair{ false };
-        bool Changed{ false };
-        std::optional<InvertedCapabilityPair> Inverted;
-    };
-
-    const std::vector<std::string>& CapabilityNamesOf(const CookedModule& module,
-                                                      uint32_t variant_index,
-                                                      size_t entry_point_index)
-    {
-        const LibraryVariant& variant = module.Variants[variant_index];
-        const CodeFormTables& tables = FormTables(module, CodeForm::Base);
-        const CodeFormIndices& indices = FormIndices(variant, CodeForm::Base);
-
-        return tables.SourceFacts[indices.SourceIndices[entry_point_index]].CapabilityNames;
-    }
-
-    /** The group holds the two values of a boolean axis, and each name list is sorted. */
-    std::optional<InvertedCapabilityPair> FindInvertedPair(const CookedModule& module,
-                                                           std::span<const uint32_t> group,
-                                                           size_t axis_index,
-                                                           size_t entry_point_index)
-    {
-        const auto isOn = [&module, axis_index](uint32_t variant_index)
-        {
-            return module.Variants[variant_index].Canonical[axis_index].Value.AsBool();
-        };
-
-        const auto offIter = std::ranges::find_if_not(group, isOn);
-        const auto onIter = std::ranges::find_if(group, isOn);
-
-        if (offIter == group.end() ||
-            onIter == group.end() ||
-            std::ranges::includes(CapabilityNamesOf(module, *onIter, entry_point_index),
-                                  CapabilityNamesOf(module, *offIter, entry_point_index)))
-        {
-            return std::nullopt;
-        }
-
-        return InvertedCapabilityPair
-        {
-            .OffVariant = *offIter,
-            .OnVariant = *onIter,
-            .EntryPoint = entry_point_index
-        };
-    }
-
-    CapabilityAxisOutcome MeasureCapabilityAxis(const CookedModule& module, size_t axis_index)
-    {
-        const bool isBoolean = module.Space->Axes()[axis_index].ValueDomain == AxisValueDomain::Boolean;
-        CapabilityAxisOutcome outcome;
-        const auto measureGroup = [&module, axis_index, isBoolean, &outcome](std::span<const uint32_t> group)
-        {
-            for (size_t entryPointIndex = 0u; entryPointIndex < module.EntryPoints.size(); ++entryPointIndex)
-            {
-                const std::vector<std::string>& firstNames = CapabilityNamesOf(module, group.front(), entryPointIndex);
-                outcome.Changed = outcome.Changed ||
-                                  std::ranges::any_of(group.subspan(1u),
-                                                      [&](uint32_t variant_index)
-                                                      {
-                                                          return CapabilityNamesOf(module, variant_index, entryPointIndex) !=
-                                                                 firstNames;
-                                                      });
-                if (isBoolean && !outcome.Inverted.has_value())
-                {
-                    outcome.Inverted = FindInvertedPair(module, group, axis_index, entryPointIndex);
-                }
-            }
-        };
-
-        outcome.FoundPair = ForEachOneAxisGroup(module, axis_index, measureGroup);
-        return outcome;
-    }
 } // namespace
 
 CookResult<ModuleInfluence> ComputeActualInfluence(const CookedModule& module)
@@ -793,5 +536,310 @@ std::string_view ToString(AxisInfluence influence) noexcept
 
     return "Invalid";
 }
+
+namespace
+{
+
+    size_t InstanceTable::Slot(size_t variant_index, size_t entry_point_index) const noexcept
+    {
+        return (variant_index * EntryPointCount) + entry_point_index;
+    }
+
+    ContentHashValue HashInstance(const CookedModule& module,
+                                  const LibraryVariant& variant,
+                                  size_t entry_point_index,
+                                  const ShaderLayoutView& layout)
+    {
+        thread_local StreamingHash hasher;
+        hasher.Reset();
+
+        hasher.Append(ResolveSource(module, variant, CodeForm::Base, entry_point_index));
+
+        hasher.Append(static_cast<uint64_t>(layout.size()));
+        for (const ResolvedBindingView& binding : layout)
+        {
+            hasher.Append(HashReflectedBinding(*binding.Resource));
+            // no footprint and an empty footprint are different facts
+            hasher.Append(static_cast<uint32_t>(binding.Footprint != nullptr));
+            if (binding.Footprint != nullptr)
+            {
+                AppendFootprintHash(hasher, *binding.Footprint);
+            }
+        }
+
+        hasher.Append(HashReflectedRasterState(module.RasterStates[variant.RasterIndices[entry_point_index]]));
+
+        const WorkgroupSize& workgroup = variant.Workgroups[entry_point_index];
+        hasher.Append(workgroup.X);
+        hasher.Append(workgroup.Y);
+        hasher.Append(workgroup.Z);
+
+        const CodeFormTables& tables = FormTables(module, CodeForm::Base);
+        const CodeFormIndices& indices = FormIndices(variant, CodeForm::Base);
+
+        hasher.Append(HashSamplerPairList(tables.SamplerPairLists[indices.SamplerPairIndices[entry_point_index]]));
+        hasher.Append(
+            HashEntryPointConstants(tables.EntryPointConstantsTable[indices.ConstantsIndices[entry_point_index]]));
+
+        return hasher.Finalize();
+    }
+
+    CookResult<InstanceTable> BuildInstanceTable(const CookedModule& module)
+    {
+        InstanceTable table;
+        table.EntryPointCount = module.EntryPoints.size();
+        table.Hashes.reserve(module.Variants.size() * table.EntryPointCount);
+        table.Layouts.reserve(module.Variants.size() * table.EntryPointCount);
+
+        for (const LibraryVariant& variant : module.Variants)
+        {
+            for (size_t entryPointIndex = 0u; entryPointIndex < table.EntryPointCount; ++entryPointIndex)
+            {
+                CookResult<ShaderLayoutView> layout = ResolveLayoutView(module, variant, CodeForm::Base, entryPointIndex);
+                if (!layout)
+                {
+                    return std::unexpected(layout.error());
+                }
+
+                table.Hashes.push_back(HashInstance(module, variant, entryPointIndex, layout.value()));
+                table.Layouts.push_back(std::move(layout.value()));
+            }
+        }
+
+        return table;
+    }
+
+    bool InstancesEqual(const CookedModule& module,
+                        const InstanceTable& instances,
+                        uint32_t lhs_variant,
+                        uint32_t rhs_variant,
+                        size_t entry_point_index)
+    {
+        const LibraryVariant& lhs = module.Variants[lhs_variant];
+        const LibraryVariant& rhs = module.Variants[rhs_variant];
+
+        const WorkgroupSize& lhsWorkgroup = lhs.Workgroups[entry_point_index];
+        const WorkgroupSize& rhsWorkgroup = rhs.Workgroups[entry_point_index];
+        
+        const bool workgroupsEqual = lhsWorkgroup.X == rhsWorkgroup.X &&
+                                     lhsWorkgroup.Y == rhsWorkgroup.Y &&
+                                     lhsWorkgroup.Z == rhsWorkgroup.Z;
+
+        const bool rasterStatesEqual = module.RasterStates[lhs.RasterIndices[entry_point_index]] ==
+                                       module.RasterStates[rhs.RasterIndices[entry_point_index]];
+        const bool layoutsEqual = instances.Layouts[instances.Slot(lhs_variant, entry_point_index)] ==
+                                  instances.Layouts[instances.Slot(rhs_variant, entry_point_index)];
+        const bool sourcesEqual = std::ranges::equal(ResolveSource(module, lhs, CodeForm::Base, entry_point_index),
+                                                     ResolveSource(module, rhs, CodeForm::Base, entry_point_index));
+
+        const CodeFormTables& tables = FormTables(module, CodeForm::Base);
+        const CodeFormIndices& lhsIndices = FormIndices(lhs, CodeForm::Base);
+        const CodeFormIndices& rhsIndices = FormIndices(rhs, CodeForm::Base);
+
+        const bool pairsEqual = tables.SamplerPairLists[lhsIndices.SamplerPairIndices[entry_point_index]] ==
+                                tables.SamplerPairLists[rhsIndices.SamplerPairIndices[entry_point_index]];
+        const bool constantsEqual = tables.EntryPointConstantsTable[lhsIndices.ConstantsIndices[entry_point_index]] ==
+                                    tables.EntryPointConstantsTable[rhsIndices.ConstantsIndices[entry_point_index]];
+
+        return workgroupsEqual &&
+               rasterStatesEqual &&
+               layoutsEqual &&
+               sourcesEqual &&
+               pairsEqual &&
+               constantsEqual;
+    }
+
+    bool GroupSharesOneInstance(const CookedModule& module,
+                                const InstanceTable& instances,
+                                std::span<const uint32_t> group,
+                                size_t entry_point_index)
+    {
+        const ContentHashValue firstHash = instances.Hashes[instances.Slot(group.front(), entry_point_index)];
+        auto hashCheck = [&instances, &entry_point_index, &firstHash](uint32_t variant_index)
+        {
+            return instances.Hashes[instances.Slot(variant_index, entry_point_index)] == firstHash;
+        };
+
+        const bool hashesAgree = std::ranges::all_of(group.subspan(1u), hashCheck);
+
+        if (!hashesAgree)
+        {
+            return false;
+        }
+
+        auto predicate = [&](uint32_t variant_index)
+        {
+            return InstancesEqual(module, instances, group.front(), variant_index, entry_point_index);
+        };
+
+        return std::ranges::all_of(group.subspan(1u), predicate);
+    }
+
+    bool AssignmentComparatorExcludingAxis(const PermutationAssignment& lhs,
+                                           const PermutationAssignment& rhs,
+                                           size_t excluded_axis_index) noexcept
+    {
+        for (std::ptrdiff_t k = 0; k < std::ssize(lhs); ++k)
+        {
+            if (std::cmp_not_equal(k , excluded_axis_index) &&
+                lhs[k].Value != rhs[k].Value)
+            {
+                return lhs[k].Value < rhs[k].Value;
+            }
+        }
+
+        return false;
+    }
+
+    std::vector<uint32_t> OrderByOtherAxes(const CookedModule& module, const size_t axis_index)
+    {
+        std::vector<uint32_t> order(module.Variants.size());
+        std::ranges::iota(order, 0u);
+        std::ranges::stable_sort(order,
+                                 [&](uint32_t lhs, uint32_t rhs)
+                                 {
+                                     return AssignmentComparatorExcludingAxis(module.Variants[lhs].Canonical,
+                                                                              module.Variants[rhs].Canonical,
+                                                                              axis_index);
+                                 });
+        return order;
+    }
+
+    const ResourceFootprint* FootprintTable::At(size_t variant_index, size_t identity_index) const noexcept
+    {
+        return Footprints[(variant_index * Identities.size()) + identity_index];
+    }
+
+    FootprintTable BuildFootprintTable(const CookedModule& module)
+    {
+        FootprintTable table;
+        table.Identities.reserve(module.Resources.size());
+        for (const ReflectedBinding& resource : module.Resources)
+        {
+            table.Identities.emplace_back(resource.ScopeName, resource.Name);
+        }
+        std::ranges::sort(table.Identities);
+        const auto [uniqueEnd, rangeEnd] = std::ranges::unique(table.Identities);
+        table.Identities.erase(uniqueEnd, rangeEnd);
+
+        std::vector<uint32_t> identityOfResource;
+        identityOfResource.reserve(module.Resources.size());
+        for (const ReflectedBinding& resource : module.Resources)
+        {
+            const auto found = std::ranges::lower_bound(table.Identities,
+                                                        std::pair<std::string_view, std::string_view>{
+                                                            resource.ScopeName, resource.Name });
+            identityOfResource.push_back(static_cast<uint32_t>(found - table.Identities.begin()));
+        }
+
+        table.Footprints.assign(module.Variants.size() * table.Identities.size(), nullptr);
+        for (auto&& [variantIndex, variant] : std::views::enumerate(module.Variants))
+        {
+            const ResourceList& resources = module.ResourceLists[variant.ResourceListIndex];
+            const FootprintList& footprints = module.FootprintLists[variant.FootprintListIndex];
+            for (size_t position = 0u; position < resources.size(); ++position)
+            {
+                const size_t slot = (static_cast<size_t>(variantIndex) * table.Identities.size()) +
+                                     identityOfResource[resources[position]];
+                table.Footprints[slot] = &footprints[position];
+            }
+        }
+
+        return table;
+    }
+
+    bool GroupSharesOneFootprint(const FootprintTable& table, std::span<const uint32_t> group, size_t identity_index)
+    {
+        const ResourceFootprint* first = nullptr;
+        for (const uint32_t variantIndex : group)
+        {
+            const ResourceFootprint* footprint = table.At(variantIndex, identity_index);
+            if (footprint == nullptr)
+            {
+                continue;
+            }
+
+            if (first == nullptr)
+            {
+                first = footprint;
+            }
+            else if (!(*footprint == *first))
+            {
+                return false;
+            }
+
+        }
+
+        return true;
+    }
+
+    const std::vector<std::string>& CapabilityNamesOf(const CookedModule& module,
+                                                      uint32_t variant_index,
+                                                      size_t entry_point_index)
+    {
+        const LibraryVariant& variant = module.Variants[variant_index];
+        const CodeFormTables& tables = FormTables(module, CodeForm::Base);
+        const CodeFormIndices& indices = FormIndices(variant, CodeForm::Base);
+
+        return tables.SourceFacts[indices.SourceIndices[entry_point_index]].CapabilityNames;
+    }
+
+    std::optional<InvertedCapabilityPair> FindInvertedPair(const CookedModule& module,
+                                                           std::span<const uint32_t> group,
+                                                           size_t axis_index,
+                                                           size_t entry_point_index)
+    {
+        const auto isOn = [&module, axis_index](uint32_t variant_index)
+        {
+            return module.Variants[variant_index].Canonical[axis_index].Value.AsBool();
+        };
+
+        const auto offIter = std::ranges::find_if_not(group, isOn);
+        const auto onIter = std::ranges::find_if(group, isOn);
+
+        if (offIter == group.end() ||
+            onIter == group.end() ||
+            std::ranges::includes(CapabilityNamesOf(module, *onIter, entry_point_index),
+                                   CapabilityNamesOf(module, *offIter, entry_point_index)))
+        {
+            return std::nullopt;
+        }
+
+        return InvertedCapabilityPair
+        {
+            .OffVariant = *offIter,
+            .OnVariant = *onIter,
+            .EntryPoint = entry_point_index
+        };
+    }
+
+    CapabilityAxisOutcome MeasureCapabilityAxis(const CookedModule& module, size_t axis_index)
+    {
+        const bool isBoolean = module.Space->Axes()[axis_index].ValueDomain == AxisValueDomain::Boolean;
+        CapabilityAxisOutcome outcome;
+        const auto measureGroup = [&module, axis_index, isBoolean, &outcome](std::span<const uint32_t> group)
+        {
+            for (size_t entryPointIndex = 0u; entryPointIndex < module.EntryPoints.size(); ++entryPointIndex)
+            {
+                const std::vector<std::string>& firstNames = CapabilityNamesOf(module, group.front(), entryPointIndex);
+                outcome.Changed = outcome.Changed ||
+                                  std::ranges::any_of(group.subspan(1u),
+                                                      [&](uint32_t variant_index)
+                                                      {
+                                                          return CapabilityNamesOf(module, variant_index, entryPointIndex) !=
+                                                                 firstNames;
+                                                      });
+                if (isBoolean && !outcome.Inverted.has_value())
+                {
+                    outcome.Inverted = FindInvertedPair(module, group, axis_index, entryPointIndex);
+                }
+            }
+        };
+
+        outcome.FoundPair = ForEachOneAxisGroup(module, axis_index, measureGroup);
+        return outcome;
+    }
+
+} // namespace
 
 } // namespace lodestone
