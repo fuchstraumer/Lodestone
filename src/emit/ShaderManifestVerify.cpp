@@ -105,6 +105,7 @@ namespace
                                 const LibraryVariant& variant,
                                 manifest::VariantView read_variant,
                                 size_t entry_point_index,
+                                ContentHashValue base_hash,
                                 DiagnosticSink& sink);
 
 } // namespace
@@ -273,8 +274,15 @@ namespace
             return sourceFactsError;
         }
 
+        const CookResult<std::vector<ContentHashValue>> baseHashes = HashBaseInstances(module);
+        if (!baseHashes)
+        {
+            return baseHashes.error();
+        }
+
+        const size_t entryPointCount = module.EntryPoints.size();
         const manifest::ShaderSourceProvider provider{ view, 0u };
-        for (const LibraryVariant& variant : module.Variants)
+        for (auto&& [position, variant] : std::views::enumerate(module.Variants))
         {
             const VariantKey key = module.VariantKeys[variant.Index];
             const std::optional<manifest::VariantView> readVariant = view.VariantByKey(key);
@@ -298,10 +306,11 @@ namespace
                 return maskError;
             }
 
-            for (size_t entryPointIndex = 0u; entryPointIndex < module.EntryPoints.size(); ++entryPointIndex)
+            for (size_t entryPointIndex = 0u; entryPointIndex < entryPointCount; ++entryPointIndex)
             {
+                const ContentHashValue baseHash = (*baseHashes)[(static_cast<size_t>(position) * entryPointCount) + entryPointIndex];
                 const CookError slotError = CheckManifestSlot(
-                    module, view, provider, variant, readVariant.value(), entryPointIndex, sink);
+                    module, view, provider, variant, readVariant.value(), entryPointIndex, baseHash, sink);
                 if (slotError != CookError::Success)
                 {
                     return slotError;
@@ -473,6 +482,13 @@ namespace
         const manifest::EntryPointInstance& lhsRecord = lhs.Record();
         const manifest::EntryPointInstance& rhsRecord = rhs.Record();
 
+        // the relevance describes the base form, and the manifest holds only its hash: the one place a hash decides
+        const manifest::Profile& profile = view.ProfileRecord();
+        if (profile.OptimizationLevel != 0u || profile.DebugLevel != 0u)
+        {
+            return lhsRecord.BaseHash == rhsRecord.BaseHash;
+        }
+
         if (lhsRecord.WorkgroupX != rhsRecord.WorkgroupX || lhsRecord.WorkgroupY != rhsRecord.WorkgroupY ||
             lhsRecord.WorkgroupZ != rhsRecord.WorkgroupZ)
         {
@@ -563,9 +579,9 @@ namespace
                                const manifest::EnvironmentView& view,
                                DiagnosticSink& sink)
     {
-        for (uint32_t sourceIndex = 0u; sourceIndex < module.SourceFacts.size(); ++sourceIndex)
+        for (uint32_t sourceIndex = 0u; sourceIndex < module.Delivered.SourceFacts.size(); ++sourceIndex)
         {
-            const SourceCodeFacts& expected = module.SourceFacts[sourceIndex];
+            const SourceCodeFacts& expected = module.Delivered.SourceFacts[sourceIndex];
             std::vector<std::string_view> read;
             for (uint32_t capabilityIndex = 0u; capabilityIndex < view.CapabilityNames().size(); ++capabilityIndex)
             {
@@ -762,7 +778,7 @@ namespace
                                   size_t entry_point_index,
                                   DiagnosticSink& sink)
     {
-        const std::span<const std::byte> expectedSource = ResolveSource(module, variant, entry_point_index);
+        const std::span<const std::byte> expectedSource = ResolveSource(module, variant, CodeForm::Delivered, entry_point_index);
         const VariantKey variantKey = module.VariantKeys[variant.Index];
         const uint32_t entryPoint = static_cast<uint32_t>(entry_point_index);
         const std::span<const std::byte> providerBytes =
@@ -905,7 +921,7 @@ namespace
                                   size_t entry_point_index,
                                   DiagnosticSink& sink)
     {
-        const CookResult<ShaderLayoutView> expectedLayoutResult = ResolveLayoutView(module, variant, entry_point_index);
+        const CookResult<ShaderLayoutView> expectedLayoutResult = ResolveLayoutView(module, variant, CodeForm::Delivered, entry_point_index);
         if (!expectedLayoutResult)
         {
             return expectedLayoutResult.error();
@@ -970,7 +986,7 @@ namespace
         }
 
         const SamplerPairList& expectedPairs =
-            module.SamplerPairLists[variant.SamplerPairIndices[entry_point_index]];
+            module.Delivered.SamplerPairLists[variant.Delivered.SamplerPairIndices[entry_point_index]];
         const std::span<const manifest::SamplerTexturePair> readPairs =
             read_variant.EntryPoint(static_cast<uint32_t>(entry_point_index)).SamplerTexturePairs();
         const bool pairsMatch = std::ranges::equal(readPairs, expectedPairs, [](const manifest::SamplerTexturePair& read, const SamplerTexturePair& expected) {
@@ -990,7 +1006,7 @@ namespace
         }
 
         const EntryPointConstants& expectedConstants =
-            module.EntryPointConstantsTable[variant.ConstantsIndices[entry_point_index]];
+            module.Delivered.EntryPointConstantsTable[variant.Delivered.ConstantsIndices[entry_point_index]];
         const manifest::EntryPointConstantsView readConstants =
             read_variant.EntryPoint(static_cast<uint32_t>(entry_point_index)).Constants();
         const manifest::EntryPointConstants& readRecord = readConstants.Record();
@@ -1101,6 +1117,7 @@ namespace
                                 const LibraryVariant& variant,
                                 manifest::VariantView read_variant,
                                 size_t entry_point_index,
+                                ContentHashValue base_hash,
                                 DiagnosticSink& sink)
     {
         const CookError sourceError = CheckManifestSource(module, provider, variant, entry_point_index, sink);
@@ -1123,7 +1140,27 @@ namespace
             return layoutError;
         }
 
-        return CheckManifestRaster(module, view, variant, entry_point_index, sink);
+        const CookError rasterError = CheckManifestRaster(module, view, variant, entry_point_index, sink);
+        if (rasterError != CookError::Success)
+        {
+            return rasterError;
+        }
+
+        // last, so that a record the specific checks above can name reports by its own error
+        const manifest::EntryPointInstance& readRecord =
+            read_variant.EntryPoint(static_cast<uint32_t>(entry_point_index)).Record();
+        if (readRecord.BaseHash != base_hash)
+        {
+            return ReportError(sink,
+                               CookError::ManifestBaseHashMismatch,
+                               std::format("manifest base hash {:#x} of {} [{}] does not match the cook's {:#x}",
+                                           readRecord.BaseHash,
+                                           module.EntryPoints[entry_point_index].Name,
+                                           variant.Description,
+                                           base_hash));
+        }
+
+        return CookError::Success;
     }
 
 } // namespace

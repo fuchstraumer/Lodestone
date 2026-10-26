@@ -182,7 +182,9 @@ namespace
                                                                 StringTableBuilder& strings,
                                                                 std::vector<manifest::UniformMember>& member_records);
     manifest::Footprint MakeFootprintRecord(const ResourceFootprint& footprint) noexcept;
-    manifest::EntryPointInstance MakeSlotRecord(const LibraryVariant& variant, size_t entry_point_index) noexcept;
+    manifest::EntryPointInstance MakeSlotRecord(const LibraryVariant& variant,
+                                                size_t entry_point_index,
+                                                ContentHashValue base_hash) noexcept;
     manifest::VertexInput MakeVertexInputRecord(const ReflectedVertexInput& input, StringTableBuilder& strings);
     manifest::ColorTarget MakeColorTargetRecord(const ReflectedColorTarget& target) noexcept;
 
@@ -285,7 +287,9 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
         profiles.push_back(manifest::Profile{ .TargetNameString = strings.Add(profile.TargetName),
                                               .Forms = profile.Forms,
                                               .CodeFormat = profile.CodeFormat,
-                                              .Flags = flags });
+                                              .Flags = flags,
+                                              .OptimizationLevel = static_cast<uint8_t>(profile.OptimizationLevel),
+                                              .DebugLevel = static_cast<uint8_t>(profile.DebugLevel) });
     }
 
     // extents add strings, and the string table is in the header region
@@ -535,17 +539,20 @@ namespace
         return manifest::SamplerTexturePair{ .Texture = pair.Texture, .Sampler = pair.Sampler };
     }
 
-    manifest::EntryPointInstance MakeSlotRecord(const LibraryVariant& variant, size_t entry_point_index) noexcept
+    manifest::EntryPointInstance MakeSlotRecord(const LibraryVariant& variant,
+                                                size_t entry_point_index,
+                                                ContentHashValue base_hash) noexcept
     {
         manifest::EntryPointInstance slot;
-        slot.Source = variant.SourceIndices[entry_point_index];
-        slot.Visibility = variant.VisibilityIndices[entry_point_index];
+        slot.BaseHash = base_hash;
+        slot.Source = variant.Delivered.SourceIndices[entry_point_index];
+        slot.Visibility = variant.Delivered.VisibilityIndices[entry_point_index];
         slot.WorkgroupX = variant.Workgroups[entry_point_index].X;
         slot.WorkgroupY = variant.Workgroups[entry_point_index].Y;
         slot.WorkgroupZ = variant.Workgroups[entry_point_index].Z;
         slot.Raster = variant.RasterIndices[entry_point_index];
-        slot.SamplerPairs = variant.SamplerPairIndices[entry_point_index];
-        slot.Constants = variant.ConstantsIndices[entry_point_index];
+        slot.SamplerPairs = variant.Delivered.SamplerPairIndices[entry_point_index];
+        slot.Constants = variant.Delivered.ConstantsIndices[entry_point_index];
         return slot;
     }
 
@@ -742,11 +749,11 @@ namespace
         AppendRuns(module.ResourceLists, tables.ResourceIndices, tables.ResourceLists, &PassThroughIndex);
         AppendRuns(module.FootprintLists, tables.Footprints, tables.FootprintLists, &MakeFootprintRecord);
         AppendRuns(
-            module.VisibilityLists, tables.VisibilityIndices, tables.VisibilityLists, &PassThroughIndex);
-        AppendRuns(module.SamplerPairLists, tables.SamplerTexturePairs, tables.SamplerPairLists, &MakeSamplerPairRecord);
+            module.Delivered.VisibilityLists, tables.VisibilityIndices, tables.VisibilityLists, &PassThroughIndex);
+        AppendRuns(module.Delivered.SamplerPairLists, tables.SamplerTexturePairs, tables.SamplerPairLists, &MakeSamplerPairRecord);
 
-        tables.EntryPointConstants.reserve(module.EntryPointConstantsTable.size());
-        for (const EntryPointConstants& constants : module.EntryPointConstantsTable)
+        tables.EntryPointConstants.reserve(module.Delivered.EntryPointConstantsTable.size());
+        for (const EntryPointConstants& constants : module.Delivered.EntryPointConstantsTable)
         {
             tables.EntryPointConstants.push_back(
                 MakeEntryPointConstantsRecord(constants, strings, tables.UniformMembers));
@@ -807,8 +814,15 @@ namespace
                                                            std::to_underlying(keyOf(*duplicate)))));
         }
 
+        const CookResult<std::vector<ContentHashValue>> baseHashes = HashBaseInstances(module);
+        if (!baseHashes)
+        {
+            return std::unexpected(baseHashes.error());
+        }
+
         const size_t axisCount = module.Space != nullptr ? module.Space->AxisCount() : 0u;
         const size_t maskWordCount = (axisCount + k_AxisMaskWordBits - 1u) / k_AxisMaskWordBits;
+        const size_t entryPointCount = module.EntryPoints.size();
 
         VariantTables tables;
         tables.Keys.reserve(order.size());
@@ -832,9 +846,10 @@ namespace
                 tables.AxisMasks[wordIndex] |= uint64_t{ 1u } << (axisPosition % k_AxisMaskWordBits);
             }
 
-            for (size_t entryPointIndex = 0u; entryPointIndex < module.EntryPoints.size(); ++entryPointIndex)
+            for (size_t entryPointIndex = 0u; entryPointIndex < entryPointCount; ++entryPointIndex)
             {
-                tables.Slots.push_back(MakeSlotRecord(variant, entryPointIndex));
+                const ContentHashValue baseHash = (*baseHashes)[(position * entryPointCount) + entryPointIndex];
+                tables.Slots.push_back(MakeSlotRecord(variant, entryPointIndex, baseHash));
             }
         }
 
@@ -844,11 +859,11 @@ namespace
     SourceTables BuildSourceTables(const CookedModule& module, StringTableBuilder& strings)
     {
         SourceTables tables;
-        tables.Refs.reserve(module.Sources.size());
+        tables.Refs.reserve(module.Delivered.Sources.size());
         // hand-built modules must supply facts, or the zip drops sources
-        assert(module.SourceFacts.size() == module.Sources.size());
+        assert(module.Delivered.SourceFacts.size() == module.Delivered.Sources.size());
 
-        for (const auto& [source, facts] : std::views::zip(module.Sources, module.SourceFacts))
+        for (const auto& [source, facts] : std::views::zip(module.Delivered.Sources, module.Delivered.SourceFacts))
         {
             tables.Refs.push_back(manifest::SourceRef{ .Offset = static_cast<uint32_t>(tables.Blob.size()),
                                                        .Length = static_cast<uint32_t>(source.size()),
@@ -864,8 +879,8 @@ namespace
             tables.CapabilityNames.push_back(strings.Add(name));
         }
         const size_t wordCount = (names.size() + k_AxisMaskWordBits - 1u) / k_AxisMaskWordBits;
-        tables.CapabilityMasks.assign(module.SourceFacts.size() * wordCount, 0u);
-        for (const auto& [sourceIndex, facts] : std::views::enumerate(module.SourceFacts))
+        tables.CapabilityMasks.assign(module.Delivered.SourceFacts.size() * wordCount, 0u);
+        for (const auto& [sourceIndex, facts] : std::views::enumerate(module.Delivered.SourceFacts))
         {
             for (const std::string& name : facts.CapabilityNames)
             {

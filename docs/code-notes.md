@@ -380,22 +380,26 @@ Moved from `CLAUDE.md` on 2026-10-25. Each bullet is one validator of the cook.
   declares `ReadWrite` and reflection reads `WriteOnly`. `IsSlangNonReadableArrayFault` (in `SpvValidator.cpp`) accepts
   that one difference, for an array of storage images only, and prints a warning. `SlangNonReadableCanaryTest` fails when
   Slang decorates the array.
+- **The delivered form check**, after the reflection cross-check of each variant. `VerifyDeliveredForm` (in
+  `model/DeliveredForm.cpp`) runs only when the cook compiled a base form beside the delivered form. An optimizer only
+  removes code, so the delivered form of each entry point instance must be a subset of the base form in one target: the
+  used bindings, the sampler pairs (compared by binding index, since a position moves when a binding before it goes),
+  the capability names, the workgroup memory, and the entry point constants (delivery and size, not the position).
+  `SPV_KHR_non_semantic_info` is the one name the delivered form may add, for debug information. It is skipped for a
+  variant with a reflection mismatch, which fails the cook already. A difference fails with `DeliveredFormExceedsBase`.
 - **The sampler pair cross-check**, after the last module and before the emit. `VerifySamplerPairsAcrossProfiles`
   (in `model/CookedLibrary.cpp`) compares the pairs of each variant that two profiles cooked, by resource scope
   and name. The two readers are independent, so agreement is a second opinion. It skips an entry point with a
-  combined texture sampler, which SPIR-V samples with no `OpSampledImage`. It compares only the pairs whose texture and
-  sampler both profiles use (`KeepPairsVisibleIn`): above `--O0` spirv-opt removes bindings from SPIR-V only, and a
-  profile has no opinion on a binding it does not use. A difference fails the cook with `SamplerPairsTargetMismatch`.
+  combined texture sampler, which SPIR-V samples with no `OpSampledImage`. It reads the base form, so spirv-opt cannot
+  remove a binding from one profile only. A difference fails the cook with `SamplerPairsTargetMismatch`.
 - **The source facts cross-check**, next to it. `VerifySourceFactsAcrossProfiles` (in `model/CookedLibrary.cpp`)
   compares the workgroup memory bytes, and a portable subset of the capability names, of each entry point that two
   profiles cooked for one variant. The map is `f16` with `Float16`, and `subgroups` with the `GroupNonUniform` family.
   A name that only one target spells (`StorageInputOutput16`, `DrawParameters`) is not compared. A profile with no
   reader (`CookedProfile::CodeFactsRead` false) is skipped, because it stores empty facts. A difference fails the
-  cook with `SourceFactsTargetMismatch`. Both cross-profile checks share `VisitSharedVariants`. When only one profile's
-  code went through an optimizer (`CookedProfile::CodeOptimized`, from `TargetProfile::OptimizesEmittedCode` above
-  `--O0`), the check is one-way: the optimized profile needs no more workgroup memory and no portable capability that the
-  other lacks. Measured 2026-10-25: KitchenSink `KsVolume` `GenerateCS` needs 0 bytes in SPIR-V and 256 in WGSL at `--O1`.
-  This one-way check cannot see a lowering that differs between the targets in the other direction (`todo.md`).
+  cook with `SourceFactsTargetMismatch`. Both cross-profile checks share `VisitSharedVariants`. Both read the base form
+  and compare exactly. The delivered form can differ: measured 2026-10-25, KitchenSink `KsVolume` `GenerateCS` needs 0
+  bytes in SPIR-V and 256 in WGSL at `--O1`.
 - **The capability axis check**, next to it. `VerifyCapabilityAxes` (in `model/AxisInfluence`) reads the capability
   names that each profile's reader measured, for each axis of kind `capability` that no other axis gates. A one-axis pair
   must differ in the names of some entry point, or the cook fails with `CapabilityAxisInert`: the "off" path still needs

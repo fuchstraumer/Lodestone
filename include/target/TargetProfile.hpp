@@ -170,8 +170,6 @@ struct TargetProfile
     uint32_t MaxPushConstantBytes{ 0u };
     /** @brief The guaranteed Vulkan version, as `VK_MAKE_API_VERSION(0, major, minor, 0)`. Zero if not Vulkan. */
     uint32_t VulkanApiVersion{ 0u };
-    /** @brief Slang gives the emitted code to an optimizer above `--O0` (spirv-opt for SPIR-V), which can remove code. */
-    bool OptimizesEmittedCode{ false };
     /** @brief What the profile still lacks. A cook for a profile with a reason fails with `TargetProfileIncomplete`. */
     std::string_view IncompleteReason;
 };

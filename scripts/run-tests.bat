@@ -103,8 +103,8 @@ if !ERRORLEVEL! neq 0 (
     echo [ ok ] KitchenSinkCookTest
 )
 
-REM The same KitchenSink cook at --O2, where spirv-opt removes bindings and workgroup memory from SPIR-V only.
-"%BIN%\KitchenSinkOptimizedCookTest.exe" -o "%REPO%\build\%PRESET%\tests\kitchen_sink_optimized_output" --target=wgsl --target=spirv --verify-deterministic --O2 --policy-file "%REPO%\tests\assets\KitchenSink\KitchenSink.toml" "%REPO%\tests\assets\KitchenSink\KsGeometry.slang" "%REPO%\tests\assets\KitchenSink\KsMaterial.slang" "%REPO%\tests\assets\KitchenSink\KsVolume.slang" "%REPO%\tests\assets\KitchenSink\KsPost.slang" >nul 2>&1
+REM The same KitchenSink cook at --O2 --g3. The measurements read the base form, so the inert axis policy still holds.
+"%BIN%\KitchenSinkOptimizedCookTest.exe" -o "%REPO%\build\%PRESET%\tests\kitchen_sink_optimized_output" --target=wgsl --target=spirv --verify-deterministic --O2 --g3 --policy-file "%REPO%\tests\assets\KitchenSink\KitchenSink.toml" "%REPO%\tests\assets\KitchenSink\KsGeometry.slang" "%REPO%\tests\assets\KitchenSink\KsMaterial.slang" "%REPO%\tests\assets\KitchenSink\KsVolume.slang" "%REPO%\tests\assets\KitchenSink\KsPost.slang" >nul 2>&1
 if !ERRORLEVEL! neq 0 (
     echo [FAIL] KitchenSinkOptimizedCookTest
     set "FAILED=1"

@@ -145,6 +145,31 @@ int main(int argc, char** argv)
     }
 
     {
+        const tests::ScopedSection section = runner.Section("the profiles record the cook's levels");
+        for (const manifest::Profile& profile : bundleDebug->Profiles())
+        {
+            runner.CheckEqual(profile.OptimizationLevel, uint8_t{ 2u }, "the debug cook records --O2");
+            runner.CheckEqual(profile.DebugLevel, uint8_t{ 3u }, "the debug cook records --g3");
+        }
+    }
+
+    {
+        // the relevance describes the base form, so neither the optimizer nor debug information changes it
+        const tests::ScopedSection section = runner.Section("the axis relevance of the debug cook equals the O0 cook's");
+        for (uint32_t profile = 0u; profile < bundle0->Profiles().size(); ++profile)
+        {
+            const tests::ScopedContext context = runner.Context(std::string{ bundle0->String(bundle0->Profiles()[profile].TargetNameString) });
+            const manifest::ManifestResult<manifest::EnvironmentView> plain = bundle0->OpenEnvironment(profile, 0u);
+            const manifest::ManifestResult<manifest::EnvironmentView> withDebug = bundleDebug->OpenEnvironment(profile, 0u);
+            if (runner.CheckOk(plain, "the O0 environment opens") && runner.CheckOk(withDebug, "the debug environment opens"))
+            {
+                runner.Check(std::ranges::equal(plain->AxisRelevance(0u), withDebug->AxisRelevance(0u)),
+                             "the relevance masks are equal");
+            }
+        }
+    }
+
+    {
         const tests::ScopedSection section = runner.Section("at O0 every profile and variant keeps all three bindings");
         for (const std::string_view target : { "wgsl", "spirv" })
         {

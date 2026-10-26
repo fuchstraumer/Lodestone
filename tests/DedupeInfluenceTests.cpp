@@ -39,9 +39,9 @@ CookResult<bool> AllVariantsShareOneLayout(const CookedModule& module)
 
     for (const LibraryVariant& variant : module.Variants)
     {
-        for (size_t i = 0u; i < variant.VisibilityIndices.size(); ++i)
+        for (size_t i = 0u; i < variant.Delivered.VisibilityIndices.size(); ++i)
         {
-            CookResult<ShaderLayoutView> layout = ResolveLayoutView(module, variant, i);
+            CookResult<ShaderLayoutView> layout = ResolveLayoutView(module, variant, CodeForm::Delivered, i);
             if (!layout.has_value())
             {
                 return std::unexpected(layout.error());
@@ -351,14 +351,14 @@ void CheckTheTwoArmsReallyDiffer(lodestone::tests::TestRunner& runner,
 
     runner.CheckEqual(deduped.Variants.size(), 4u, "both arms hold every variant");
     runner.CheckEqual(raw.Variants.size(), 4u, "both arms hold every variant");
-    runner.CheckEqual(deduped.Sources.size(), 3u, "dedup collapses eight artifacts onto three unique texts");
-    runner.CheckEqual(raw.Sources.size(), 8u, "no-dedupe gives each of the eight artifacts its own entry");
+    runner.CheckEqual(deduped.Delivered.Sources.size(), 3u, "dedup collapses eight artifacts onto three unique texts");
+    runner.CheckEqual(raw.Delivered.Sources.size(), 8u, "no-dedupe gives each of the eight artifacts its own entry");
     // D8b took the usage mask and the footprint out of the resource key, so one resource at one
     // place is one row however many entry points read it.
     runner.CheckEqual(deduped.Resources.size(), 1u,
                       "two entry points binding one resource at one place give one resource");
     runner.CheckEqual(deduped.ResourceLists.size(), 1u, "every variant declares the same one resource");
-    runner.CheckEqual(deduped.VisibilityLists.size(), 1u,
+    runner.CheckEqual(deduped.Delivered.VisibilityLists.size(), 1u,
                       "both entry points read that resource, so both see the same visibility list");
     // four, not eight: resources are interned per variant, and sources per entry point
     runner.CheckEqual(raw.Resources.size(), 4u,

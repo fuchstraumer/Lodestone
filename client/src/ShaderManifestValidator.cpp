@@ -333,6 +333,15 @@ namespace
                          .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = static_cast<uint32_t>(profile.CodeFormat) };
             }
+
+            // `--O3` and `--g3` are the highest levels Slang has
+            if (profile.OptimizationLevel > 3u || profile.DebugLevel > 3u)
+            {
+                return { .Code = ErrorCode::InvalidProfileCodeFlags,
+                         .Table = ShaderManifestTable::Profiles,
+                         .RecordIndex = static_cast<uint32_t>(i),
+                         .Detail = profile.OptimizationLevel > 3u ? profile.OptimizationLevel : profile.DebugLevel };
+            }
         }
 
         return k_ManifestOk;

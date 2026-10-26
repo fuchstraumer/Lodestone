@@ -9,6 +9,7 @@
 #include "driver/CookerSteps.hpp"
 #include "emit/StageDump.hpp"
 #include "model/CookedLibrary.hpp"
+#include "model/DeliveredForm.hpp"
 #include "model/ResolveStage.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "permute/PermutationAssignment.hpp"
@@ -756,6 +757,16 @@ namespace
             }
             std::atomic_ref<uint32_t> mismatchesRef(localStats.ReflectionMismatches);
             mismatchesRef += *mismatches;
+
+            // a form with a mismatch has no facts to compare, and the mismatch fails the cook already
+            if (*mismatches == 0u)
+            {
+                const CookError deliveredError = VerifyDeliveredForm(variant, target.Name, *shared_state.Diagnostics);
+                if (deliveredError != CookError::Success)
+                {
+                    return std::unexpected(deliveredError);
+                }
+            }
 
             if (shared_state.Options.ReportReflection)
             {

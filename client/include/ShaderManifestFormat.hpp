@@ -13,7 +13,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 17u;
+inline constexpr uint32_t k_ShaderManifestVersion = 18u;
 
 // NOLINTBEGIN(readability-enum-initial-value, performance-enum-size)
 enum class ErrorCode : uint32_t
@@ -83,6 +83,7 @@ enum class ErrorCode : uint32_t
     InvalidSourceCapabilities = 61,
     InvalidStoredValue = 62,
     StoredValueContainerMissing = 63,
+    InvalidProfileCodeFlags = 64,
     Count
 };
 
@@ -217,7 +218,10 @@ struct alignas(8) Profile
     ShaderCodeFormat CodeFormat{ ShaderCodeFormat::None };
     uint8_t Reserved{ 0u };
     uint16_t Flags{ 0u };
-    uint32_t Reserved2{ 0u };
+    // the cook's `--O` and `--g` levels, which made the code in this profile
+    uint8_t OptimizationLevel{ 0u };
+    uint8_t DebugLevel{ 0u };
+    uint16_t Reserved2{ 0u };
 };
 
 enum class ProfileFlags : uint16_t
@@ -394,6 +398,8 @@ struct alignas(8) EntryPointConstants
 
 struct alignas(8) EntryPointInstance
 {
+    // the instance hash of the code at the base flags (`--O0`, no debug information), which the axis relevance compares
+    uint64_t BaseHash{ 0u };
     uint32_t Source{ 0u };
     uint32_t Visibility{ 0u };
     uint32_t WorkgroupX{ 1u };

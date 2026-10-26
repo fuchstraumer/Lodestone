@@ -129,7 +129,7 @@ contents. `Check` returns its condition, so the check can guard the checks that 
 check fails, so a guard that fails cannot hide the checks behind it. To read the diagnostics of a cook, pass a
 `RecordingDiagnosticSink` to the three-argument `RunCook`.
 
-Forty-six test targets exist: forty unit tests and six cook tests. `tests/README.md` lists what each one proves. Read it before you add or change a test, and add a row there for each new target.
+Forty-nine test targets exist: forty-two unit tests and seven cook tests. `tests/README.md` lists what each one proves. Read it before you add or change a test, and add a row there for each new target.
 
 Each cook test writes into its own output directory. The bundle and the dedup report hold every module
 of one cook, so a module added to a cook changes those files.
@@ -483,7 +483,7 @@ number would state that every target must supply one. A target supplies a valida
    A cooked module points into its `PermutationSpace`, so the driver moves each space to the heap and
    keeps it until the emit is done.
 
-Eight validators run inside that loop. None of them is a stage.
+Nine validators run inside that loop. None of them is a stage.
 
 Each validator is one bullet here. `docs/code-notes.md` section 14 holds the detail of each one: what it reads, what it
 skips, and the Slang workarounds it carries.
@@ -498,12 +498,16 @@ skips, and the Slang workarounds it carries.
   code does not declare leaves the visibility and is not a mismatch. Every other difference still fails. One Slang fault
   has a narrow workaround here, with a canary test: shader-slang/slang#13895 (`IsSlangNonReadableArrayFault`).
   `SlangMetadataCanaryTest` still watches shader-slang/slang#13789, which needs no workaround now.
+- **The delivered form check**, after the reflection cross-check (`VerifyDeliveredForm`, `model/DeliveredForm`). When the
+  cook's flags are not the base flags, each entry point instance's delivered form must need no more than its base form, in
+  one target: used bindings, sampler pairs (by binding), capability names (plus `SPV_KHR_non_semantic_info` from debug
+  information), workgroup memory, and entry point constants (`DeliveredFormExceedsBase`).
 - **The sampler pair cross-check** (`VerifySamplerPairsAcrossProfiles`, `model/CookedLibrary.cpp`). The pairs that two
-  profiles read for one variant must agree (`SamplerPairsTargetMismatch`), on the bindings that both profiles use. It skips
+  profiles read for one variant must agree (`SamplerPairsTargetMismatch`), in the base form. It skips
   an entry point whose pairs the code cannot show: a combined texture sampler, or a texture or sampler through a handle.
 - **The source facts cross-check** (`VerifySourceFactsAcrossProfiles`, same file). Workgroup memory and a portable subset of
-  the capability names must agree between profiles (`SourceFactsTargetMismatch`). When only one profile's code went through
-  an optimizer (`CookedProfile::CodeOptimized`: SPIR-V above `--O0`), the check is one-way: that profile must need no more.
+  the capability names must agree between profiles (`SourceFactsTargetMismatch`), in the base form (`--O0`, no debug
+  information), which the cook compiles beside the delivered form when the flags differ (`docs/base-cook-plan.md`).
 - **The capability axis check** (`VerifyCapabilityAxes`, `model/AxisInfluence`). An axis of kind `capability` must change
   the measured capability names (`CapabilityAxisInert`), and a boolean off path must need a subset of the on path
   (`CapabilityAxisInverted`).
@@ -714,6 +718,7 @@ What each version added (details in `client/FORMAT.md`):
 - 15: `ProfileFlags::CodeFactsRead`.
 - 16: `Binding::ArrayCount` of 0 for an unbounded binding array.
 - 17: stored values for the Handle and Pointer forms (`Binding::ValueContainer`, `Binding::ValueOffset`, `Profile::Forms`).
+- 18: the cook's `--O` and `--g` levels (`Profile::OptimizationLevel`, `Profile::DebugLevel`), and the base form's hash for each entry point instance (`EntryPointInstance::BaseHash`).
 
 Read `client/FORMAT.md` before you change the manifest format or the client views.
 

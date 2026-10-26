@@ -133,6 +133,8 @@ enum class CookError : uint16_t
     ShimStorageFormatAxisInvalid = 182, // the axis of `ls_storage_format` is not an ungated enum axis over `StorageFormat`
     ShimStoredValueUnsupported = 183, // a Handle or Pointer shim where the cooker cannot read it: an array, or a storage buffer
     ShimPointerAccessMismatch = 184, // the access of a Pointer shim's `Ptr` differs from the access of its interface
+    ManifestBaseHashMismatch = 185, // an entry point instance's base hash read back differently than the cook computed it
+    DeliveredFormExceedsBase = 186, // the delivered code needs a binding, pair, capability, or size that the base code does not
 
     SystemError = 200,
     DirectoryDoesNotExist = 201,

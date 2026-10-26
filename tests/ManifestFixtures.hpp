@@ -16,12 +16,12 @@
 namespace lodestone::tests
 {
 
-/** Appends one source and its facts. `CookedModule::SourceFacts` runs parallel to `CookedModule::Sources`, so a
+/** Appends one source and its facts. `CodeFormTables::SourceFacts` runs parallel to `CodeFormTables::Sources`, so a
  * fixture adds both together. */
 inline void AddFixtureSource(CookedModule& module, std::vector<std::byte> code, SourceCodeFacts facts)
 {
-    module.Sources.push_back(std::move(code));
-    module.SourceFacts.push_back(std::move(facts));
+    module.Delivered.Sources.push_back(std::move(code));
+    module.Delivered.SourceFacts.push_back(std::move(facts));
 }
 
 /** One entry point of a hand-built variant: the index into each per-entry-point table of the module. */
@@ -61,11 +61,11 @@ inline LibraryVariant MakeFixtureVariant(const PermutationSpace& space,
     variant.FootprintListIndex = 0u;
     for (const FixtureInstance& instance : instances)
     {
-        variant.SourceIndices.push_back(instance.Source);
-        variant.VisibilityIndices.push_back(instance.Visibility);
+        variant.Delivered.SourceIndices.push_back(instance.Source);
+        variant.Delivered.VisibilityIndices.push_back(instance.Visibility);
         variant.RasterIndices.push_back(instance.Raster);
-        variant.SamplerPairIndices.push_back(instance.SamplerPairs);
-        variant.ConstantsIndices.push_back(instance.Constants);
+        variant.Delivered.SamplerPairIndices.push_back(instance.SamplerPairs);
+        variant.Delivered.ConstantsIndices.push_back(instance.Constants);
         variant.Workgroups.push_back(instance.Workgroup);
     }
     return variant;
@@ -76,8 +76,8 @@ inline LibraryVariant MakeFixtureVariant(const PermutationSpace& space,
 inline void AddDefaultInstanceTables(CookedModule& module)
 {
     module.RasterStates.emplace_back();
-    module.SamplerPairLists.emplace_back();
-    module.EntryPointConstantsTable.emplace_back();
+    module.Delivered.SamplerPairLists.emplace_back();
+    module.Delivered.EntryPointConstantsTable.emplace_back();
 }
 
 } // namespace lodestone::tests

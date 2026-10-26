@@ -108,12 +108,14 @@ set(LODESTONE_EMIT_SOURCES
 
 set(LODESTONE_MODEL_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/model/AxisInfluence.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/model/DeliveredForm.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/model/ContentHash.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/model/ContentInterner.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/model/CookedLibrary.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/model/ResolveStage.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/model/ShaderDataSchema.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/AxisInfluence.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/DeliveredForm.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/ContentHash.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/CookedLibrary.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/ResolveStage.cpp"

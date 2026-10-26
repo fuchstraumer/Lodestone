@@ -30,6 +30,21 @@ struct LibraryEntryPoint
     ShaderStageKind Stage{ ShaderStageKind::Invalid };
 };
 
+enum class CodeForm : uint8_t
+{
+    Delivered,
+    Base
+};
+
+/** @brief Indices into one form's tables, per entry point. */
+struct CodeFormIndices
+{
+    std::vector<uint32_t> SourceIndices;
+    std::vector<uint32_t> VisibilityIndices;
+    std::vector<uint32_t> SamplerPairIndices;
+    std::vector<uint32_t> ConstantsIndices;
+};
+
 /** @brief One variant: indices into the module's tables, per variant and per entry point. */
 struct LibraryVariant
 {
@@ -40,14 +55,11 @@ struct LibraryVariant
     CanonicalAssignment Canonical;
     uint32_t ResourceListIndex{ 0u };
     uint32_t FootprintListIndex{ 0u };
-    std::vector<uint32_t> SourceIndices;
-    /** If the target and base cooks use same flags, this is empty (and `SourceIndices` is base code). */
-    std::vector<uint32_t> BaseSourceIndices;
-    std::vector<uint32_t> VisibilityIndices;
     std::vector<uint32_t> RasterIndices;
     std::vector<WorkgroupSize> Workgroups;
-    std::vector<uint32_t> SamplerPairIndices;
-    std::vector<uint32_t> ConstantsIndices;
+    CodeFormIndices Delivered;
+    /** Empty when the cook compiled once, and `Delivered` is the base. */
+    std::optional<CodeFormIndices> Base;
 };
 
 /** @brief The axes that a resource's size attributes name, directly or through derived constants. */
@@ -82,6 +94,24 @@ struct TableStatistics
     InternerStatistics Interning;
 };
 
+struct CodeFormInterners
+{
+    ContentInterner<std::vector<std::byte>> SourceInterner{ &HashSourceCode, k_HashName };
+    ContentInterner<VisibilityList> VisibilityInterner{ &HashVisibilityList, k_HashName };
+    ContentInterner<SamplerPairList> SamplerPairInterner{ &HashSamplerPairList, k_HashName };
+    ContentInterner<EntryPointConstants> ConstantsInterner{ &HashEntryPointConstants, k_HashName };
+    /** Parallel to the source table. The code decides the facts, so the first variant with a source gives them. */
+    std::vector<SourceCodeFacts> SourceFacts;
+
+    void DisableDedupe() noexcept
+    {
+        SourceInterner.Disable();
+        VisibilityInterner.Disable();
+        SamplerPairInterner.Disable();
+        ConstantsInterner.Disable();
+    }
+};
+
 /** @brief The stage 6 builder: interns each variant as it arrives. `FreezeModuleTables` consumes it. */
 struct InternedModule
 {
@@ -91,35 +121,42 @@ struct InternedModule
     std::vector<LibraryEntryPoint> EntryPoints;
     std::vector<VariantKey> VariantKeys;
     std::vector<LibraryVariant> Variants;
-    ContentInterner<std::vector<std::byte>> SourceInterner{ &HashSourceCode, k_HashName };
-    /** The base code, which the measurements read and the manifest does not hold. */
-    ContentInterner<std::vector<std::byte>> BaseSourceInterner{ &HashSourceCode, k_HashName };
     ContentInterner<ReflectedBinding> ResourceInterner{ &HashReflectedBinding, k_HashName };
     ContentInterner<ResourceList> ResourceListInterner{ &HashResourceList, k_HashName };
     ContentInterner<FootprintList> FootprintListInterner{ &HashFootprintList, k_HashName };
-    ContentInterner<VisibilityList> VisibilityInterner{ &HashVisibilityList, k_HashName };
     ContentInterner<ReflectedRasterState> RasterInterner{ &HashReflectedRasterState, k_HashName };
-    ContentInterner<SamplerPairList> SamplerPairInterner{ &HashSamplerPairList, k_HashName };
-    ContentInterner<EntryPointConstants> ConstantsInterner{ &HashEntryPointConstants, k_HashName };
-    /** Parallel to the source table. The code decides the facts, so the first variant with a source gives them. */
-    std::vector<SourceCodeFacts> SourceFacts;
-    /** Sorted and unique. */
+    CodeFormInterners Delivered;
+    /** Used only when the cook compiles a base form. */
+    CodeFormInterners Base;
+    /** Sorted and unique. The delivered code only, since the manifest holds these names. */
     std::vector<std::string> ObservedCapabilities;
     /** Sorted by scope and name. The first declaring variant adds an entry: the attribute text never varies. */
     std::vector<FootprintAxisDeclaration> FootprintDeclarations;
 
     void DisableDedupe() noexcept
     {
-        SourceInterner.Disable();
-        BaseSourceInterner.Disable();
         ResourceInterner.Disable();
         ResourceListInterner.Disable();
         FootprintListInterner.Disable();
-        VisibilityInterner.Disable();
         RasterInterner.Disable();
-        SamplerPairInterner.Disable();
-        ConstantsInterner.Disable();
+        Delivered.DisableDedupe();
+        Base.DisableDedupe();
     }
+};
+
+struct CodeFormTables
+{
+    std::vector<std::vector<std::byte>> Sources;
+    /** Parallel to `Sources`. */
+    std::vector<SourceCodeFacts> SourceFacts;
+    std::vector<VisibilityList> VisibilityLists;
+    std::vector<SamplerPairList> SamplerPairLists;
+    std::vector<EntryPointConstants> EntryPointConstantsTable;
+
+    TableStatistics SourceTable;
+    TableStatistics VisibilityTable;
+    TableStatistics SamplerPairTable;
+    TableStatistics ConstantsTable;
 };
 
 /** @brief The frozen tables of one module, with statistics for each, since they collapse at very different rates. */
@@ -130,34 +167,28 @@ struct CookedModule
     /** @brief Holes included. */
     uint64_t SpaceSize{ 0u };
     std::vector<LibraryEntryPoint> EntryPoints;
-    std::vector<std::vector<std::byte>> Sources;
-    /** Empty when the cook compiled once. */
-    std::vector<std::vector<std::byte>> BaseSources;
     std::vector<ReflectedBinding> Resources;
     std::vector<ResourceList> ResourceLists;
     std::vector<FootprintList> FootprintLists;
-    std::vector<VisibilityList> VisibilityLists;
     std::vector<ReflectedRasterState> RasterStates;
-    std::vector<SamplerPairList> SamplerPairLists;
-    std::vector<EntryPointConstants> EntryPointConstantsTable;
     std::vector<VariantKey> VariantKeys;
     std::vector<LibraryVariant> Variants;
-    /** Parallel to `Sources`. */
-    std::vector<SourceCodeFacts> SourceFacts;
+    /** The manifest holds this form. */
+    CodeFormTables Delivered;
+    /** The measurements read this form. Empty when the cook compiled once, and `Delivered` is the base. */
+    std::optional<CodeFormTables> Base;
     /** The manifest's capability name table: sorted and unique. */
     std::vector<std::string> ObservedCapabilities;
     std::vector<FootprintAxisDeclaration> FootprintDeclarations;
 
-    TableStatistics SourceTable;
-    TableStatistics BaseSourceTable;
     TableStatistics ResourceTable;
     TableStatistics ResourceListTable;
     TableStatistics FootprintListTable;
-    TableStatistics VisibilityTable;
     TableStatistics RasterTable;
-    TableStatistics SamplerPairTable;
-    TableStatistics ConstantsTable;
 };
+
+const CodeFormTables& FormTables(const CookedModule& module, CodeForm form) noexcept;
+const CodeFormIndices& FormIndices(const LibraryVariant& variant, CodeForm form) noexcept;
 
 struct CookedProfile
 {
@@ -168,8 +199,8 @@ struct CookedProfile
     bool SamplerTexturePairsRecorded{ false };
     /** Whether the capability names and workgroup memory were read */
     bool CodeFactsRead{ false };
-    /** An optimizer ran on the emitted code, so its facts can need less than an unoptimized profile's */
-    bool CodeOptimized{ false };
+    uint32_t OptimizationLevel{ 0u };
+    uint32_t DebugLevel{ 0u };
 };
 
 /** @brief The whole cook. `Environments` is the profile-major grid, and an empty entry was not cooked. */
@@ -198,21 +229,19 @@ CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library, Diagnost
 /** @brief Consumes the builder, so nothing after the freeze can reach an interner. */
 CookedModule FreezeModuleTables(InternedModule&& interned);
 
-/** @brief Returns the code of one entry point of one variant. The round trip compares it with the compiler output. */
 std::span<const std::byte> ResolveSource(const CookedModule& module,
                                          const LibraryVariant& variant,
+                                         CodeForm form,
                                          size_t entry_point_index) noexcept;
-/** @brief Returns the base code of one entry point of one variant, which the measurements compare. */
-std::span<const std::byte> ResolveBaseSource(const CookedModule& module,
-                                             const LibraryVariant& variant,
-                                             size_t entry_point_index) noexcept;
 
 CookResult<ShaderLayout> ResolveLayout(const CookedModule& module,
                                        const LibraryVariant& variant,
+                                       CodeForm form,
                                        size_t entry_point_index);
 
 CookResult<ShaderLayoutView> ResolveLayoutView(const CookedModule& module,
                                                const LibraryVariant& variant,
+                                               CodeForm form,
                                                size_t entry_point_index);
 
 } // namespace lodestone

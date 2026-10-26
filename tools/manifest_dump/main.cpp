@@ -125,6 +125,8 @@ void WriteProfiles(lodestone::JsonWriter& writer, const manifest::BundleView& bu
         writer.KeyString("storageTexture", magic_enum::enum_name(profile.Forms.StorageTexture));
         writer.EndObject();
         writer.KeyString("codeFormat", magic_enum::enum_name(profile.CodeFormat));
+        writer.KeyUInt("optimizationLevel", profile.OptimizationLevel);
+        writer.KeyUInt("debugLevel", profile.DebugLevel);
         writer.EndObject();
     }
     writer.EndArray();
@@ -425,6 +427,8 @@ void WriteSlot(lodestone::JsonWriter& writer,
             writer.KeyString("source", instance.Source());
         }
     }
+
+    writer.KeyUInt("baseHash", instance.Record().BaseHash);
 
     writer.EndObject();
 }

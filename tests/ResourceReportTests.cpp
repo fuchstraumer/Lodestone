@@ -90,7 +90,7 @@ CookedModule BuildModule(const PermutationSpace& space, std::span<const VariantC
     ReflectedBinding sampler = MakeBinding("LinearSampler", 4u, BindingKind::Sampler, ResourceShape::Invalid);
     module.Resources = { counts, params, lut, target, sampler };
     module.ResourceLists.push_back(ResourceList{ k_Counts, k_Params, k_Lut, k_Target, k_Sampler });
-    module.VisibilityLists.push_back(VisibilityList{ 0u, 1u, 2u, 3u, 4u });
+    module.Delivered.VisibilityLists.push_back(VisibilityList{ 0u, 1u, 2u, 3u, 4u });
 
     for (const uint64_t elementCount : { 64u, 128u })
     {

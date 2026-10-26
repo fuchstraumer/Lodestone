@@ -148,7 +148,7 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space, Keep keep, Ac
     module.ResourceLists.push_back(lodestone::ResourceList{ 0u });
     module.FootprintLists.push_back(
         lodestone::FootprintList{ lodestone::BufferFootprint{ .ElementCount = 256u } });
-    module.VisibilityLists.push_back(lodestone::VisibilityList{ 0u });
+    module.Delivered.VisibilityLists.push_back(lodestone::VisibilityList{ 0u });
     lodestone::tests::AddDefaultInstanceTables(module);
 
     // The full cross product, enumerated in declaration order, packs to keys 0..35 in ascending order,
@@ -292,7 +292,7 @@ lodestone::CookedModule BuildTileModule(std::string name, const PermutationSpace
     lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// wgsl for a tile module"), lodestone::SourceCodeFacts{});
     module.ResourceLists.emplace_back();
     module.FootprintLists.emplace_back();
-    module.VisibilityLists.emplace_back();
+    module.Delivered.VisibilityLists.emplace_back();
     lodestone::tests::AddDefaultInstanceTables(module);
 
     const uint32_t valueCount = static_cast<uint32_t>(space.Axes()[0].NumValues());
@@ -335,7 +335,7 @@ lodestone::CookedModule BuildRelevanceModule(const PermutationSpace& space, bool
     lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// plain"), lodestone::SourceCodeFacts{});
     module.ResourceLists.emplace_back();
     module.FootprintLists.emplace_back();
-    module.VisibilityLists.emplace_back();
+    module.Delivered.VisibilityLists.emplace_back();
     lodestone::tests::AddDefaultInstanceTables(module);
 
     uint32_t index = 0u;
@@ -524,7 +524,7 @@ lodestone::CookedModule BuildChainModule(const PermutationSpace& space)
     lodestone::tests::AddFixtureSource(module, lodestone::tests::BytesOf("// only A and B together"), lodestone::SourceCodeFacts{});
     module.ResourceLists.emplace_back();
     module.FootprintLists.emplace_back();
-    module.VisibilityLists.emplace_back();
+    module.Delivered.VisibilityLists.emplace_back();
     lodestone::tests::AddDefaultInstanceTables(module);
 
     constexpr std::array<std::array<bool, 3u>, 5u> k_Cooked{ { { false, false, false },
@@ -602,9 +602,9 @@ lodestone::CookedModule BuildDeviceModule(const PermutationSpace& space)
     module.ObservedCapabilities = { "GroupNonUniform" };
     module.ResourceLists.emplace_back();
     module.FootprintLists.emplace_back();
-    module.VisibilityLists.emplace_back();
+    module.Delivered.VisibilityLists.emplace_back();
     lodestone::tests::AddDefaultInstanceTables(module);
-    module.EntryPointConstantsTable.push_back(lodestone::EntryPointConstants{
+    module.Delivered.EntryPointConstantsTable.push_back(lodestone::EntryPointConstants{
         .Delivery = lodestone::EntryPointConstantsDelivery::PushConstant, .ByteSize = 144u });
 
     uint32_t index = 0u;

@@ -136,7 +136,7 @@ lodestone::CookedModule BuildModule(const PermutationSpace& space,
     {
         module.FootprintLists.emplace_back(resources.size());
     }
-    module.VisibilityLists = std::move(visibility_lists);
+    module.Delivered.VisibilityLists = std::move(visibility_lists);
     lodestone::tests::AddDefaultInstanceTables(module);
 
     const PermutationAxis& axis = space.Axes()[0];
@@ -373,10 +373,10 @@ void TestSamplerPairs(lodestone::tests::TestRunner& runner, const PermutationSpa
     runner.BeginSection("sampler and texture pairs");
 
     lodestone::CookedModule module = BuildModule(space, GoodVisibilityLists(), k_GoodVisibility);
-    module.VisibilityLists[0] = lodestone::VisibilityList{ 0u, 2u, 3u };
-    module.SamplerPairLists = { lodestone::SamplerPairList{},
+    module.Delivered.VisibilityLists[0] = lodestone::VisibilityList{ 0u, 2u, 3u };
+    module.Delivered.SamplerPairLists = { lodestone::SamplerPairList{},
                                 lodestone::SamplerPairList{ lodestone::SamplerTexturePair{ .Texture = 1u, .Sampler = 2u } } };
-    module.Variants[0].SamplerPairIndices = { 1u, 1u, 0u };
+    module.Variants[0].Delivered.SamplerPairIndices = { 1u, 1u, 0u };
 
     lodestone::CookedLibrary library;
     library.ModuleNames = { "MergeTestModule" };
@@ -470,12 +470,12 @@ void TestPushConstants(lodestone::tests::TestRunner& runner, const PermutationSp
     };
 
     lodestone::CookedModule module = BuildModule(space, GoodVisibilityLists(), k_GoodVisibility);
-    module.EntryPointConstantsTable.push_back(push(64u, { transform }));
-    module.EntryPointConstantsTable.push_back(push(80u, { worldViewProjection, tint }));
-    module.EntryPointConstantsTable.push_back(push(16u, { tintAtZero }));
+    module.Delivered.EntryPointConstantsTable.push_back(push(64u, { transform }));
+    module.Delivered.EntryPointConstantsTable.push_back(push(80u, { worldViewProjection, tint }));
+    module.Delivered.EntryPointConstantsTable.push_back(push(16u, { tintAtZero }));
     // case 0: VS 64 bytes, FS 80 bytes, CS none. case 1: VS 64 bytes, FS the float4 at 0. case 2: none
-    module.Variants[0].ConstantsIndices = { 1u, 2u, 0u };
-    module.Variants[1].ConstantsIndices = { 1u, 3u, 0u };
+    module.Variants[0].Delivered.ConstantsIndices = { 1u, 2u, 0u };
+    module.Variants[1].Delivered.ConstantsIndices = { 1u, 3u, 0u };
 
     lodestone::CookedLibrary library;
     library.ModuleNames = { "MergeTestModule" };

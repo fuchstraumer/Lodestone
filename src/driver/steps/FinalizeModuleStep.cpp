@@ -118,7 +118,7 @@ namespace
 
             for (size_t i = 0u; i < origin->EntryPoints.size(); ++i)
             {
-                const CookResult<ShaderLayoutView> resolved = ResolveLayoutView(module, variant, i);
+                const CookResult<ShaderLayoutView> resolved = ResolveLayoutView(module, variant, CodeForm::Delivered, i);
                 if (!resolved)
                 {
                     lastError = ReportError(diagnostics,
@@ -173,8 +173,8 @@ namespace
             for (size_t i = 0u; i < origin->EntryPoints.size(); ++i)
             {
                 const CompiledEntryPoint& entryPoint = origin->EntryPoints[i];
-                const bool deliveredEqual = std::ranges::equal(ResolveSource(module, variant, i), entryPoint.Delivered.Code);
-                const bool baseEqual = std::ranges::equal(ResolveBaseSource(module, variant, i), BaseForm(entryPoint).Code);
+                const bool deliveredEqual = std::ranges::equal(ResolveSource(module, variant, CodeForm::Delivered, i), entryPoint.Delivered.Code);
+                const bool baseEqual = std::ranges::equal(ResolveSource(module, variant, CodeForm::Base, i), BaseForm(entryPoint).Code);
                 if (!deliveredEqual || !baseEqual)
                 {
                     const std::string errStr = std::format("ROUND TRIP FAILED for {} [{}]: the {} table returns "

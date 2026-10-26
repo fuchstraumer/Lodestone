@@ -105,6 +105,7 @@ add_lodestone_unit_test(KitchenSinkOptimizedCookTest CookTest.cpp
               --target=spirv
               --verify-deterministic
               --O2
+              --g3
               --policy-file "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KitchenSink.toml"
               "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KsGeometry.slang"
               "${PROJECT_SOURCE_DIR}/tests/assets/KitchenSink/KsMaterial.slang"
@@ -223,6 +224,7 @@ target_link_libraries(SpvValidatorTest PRIVATE SPIRV-Tools-static)
 add_lodestone_unit_test(ReflectionSchemaTest ReflectionSchemaTests.cpp)
 add_lodestone_unit_test(DiagnosticParserTest DiagnosticParserTests.cpp)
 add_lodestone_unit_test(ResolveStageTest ResolveStageTests.cpp)
+add_lodestone_unit_test(DeliveredFormTest DeliveredFormTests.cpp)
 add_lodestone_unit_test(StageDumpTest StageDumpTests.cpp)
 add_lodestone_unit_test(DedupeInfluenceTest DedupeInfluenceTests.cpp)
 add_lodestone_unit_test(PermutationConstraintTest PermutationConstraintTests.cpp)

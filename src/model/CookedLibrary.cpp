@@ -133,19 +133,14 @@ namespace
     /** Texture scope, texture name, sampler scope, sampler name. */
     using NamedPair = std::array<std::string_view, 4u>;
     /** Scope and name. */
-    using NamedBinding = std::array<std::string_view, 2u>;
 
     /** `has_unread_pairs` is set when the code cannot show every pair: a combined texture sampler, which SPIR-V samples
      * with no `OpSampledImage`, or a texture or a sampler reached through a descriptor handle, whose pairs are not
-     * recorded yet. `visible` receives the sorted names of the used bindings. */
+     * recorded yet. */
     CookResult<std::vector<NamedPair>> NamePairs(const CookedModule& module,
                                                  const LibraryVariant& variant,
                                                  size_t entry_point_index,
-                                                 bool& has_unread_pairs,
-                                                 std::vector<NamedBinding>& visible);
-
-    /** Keeps the pairs whose texture and sampler `other_visible` also holds. */
-    void KeepPairsVisibleIn(std::vector<NamedPair>& pairs, std::span<const NamedBinding> other_visible);
+                                                 bool& has_unread_pairs);
 
 } // namespace
 
@@ -218,16 +213,33 @@ ContentHashValue HashFootprintList(const std::vector<ResourceFootprint>& footpri
 
 void DisableDedupe(InternedModule& module) noexcept
 {
-    // todo: brittle when interners change. Can we do something smarter?
-    module.SourceInterner.Disable();
-    module.ResourceInterner.Disable();
-    module.ResourceListInterner.Disable();
-    module.FootprintListInterner.Disable();
-    module.VisibilityInterner.Disable();
-    module.RasterInterner.Disable();
-    module.SamplerPairInterner.Disable();
-    module.ConstantsInterner.Disable();
+    module.DisableDedupe();
 }
+
+namespace
+{
+
+    // returns true when the source is new, so the caller can record what only a new source adds
+    bool InternCodeForm(CodeFormInterners& interners,
+                        const EntryPointCode& form,
+                        const ProvenanceRecord& origin,
+                        CodeFormIndices& indices)
+    {
+        const InternResult source = interners.SourceInterner.Intern(form.Code, origin);
+        indices.SourceIndices.push_back(source.Index);
+        if (source.WasNew)
+        {
+            interners.SourceFacts.push_back(form.CodeFacts);
+        }
+
+        indices.VisibilityIndices.push_back(interners.VisibilityInterner.Intern(form.UsedBindingIndices, origin).Index);
+        indices.SamplerPairIndices.push_back(interners.SamplerPairInterner.Intern(form.SamplerTexturePairs, origin).Index);
+        indices.ConstantsIndices.push_back(interners.ConstantsInterner.Intern(form.Constants, origin).Index);
+
+        return source.WasNew;
+    }
+
+} // namespace
 
 CookError AppendVariantToModule(InternedModule& module,
                                 const CompiledVariant& variant,
@@ -264,32 +276,25 @@ CookError AppendVariantToModule(InternedModule& module,
     record.Canonical = descriptor.Canonical;
     record.ResourceListIndex = module.ResourceListInterner.Intern(resources, variantOrigin).Index;
     record.FootprintListIndex = module.FootprintListInterner.Intern(variant.Footprints, variantOrigin).Index;
-    record.SourceIndices.reserve(variant.EntryPoints.size());
-    record.VisibilityIndices.reserve(variant.EntryPoints.size());
     record.RasterIndices.reserve(variant.EntryPoints.size());
     record.Workgroups.reserve(variant.EntryPoints.size());
-    record.SamplerPairIndices.reserve(variant.EntryPoints.size());
-    record.ConstantsIndices.reserve(variant.EntryPoints.size());
-    for (size_t entryPointIndex = 0u; entryPointIndex < variant.EntryPoints.size(); ++entryPointIndex)
+
+    const bool hasBase = !variant.EntryPoints.empty() && variant.EntryPoints.front().Base.has_value();
+    if (hasBase)
     {
-        const CompiledEntryPoint& entryPoint = variant.EntryPoints[entryPointIndex];
+        record.Base.emplace();
+    }
+
+    for (const CompiledEntryPoint& entryPoint : variant.EntryPoints)
+    {
         const ProvenanceRecord origin{ .EntryPointName = entryPoint.Name,
                                        .VariantDescription = variant.VariantDescription,
                                        .VariantIndex = variant.VariantIndex };
 
-        const EntryPointCode& delivered = entryPoint.Delivered;
-        const InternResult source = module.SourceInterner.Intern(delivered.Code, origin);
-        record.SourceIndices.push_back(source.Index);
-        
-        if (entryPoint.Base.has_value())
+        const bool newSource = InternCodeForm(module.Delivered, entryPoint.Delivered, origin, record.Delivered);
+        if (newSource)
         {
-            record.BaseSourceIndices.push_back(module.BaseSourceInterner.Intern(entryPoint.Base->Code, origin).Index);
-        }
-
-        if (source.WasNew)
-        {
-            module.SourceFacts.push_back(delivered.CodeFacts);
-            for (const std::string& name : delivered.CodeFacts.CapabilityNames)
+            for (const std::string& name : entryPoint.Delivered.CodeFacts.CapabilityNames)
             {
                 const auto position = std::ranges::lower_bound(module.ObservedCapabilities, name);
                 if (position == module.ObservedCapabilities.end() || *position != name)
@@ -299,20 +304,14 @@ CookError AppendVariantToModule(InternedModule& module,
             }
         }
 
-        const InternResult visibility =
-            module.VisibilityInterner.Intern(delivered.UsedBindingIndices, origin);
-        record.VisibilityIndices.push_back(visibility.Index);
+        if (hasBase)
+        {
+            InternCodeForm(module.Base, *entryPoint.Base, origin, *record.Base);
+        }
 
         const InternResult raster = module.RasterInterner.Intern(entryPoint.Reflection.Raster, origin);
         record.RasterIndices.push_back(raster.Index);
-
         record.Workgroups.push_back(entryPoint.Reflection.Workgroup);
-
-        const InternResult samplerPairs = module.SamplerPairInterner.Intern(delivered.SamplerTexturePairs, origin);
-        record.SamplerPairIndices.push_back(samplerPairs.Index);
-
-        const InternResult constants = module.ConstantsInterner.Intern(delivered.Constants, origin);
-        record.ConstantsIndices.push_back(constants.Index);
     }
 
     module.Variants.emplace_back(std::move(record));
@@ -331,6 +330,23 @@ namespace
                                 .Interning = interner.Statistics() };
     }
 
+    CodeFormTables FreezeCodeForm(CodeFormInterners& interners)
+    {
+        CodeFormTables tables;
+        tables.Sources = interners.SourceInterner.ConsumeTable();
+        tables.SourceFacts = std::move(interners.SourceFacts);
+        tables.VisibilityLists = interners.VisibilityInterner.ConsumeTable();
+        tables.SamplerPairLists = interners.SamplerPairInterner.ConsumeTable();
+        tables.EntryPointConstantsTable = interners.ConstantsInterner.ConsumeTable();
+
+        tables.SourceTable = DescribeTable(interners.SourceInterner);
+        tables.VisibilityTable = DescribeTable(interners.VisibilityInterner);
+        tables.SamplerPairTable = DescribeTable(interners.SamplerPairInterner);
+        tables.ConstantsTable = DescribeTable(interners.ConstantsInterner);
+
+        return tables;
+    }
+
 } // namespace
 
 CookedModule FreezeModuleTables(InternedModule&& interned)
@@ -343,75 +359,76 @@ CookedModule FreezeModuleTables(InternedModule&& interned)
     module.Variants = std::move(interned.Variants);
     module.VariantKeys = std::move(interned.VariantKeys);
 
-    module.Sources = interned.SourceInterner.ConsumeTable();
-    module.BaseSources = interned.BaseSourceInterner.ConsumeTable();
     module.Resources = interned.ResourceInterner.ConsumeTable();
     module.ResourceLists = interned.ResourceListInterner.ConsumeTable();
     module.FootprintLists = interned.FootprintListInterner.ConsumeTable();
-    module.VisibilityLists = interned.VisibilityInterner.ConsumeTable();
     module.RasterStates = interned.RasterInterner.ConsumeTable();
-    module.SamplerPairLists = interned.SamplerPairInterner.ConsumeTable();
-    module.EntryPointConstantsTable = interned.ConstantsInterner.ConsumeTable();
-    module.SourceFacts = std::move(interned.SourceFacts);
     module.ObservedCapabilities = std::move(interned.ObservedCapabilities);
     module.FootprintDeclarations = std::move(interned.FootprintDeclarations);
 
-    module.SourceTable = DescribeTable(interned.SourceInterner);
-    module.BaseSourceTable = DescribeTable(interned.BaseSourceInterner);
     module.ResourceTable = DescribeTable(interned.ResourceInterner);
     module.ResourceListTable = DescribeTable(interned.ResourceListInterner);
     module.FootprintListTable = DescribeTable(interned.FootprintListInterner);
-    module.VisibilityTable = DescribeTable(interned.VisibilityInterner);
     module.RasterTable = DescribeTable(interned.RasterInterner);
-    module.SamplerPairTable = DescribeTable(interned.SamplerPairInterner);
-    module.ConstantsTable = DescribeTable(interned.ConstantsInterner);
+
+    // every variant of one module is compiled with the same flags, so the first decides
+    const bool hasBase = !module.Variants.empty() && module.Variants.front().Base.has_value();
+    module.Delivered = FreezeCodeForm(interned.Delivered);
+    if (hasBase)
+    {
+        module.Base = FreezeCodeForm(interned.Base);
+    }
 
     return module;
 }
 
-std::span<const std::byte> ResolveSource(const CookedModule& module,
-                                         const LibraryVariant& variant,
-                                         size_t entry_point_index) noexcept
+const CodeFormTables& FormTables(const CookedModule& module, CodeForm form) noexcept
 {
-    if (entry_point_index >= variant.SourceIndices.size())
-    {
-        return {};
-    }
-
-    const uint32_t sourceIndex = variant.SourceIndices[entry_point_index];
-    if (sourceIndex >= module.Sources.size())
-    {
-        return {};
-    }
-
-    return module.Sources[sourceIndex];
+    return form == CodeForm::Base && module.Base.has_value() ? *module.Base : module.Delivered;
 }
 
-std::span<const std::byte> ResolveBaseSource(const CookedModule& module,
-                                             const LibraryVariant& variant,
-                                             size_t entry_point_index) noexcept
+const CodeFormIndices& FormIndices(const LibraryVariant& variant, CodeForm form) noexcept
 {
-    if (variant.BaseSourceIndices.empty())
+    return form == CodeForm::Base && variant.Base.has_value() ? *variant.Base : variant.Delivered;
+}
+
+std::span<const std::byte> ResolveSource(const CookedModule& module,
+                                         const LibraryVariant& variant,
+                                         CodeForm form,
+                                         size_t entry_point_index) noexcept
+{
+    const CodeFormTables& tables = FormTables(module, form);
+    const CodeFormIndices& indices = FormIndices(variant, form);
+    if (entry_point_index >= indices.SourceIndices.size())
     {
-        return ResolveSource(module, variant, entry_point_index);
+        return {};
     }
 
-    return module.BaseSources[variant.BaseSourceIndices[entry_point_index]];
+    const uint32_t sourceIndex = indices.SourceIndices[entry_point_index];
+    if (sourceIndex >= tables.Sources.size())
+    {
+        return {};
+    }
+
+    return tables.Sources[sourceIndex];
 }
 
 CookResult<ShaderLayout> ResolveLayout(const CookedModule& module,
                                        const LibraryVariant& variant,
+                                       CodeForm form,
                                        size_t entry_point_index)
 {
-    if (entry_point_index >= variant.VisibilityIndices.size() ||
+    const CodeFormTables& tables = FormTables(module, form);
+    const CodeFormIndices& indices = FormIndices(variant, form);
+    if (entry_point_index >= indices.VisibilityIndices.size() ||
         variant.ResourceListIndex >= module.ResourceLists.size() ||
         variant.FootprintListIndex >= module.FootprintLists.size())
     {
         return std::unexpected(CookError::ManifestShaderLayoutVariantIndicesInvalid);
     }
 
-    const uint32_t visibilityIndex = variant.VisibilityIndices[entry_point_index];
-    if (visibilityIndex >= module.VisibilityLists.size())
+    const uint32_t visibilityIndex = indices.VisibilityIndices[entry_point_index];
+    if (visibilityIndex >= tables.VisibilityLists.size())
     {
         return std::unexpected(CookError::ManifestShaderLayoutVisiblityIndexInvalid);
     }
@@ -420,8 +437,8 @@ CookResult<ShaderLayout> ResolveLayout(const CookedModule& module,
     const FootprintList& footprints = module.FootprintLists[variant.FootprintListIndex];
 
     ShaderLayout layout;
-    layout.reserve(module.VisibilityLists[visibilityIndex].size());
-    for (const uint32_t localRsrcIndex : module.VisibilityLists[visibilityIndex])
+    layout.reserve(tables.VisibilityLists[visibilityIndex].size());
+    for (const uint32_t localRsrcIndex : tables.VisibilityLists[visibilityIndex])
     {
         if (localRsrcIndex >= resources.size() || resources[localRsrcIndex] >= module.Resources.size())
         {
@@ -437,17 +454,20 @@ CookResult<ShaderLayout> ResolveLayout(const CookedModule& module,
 
 CookResult<ShaderLayoutView> ResolveLayoutView(const CookedModule& module,
                                                const LibraryVariant& variant,
+                                               CodeForm form,
                                                size_t entry_point_index)
 {
-    if (entry_point_index >= variant.VisibilityIndices.size() ||
+    const CodeFormTables& tables = FormTables(module, form);
+    const CodeFormIndices& indices = FormIndices(variant, form);
+    if (entry_point_index >= indices.VisibilityIndices.size() ||
         variant.ResourceListIndex >= module.ResourceLists.size() ||
         variant.FootprintListIndex >= module.FootprintLists.size()) [[unlikely]]
     {
         return std::unexpected(CookError::ManifestShaderLayoutVariantIndicesInvalid);
     }
 
-    const uint32_t visibilityIndex = variant.VisibilityIndices[entry_point_index];
-    if (visibilityIndex >= module.VisibilityLists.size()) [[unlikely]]
+    const uint32_t visibilityIndex = indices.VisibilityIndices[entry_point_index];
+    if (visibilityIndex >= tables.VisibilityLists.size()) [[unlikely]]
     {
         return std::unexpected(CookError::ManifestShaderLayoutVisiblityIndexInvalid);
     }
@@ -456,8 +476,8 @@ CookResult<ShaderLayoutView> ResolveLayoutView(const CookedModule& module,
     const FootprintList& footprints = module.FootprintLists[variant.FootprintListIndex];
 
     std::vector<ResolvedBindingView> layoutView;
-    layoutView.reserve(module.VisibilityLists[visibilityIndex].size());
-    for (const uint32_t localRsrcIndex : module.VisibilityLists[visibilityIndex])
+    layoutView.reserve(tables.VisibilityLists[visibilityIndex].size());
+    for (const uint32_t localRsrcIndex : tables.VisibilityLists[visibilityIndex])
     {
         if (localRsrcIndex >= resources.size() || resources[localRsrcIndex] >= module.Resources.size())
             [[unlikely]]
@@ -483,13 +503,11 @@ CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library, Diagnos
         {
             bool unreadPairs = false;
             bool baselineUnreadPairs = false;
-            std::vector<NamedBinding> visible;
-            std::vector<NamedBinding> baselineVisible;
 
             CookResult<std::vector<NamedPair>> pairs =
-                NamePairs(shared.Environment, shared.Variant, entryPointIndex, unreadPairs, visible);
+                NamePairs(shared.Environment, shared.Variant, entryPointIndex, unreadPairs);
             CookResult<std::vector<NamedPair>> baselinePairs =
-                NamePairs(shared.Baseline, shared.BaselineVariant, entryPointIndex, baselineUnreadPairs, baselineVisible);
+                NamePairs(shared.Baseline, shared.BaselineVariant, entryPointIndex, baselineUnreadPairs);
 
             if (!pairs || !baselinePairs)
             {
@@ -502,9 +520,6 @@ CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library, Diagnos
                                                shared.Environment.EntryPoints[entryPointIndex].Name));
             }
 
-            // an optimizer can remove a binding from one target only, and a profile has no opinion on a binding it does not use
-            KeepPairsVisibleIn(*pairs, baselineVisible);
-            KeepPairsVisibleIn(*baselinePairs, visible);
             if (unreadPairs || baselineUnreadPairs || *pairs == *baselinePairs)
             {
                 continue;
@@ -537,26 +552,16 @@ CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library, Diagnost
         const CookedProfile& baselineProfile = library.Profiles[shared.BaselineProfile];
         for (size_t entryPointIndex = 0u; entryPointIndex < shared.Environment.EntryPoints.size(); ++entryPointIndex)
         {
-            const SourceCodeFacts& facts = shared.Environment.SourceFacts[shared.Variant.SourceIndices[entryPointIndex]];
+            const SourceCodeFacts& facts =
+                FormTables(shared.Environment, CodeForm::Base)
+                    .SourceFacts[FormIndices(shared.Variant, CodeForm::Base).SourceIndices[entryPointIndex]];
             const SourceCodeFacts& baselineFacts =
-                shared.Baseline.SourceFacts[shared.BaselineVariant.SourceIndices[entryPointIndex]];
+                FormTables(shared.Baseline, CodeForm::Base)
+                    .SourceFacts[FormIndices(shared.BaselineVariant, CodeForm::Base).SourceIndices[entryPointIndex]];
 
             const uint32_t portable = PortableCapabilities(profile.CodeFormat, facts.CapabilityNames);
             const uint32_t baselinePortable = PortableCapabilities(baselineProfile.CodeFormat, baselineFacts.CapabilityNames);
-            const bool equal = facts.WorkgroupMemoryBytes == baselineFacts.WorkgroupMemoryBytes && portable == baselinePortable;
-            // an optimizer only removes code, so the optimized profile must need no more than the other
-            auto needsNoMore = [](const SourceCodeFacts& optimized, uint32_t optimized_portable,
-                                  const SourceCodeFacts& other, uint32_t other_portable)
-            {
-                return optimized.WorkgroupMemoryBytes <= other.WorkgroupMemoryBytes &&
-                       (optimized_portable & ~other_portable) == 0u;
-            };
-            const bool consistent =
-                profile.CodeOptimized == baselineProfile.CodeOptimized
-                    ? equal
-                    : profile.CodeOptimized ? needsNoMore(facts, portable, baselineFacts, baselinePortable)
-                                            : needsNoMore(baselineFacts, baselinePortable, facts, portable);
-            if (consistent)
+            if (facts.WorkgroupMemoryBytes == baselineFacts.WorkgroupMemoryBytes && portable == baselinePortable)
             {
                 continue;
             }
@@ -586,10 +591,9 @@ namespace
     CookResult<std::vector<NamedPair>> NamePairs(const CookedModule& module,
                                                  const LibraryVariant& variant,
                                                  size_t entry_point_index,
-                                                 bool& has_unread_pairs,
-                                                 std::vector<NamedBinding>& visible)
+                                                 bool& has_unread_pairs)
     {
-        const CookResult<ShaderLayoutView> layout = ResolveLayoutView(module, variant, entry_point_index);
+        const CookResult<ShaderLayoutView> layout = ResolveLayoutView(module, variant, CodeForm::Base, entry_point_index);
         if (!layout)
         {
             return std::unexpected(layout.error());
@@ -604,17 +608,11 @@ namespace
 
         has_unread_pairs = std::ranges::any_of(*layout, hidesPairs);
 
-        visible.clear();
-        visible.reserve(layout->size());
-        for (const ResolvedBindingView& binding : *layout)
-        {
-            visible.push_back(NamedBinding{ binding.Resource->ScopeName, binding.Resource->Name });
-        }
-        std::ranges::sort(visible);
-
         std::vector<NamedPair> named;
         const ShaderLayoutView& layout_view = *layout;
-        for (const SamplerTexturePair& pair : module.SamplerPairLists[variant.SamplerPairIndices[entry_point_index]])
+        const SamplerPairList& pairs = FormTables(module, CodeForm::Base)
+                                           .SamplerPairLists[FormIndices(variant, CodeForm::Base).SamplerPairIndices[entry_point_index]];
+        for (const SamplerTexturePair& pair : pairs)
         {
             const ReflectedBinding* texture = layout_view[pair.Texture].Resource;
             const ReflectedBinding* sampler = layout_view[pair.Sampler].Resource;
@@ -624,15 +622,6 @@ namespace
         std::ranges::sort(named);
 
         return named;
-    }
-
-    void KeepPairsVisibleIn(std::vector<NamedPair>& pairs, std::span<const NamedBinding> other_visible)
-    {
-        std::erase_if(pairs, [other_visible](const NamedPair& pair)
-        {
-            return !std::ranges::binary_search(other_visible, NamedBinding{ pair[0], pair[1] }) ||
-                   !std::ranges::binary_search(other_visible, NamedBinding{ pair[2], pair[3] });
-        });
     }
 
 }

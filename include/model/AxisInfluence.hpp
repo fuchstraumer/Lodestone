@@ -2,6 +2,7 @@
 #ifndef LODESTONE_AXIS_INFLUENCE_HPP
 #define LODESTONE_AXIS_INFLUENCE_HPP
 #include "CookerErrors.hpp"
+#include "model/ContentHash.hpp"
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -40,6 +41,9 @@ struct ModuleInfluence
 
 /** @brief Measures the two passes: one-axis pairs, then the closure that `SingleFor` rests on. */
 CookResult<ModuleInfluence> ComputeActualInfluence(const CookedModule& module);
+
+/** @brief Returns the hash of each entry point instance of the base form, at `variant * EntryPointCount + entry_point`. */
+CookResult<std::vector<ContentHashValue>> HashBaseInstances(const CookedModule& module);
 
 /** @brief The influence of each axis on one resource's element count or extent. Variants that do not declare the
  * resource do not take part. */

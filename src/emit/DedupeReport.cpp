@@ -133,7 +133,7 @@ std::string GenerateDedupeReport(const CookedLibrary& library)
 
         const CookedModule& module = *library.Environments[environmentIndex];
         const CookedProfile& profile = library.Profiles[environmentIndex / moduleCount];
-        const InternerStatistics& sourceStatistics = module.SourceTable.Interning;
+        const InternerStatistics& sourceStatistics = module.Delivered.SourceTable.Interning;
 
         report += std::format("{} [{}]  {} variants x {} entrypoints = {} artifacts\n\n",
                               module.Name,
@@ -147,13 +147,13 @@ std::string GenerateDedupeReport(const CookedLibrary& library)
 
         // the tables collapse at different rates, so one number would hide which grows
         const std::array<std::pair<std::string_view, const TableStatistics*>, 7u> tables{
-            std::pair{ std::string_view{ "sources" }, &module.SourceTable },
+            std::pair{ std::string_view{ "sources" }, &module.Delivered.SourceTable },
             std::pair{ std::string_view{ "resources" }, &module.ResourceTable },
             std::pair{ std::string_view{ "resource lists" }, &module.ResourceListTable },
             std::pair{ std::string_view{ "footprints" }, &module.FootprintListTable },
-            std::pair{ std::string_view{ "visibility" }, &module.VisibilityTable },
-            std::pair{ std::string_view{ "sampler pairs" }, &module.SamplerPairTable },
-            std::pair{ std::string_view{ "entry point constants" }, &module.ConstantsTable }
+            std::pair{ std::string_view{ "visibility" }, &module.Delivered.VisibilityTable },
+            std::pair{ std::string_view{ "sampler pairs" }, &module.Delivered.SamplerPairTable },
+            std::pair{ std::string_view{ "entry point constants" }, &module.Delivered.ConstantsTable }
         };
 
         uint32_t collisions = 0u;
@@ -172,8 +172,8 @@ std::string GenerateDedupeReport(const CookedLibrary& library)
             comparisons += table->Interning.ByteComparisons;
         }
 
-        report += std::format("  dedup enabled: {}\n", module.SourceTable.DedupeEnabled ? "yes" : "no");
-        report += std::format("  hash function: {}\n", module.SourceTable.HashName);
+        report += std::format("  dedup enabled: {}\n", module.Delivered.SourceTable.DedupeEnabled ? "yes" : "no");
+        report += std::format("  hash function: {}\n", module.Delivered.SourceTable.HashName);
         report += std::format("  hash collisions resolved by byte compare: {}\n", collisions);
         report += std::format("  byte comparisons forced by a hash hit: {}\n", comparisons);
         report += "  normalization passes active: (none)\n";
@@ -248,7 +248,7 @@ namespace
 
         for (const LibraryVariant& variant : module.Variants)
         {
-            const uint32_t sourceIndex = variant.SourceIndices[entry_point_index];
+            const uint32_t sourceIndex = variant.Delivered.SourceIndices[entry_point_index];
 
             const auto found = std::ranges::find(collapses, sourceIndex, &SourceCollapse::SourceIndex);
 

@@ -412,13 +412,13 @@ void CheckCookedDumpDetectsChange(lodestone::tests::TestRunner& runner)
     const CookedModule original = BuildTinyModule();
 
     CookedModule changed = BuildTinyModule();
-    runner.Check(!changed.Sources.empty(), "the module has a source to change");
-    if (changed.Sources.empty())
+    runner.Check(!changed.Delivered.Sources.empty(), "the module has a source to change");
+    if (changed.Delivered.Sources.empty())
     {
         return;
     }
 
-    changed.Sources[0].push_back(std::byte{ 'X' });
+    changed.Delivered.Sources[0].push_back(std::byte{ 'X' });
     runner.Check(DumpCookedModule(original) != DumpCookedModule(changed),
                  "one changed byte of source moves the dump");
 

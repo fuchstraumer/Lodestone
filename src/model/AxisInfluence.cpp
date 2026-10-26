@@ -53,7 +53,7 @@ namespace
         thread_local StreamingHash hasher;
         hasher.Reset();
 
-        hasher.Append(ResolveSource(module, variant, entry_point_index));
+        hasher.Append(ResolveSource(module, variant, CodeForm::Base, entry_point_index));
 
         hasher.Append(static_cast<uint64_t>(layout.size()));
         for (const ResolvedBindingView& binding : layout)
@@ -74,9 +74,12 @@ namespace
         hasher.Append(workgroup.Y);
         hasher.Append(workgroup.Z);
 
-        hasher.Append(HashSamplerPairList(module.SamplerPairLists[variant.SamplerPairIndices[entry_point_index]]));
+        const CodeFormTables& tables = FormTables(module, CodeForm::Base);
+        const CodeFormIndices& indices = FormIndices(variant, CodeForm::Base);
+
+        hasher.Append(HashSamplerPairList(tables.SamplerPairLists[indices.SamplerPairIndices[entry_point_index]]));
         hasher.Append(
-            HashEntryPointConstants(module.EntryPointConstantsTable[variant.ConstantsIndices[entry_point_index]]));
+            HashEntryPointConstants(tables.EntryPointConstantsTable[indices.ConstantsIndices[entry_point_index]]));
 
         return hasher.Finalize();
     }
@@ -92,7 +95,7 @@ namespace
         {
             for (size_t entryPointIndex = 0u; entryPointIndex < table.EntryPointCount; ++entryPointIndex)
             {
-                CookResult<ShaderLayoutView> layout = ResolveLayoutView(module, variant, entryPointIndex);
+                CookResult<ShaderLayoutView> layout = ResolveLayoutView(module, variant, CodeForm::Base, entryPointIndex);
                 if (!layout)
                 {
                     return std::unexpected(layout.error());
@@ -127,12 +130,17 @@ namespace
                                        module.RasterStates[rhs.RasterIndices[entry_point_index]];
         const bool layoutsEqual = instances.Layouts[instances.Slot(lhs_variant, entry_point_index)] ==
                                   instances.Layouts[instances.Slot(rhs_variant, entry_point_index)];
-        const bool sourcesEqual = std::ranges::equal(ResolveSource(module, lhs, entry_point_index),
-                                                     ResolveSource(module, rhs, entry_point_index));
-        const bool pairsEqual = module.SamplerPairLists[lhs.SamplerPairIndices[entry_point_index]] ==
-                                module.SamplerPairLists[rhs.SamplerPairIndices[entry_point_index]];
-        const bool constantsEqual = module.EntryPointConstantsTable[lhs.ConstantsIndices[entry_point_index]] ==
-                                    module.EntryPointConstantsTable[rhs.ConstantsIndices[entry_point_index]];
+        const bool sourcesEqual = std::ranges::equal(ResolveSource(module, lhs, CodeForm::Base, entry_point_index),
+                                                     ResolveSource(module, rhs, CodeForm::Base, entry_point_index));
+
+        const CodeFormTables& tables = FormTables(module, CodeForm::Base);
+        const CodeFormIndices& lhsIndices = FormIndices(lhs, CodeForm::Base);
+        const CodeFormIndices& rhsIndices = FormIndices(rhs, CodeForm::Base);
+
+        const bool pairsEqual = tables.SamplerPairLists[lhsIndices.SamplerPairIndices[entry_point_index]] ==
+                                tables.SamplerPairLists[rhsIndices.SamplerPairIndices[entry_point_index]];
+        const bool constantsEqual = tables.EntryPointConstantsTable[lhsIndices.ConstantsIndices[entry_point_index]] ==
+                                    tables.EntryPointConstantsTable[rhsIndices.ConstantsIndices[entry_point_index]];
 
         return workgroupsEqual &&
                rasterStatesEqual &&
@@ -476,7 +484,10 @@ namespace
                                                       size_t entry_point_index)
     {
         const LibraryVariant& variant = module.Variants[variant_index];
-        return module.SourceFacts[variant.SourceIndices[entry_point_index]].CapabilityNames;
+        const CodeFormTables& tables = FormTables(module, CodeForm::Base);
+        const CodeFormIndices& indices = FormIndices(variant, CodeForm::Base);
+
+        return tables.SourceFacts[indices.SourceIndices[entry_point_index]].CapabilityNames;
     }
 
     /** The group holds the two values of a boolean axis, and each name list is sorted. */
@@ -580,6 +591,17 @@ CookResult<ModuleInfluence> ComputeActualInfluence(const CookedModule& module)
     }
 
     return influence;
+}
+
+CookResult<std::vector<ContentHashValue>> HashBaseInstances(const CookedModule& module)
+{
+    CookResult<InstanceTable> instances = BuildInstanceTable(module);
+    if (!instances)
+    {
+        return std::unexpected(instances.error());
+    }
+
+    return std::move(instances->Hashes);
 }
 
 std::vector<ResourceFootprintInfluence> ComputeFootprintInfluence(const CookedModule& module)

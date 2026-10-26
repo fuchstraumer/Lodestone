@@ -258,16 +258,16 @@ namespace
     {
         writer.Key("sources");
         writer.BeginArray();
-        for (size_t i = 0u; i < module.Sources.size(); ++i)
+        for (size_t i = 0u; i < module.Delivered.Sources.size(); ++i)
         {
             writer.BeginObject();
             writer.KeyUInt("index", i);
-            writer.KeyUInt("byteLength", module.Sources[i].size());
-            writer.KeyUInt("contentHash", HashSourceCode(module.Sources[i]));
-            writer.KeyUInt("workgroupMemoryBytes", module.SourceFacts[i].WorkgroupMemoryBytes);
+            writer.KeyUInt("byteLength", module.Delivered.Sources[i].size());
+            writer.KeyUInt("contentHash", HashSourceCode(module.Delivered.Sources[i]));
+            writer.KeyUInt("workgroupMemoryBytes", module.Delivered.SourceFacts[i].WorkgroupMemoryBytes);
             writer.Key("capabilities");
             writer.BeginArray();
-            for (const std::string& name : module.SourceFacts[i].CapabilityNames)
+            for (const std::string& name : module.Delivered.SourceFacts[i].CapabilityNames)
             {
                 writer.String(name);
             }
@@ -357,12 +357,12 @@ namespace
     {
         writer.Key("entryPointConstants");
         writer.BeginArray();
-        for (size_t i = 0u; i < module.EntryPointConstantsTable.size(); ++i)
+        for (size_t i = 0u; i < module.Delivered.EntryPointConstantsTable.size(); ++i)
         {
             writer.BeginObject();
             writer.KeyUInt("index", i);
-            writer.KeyUInt("contentHash", HashEntryPointConstants(module.EntryPointConstantsTable[i]));
-            WriteEntryPointConstants(writer, module.EntryPointConstantsTable[i]);
+            writer.KeyUInt("contentHash", HashEntryPointConstants(module.Delivered.EntryPointConstantsTable[i]));
+            WriteEntryPointConstants(writer, module.Delivered.EntryPointConstantsTable[i]);
             writer.EndObject();
         }
         writer.EndArray();
@@ -372,12 +372,12 @@ namespace
     {
         writer.Key("samplerPairLists");
         writer.BeginArray();
-        for (size_t i = 0u; i < module.SamplerPairLists.size(); ++i)
+        for (size_t i = 0u; i < module.Delivered.SamplerPairLists.size(); ++i)
         {
             writer.BeginObject();
             writer.KeyUInt("index", i);
-            writer.KeyUInt("contentHash", HashSamplerPairList(module.SamplerPairLists[i]));
-            WriteSamplerPairs(writer, "pairs", module.SamplerPairLists[i]);
+            writer.KeyUInt("contentHash", HashSamplerPairList(module.Delivered.SamplerPairLists[i]));
+            WriteSamplerPairs(writer, "pairs", module.Delivered.SamplerPairLists[i]);
             writer.EndObject();
         }
         writer.EndArray();
@@ -452,11 +452,11 @@ namespace
             WriteAssignment(writer, variant.Canonical);
             writer.KeyUInt("resourceListIndex", variant.ResourceListIndex);
             writer.KeyUInt("footprintListIndex", variant.FootprintListIndex);
-            WriteIndexArray(writer, "sourceIndices", variant.SourceIndices);
-            WriteIndexArray(writer, "visibilityIndices", variant.VisibilityIndices);
+            WriteIndexArray(writer, "sourceIndices", variant.Delivered.SourceIndices);
+            WriteIndexArray(writer, "visibilityIndices", variant.Delivered.VisibilityIndices);
             WriteIndexArray(writer, "rasterIndices", variant.RasterIndices);
-            WriteIndexArray(writer, "samplerPairIndices", variant.SamplerPairIndices);
-            WriteIndexArray(writer, "constantsIndices", variant.ConstantsIndices);
+            WriteIndexArray(writer, "samplerPairIndices", variant.Delivered.SamplerPairIndices);
+            WriteIndexArray(writer, "constantsIndices", variant.Delivered.ConstantsIndices);
             WriteWorkgroups(writer, variant);
             writer.EndObject();
         }
@@ -486,9 +486,9 @@ namespace
         writer.BeginObject();
         WriteInterner(writer,
                       "sources",
-                      module.SourceTable.HashName,
-                      module.SourceTable.DedupeEnabled,
-                      module.SourceTable.Interning);
+                      module.Delivered.SourceTable.HashName,
+                      module.Delivered.SourceTable.DedupeEnabled,
+                      module.Delivered.SourceTable.Interning);
         WriteInterner(writer,
                       "resources",
                       module.ResourceTable.HashName,
@@ -506,9 +506,9 @@ namespace
                       module.FootprintListTable.Interning);
         WriteInterner(writer,
                       "visibility",
-                      module.VisibilityTable.HashName,
-                      module.VisibilityTable.DedupeEnabled,
-                      module.VisibilityTable.Interning);
+                      module.Delivered.VisibilityTable.HashName,
+                      module.Delivered.VisibilityTable.DedupeEnabled,
+                      module.Delivered.VisibilityTable.Interning);
         WriteInterner(writer,
                       "rasterStates",
                       module.RasterTable.HashName,
@@ -516,14 +516,14 @@ namespace
                       module.RasterTable.Interning);
         WriteInterner(writer,
                       "samplerPairs",
-                      module.SamplerPairTable.HashName,
-                      module.SamplerPairTable.DedupeEnabled,
-                      module.SamplerPairTable.Interning);
+                      module.Delivered.SamplerPairTable.HashName,
+                      module.Delivered.SamplerPairTable.DedupeEnabled,
+                      module.Delivered.SamplerPairTable.Interning);
         WriteInterner(writer,
                       "entryPointConstants",
-                      module.ConstantsTable.HashName,
-                      module.ConstantsTable.DedupeEnabled,
-                      module.ConstantsTable.Interning);
+                      module.Delivered.ConstantsTable.HashName,
+                      module.Delivered.ConstantsTable.DedupeEnabled,
+                      module.Delivered.ConstantsTable.Interning);
         writer.EndObject();
     }
 
@@ -909,9 +909,9 @@ std::string DumpInternedModule(const InternedModule& module)
     writer.BeginObject();
     WriteInterner(writer,
                   "sources",
-                  module.SourceInterner.HashName(),
-                  module.SourceInterner.IsEnabled(),
-                  module.SourceInterner.Statistics());
+                  module.Delivered.SourceInterner.HashName(),
+                  module.Delivered.SourceInterner.IsEnabled(),
+                  module.Delivered.SourceInterner.Statistics());
     WriteInterner(writer,
                   "resources",
                   module.ResourceInterner.HashName(),
@@ -929,9 +929,9 @@ std::string DumpInternedModule(const InternedModule& module)
                   module.FootprintListInterner.Statistics());
     WriteInterner(writer,
                   "visibility",
-                  module.VisibilityInterner.HashName(),
-                  module.VisibilityInterner.IsEnabled(),
-                  module.VisibilityInterner.Statistics());
+                  module.Delivered.VisibilityInterner.HashName(),
+                  module.Delivered.VisibilityInterner.IsEnabled(),
+                  module.Delivered.VisibilityInterner.Statistics());
     WriteInterner(writer,
                   "rasterStates",
                   module.RasterInterner.HashName(),
@@ -939,26 +939,26 @@ std::string DumpInternedModule(const InternedModule& module)
                   module.RasterInterner.Statistics());
     WriteInterner(writer,
                   "samplerPairs",
-                  module.SamplerPairInterner.HashName(),
-                  module.SamplerPairInterner.IsEnabled(),
-                  module.SamplerPairInterner.Statistics());
+                  module.Delivered.SamplerPairInterner.HashName(),
+                  module.Delivered.SamplerPairInterner.IsEnabled(),
+                  module.Delivered.SamplerPairInterner.Statistics());
     WriteInterner(writer,
                   "entryPointConstants",
-                  module.ConstantsInterner.HashName(),
-                  module.ConstantsInterner.IsEnabled(),
-                  module.ConstantsInterner.Statistics());
+                  module.Delivered.ConstantsInterner.HashName(),
+                  module.Delivered.ConstantsInterner.IsEnabled(),
+                  module.Delivered.ConstantsInterner.Statistics());
     writer.EndObject();
 
     writer.Key("provenance");
     writer.BeginObject();
-    WriteProvenance(writer, "sources", module.SourceInterner);
+    WriteProvenance(writer, "sources", module.Delivered.SourceInterner);
     WriteProvenance(writer, "resources", module.ResourceInterner);
     WriteProvenance(writer, "resourceLists", module.ResourceListInterner);
     WriteProvenance(writer, "footprintLists", module.FootprintListInterner);
-    WriteProvenance(writer, "visibility", module.VisibilityInterner);
+    WriteProvenance(writer, "visibility", module.Delivered.VisibilityInterner);
     WriteProvenance(writer, "rasterStates", module.RasterInterner);
-    WriteProvenance(writer, "samplerPairs", module.SamplerPairInterner);
-    WriteProvenance(writer, "entryPointConstants", module.ConstantsInterner);
+    WriteProvenance(writer, "samplerPairs", module.Delivered.SamplerPairInterner);
+    WriteProvenance(writer, "entryPointConstants", module.Delivered.ConstantsInterner);
     writer.EndObject();
 
     writer.EndObject();
@@ -972,14 +972,14 @@ std::string DumpCookedModule(const CookedModule& module)
     writer.KeyString("stage", "cooked");
     writer.KeyString("module", module.Name);
     writer.KeyUInt("spaceSize", module.SpaceSize);
-    writer.KeyUInt("sourceCount", module.Sources.size());
+    writer.KeyUInt("sourceCount", module.Delivered.Sources.size());
     writer.KeyUInt("resourceCount", module.Resources.size());
     writer.KeyUInt("resourceListCount", module.ResourceLists.size());
     writer.KeyUInt("footprintListCount", module.FootprintLists.size());
-    writer.KeyUInt("visibilityListCount", module.VisibilityLists.size());
+    writer.KeyUInt("visibilityListCount", module.Delivered.VisibilityLists.size());
     writer.KeyUInt("rasterStateCount", module.RasterStates.size());
-    writer.KeyUInt("samplerPairListCount", module.SamplerPairLists.size());
-    writer.KeyUInt("entryPointConstantsCount", module.EntryPointConstantsTable.size());
+    writer.KeyUInt("samplerPairListCount", module.Delivered.SamplerPairLists.size());
+    writer.KeyUInt("entryPointConstantsCount", module.Delivered.EntryPointConstantsTable.size());
     writer.KeyUInt("variantCount", module.Variants.size());
 
     WriteEntryPointTable(writer, module.EntryPoints);
@@ -987,7 +987,7 @@ std::string DumpCookedModule(const CookedModule& module)
     WriteResourceTable(writer, module);
     WriteIndexListTable(writer, "resourceLists", module.ResourceLists);
     WriteFootprintListTable(writer, module);
-    WriteIndexListTable(writer, "visibilityLists", module.VisibilityLists);
+    WriteIndexListTable(writer, "visibilityLists", module.Delivered.VisibilityLists);
     WriteRasterTable(writer, module);
     WriteSamplerPairTable(writer, module);
     WriteEntryPointConstantsTable(writer, module);
@@ -1058,10 +1058,10 @@ CookError DumpShaderSources(const CookedModule& module,
 
     std::unordered_map<uint32_t, std::string> sourceIdxToFilename;
 
-    for (const auto& [sourceIdx, usage] : std::views::enumerate(module.Sources))
+    for (const auto& [sourceIdx, usage] : std::views::enumerate(module.Delivered.Sources))
     {
-        const ContentHashValue hashedSource = HashSourceCode(module.Sources[sourceIdx]);
-        const std::span<const std::byte> source = module.Sources[sourceIdx];
+        const ContentHashValue hashedSource = HashSourceCode(module.Delivered.Sources[sourceIdx]);
+        const std::span<const std::byte> source = module.Delivered.Sources[sourceIdx];
         const bool isSpirv = code_format == ShaderCodeFormat::Spirv;
         std::string filename =
             std::format("{}_{:016X}.{}", module.Name, hashedSource, isSpirv ? "spv" : "wgsl");
@@ -1089,7 +1089,7 @@ CookError DumpShaderSources(const CookedModule& module,
         
         tableWriter.Key("sourceFiles");
         tableWriter.BeginArray();
-        for (uint32_t sourceIdx : variant.SourceIndices)
+        for (uint32_t sourceIdx : variant.Delivered.SourceIndices)
         {
             tableWriter.String(sourceIdxToFilename[sourceIdx]);
         }

@@ -81,7 +81,7 @@ CookedModule MakeSmallModule()
     module.ResourceLists.push_back(lodestone::ResourceList{ 0u });
     module.FootprintLists.push_back(
         lodestone::FootprintList{ lodestone::BufferFootprint{ .ElementCount = 256u } });
-    module.VisibilityLists.push_back(lodestone::VisibilityList{ 0u });
+    module.Delivered.VisibilityLists.push_back(lodestone::VisibilityList{ 0u });
 
     lodestone::tests::AddDefaultInstanceTables(module);
 
@@ -128,7 +128,7 @@ CookedLibrary MakeSpirvLibrary()
 {
     CookedLibrary library = MakeSmallLibrary();
     CookedModule module = MakeSmallModule();
-    module.Sources = { std::vector<std::byte>(8u, std::byte{ 0x01 }), std::vector<std::byte>(12u, std::byte{ 0x02 }) };
+    module.Delivered.Sources = { std::vector<std::byte>(8u, std::byte{ 0x01 }), std::vector<std::byte>(12u, std::byte{ 0x02 }) };
     library.Environments = {};
     library.Environments.emplace_back(std::nullopt);
     library.Environments.emplace_back(std::move(module));
@@ -154,8 +154,8 @@ CookedModule MakeSampledModule(lodestone::SamplerPairList pairs)
     module.Resources = { texture, sampler };
     module.ResourceLists = { lodestone::ResourceList{ 0u, 1u } };
     module.FootprintLists = { lodestone::FootprintList{ std::monostate{}, std::monostate{} } };
-    module.VisibilityLists = { lodestone::VisibilityList{ 0u, 1u } };
-    module.SamplerPairLists = { std::move(pairs) };
+    module.Delivered.VisibilityLists = { lodestone::VisibilityList{ 0u, 1u } };
+    module.Delivered.SamplerPairLists = { std::move(pairs) };
     return module;
 }
 
@@ -169,7 +169,7 @@ CookedLibrary MakeSampledLibrary(lodestone::SamplerPairList wgsl_pairs, lodeston
     library.Environments.emplace_back(MakeSampledModule(std::move(wgsl_pairs)));
     CookedModule spirvModule = MakeSampledModule(std::move(spirv_pairs));
     // a SPIR-V source must be whole words. The emitter does not read SPIR-V, so the words need not be a module
-    spirvModule.Sources = { std::vector<std::byte>(8u, std::byte{ 0x01 }), std::vector<std::byte>(12u, std::byte{ 0x02 }) };
+    spirvModule.Delivered.Sources = { std::vector<std::byte>(8u, std::byte{ 0x01 }), std::vector<std::byte>(12u, std::byte{ 0x02 }) };
     library.Environments.emplace_back(std::move(spirvModule));
     return library;
 }
@@ -193,15 +193,15 @@ CookedLibrary MakeConstantsLibrary(bool with_constants)
     module.Resources = { container };
     module.ResourceLists = { lodestone::ResourceList{ 0u } };
     module.FootprintLists = { lodestone::FootprintList{ std::monostate{} } };
-    module.VisibilityLists = { lodestone::VisibilityList{ 0u } };
-    module.EntryPointConstantsTable.push_back(
+    module.Delivered.VisibilityLists = { lodestone::VisibilityList{ 0u } };
+    module.Delivered.EntryPointConstantsTable.push_back(
         lodestone::EntryPointConstants{ .Delivery = lodestone::EntryPointConstantsDelivery::UniformBuffer,
                                         .ByteSize = 16u,
                                         .Binding = 0u,
                                         .Members = { tint } });
     for (lodestone::LibraryVariant& variant : module.Variants)
     {
-        variant.ConstantsIndices = { with_constants ? 1u : 0u };
+        variant.Delivered.ConstantsIndices = { with_constants ? 1u : 0u };
     }
 
     CookedLibrary library = MakeSmallLibrary();
@@ -253,7 +253,7 @@ void TestSourceFacts(lodestone::tests::TestRunner& runner)
     runner.BeginSection("the capability names and the workgroup memory of each source read back");
     CookedLibrary library = MakeSmallLibrary();
     CookedModule& module = *library.Environments[0u];
-    module.SourceFacts = { lodestone::SourceCodeFacts{ .CapabilityNames = { "Float16", "GroupNonUniform" },
+    module.Delivered.SourceFacts = { lodestone::SourceCodeFacts{ .CapabilityNames = { "Float16", "GroupNonUniform" },
                                                        .WorkgroupMemoryBytes = 4096u },
                            lodestone::SourceCodeFacts{ .CapabilityNames = { "GroupNonUniform" },
                                                        .WorkgroupMemoryBytes = 0u } };
@@ -297,11 +297,11 @@ void TestSourceFacts(lodestone::tests::TestRunner& runner)
                  "another source keeps its own facts");
 
     CookedLibrary otherFacts = library;
-    otherFacts.Environments[0u]->SourceFacts[1u].WorkgroupMemoryBytes = 16u;
+    otherFacts.Environments[0u]->Delivered.SourceFacts[1u].WorkgroupMemoryBytes = 16u;
     runner.CheckEqual(lodestone::VerifyManifestRoundTrip(otherFacts, bytes, manifestDiagnostics), lodestone::CookError::ManifestSourceFactsMismatch,
                       "the round trip fails on workgroup memory that differs");
     CookedLibrary otherNames = library;
-    otherNames.Environments[0u]->SourceFacts[1u].CapabilityNames = { "Float16" };
+    otherNames.Environments[0u]->Delivered.SourceFacts[1u].CapabilityNames = { "Float16" };
     runner.CheckEqual(lodestone::VerifyManifestRoundTrip(otherNames, bytes, manifestDiagnostics), lodestone::CookError::ManifestSourceFactsMismatch,
                       "the round trip fails on a capability name that differs");
 
@@ -329,8 +329,8 @@ void TestSourceFactsAcrossProfiles(lodestone::tests::TestRunner& runner)
         CookedLibrary library = MakeSampledLibrary({}, {});
         library.Profiles[0].CodeFactsRead = true;
         library.Profiles[1].CodeFactsRead = true;
-        library.Environments[0]->SourceFacts = { wgsl, wgsl };
-        library.Environments[1]->SourceFacts = { spirv, spirv };
+        library.Environments[0]->Delivered.SourceFacts = { wgsl, wgsl };
+        library.Environments[1]->Delivered.SourceFacts = { spirv, spirv };
         return library;
     };
 
@@ -393,8 +393,8 @@ void TestMemberLookup(lodestone::tests::TestRunner& runner)
                                                                   member("Swell.WindSpeed", 52u) };
     module.Resources[0u].UniformMembers = members;
     module.Resources[0u].ByteSize = 64u;
-    module.EntryPointConstantsTable[1u].Members = members;
-    module.EntryPointConstantsTable[1u].ByteSize = 64u;
+    module.Delivered.EntryPointConstantsTable[1u].Members = members;
+    module.Delivered.EntryPointConstantsTable[1u].ByteSize = 64u;
 
     const lodestone::CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library, manifestDiagnostics);
     const ManifestResult<BundleView> bundle =

@@ -168,3 +168,14 @@ A visibility list is ordered by `PlacementOrderKey`: bound placements by group a
 group, binding, and offset. The merged layout merges by the same key, so a value never collides with its container.
 `Profile::Forms` (a `PlacementForms`) replaces the profile's one access model. The client reads a stored value with
 `ResolvedResource::Placement`, `PlacementValue`, `ValueContainer`, and `ValueOffset`.
+
+## Version 18
+
+Format version 18 (base cook, step B2) separates what the cook measures from what it ships. `Profile::OptimizationLevel`
+and `Profile::DebugLevel` record the cook's `--O` and `--g` levels, which made the profile's code. `Open` rejects a level
+above 3 (`InvalidProfileCodeFlags`). Above the base flags (`--O0`, no debug information), the cooker compiles each variant
+twice, and the axis relevance describes the base form: an optimizer or debug information must not change which axes an
+entry point depends on. `EntryPointInstance::BaseHash` holds the instance hash of the base form (source, layout, raster
+state, workgroup size, sampler pairs, and constants). The base code itself is not stored. The client does not read the
+base hash. The cooker's relevance check compares base hashes when the profile's levels are not the base levels, and
+compares the bytes otherwise.

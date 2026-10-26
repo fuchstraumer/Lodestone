@@ -405,8 +405,8 @@ namespace
                                                           .CodeFormat = CodeFormatFromLanguage(profile.Language),
                                                           .SamplerTexturePairsRecorded = profile.Validator != nullptr,
                                                           .CodeFactsRead = profile.Validator != nullptr,
-                                                          .CodeOptimized = profile.OptimizesEmittedCode &&
-                                                                           cook_state.Options.OptimizationLevel > 0u });
+                                                          .OptimizationLevel = cook_state.Options.OptimizationLevel,
+                                                          .DebugLevel = cook_state.Options.DebugLevel });
         }
 
         library.Environments.resize(library.Profiles.size() * library.ModuleNames.size());
