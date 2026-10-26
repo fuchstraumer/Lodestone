@@ -170,8 +170,6 @@ struct TargetProfile
     uint32_t MaxPushConstantBytes{ 0u };
     /** @brief The guaranteed Vulkan version, as `VK_MAKE_API_VERSION(0, major, minor, 0)`. Zero if not Vulkan. */
     uint32_t VulkanApiVersion{ 0u };
-    /** @brief What the profile still lacks. A cook for a profile with a reason fails with `TargetProfileIncomplete`. */
-    std::string_view IncompleteReason;
 };
 
 /** @brief A compiled-in table, since each target needs its own validation code. */

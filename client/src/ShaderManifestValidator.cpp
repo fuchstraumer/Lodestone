@@ -342,6 +342,15 @@ namespace
                          .RecordIndex = static_cast<uint32_t>(i),
                          .Detail = profile.OptimizationLevel > 3u ? profile.OptimizationLevel : profile.DebugLevel };
             }
+
+            const bool noHeap = profile.HeapLowering == DescriptorHeapLowering::None;
+            if (profile.HeapLowering > DescriptorHeapLowering::MutableDescriptor || (noHeap && profile.DescriptorHeapSet != 0u))
+            {
+                return { .Code = ErrorCode::InvalidProfileDescriptorHeap,
+                         .Table = ShaderManifestTable::Profiles,
+                         .RecordIndex = static_cast<uint32_t>(i),
+                         .Detail = static_cast<uint32_t>(profile.HeapLowering) };
+            }
         }
 
         return k_ManifestOk;

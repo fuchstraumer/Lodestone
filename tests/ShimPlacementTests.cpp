@@ -26,9 +26,6 @@
 #include <string_view>
 #include <vector>
 
-// spirv-modern is not complete, so this test cooks it through `CookerOptions::AllowIncompleteProfiles`. Delete that use
-// when the profile is complete.
-
 namespace
 {
 
@@ -48,7 +45,6 @@ CookOutcome Cook(const std::filesystem::path& module_path, std::string_view targ
     options.TargetNames.emplace_back(target);
     options.OutputPath = "ShimPlacement";
     options.VerifyDeterministic = true;
-    options.AllowIncompleteProfiles = true;
 
     MemoryOutputSink sink;
     RecordingDiagnosticSink diagnostics;
@@ -267,7 +263,6 @@ int main(int argc, char** argv)
         options.ModulePaths.push_back(assetDirectory / "ShimMaterial.slang");
         options.TargetNames = { "wgsl", "spirv-modern" };
         options.OutputPath = "ShimPlacementTogether";
-        options.AllowIncompleteProfiles = true;
         MemoryOutputSink sink;
         RecordingDiagnosticSink diagnostics;
         const CookResult<CookStatistics> together = RunCook(options, sink, diagnostics);
@@ -275,18 +270,6 @@ int main(int argc, char** argv)
         {
             PrintErrors(CookOutcome{ .Records = std::move(diagnostics.Records()) });
         }
-    }
-
-    runner.BeginSection("without the test switch, spirv-modern still refuses to cook");
-    {
-        CookerOptions options;
-        options.ModulePaths.push_back(assetDirectory / "ShimMaterial.slang");
-        options.TargetNames.emplace_back("spirv-modern");
-        options.OutputPath = "ShimPlacementRefused";
-        MemoryOutputSink sink;
-        RecordingDiagnosticSink diagnostics;
-        runner.CheckError(RunCook(options, sink, diagnostics), CookError::TargetProfileIncomplete,
-                          "a cook with no switch fails with TargetProfileIncomplete");
     }
 
     return runner.Report();

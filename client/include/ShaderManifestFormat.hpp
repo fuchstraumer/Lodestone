@@ -84,6 +84,7 @@ enum class ErrorCode : uint32_t
     InvalidStoredValue = 62,
     StoredValueContainerMissing = 63,
     InvalidProfileCodeFlags = 64,
+    InvalidProfileDescriptorHeap = 65,
     Count
 };
 
@@ -210,18 +211,34 @@ struct alignas(8) SourceRef
     uint32_t Reserved{ 0u };
 };
 
+/** @brief How a profile's handles reach their resources. A renderer builds the heap's set layout from this. */
+enum class DescriptorHeapLowering : uint8_t
+{
+    None = 0,
+    // VK_EXT_mutable_descriptor_type, one unbounded array for each binding below
+    MutableDescriptor = 1,
+};
+
+inline constexpr uint32_t k_MutableHeapSamplerBinding = 0u;
+inline constexpr uint32_t k_MutableHeapCombinedImageSamplerBinding = 1u;
+// textures, storage textures, texel buffers, storage buffers, and uniform buffers
+inline constexpr uint32_t k_MutableHeapResourceBinding = 2u;
+
 /** @brief One cooked form: a target and the placement of each class of shim resource. */
 struct alignas(8) Profile
 {
     uint32_t TargetNameString{ 0u };
     PlacementForms Forms{};
     ShaderCodeFormat CodeFormat{ ShaderCodeFormat::None };
-    uint8_t Reserved{ 0u };
+    DescriptorHeapLowering HeapLowering{ DescriptorHeapLowering::None };
     uint16_t Flags{ 0u };
     // the cook's `--O` and `--g` levels, which made the code in this profile
     uint8_t OptimizationLevel{ 0u };
     uint8_t DebugLevel{ 0u };
     uint16_t Reserved2{ 0u };
+    // 0 when `HeapLowering` is `None`
+    uint32_t DescriptorHeapSet{ 0u };
+    uint32_t Reserved3{ 0u };
 };
 
 enum class ProfileFlags : uint16_t

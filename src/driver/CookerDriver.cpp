@@ -406,7 +406,11 @@ namespace
                                                           .SamplerTexturePairsRecorded = profile.Validator != nullptr,
                                                           .CodeFactsRead = profile.Validator != nullptr,
                                                           .OptimizationLevel = cook_state.Options.OptimizationLevel,
-                                                          .DebugLevel = cook_state.Options.DebugLevel });
+                                                          .DebugLevel = cook_state.Options.DebugLevel,
+                                                          .HeapLowering = profile.DescriptorHeapSet.has_value()
+                                                                              ? manifest::DescriptorHeapLowering::MutableDescriptor
+                                                                              : manifest::DescriptorHeapLowering::None,
+                                                          .DescriptorHeapSet = profile.DescriptorHeapSet.value_or(0u) });
         }
 
         library.Environments.resize(library.Profiles.size() * library.ModuleNames.size());

@@ -287,9 +287,11 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
         profiles.push_back(manifest::Profile{ .TargetNameString = strings.Add(profile.TargetName),
                                               .Forms = profile.Forms,
                                               .CodeFormat = profile.CodeFormat,
+                                              .HeapLowering = profile.HeapLowering,
                                               .Flags = flags,
                                               .OptimizationLevel = static_cast<uint8_t>(profile.OptimizationLevel),
-                                              .DebugLevel = static_cast<uint8_t>(profile.DebugLevel) });
+                                              .DebugLevel = static_cast<uint8_t>(profile.DebugLevel),
+                                              .DescriptorHeapSet = profile.DescriptorHeapSet });
     }
 
     // extents add strings, and the string table is in the header region

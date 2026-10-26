@@ -179,3 +179,5 @@ entry point depends on. `EntryPointInstance::BaseHash` holds the instance hash o
 state, workgroup size, sampler pairs, and constants). The base code itself is not stored. The client does not read the
 base hash. The cooker's relevance check compares base hashes when the profile's levels are not the base levels, and
 compares the bytes otherwise.
+
+Format version 18 also records the descriptor heap that the Handle form indexes (phase F step F4): `Profile::HeapLowering` and `Profile::DescriptorHeapSet`. `MutableDescriptor` (`VK_EXT_mutable_descriptor_type`) puts one unbounded array at each of three bindings of the set: samplers at `k_MutableHeapSamplerBinding` (0), combined image samplers at `k_MutableHeapCombinedImageSamplerBinding` (1), and every other resource at `k_MutableHeapResourceBinding` (2). A renderer builds the heap's set layout from these. The `Profile` record grows to 24 bytes. `Open` rejects an unknown lowering, and a heap set with no lowering (`InvalidProfileDescriptorHeap`).

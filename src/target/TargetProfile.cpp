@@ -86,10 +86,7 @@ namespace
                            .DescriptorHeapSet = k_SpirvModernHeapSet,
                            .Validator = &k_SpvModernValidator,
                            .MaxPushConstantBytes = 128u,
-                           .VulkanApiVersion = (1u << 22u) | (2u << 12u),
-                           .IncompleteReason = "the manifest does not record the descriptor heap, the validator does not compare "
-                                               "the offsets of handles and pointers with the code, and the sampler pairs of "
-                                               "handles are not recorded" },
+                           .VulkanApiVersion = (1u << 22u) | (2u << 12u) },
     };
 
     constexpr std::array<std::string_view, 3u> k_TargetProfileNames

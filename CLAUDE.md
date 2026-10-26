@@ -176,14 +176,12 @@ the priming error names `--include-dir`. `lodestone_add_shader_cook` takes `INCL
 name is rejected at the command line and never in the driver, so a name that reaches `CookerOptions` is
 a name `FindTargetProfile` accepts. This build has `wgsl` and `spirv`. Each has a validator:
 `WgslValidator` (Tint) and `SpvValidator` (SPIRV-Tools). A third profile, `spirv-modern` (buffers through buffer device
-addresses, textures and samplers through descriptor handles, phase F step F4), exists and fails every cook with
-`TargetProfileIncomplete`. A profile has one access model for each class of shim resource (`TargetProfile::Forms`, a
+addresses, textures and samplers through descriptor handles, phase F step F4), exists. `spirv-modern` cooks. Not yet checked
+against the code: the byte offsets of stored values (F4.5), and the sampler pairs of handles. A profile has one access model for each class of shim resource (`TargetProfile::Forms`, a
 `ShimForms`), and `ShimLinkSource` links each extern in the form of its class. `spirv-modern` gives buffers the Pointer
 form and textures, samplers, and storage textures the Handle form, with the descriptor heap in set 3
 (`TargetProfile::DescriptorHeapSet`, given to Slang as its bindless space index). The manifest records the form of each
-class (`Profile::Forms`, format 17). `TargetProfile::IncompleteReason` names what it lacks, and `PrepareCookStep` prints it.
-A name in the policy file can name it already. A test cooks it anyway with `CookerOptions::AllowIncompleteProfiles`, which no
-flag sets.
+class (`Profile::Forms`, format 17). A name in the policy file can name it.
 
 A Pointer or Handle member stores a value in a block: `[ls_shim_value]` marks it in `builtins/LodestoneShims.slang`, because
 reflection gives a descriptor handle as a plain `uint2` and a pointer with no resource type. The reflector finds the marked
@@ -718,7 +716,7 @@ What each version added (details in `client/FORMAT.md`):
 - 15: `ProfileFlags::CodeFactsRead`.
 - 16: `Binding::ArrayCount` of 0 for an unbounded binding array.
 - 17: stored values for the Handle and Pointer forms (`Binding::ValueContainer`, `Binding::ValueOffset`, `Profile::Forms`).
-- 18: the cook's `--O` and `--g` levels (`Profile::OptimizationLevel`, `Profile::DebugLevel`), and the base form's hash for each entry point instance (`EntryPointInstance::BaseHash`).
+- 18: the cook's `--O` and `--g` levels (`Profile::OptimizationLevel`, `Profile::DebugLevel`), the base form's hash for each entry point instance (`EntryPointInstance::BaseHash`), and the descriptor heap (`Profile::HeapLowering`, `Profile::DescriptorHeapSet`).
 
 Read `client/FORMAT.md` before you change the manifest format or the client views.
 

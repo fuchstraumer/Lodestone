@@ -534,6 +534,25 @@ int main()
     runner.CheckEqual(BundleErrorFrom(badFormat), ErrorCode::InvalidProfileCodeFormat,
                       "a profile with no code format is rejected when the bundle opens");
 
+    runner.BeginSection("the code flags and the descriptor heap of a profile");
+    const size_t firstLevelOffset = header.Profiles.Offset + offsetof(lodestone::manifest::Profile, DebugLevel);
+    std::vector<std::byte> badLevel = valid;
+    WriteValue(badLevel, firstLevelOffset, uint8_t{ 4u });
+    runner.CheckEqual(BundleErrorFrom(badLevel), ErrorCode::InvalidProfileCodeFlags,
+                      "a debug level above 3 is rejected when the bundle opens");
+
+    const size_t firstLoweringOffset = header.Profiles.Offset + offsetof(lodestone::manifest::Profile, HeapLowering);
+    std::vector<std::byte> badLowering = valid;
+    WriteValue(badLowering, firstLoweringOffset, uint8_t{ 7u });
+    runner.CheckEqual(BundleErrorFrom(badLowering), ErrorCode::InvalidProfileDescriptorHeap,
+                      "an unknown heap lowering is rejected when the bundle opens");
+
+    const size_t firstHeapSetOffset = header.Profiles.Offset + offsetof(lodestone::manifest::Profile, DescriptorHeapSet);
+    std::vector<std::byte> strayHeapSet = valid;
+    WriteValue(strayHeapSet, firstHeapSetOffset, uint32_t{ 3u });
+    runner.CheckEqual(BundleErrorFrom(strayHeapSet), ErrorCode::InvalidProfileDescriptorHeap,
+                      "a heap set with no lowering is rejected when the bundle opens");
+
     // The WGSL sources of the small module are 24 and 23 bytes, so the second is not whole words.
     std::vector<std::byte> textAsSpirv = valid;
     WriteValue(textAsSpirv, firstFormatOffset, lodestone::ShaderCodeFormat::Spirv);

@@ -6,6 +6,7 @@
 #include "CookerErrors.hpp"
 #include "ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "ShaderManifestFormat.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "VariantKey.hpp"
@@ -201,6 +202,8 @@ struct CookedProfile
     bool CodeFactsRead{ false };
     uint32_t OptimizationLevel{ 0u };
     uint32_t DebugLevel{ 0u };
+    manifest::DescriptorHeapLowering HeapLowering{ manifest::DescriptorHeapLowering::None };
+    uint32_t DescriptorHeapSet{ 0u };
 };
 
 /** @brief The whole cook. `Environments` is the profile-major grid, and an empty entry was not cooked. */

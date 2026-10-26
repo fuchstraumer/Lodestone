@@ -219,8 +219,12 @@ namespace
         for (auto&& [profileIndex, profile] : std::views::enumerate(bundle.Profiles()))
         {
             const CookedProfile& expected = library.Profiles[static_cast<size_t>(profileIndex)];
-            if (bundle.String(profile.TargetNameString) != expected.TargetName ||
-                profile.Forms != expected.Forms)
+            const bool levelsEqual = profile.OptimizationLevel == expected.OptimizationLevel &&
+                                     profile.DebugLevel == expected.DebugLevel;
+            const bool heapEqual = profile.HeapLowering == expected.HeapLowering &&
+                                   profile.DescriptorHeapSet == expected.DescriptorHeapSet;
+            if (bundle.String(profile.TargetNameString) != expected.TargetName || profile.Forms != expected.Forms ||
+                !levelsEqual || !heapEqual)
             {
                 return ReportError(
                     sink,

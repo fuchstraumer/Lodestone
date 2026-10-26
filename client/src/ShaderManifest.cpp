@@ -113,6 +113,7 @@ namespace
             "a binding's stored value has an unknown container, a push constant value with a group or binding, or a container or offset on a placement that is not a Handle or a Pointer",
             "an entry point instance reads a stored value whose uniform buffer is not in its visibility list, or whose push constants it does not have",
             "a profile names an optimization or debug information level above 3",
+            "a profile names an unknown descriptor heap lowering, or a heap set with no lowering",
         });
 
     static_assert(k_ErrorDescriptions.size() == static_cast<size_t>(ErrorCode::Count),

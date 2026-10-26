@@ -54,8 +54,6 @@ struct CookerOptions
     std::optional<std::filesystem::path> PolicyFile;
     bool DumpSources{ false };
     bool WriteDepfile{ false };
-    /** Tests only, and no flag sets it: cooks a profile whose `IncompleteReason` is not empty, with a warning. */
-    bool AllowIncompleteProfiles{ false };
 };
 
 bool IsStageDumpRequested(const CookerOptions& options, StageDumpKind kind) noexcept;

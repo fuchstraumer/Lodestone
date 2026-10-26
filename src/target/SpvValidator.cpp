@@ -1,5 +1,6 @@
 #include "target/SpvValidator.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "ShaderManifestFormat.hpp"
 #include "target/TargetProfile.hpp"
 #include "target/TargetUtils.hpp"
 #include "CookerErrors.hpp"
@@ -208,16 +209,15 @@ namespace
         }
     }
 
-    /** The mutable descriptor lowering: samplers at 0, combined image samplers at 1, and every other resource at 2. */
     bool HeapBindingAllows(uint32_t binding, BindingKind kind) noexcept
     {
         switch (binding)
         {
-        case 0u:
+        case manifest::k_MutableHeapSamplerBinding:
             return kind == BindingKind::Sampler;
-        case 1u:
+        case manifest::k_MutableHeapCombinedImageSamplerBinding:
             return kind == BindingKind::CombinedTextureSampler;
-        case 2u:
+        case manifest::k_MutableHeapResourceBinding:
             return kind == BindingKind::Texture || kind == BindingKind::StorageTexture || kind == BindingKind::TexelBuffer ||
                    kind == BindingKind::StorageBuffer || kind == BindingKind::UniformBuffer;
         default:
