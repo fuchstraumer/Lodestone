@@ -1,7 +1,9 @@
 #include "model/ContentHash.hpp"
 
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string_view>
 #include <xxhash.h>
 

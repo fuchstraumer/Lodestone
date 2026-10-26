@@ -8,10 +8,8 @@
 #include "model/ShaderDataSchema.hpp"
 #include "model/CookedLibrary.hpp"
 #include "permute/PermutationSpace.hpp"
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -30,22 +28,7 @@ struct CookStatistics
     uint32_t ReflectionMismatches{ 0u };
     double ElapsedMilliseconds{ 0.0 };
     size_t TotalSourceBytes{ 0u };
-    CookStatistics& operator+=(const CookStatistics& other)
-    {
-        std::atomic_ref<uint32_t> atomicModulesCooked{ ModulesCooked };
-        std::atomic_ref<uint32_t> atomicVariantsCompiled{ VariantsCompiled };
-        std::atomic_ref<uint32_t> atomicEntryPointsCompiled{ EntryPointsCompiled };
-        std::atomic_ref<uint32_t> atomicReflectionMismatches{ ReflectionMismatches };
-        std::atomic_ref<double> atomicElapsedMilliseconds{ ElapsedMilliseconds };
-        std::atomic_ref<size_t> atomicTotalSourceBytes{ TotalSourceBytes };
-        atomicModulesCooked.fetch_add(other.ModulesCooked, std::memory_order_relaxed);
-        atomicVariantsCompiled.fetch_add(other.VariantsCompiled, std::memory_order_relaxed);
-        atomicEntryPointsCompiled.fetch_add(other.EntryPointsCompiled, std::memory_order_relaxed);
-        atomicReflectionMismatches.fetch_add(other.ReflectionMismatches, std::memory_order_relaxed);
-        atomicElapsedMilliseconds.fetch_add(other.ElapsedMilliseconds, std::memory_order_relaxed);
-        atomicTotalSourceBytes.fetch_add(other.TotalSourceBytes, std::memory_order_relaxed);
-        return *this;
-    }
+    CookStatistics& operator+=(const CookStatistics& other);
 };
 
 struct SharedCookState

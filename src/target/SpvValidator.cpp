@@ -13,7 +13,9 @@
 #include <cstring>
 #include <expected>
 #include <format>
+#include <optional>
 #include <span>
+#include <spirv-tools/libspirv.h>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -261,7 +263,14 @@ namespace
             }
 
             std::string reason;
+            
             const std::optional<BlockMember> member = FindMemberAtOffset(parse_state, structType, stored->ByteOffset);
+
+            // after finding member, we need to check if:
+            // 1. A member exists at the specified byte offset within the container struct
+            // 2. The member's name matches the expected reflected binding name
+            // 3. The member's type matches the expected kind (handle or device pointer)
+            // any of these not being true indicates something is amiss, and that we can't use the shader bc CPU/GPU would disagree on the layout of the data
             const bool typeMatches = member.has_value() && (stored->Kind == PlacementKind::Handle
                                                                 ? IsHandleType(parse_state, member->TypeId)
                                                                 : IsDevicePointerType(parse_state, member->TypeId));

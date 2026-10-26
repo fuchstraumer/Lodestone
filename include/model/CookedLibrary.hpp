@@ -7,9 +7,9 @@
 #include "ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifestFormat.hpp"
+#include "VariantKey.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
-#include "VariantKey.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -18,8 +18,9 @@
 #include <string_view>
 #include <vector>
 
+/** @file The frozen model every emitter reads, so that two artifacts of one cook cannot describe different
+ * shaders. */
 
-/** The frozen model every emitter reads, so that two artifacts of one cook cannot describe different shaders. */
 namespace lodestone
 {
 
@@ -59,7 +60,7 @@ struct LibraryVariant
     std::vector<uint32_t> RasterIndices;
     std::vector<WorkgroupSize> Workgroups;
     CodeFormIndices Delivered;
-    /** Empty when the cook compiled once, and `Delivered` is the base. */
+    /** @brief Empty when the cook compiled once, and `Delivered` is the base. */
     std::optional<CodeFormIndices> Base;
 };
 
@@ -72,6 +73,8 @@ struct FootprintAxisDeclaration
     std::vector<uint32_t> Axes;
 };
 
+/**@brief Positions into the master resource table, representing the canonical ordering of all resources in a
+ * module. */
 using ResourceList = std::vector<uint32_t>;
 /** @brief Positions in the variant's resource list, so the list survives table changes and collapses well. */
 using VisibilityList = std::vector<uint32_t>;
@@ -79,14 +82,6 @@ using SamplerPairList = std::vector<SamplerTexturePair>;
 using FootprintList = std::vector<ResourceFootprint>;
 using ShaderLayout = std::vector<ResolvedBinding>;
 using ShaderLayoutView = std::vector<ResolvedBindingView>;
-
-ContentHashValue HashIndexList(const std::vector<uint32_t>& indices) noexcept;
-ContentHashValue HashSourceCode(const std::vector<std::byte>& source) noexcept;
-ContentHashValue HashResourceList(const ResourceList& resources) noexcept;
-ContentHashValue HashVisibilityList(const VisibilityList& visibility) noexcept;
-ContentHashValue HashFootprintList(const FootprintList& footprints) noexcept;
-ContentHashValue HashSamplerPairList(const SamplerPairList& pairs) noexcept;
-void AppendFootprintHash(StreamingHash& hasher, const ResourceFootprint& footprint) noexcept;
 
 struct TableStatistics
 {
@@ -97,52 +92,39 @@ struct TableStatistics
 
 struct CodeFormInterners
 {
-    ContentInterner<std::vector<std::byte>> SourceInterner{ &HashSourceCode, k_HashName };
-    ContentInterner<VisibilityList> VisibilityInterner{ &HashVisibilityList, k_HashName };
-    ContentInterner<SamplerPairList> SamplerPairInterner{ &HashSamplerPairList, k_HashName };
-    ContentInterner<EntryPointConstants> ConstantsInterner{ &HashEntryPointConstants, k_HashName };
-    /** Parallel to the source table. The code decides the facts, so the first variant with a source gives them. */
+    CodeFormInterners();
+    ContentInterner<std::vector<std::byte>> SourceInterner;
+    ContentInterner<VisibilityList> VisibilityInterner;
+    ContentInterner<SamplerPairList> SamplerPairInterner;
+    ContentInterner<EntryPointConstants> ConstantsInterner;
+    /** Parallel to source table. Code decides the facts, so the first variant with a source gives them. */
     std::vector<SourceCodeFacts> SourceFacts;
-
-    void DisableDedupe() noexcept
-    {
-        SourceInterner.Disable();
-        VisibilityInterner.Disable();
-        SamplerPairInterner.Disable();
-        ConstantsInterner.Disable();
-    }
+    void DisableDedupe() noexcept;
 };
 
 /** @brief The stage 6 builder: interns each variant as it arrives. `FreezeModuleTables` consumes it. */
 struct InternedModule
 {
+    InternedModule();
     std::string Name;
     const PermutationSpace* Space{ nullptr };
     uint64_t SpaceSize{ 0u };
     std::vector<LibraryEntryPoint> EntryPoints;
     std::vector<VariantKey> VariantKeys;
     std::vector<LibraryVariant> Variants;
-    ContentInterner<ReflectedBinding> ResourceInterner{ &HashReflectedBinding, k_HashName };
-    ContentInterner<ResourceList> ResourceListInterner{ &HashResourceList, k_HashName };
-    ContentInterner<FootprintList> FootprintListInterner{ &HashFootprintList, k_HashName };
-    ContentInterner<ReflectedRasterState> RasterInterner{ &HashReflectedRasterState, k_HashName };
+    ContentInterner<ReflectedBinding> ResourceInterner;
+    ContentInterner<ResourceList> ResourceListInterner;
+    ContentInterner<FootprintList> FootprintListInterner;
+    ContentInterner<ReflectedRasterState> RasterInterner;
     CodeFormInterners Delivered;
     /** Used only when the cook compiles a base form. */
     CodeFormInterners Base;
     /** Sorted and unique. The delivered code only, since the manifest holds these names. */
     std::vector<std::string> ObservedCapabilities;
-    /** Sorted by scope and name. The first declaring variant adds an entry: the attribute text never varies. */
+    /** Sorted by scope and name. The first declaring variant adds an entry: the attribute text never varies.
+     */
     std::vector<FootprintAxisDeclaration> FootprintDeclarations;
-
-    void DisableDedupe() noexcept
-    {
-        ResourceInterner.Disable();
-        ResourceListInterner.Disable();
-        FootprintListInterner.Disable();
-        RasterInterner.Disable();
-        Delivered.DisableDedupe();
-        Base.DisableDedupe();
-    }
+    void DisableDedupe() noexcept;
 };
 
 struct CodeFormTables
@@ -160,7 +142,8 @@ struct CodeFormTables
     TableStatistics ConstantsTable;
 };
 
-/** @brief The frozen tables of one module, with statistics for each, since they collapse at very different rates. */
+/** @brief The frozen tables of one module, with statistics for each, since they collapse at very different
+ * rates. */
 struct CookedModule
 {
     std::string Name;
@@ -188,9 +171,6 @@ struct CookedModule
     TableStatistics RasterTable;
 };
 
-const CodeFormTables& FormTables(const CookedModule& module, CodeForm form) noexcept;
-const CodeFormIndices& FormIndices(const LibraryVariant& variant, CodeForm form) noexcept;
-
 struct CookedProfile
 {
     std::string TargetName;
@@ -214,19 +194,27 @@ struct CookedLibrary
     std::vector<std::optional<CookedModule>> Environments;
 };
 
+ContentHashValue HashIndexList(const std::vector<uint32_t>& indices) noexcept;
+ContentHashValue HashSourceCode(const std::vector<std::byte>& source) noexcept;
+ContentHashValue HashResourceList(const ResourceList& resources) noexcept;
+ContentHashValue HashVisibilityList(const VisibilityList& visibility) noexcept;
+ContentHashValue HashFootprintList(const FootprintList& footprints) noexcept;
+ContentHashValue HashSamplerPairList(const SamplerPairList& pairs) noexcept;
+void AppendFootprintHash(StreamingHash& hasher, const ResourceFootprint& footprint) noexcept;
+const CodeFormTables& FormTables(const CookedModule& module, CodeForm form) noexcept;
+const CodeFormIndices& FormIndices(const LibraryVariant& variant, CodeForm form) noexcept;
 void DisableDedupe(InternedModule& module) noexcept;
-
 CookError AppendVariantToModule(InternedModule& module,
                                 const CompiledVariant& variant,
                                 const VariantDescriptor& descriptor,
                                 DiagnosticSink& sink);
 
-/** @brief Compares the pairs of each variant that two profiles cooked. Skips profiles that did not record pairs, and
- * entry points with combined texture samplers. */
+/** @brief Compares the pairs of each variant that two profiles cooked. Skips profiles that did not record
+ * pairs, and entry points with combined texture samplers. */
 CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library, DiagnosticSink& sink);
 
-/** @brief Compares the workgroup memory and the portable capabilities (16-bit floats, subgroups) of each entry point
- * that two profiles cooked for one variant. Skips profiles that did not read their facts. */
+/** @brief Compares the workgroup memory and the portable capabilities (16-bit floats, subgroups) of each
+ * entry point that two profiles cooked for one variant. Skips profiles that did not read their facts. */
 CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library, DiagnosticSink& sink);
 
 /** @brief Consumes the builder, so nothing after the freeze can reach an interner. */

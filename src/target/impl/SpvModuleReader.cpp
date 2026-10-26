@@ -7,6 +7,7 @@
 #include "target/TargetProfile.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -585,6 +586,7 @@ namespace
                 declared.Unsupported = "a binding array whose length is not a constant";
                 return declared;
             }
+
             declared.ArrayCount = static_cast<uint32_t>(length.ConstantBits);
             declared.Array = true;
             element = &parse_state.Ids[pointee.ElementType];
@@ -637,10 +639,12 @@ namespace
         for (size_t step = 0u; step < parse_state.Ids.size() && id != 0u && id < parse_state.Ids.size(); ++step)
         {
             const IdRecord& record = parse_state.Ids[id];
+
             if (record.OpCode == spv::Op::OpVariable)
             {
                 return id;
             }
+
             id = record.DerivedFrom;
         }
         return 0u;
@@ -767,10 +771,12 @@ namespace
         {
             const IdRecord& record = parse_state.Ids[id];
             const bool chain = record.OpCode == spv::Op::OpAccessChain || record.OpCode == spv::Op::OpInBoundsAccessChain;
+
             if (chain && record.DerivedFrom == heap_variable && record.IndexCount != 0u)
             {
                 return TraceHandle(parse_state, parse_state.Indices[record.FirstIndex]);
             }
+
             id = record.DerivedFrom;
         }
 
@@ -808,6 +814,7 @@ CookError ParseModule(spv_context_t* context,
             spvDiagnosticDestroy(diagnostic);
             return ReportError(sink, CookError::TargetValidationEntryPointInvalid, std::move(errStr));
         }
+
         spvDiagnosticDestroy(diagnostic);
         diagnostic = nullptr;
     }
@@ -826,8 +833,10 @@ CookError ParseModule(spv_context_t* context,
         spvDiagnosticDestroy(diagnostic);
         return ReportError(sink, CookError::TargetValidationEntryPointParseFailed, std::move(errStr));
     }
+
     spvDiagnosticDestroy(diagnostic);
     ApplyPendingMembers(out_state);
+
     return CookError::Success;
 }
 
@@ -842,6 +851,7 @@ CookResult<std::vector<SamplerTexturePlacement>> CollectSamplerTexturePairs(cons
         const uint32_t samplerVariable = TraceToVariable(parse_state, use.SamplerId);
         const bool imageBound = imageVariable != 0u && parse_state.Ids[imageVariable].Group != ~0u;
         const bool samplerBound = samplerVariable != 0u && parse_state.Ids[samplerVariable].Group != ~0u;
+
         auto unresolved = [&sink, &use](std::string_view reason)
         {
             const std::string errStr = std::format("an OpSampledImage of image %{} and sampler %{} {}, so the pair "
@@ -873,6 +883,7 @@ CookResult<std::vector<SamplerTexturePlacement>> CollectSamplerTexturePairs(cons
             {
                 return unresolved("reads an image from the descriptor heap with an index that is not a handle in a block");
             }
+
             pair.TextureGroup = handle->Group;
             pair.TextureBinding = handle->Binding;
             pair.TextureContainer = handle->Container;
@@ -886,6 +897,7 @@ CookResult<std::vector<SamplerTexturePlacement>> CollectSamplerTexturePairs(cons
             {
                 return unresolved("reads a sampler from the descriptor heap with an index that is not a handle in a block");
             }
+
             pair.SamplerGroup = handle->Group;
             pair.SamplerBinding = handle->Binding;
             pair.SamplerContainer = handle->Container;
@@ -913,6 +925,7 @@ uint32_t FindContainerStruct(const ParseState& parse_state, const StoredValueLoc
                                   record.Binding == container.Binding;
         const bool pushMatch = container.Container == StoredValueContainer::PushConstants &&
                                storageClass == spv::StorageClass::PushConstant;
+        
         if (uniformMatch || pushMatch)
         {
             return parse_state.Ids[record.TypeId].PointeeType;
@@ -1272,24 +1285,29 @@ CookResult<EmittedCodeFacts> CollectEmittedCodeFacts(const ParseState& parse_sta
     {
         facts.DeclaredPlacements.emplace_back(binding.Group, binding.Binding);
     }
+
     facts.CapabilityNames.reserve(parse_state.Capabilities.size() + parse_state.Extensions.size());
     for (const std::string_view name : CollectDynamicIndexingCapabilities(parse_state))
     {
         facts.CapabilityNames.emplace_back(name);
     }
+
     // store primary names, which vk.xml uses (SPIRV-Headers may give `StorageUniform16`)
     for (const std::string_view name : parse_state.Capabilities)
     {
         facts.CapabilityNames.emplace_back(vulkan::PrimaryCapabilityName(name));
     }
+
     for (const std::string_view name : parse_state.Extensions)
     {
         facts.CapabilityNames.emplace_back(name);
     }
+
     std::ranges::sort(facts.CapabilityNames);
     const auto repeated = std::ranges::unique(facts.CapabilityNames);
     facts.CapabilityNames.erase(repeated.begin(), repeated.end());
     facts.WorkgroupMemoryBytes = *workgroupBytes;
+    
     return facts;
 }
 

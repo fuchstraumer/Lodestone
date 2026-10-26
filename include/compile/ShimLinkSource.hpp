@@ -26,10 +26,10 @@ struct ShimFormatLinkSource
 /** @brief The comma-separated type arguments of a shim extern, trimmed. Empty when there are none, and also
  * when an argument is not a plain identifier, so the caller compares the count with the interface. */
 std::vector<std::string_view> SplitShimTypeArguments(std::string_view type_arguments);
-/**@brief The source of the module that links the shim implementations of one profile, each in the form of its
- * resource class. Skips externs with a format axis.
- * @return Generated source string on success. `ShimFormUnavailable` for unsupported shim forms.
- * `ShimExternInvalid` for invalid externs. */
+/** @brief The source of the module that links the shim implementations of one profile, each in the form of its
+ *  resource class. Skips externs with a format axis.
+ *  @return Generated source string on success. `ShimFormUnavailable` for unsupported shim forms.
+ * `ShimExternInvalid` for invalid externs.*/
 CookResult<std::string> MakeShimLinkSource(std::span<const RawShimExtern> externs,
                                            const ShimForms& forms,
                                            std::string_view module_name,

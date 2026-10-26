@@ -40,7 +40,7 @@ struct StreamingHash
     void Append(std::span<const int32_t> values) noexcept;
     // memsets only, so the thread-local state skips the aligned alloc
     void Reset() noexcept;
-    ContentHashValue Finalize() const noexcept;
+    [[nodiscard]] ContentHashValue Finalize() const noexcept;
 private:
     XXH3_state_s* hashState{ nullptr };
 };

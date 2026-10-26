@@ -10,9 +10,6 @@
 #include <utility>
 #include <vector>
 
-/** A hash table with provenance: it collapses equal artifacts onto one entry and records every input that mapped
- * there. Hashes only find buckets and bytes decide. `Disable()` gives every artifact its own entry, and the output
- * must stay correct in both modes. */
 namespace lodestone
 {
 
@@ -37,6 +34,12 @@ struct InternerStatistics
     /** A rising count means a worse hash, not a bug. */
     uint32_t ByteComparisons{ 0u };
 };
+
+/** @brief A hash table with provenance: it collapses equal artifacts onto one entry and records every input that mapped
+ * there. Hashes only find buckets and bytes decide. `Disable()` gives every artifact its own entry, and the output
+ * must stay correct in both modes.
+ *
+ * @tparam PayloadType The type of the artifacts being interned. Must support equality comparison and move semantics. */
 template<typename PayloadType>
 class ContentInterner final
 {
@@ -45,8 +48,7 @@ public:
 
     ContentInterner(HashFunction hash_function, std::string_view hash_name) noexcept
         : hashFunction{ hash_function },
-          hashName{ hash_name },
-          dedupeEnabled{ true }
+          hashName{ hash_name }
     {
         uniqueEntries.reserve(1024);
         origins.reserve(1024);
@@ -99,7 +101,7 @@ public:
         return uniqueEntries;
     }
 
-    /** @brief Moves the table out, for the freeze. */
+    /** @brief Moves the payload table out, for the freeze, to avoid copies of what can be a huge table of data */
     [[nodiscard]] std::vector<PayloadType> ConsumeTable() noexcept
     {
         return std::move(uniqueEntries);
@@ -120,12 +122,14 @@ public:
         return statistics;
     }
 
+    // @brief Used to make sure that the hash hasn't changed between versions of the interner/manifest
     [[nodiscard]] std::string_view HashName() const noexcept
     {
         return hashName;
     }
 
 private:
+
     InternResult append(PayloadType&& payload, ProvenanceRecord&& origin)
     {
         const uint32_t index = static_cast<uint32_t>(uniqueEntries.size());

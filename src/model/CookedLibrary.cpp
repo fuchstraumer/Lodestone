@@ -37,6 +37,18 @@ namespace lodestone
 namespace
 {
 
+    constexpr uint32_t k_PortableFloat16 = 1u << 0u;
+    constexpr uint32_t k_PortableSubgroups = 1u << 1u;
+
+    struct NamedPair
+    {
+        std::string_view TextureScope;
+        std::string_view TextureName;
+        std::string_view SamplerScope;
+        std::string_view SamplerName;
+        auto operator<=>(const NamedPair&) const = default;
+    };
+
     /** One variant that the baseline profile and another profile both cooked, for the same module. */
     struct SharedVariant
     {
@@ -49,6 +61,22 @@ namespace
         const LibraryVariant& BaselineVariant;
     };
 
+    // returns true when the source is new, so the caller can record what only a new source adds
+    bool InternCodeForm(CodeFormInterners& interners,
+                        const EntryPointCode& form,
+                        const ProvenanceRecord& origin,
+                        CodeFormIndices& indices);
+    /** The capabilities that both targets can spell: `f16` and `Float16`, `subgroups` and the `GroupNonUniform` family. */
+    uint32_t PortableCapabilities(ShaderCodeFormat format, const std::vector<std::string>& names);
+    /** `has_unread_pairs` is set when the code cannot show every pair: a combined texture sampler, which SPIR-V samples
+     * with no `OpSampledImage`. */
+    CookResult<std::vector<NamedPair>> NamePairs(const CookedModule& module,
+                                                 const LibraryVariant& variant,
+                                                 size_t entry_point_index,
+                                                 bool& has_unread_pairs);
+    /** @brief Constructs the frozen codeform tables by consuming the interners */
+    CodeFormTables FreezeCodeForm(CodeFormInterners& interners);
+    
     /** Calls `visit` for each variant that the first recording profile of a module and a later one both cooked. Each
      * profile applies its own policy, so only the shared keys are compared. */
     template <typename Visitor>
@@ -107,39 +135,13 @@ namespace
         return CookError::Success;
     }
 
-    constexpr uint32_t k_PortableFloat16 = 1u << 0u;
-    constexpr uint32_t k_PortableSubgroups = 1u << 1u;
-
-    /** The capabilities that both targets can spell: `f16` and `Float16`, `subgroups` and the `GroupNonUniform` family. */
-    uint32_t PortableCapabilities(ShaderCodeFormat format, const std::vector<std::string>& names)
+    template<typename PayloadType>
+    TableStatistics DescribeTable(const ContentInterner<PayloadType>& interner)
     {
-        uint32_t portable = 0u;
-        for (const std::string& name : names)
-        {
-            if (format == ShaderCodeFormat::Wgsl)
-            {
-                portable |= name == "f16" ? k_PortableFloat16 : 0u;
-                portable |= name == "subgroups" ? k_PortableSubgroups : 0u;
-            }
-            else
-            {
-                portable |= name == "Float16" ? k_PortableFloat16 : 0u;
-                portable |= name.starts_with("GroupNonUniform") ? k_PortableSubgroups : 0u;
-            }
-        }
-        return portable;
+        return TableStatistics{ .HashName = interner.HashName(),
+                                .DedupeEnabled = interner.IsEnabled(),
+                                .Interning = interner.Statistics() };
     }
-
-    /** Texture scope, texture name, sampler scope, sampler name. */
-    using NamedPair = std::array<std::string_view, 4u>;
-    /** Scope and name. */
-
-    /** `has_unread_pairs` is set when the code cannot show every pair: a combined texture sampler, which SPIR-V samples
-     * with no `OpSampledImage`. */
-    CookResult<std::vector<NamedPair>> NamePairs(const CookedModule& module,
-                                                 const LibraryVariant& variant,
-                                                 size_t entry_point_index,
-                                                 bool& has_unread_pairs);
 
 } // namespace
 
@@ -192,6 +194,40 @@ void AppendFootprintHash(StreamingHash& hasher, const ResourceFootprint& footpri
     }
 }
 
+CodeFormInterners::CodeFormInterners()
+    : SourceInterner{ &HashSourceCode, k_HashName },
+      VisibilityInterner{ &HashVisibilityList, k_HashName },
+      SamplerPairInterner{ &HashSamplerPairList, k_HashName },
+      ConstantsInterner{ &HashEntryPointConstants, k_HashName }
+{
+}
+
+void CodeFormInterners::DisableDedupe() noexcept
+{
+    SourceInterner.Disable();
+    VisibilityInterner.Disable();
+    SamplerPairInterner.Disable();
+    ConstantsInterner.Disable();
+}
+
+InternedModule::InternedModule()
+    : ResourceInterner{ &HashReflectedBinding, k_HashName },
+      ResourceListInterner{ &HashResourceList, k_HashName },
+      FootprintListInterner{ &HashFootprintList, k_HashName },
+      RasterInterner{ &HashReflectedRasterState, k_HashName }
+{
+}
+
+void InternedModule::DisableDedupe() noexcept
+{
+    ResourceInterner.Disable();
+    ResourceListInterner.Disable();
+    FootprintListInterner.Disable();
+    RasterInterner.Disable();
+    Delivered.DisableDedupe();
+    Base.DisableDedupe();
+}
+
 ContentHashValue HashSamplerPairList(const SamplerPairList& pairs) noexcept
 {
     static_assert(sizeof(SamplerTexturePair) == 2u * sizeof(uint32_t));
@@ -214,31 +250,6 @@ void DisableDedupe(InternedModule& module) noexcept
 {
     module.DisableDedupe();
 }
-
-namespace
-{
-
-    // returns true when the source is new, so the caller can record what only a new source adds
-    bool InternCodeForm(CodeFormInterners& interners,
-                        const EntryPointCode& form,
-                        const ProvenanceRecord& origin,
-                        CodeFormIndices& indices)
-    {
-        const InternResult source = interners.SourceInterner.Intern(form.Code, origin);
-        indices.SourceIndices.push_back(source.Index);
-        if (source.WasNew)
-        {
-            interners.SourceFacts.push_back(form.CodeFacts);
-        }
-
-        indices.VisibilityIndices.push_back(interners.VisibilityInterner.Intern(form.UsedBindingIndices, origin).Index);
-        indices.SamplerPairIndices.push_back(interners.SamplerPairInterner.Intern(form.SamplerTexturePairs, origin).Index);
-        indices.ConstantsIndices.push_back(interners.ConstantsInterner.Intern(form.Constants, origin).Index);
-
-        return source.WasNew;
-    }
-
-} // namespace
 
 CookError AppendVariantToModule(InternedModule& module,
                                 const CompiledVariant& variant,
@@ -318,35 +329,6 @@ CookError AppendVariantToModule(InternedModule& module,
     return CookError::Success;
 }
 
-namespace
-{
-
-    template<typename PayloadType>
-    TableStatistics DescribeTable(const ContentInterner<PayloadType>& interner)
-    {
-        return TableStatistics{ .HashName = interner.HashName(),
-                                .DedupeEnabled = interner.IsEnabled(),
-                                .Interning = interner.Statistics() };
-    }
-
-    CodeFormTables FreezeCodeForm(CodeFormInterners& interners)
-    {
-        CodeFormTables tables;
-        tables.Sources = interners.SourceInterner.ConsumeTable();
-        tables.SourceFacts = std::move(interners.SourceFacts);
-        tables.VisibilityLists = interners.VisibilityInterner.ConsumeTable();
-        tables.SamplerPairLists = interners.SamplerPairInterner.ConsumeTable();
-        tables.EntryPointConstantsTable = interners.ConstantsInterner.ConsumeTable();
-
-        tables.SourceTable = DescribeTable(interners.SourceInterner);
-        tables.VisibilityTable = DescribeTable(interners.VisibilityInterner);
-        tables.SamplerPairTable = DescribeTable(interners.SamplerPairInterner);
-        tables.ConstantsTable = DescribeTable(interners.ConstantsInterner);
-
-        return tables;
-    }
-
-} // namespace
 
 CookedModule FreezeModuleTables(InternedModule&& interned)
 {
@@ -383,12 +365,26 @@ CookedModule FreezeModuleTables(InternedModule&& interned)
 
 const CodeFormTables& FormTables(const CookedModule& module, CodeForm form) noexcept
 {
-    return form == CodeForm::Base && module.Base.has_value() ? *module.Base : module.Delivered;
+    if (form == CodeForm::Base && module.Base.has_value())
+    {
+        return *module.Base;
+    }
+    else
+    {
+        return module.Delivered;
+    }
 }
 
 const CodeFormIndices& FormIndices(const LibraryVariant& variant, CodeForm form) noexcept
 {
-    return form == CodeForm::Base && variant.Base.has_value() ? *variant.Base : variant.Delivered;
+    if (form == CodeForm::Base && variant.Base.has_value())
+    {
+        return *variant.Base;
+    }
+    else
+    {
+        return variant.Delivered;
+    }
 }
 
 std::span<const std::byte> ResolveSource(const CookedModule& module,
@@ -587,6 +583,45 @@ CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library, Diagnost
 namespace
 {
 
+    bool InternCodeForm(CodeFormInterners& interners,
+                        const EntryPointCode& form,
+                        const ProvenanceRecord& origin,
+                        CodeFormIndices& indices)
+    {
+        const InternResult source = interners.SourceInterner.Intern(form.Code, origin);
+        indices.SourceIndices.push_back(source.Index);
+        if (source.WasNew)
+        {
+            interners.SourceFacts.push_back(form.CodeFacts);
+        }
+
+        indices.VisibilityIndices.push_back(interners.VisibilityInterner.Intern(form.UsedBindingIndices, origin).Index);
+        indices.SamplerPairIndices.push_back(interners.SamplerPairInterner.Intern(form.SamplerTexturePairs, origin).Index);
+        indices.ConstantsIndices.push_back(interners.ConstantsInterner.Intern(form.Constants, origin).Index);
+
+        return source.WasNew;
+    }
+
+    uint32_t PortableCapabilities(ShaderCodeFormat format, const std::vector<std::string>& names)
+    {
+        // we could probably make this more robust in the future
+        uint32_t portable = 0u;
+        for (const std::string& name : names)
+        {
+            if (format == ShaderCodeFormat::Wgsl)
+            {
+                portable |= name == "f16" ? k_PortableFloat16 : 0u;
+                portable |= name == "subgroups" ? k_PortableSubgroups : 0u;
+            }
+            else
+            {
+                portable |= name == "Float16" ? k_PortableFloat16 : 0u;
+                portable |= name.starts_with("GroupNonUniform") ? k_PortableSubgroups : 0u;
+            }
+        }
+        return portable;
+    }
+
     CookResult<std::vector<NamedPair>> NamePairs(const CookedModule& module,
                                                  const LibraryVariant& variant,
                                                  size_t entry_point_index,
@@ -606,19 +641,40 @@ namespace
         has_unread_pairs = std::ranges::any_of(*layout, hidesPairs);
 
         std::vector<NamedPair> named;
-        const ShaderLayoutView& layout_view = *layout;
-        const SamplerPairList& pairs = FormTables(module, CodeForm::Base)
-                                           .SamplerPairLists[FormIndices(variant, CodeForm::Base).SamplerPairIndices[entry_point_index]];
+        const ShaderLayoutView& layoutView = *layout;
+
+        const CodeFormIndices& formIndices = FormIndices(variant, CodeForm::Base);
+        const uint32_t samplerPairIndex = formIndices.SamplerPairIndices[entry_point_index];
+        const CodeFormTables& formTables = FormTables(module, CodeForm::Base);
+        const SamplerPairList& pairs = formTables.SamplerPairLists[samplerPairIndex];
+
         for (const SamplerTexturePair& pair : pairs)
         {
-            const ReflectedBinding* texture = layout_view[pair.Texture].Resource;
-            const ReflectedBinding* sampler = layout_view[pair.Sampler].Resource;
+            const ReflectedBinding* texture = layoutView[pair.Texture].Resource;
+            const ReflectedBinding* sampler = layoutView[pair.Sampler].Resource;
             named.push_back(NamedPair{ texture->ScopeName, texture->Name, sampler->ScopeName, sampler->Name });
         }
 
         std::ranges::sort(named);
 
         return named;
+    }
+
+    CodeFormTables FreezeCodeForm(CodeFormInterners& interners)
+    {
+        CodeFormTables tables;
+        tables.Sources = interners.SourceInterner.ConsumeTable();
+        tables.SourceFacts = std::move(interners.SourceFacts);
+        tables.VisibilityLists = interners.VisibilityInterner.ConsumeTable();
+        tables.SamplerPairLists = interners.SamplerPairInterner.ConsumeTable();
+        tables.EntryPointConstantsTable = interners.ConstantsInterner.ConsumeTable();
+
+        tables.SourceTable = DescribeTable(interners.SourceInterner);
+        tables.VisibilityTable = DescribeTable(interners.VisibilityInterner);
+        tables.SamplerPairTable = DescribeTable(interners.SamplerPairInterner);
+        tables.ConstantsTable = DescribeTable(interners.ConstantsInterner);
+
+        return tables;
     }
 
 }

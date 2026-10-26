@@ -121,7 +121,11 @@ struct RawVariant
     std::vector<RawEntryPoint> EntryPoints;
 };
 
-/** A non-`extern` module-scope `static const` as written. Stage 4 evaluates it per variant. */
+/** @brief A non-`extern` module-scope `static const` as written. Stage 4 evaluates it per variant.
+  *
+  * We can use these to drive variables *from* permutation constants, like setting array sizes based on
+  * a combination of permutation constants and other derived values, or adjusting workgroup dims, etc.
+*/
 struct RawDerivedConstant
 {
     std::string Name;
@@ -130,7 +134,11 @@ struct RawDerivedConstant
     uint32_t SourceLine{ 0u };
 };
 
-/** @brief An `extern struct` whose interface is in the shim table. The profile decides which implementation links. */
+/** @brief An `extern struct` whose interface is in the shim table. The profile decides which implementation links.
+  *
+  * Shim externs are those that allow us to lower shader resources - textures, buffers, etc - into profile/target
+  * specific implementations, like pointer-based buffers or descriptor-heap handles.
+*/
 struct RawShimExtern
 {
     std::string Name;

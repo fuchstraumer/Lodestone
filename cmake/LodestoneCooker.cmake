@@ -84,6 +84,7 @@ set(LODESTONE_DRIVER_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/driver/steps/PreparePermutationSpaceStep.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/CookerDriver.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/CookerOptions.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/CookerSteps.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/steps/BuildModuleStep.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/steps/FinalizeModuleStep.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/steps/PrepareCookStep.cpp"

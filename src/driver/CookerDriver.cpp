@@ -1,11 +1,10 @@
 #include "driver/CookerDriver.hpp"
-#include "ShaderLibraryTypes.hpp"
 #include "compile/SymbolTable.hpp"
-#include "driver/CookerOptions.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
+#include "driver/CookerOptions.hpp"
 #include "driver/CookerSteps.hpp"
 #include "driver/steps/PrepareCookStep.hpp"
 #include "driver/steps/PrepareModuleStep.hpp"
@@ -18,6 +17,11 @@
 #include "emit/ResourceReport.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 #include "emit/ShaderManifestVerify.hpp"
+#include "emit/StageDump.hpp"
+#include "model/AxisInfluence.hpp"
+#include "model/CookedLibrary.hpp"
+#include "ShaderLibraryTypes.hpp"
+#include "ShaderManifestFormat.hpp"
 #include "target/TargetProfile.hpp"
 #include <algorithm>
 #include <chrono>
@@ -35,10 +39,7 @@
 #include <system_error>
 #include <utility>
 #include <vector>
-#include "emit/StageDump.hpp"
 #include "magic_enum/magic_enum.hpp"
-#include "model/AxisInfluence.hpp"
-#include "model/CookedLibrary.hpp"
 
 namespace lodestone
 {
@@ -320,7 +321,7 @@ namespace
 {
 
     /** A difference means an unordered container's order reached the output. */
-    CookResult<CookStatistics> RunCookTwiceAndCompare(const CookerOptions& options,
+    CookResult<CookStatistics> RunCookTwiceAndCompare(CookerOptions options,
                                                       OutputSink& sink,
                                                       DiagnosticSink& diagnostics)
     {
