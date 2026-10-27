@@ -276,6 +276,32 @@ int main(int argc, char** argv)
         }
     }
 
+    runner.BeginSection("a global shim is stored in the uniform buffer of global data, named as the code names it");
+    const CookOutcome global = Cook(assetDirectory / "ShimGlobal.slang", "spirv-modern");
+    if (!runner.CheckEqual(global.Result, CookError::Success, "the global shim module cooks for spirv-modern"))
+    {
+        PrintErrors(global);
+    }
+    const manifest::ManifestResult<manifest::BundleView> globalBundle = manifest::BundleView::Open(global.Bytes);
+    const manifest::ManifestResult<manifest::EnvironmentView> globalEnvironment =
+        globalBundle.has_value() ? globalBundle->OpenEnvironment(0u, 0u) : std::unexpected(globalBundle.error());
+    if (runner.CheckOk(globalEnvironment, "the environment opens"))
+    {
+        uint32_t containers = 0u;
+        uint32_t pointers = 0u;
+        for (const manifest::ResolvedResource resource : globalEnvironment->VariantAt(0u).EntryPoint(0u).Layout())
+        {
+            containers += resource.Kind() == BindingKind::UniformBuffer && resource.Name() == "globalParams" ? 1u : 0u;
+            pointers += resource.Placement() == PlacementKind::Pointer &&
+                                resource.ValueContainer() == StoredValueContainer::UniformBuffer
+                            ? 1u
+                            : 0u;
+        }
+
+        runner.CheckEqual(containers, 1u, "the container is the uniform buffer globalParams");
+        runner.CheckEqual(pointers, 2u, "both buffers are pointers in that uniform buffer");
+    }
+
     runner.BeginSection("wgsl and spirv-modern cook together");
     {
         CookerOptions options;

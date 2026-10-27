@@ -39,6 +39,8 @@ using namespace lodestone;
 
 /** Slang's name hint for the scope of entry point `uniform` parameters. Reflection never reports it. */
 constexpr std::string_view k_EntryPointScopeName = "entryPointParams";
+/** Slang's name hint for the uniform buffer of global ordinary data. Its binding range has no leaf variable. */
+constexpr std::string_view k_GlobalScopeName = "globalParams";
 constexpr const char* k_ShimValueAttributeName = "ls_shim_value";
 
 constexpr SlangUInt k_WorkgroupAxisCount = 3u;
@@ -685,8 +687,12 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
             continue;
         }
 
+        // Slang's buffer of global ordinary data has no leaf variable, and its members are the globals
+        const bool globalContainer = leafName == nullptr && bindingType == slang::BindingType::ConstantBuffer;
+
         RawBindingDraft draft;
-        draft.Binding.Name = leafName != nullptr ? leafName : std::string{};
+        draft.Binding.Name = globalContainer ? std::string{ k_GlobalScopeName }
+                                             : (leafName != nullptr ? std::string{ leafName } : std::string{});
         draft.Binding.ScopeName = std::move(scopeNames[static_cast<size_t>(rangeIndex)]);
         draft.Binding.Placement = BoundPlacement{ .Group = scope.Base.Group + *spaceOffset,
                                                   .Binding = scope.Base.Binding + *indexOffset };
@@ -703,6 +709,20 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
         if (!applyLayoutError)
         {
             return applyLayoutError;
+        }
+
+        if (globalContainer)
+        {
+            slang::TypeLayoutReflection* globals = containing_layout->getKind() == slang::TypeReflection::Kind::ConstantBuffer
+                                                       ? containing_layout->getElementTypeLayout()
+                                                       : containing_layout;
+            draft.Binding.ByteSize = static_cast<uint64_t>(globals->getSize());
+
+            const CookError membersError = collectStructMembers(globals, draft.Binding.UniformMembers, &storedValues);
+            if (!membersError)
+            {
+                return membersError;
+            }
         }
 
         const CookError collectAttributesError =
@@ -727,7 +747,8 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
         }
 
         const BoundPlacement container = *GetBoundPlacement(draft.Binding.Placement);
-        const std::string valueScope = JoinScopeName(draft.Binding.ScopeName, draft.Binding.Name.c_str());
+        const std::string valueScope =
+            globalContainer ? scope.Name : JoinScopeName(draft.Binding.ScopeName, draft.Binding.Name.c_str());
         out_drafts.emplace_back(std::move(draft));
         const CookError storedError = appendStoredValueDrafts(storedValues,
                                                               StoredValueContainer::UniformBuffer,
