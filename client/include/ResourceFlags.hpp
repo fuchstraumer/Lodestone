@@ -33,7 +33,7 @@ enum class BufferUsageFlags : uint16_t
     AllShaderBinding = Uniform | Storage
 };
 
-MAKE_ENUM_CLASS_FLAGS(BufferUsageFlags);
+LODESTONE_MAKE_ENUM_FLAGS(BufferUsageFlags);
 
 /** @brief The usages a texture is created with. Sampled and Storage name what the shader does. */
 enum class TextureUsageFlags : uint16_t
@@ -50,7 +50,7 @@ enum class TextureUsageFlags : uint16_t
     AllShaderBinding = Sampled | Storage
 };
 
-MAKE_ENUM_CLASS_FLAGS(TextureUsageFlags);
+LODESTONE_MAKE_ENUM_FLAGS(TextureUsageFlags);
 
 /** @brief Usages of a buffer outside of its shader bindings, from `[ls_resource_role("...")]`. The cooker checks each
  * role against the binding kind and the element stride. */
@@ -69,7 +69,7 @@ enum class ResourceRoleFlags : uint16_t
     All = IndirectDispatch | IndirectDraw | IndirectDrawIndexed | IndexData | VertexData,
 };
 
-MAKE_ENUM_CLASS_FLAGS(ResourceRoleFlags);
+LODESTONE_MAKE_ENUM_FLAGS(ResourceRoleFlags);
 
 inline constexpr std::array<std::pair<std::string_view, ResourceRoleFlags>, 5u> k_ResourceRoleNames{ {
     { "IndirectDispatch", ResourceRoleFlags::IndirectDispatch },

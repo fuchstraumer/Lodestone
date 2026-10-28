@@ -75,11 +75,13 @@ constexpr bool HasAnyFlag(T value, T flags) noexcept
     return (std::to_underlying(value) & std::to_underlying(flags)) != 0;
 }
 
-#define MAKE_ENUM_CLASS_FLAGS(EnumClass) \
+#ifndef LODESTONE_MAKE_ENUM_FLAGS
+#define LODESTONE_MAKE_ENUM_FLAGS(EnumClass) \
     [[maybe_unused]] consteval bool enable_bitmask_operator_or(EnumClass) { return true; } \
     [[maybe_unused]] consteval bool enable_bitmask_operator_and(EnumClass) { return true; } \
     [[maybe_unused]] consteval bool enable_bitmask_operator_xor(EnumClass) { return true; } \
     [[maybe_unused]] consteval bool enable_bitmask_operator_or_eq(EnumClass) { return true; } \
     [[maybe_unused]] consteval bool enable_bitmask_operator_not(EnumClass) { return true; }
+#endif
 
 #endif // !LODESTONE_UTILITY_ENUM_CLASS_UTILS_HPP

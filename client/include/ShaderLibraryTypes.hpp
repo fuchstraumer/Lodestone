@@ -115,7 +115,7 @@ enum class ShaderStageKind : uint32_t
     Count = Task + 1u, // just enough to compare against numerically (e.g, stage >= Count stuff)
 };
 
-MAKE_ENUM_CLASS_FLAGS(ShaderStageKind)
+LODESTONE_MAKE_ENUM_FLAGS(ShaderStageKind)
 
 /** @brief The declared shape of a resource, mirroring Slang's resource shape: a base shape plus flags. */
 enum class ResourceShape : uint8_t
@@ -137,7 +137,7 @@ enum class ResourceShape : uint8_t
     MultisampleFlag = 0x80
 };
 
-MAKE_ENUM_CLASS_FLAGS(ResourceShape)
+LODESTONE_MAKE_ENUM_FLAGS(ResourceShape)
 
 constexpr ResourceShape GetBaseShape(ResourceShape shape)
 {
