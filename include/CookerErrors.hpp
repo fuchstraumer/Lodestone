@@ -113,6 +113,7 @@ enum class CookError : uint16_t
     AxisDefaultNotDeclared = 142, // the initializer is not one of the values the axis declares
     AxisDefaultMismatch = 143, // the source text and Slang reflection disagree on the initializer
     AxisDefaultAmbiguous = 144, // the module's sources declare the axis with two different initializers
+    AxisKindUnknown = 145, // `ls_axis_kind` spells no axis kind
 
     DerivedConstantShadowsSymbol = 150, // a derived constant has the name of an axis or an extern constant
     DerivedConstantAmbiguous = 151, // two declarations of one name have different expressions

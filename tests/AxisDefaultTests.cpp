@@ -1,6 +1,7 @@
 #include "TestHarness.hpp"
 
 #include "CookerErrors.hpp"
+#include "Diagnostics.hpp"
 #include "ShaderManifest.hpp"
 #include "ShaderManifestIndex.hpp"
 #include "driver/CookerDriver.hpp"
@@ -8,10 +9,12 @@
 #include "emit/OutputSink.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstring>
 #include <filesystem>
+#include <format>
 #include <map>
 #include <optional>
 #include <print>
@@ -34,7 +37,7 @@ struct RejectionCase
     std::string_view Claim;
 };
 
-constexpr std::array<RejectionCase, 2u> k_RejectionCases
+constexpr std::array<RejectionCase, 3u> k_RejectionCases
 {
     RejectionCase{ .ModuleFile = "AxisDefaultMissing.slang",
                    .Expected = CookError::AxisDefaultMissing,
@@ -42,6 +45,9 @@ constexpr std::array<RejectionCase, 2u> k_RejectionCases
     RejectionCase{ .ModuleFile = "AxisDefaultNotDeclared.slang",
                    .Expected = CookError::AxisDefaultNotDeclared,
                    .Claim = "an initializer that is not one of the axis values fails the cook" },
+    RejectionCase{ .ModuleFile = "AxisKindUnknown.slang",
+                   .Expected = CookError::AxisKindUnknown,
+                   .Claim = "an ls_axis_kind that spells no kind fails the cook" },
 };
 
 CookResult<CookStatistics> CookIntoMemory(const std::filesystem::path& module_path,
@@ -113,6 +119,31 @@ int main(int argc, char** argv)
             CookIntoMemory(assetDirectory / testCase.ModuleFile, std::nullopt, sink);
         const CookError actual = result ? CookError::Success : result.error();
         runner.CheckEqual(actual, testCase.Expected, std::format("{}: {}", testCase.ModuleFile, testCase.Claim));
+    }
+
+    runner.BeginSection("a misspelled axis kind names the axis and suggests the kind it is closest to");
+    {
+        CookerOptions options;
+        options.ModulePaths.push_back(assetDirectory / "AxisKindUnknown.slang");
+        options.TargetNames.emplace_back("wgsl");
+        options.OutputPath = "AxisDefault";
+        MemoryOutputSink kindSink;
+        RecordingDiagnosticSink diagnostics;
+        const CookResult<CookStatistics> kindCook = RunCook(options, kindSink, diagnostics);
+        runner.CheckEqual(kindCook ? CookError::Success : kindCook.error(), CookError::AxisKindUnknown,
+                          "the cook fails on the misspelled kind");
+
+        const std::vector<Diagnostic>& records = diagnostics.Records();
+        const auto kindRecord = std::ranges::find_if(records,
+                                                     [](const Diagnostic& record)
+                                                     { return record.Message.contains("is not an axis kind"); });
+        if (runner.Check(kindRecord != records.end(), "the cook reports one record for the unknown kind"))
+        {
+            const std::string& message = kindRecord->Message;
+            runner.Check(message.contains("USE_WAVE_OPS"), std::format("the record names the axis: '{}'", message));
+            runner.Check(message.contains("Did you mean 'Capability'?"),
+                         std::format("the record suggests the nearest kind: '{}'", message));
+        }
     }
 
     runner.BeginSection("an enum axis that no code reads is pruned, and its initializer is not read as a value");

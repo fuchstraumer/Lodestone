@@ -26,7 +26,7 @@ namespace lodestone
             Const = 1u << 2u,
             Struct = 1u << 3u,
         };
-        MAKE_ENUM_CLASS_FLAGS(DeclarationKeyword)
+        LODESTONE_MAKE_ENUM_FLAGS(DeclarationKeyword)
 
         /** @brief Returns the part of `line` that is code. A `//` comment ends the line, a block comment that opens the line is
          * dropped, a block comment inside a declaration stays, and a block comment that does not close on the line starts a

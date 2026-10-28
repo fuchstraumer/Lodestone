@@ -12,7 +12,10 @@
 #include "permute/PermutationSpace.hpp"
 #include "permute/PermutationValue.hpp"
 #include "permute/PolicyDocument.hpp"
+#include "ShaderManifestIndex.hpp"
 #include <algorithm>
+#include <array>
+#include <cctype>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
@@ -33,7 +36,9 @@ namespace lodestone
 
 namespace
 {
-    AxisKind AxisKindFromString(std::string_view str);
+    CookResult<AxisKind> AxisKindFromString(const RawAxisDeclaration& raw_axis, DiagnosticSink& sink);
+    std::string ToLowerAscii(std::string_view text);
+    ShaderLocation LocationOf(const RawAxisDeclaration& raw_axis) noexcept;
     CookResult<std::vector<PermutationValue>> ValuesFromStr(const std::string_view str,
                                                             DiagnosticSink& sink);
     CookResult<PermutationSpace> BuildPermutationSpace(const SymbolTable& symbol_table,
@@ -126,24 +131,63 @@ CookResult<PreparedPermutationSpace> PreparePermutationSpaceStep::operator()(con
 
 namespace
 {
-    AxisKind AxisKindFromString(std::string_view str)
+    /** Returns the kind that `ls_axis_kind` spells, matched without regard to case, or `None` when the axis has no
+      * `ls_axis_kind`. An unknown name fails the module: it used to read as `None`, which silently turned off the
+      * capability axis checks for a misspelled "Capability". */
+    CookResult<AxisKind> AxisKindFromString(const RawAxisDeclaration& raw_axis, DiagnosticSink& sink)
     {
-        if (str.empty())
+        if (raw_axis.Kind.empty())
         {
             return AxisKind::None;
         }
-        else
+
+        const std::optional<AxisKind> kind =
+            magic_enum::enum_cast<AxisKind>(raw_axis.Kind, magic_enum::case_insensitive);
+        if (kind.has_value() && kind.value() != AxisKind::None)
         {
-            std::optional<AxisKind> kind = magic_enum::enum_cast<AxisKind>(str, magic_enum::case_insensitive);
-            if (kind.has_value())
-            {
-                return kind.value();
-            }
-            else
-            {
-                return AxisKind::None;
-            }
+            return kind.value();
         }
+
+        // the match ignores case, so the suggestion compares lowercase spellings. otherwise "TUNING" costs five
+        // edits against "Tuning" and gets no suggestion at all
+        constexpr std::array<AxisKind, 4u> k_NamedKinds
+        {
+            AxisKind::ResourcePresence,
+            AxisKind::Capability,
+            AxisKind::Tuning,
+            AxisKind::Technique,
+        };
+        std::array<std::string, k_NamedKinds.size()> lowercaseNames;
+        std::array<std::string_view, k_NamedKinds.size()> lowercaseViews;
+        for (auto&& [index, namedKind] : std::views::enumerate(k_NamedKinds))
+        {
+            lowercaseNames[index] = ToLowerAscii(magic_enum::enum_name(namedKind));
+            lowercaseViews[index] = lowercaseNames[index];
+        }
+
+        const std::string lowercaseInput = ToLowerAscii(raw_axis.Kind);
+        const std::string_view nearest = NearestName(lowercaseInput, lowercaseViews);
+        const std::ptrdiff_t nearestIndex = std::ranges::find(lowercaseViews, nearest) - lowercaseViews.begin();
+        const std::string suggestion =
+            nearest.empty() ? std::string{}
+                            : std::format(" Did you mean '{}'?", magic_enum::enum_name(k_NamedKinds[nearestIndex]));
+        const std::string message =
+            std::format("axis '{}': '{}' is not an axis kind. The kinds are ResourcePresence, Capability, Tuning, and "
+                        "Technique.{}",
+                        raw_axis.Name,
+                        raw_axis.Kind,
+                        suggestion);
+        return std::unexpected(ReportError(sink, CookError::AxisKindUnknown, LocationOf(raw_axis), message));
+    }
+
+    std::string ToLowerAscii(std::string_view text)
+    {
+        std::string lowered{ text };
+        std::ranges::transform(lowered,
+                               lowered.begin(),
+                               [](const unsigned char character) { return static_cast<char>(std::tolower(character)); });
+
+        return lowered;
     }
 
     CookResult<std::vector<PermutationValue>> ValuesFromStr(const std::string_view str,
@@ -542,7 +586,13 @@ namespace
         std::vector<PermutationAxis> axes;
         for (RawAxisDeclaration& rawAxis : filteredAxes)
         {
-            const AxisKind kind = AxisKindFromString(rawAxis.Kind);
+            const CookResult<AxisKind> parsedKind = AxisKindFromString(rawAxis, sink);
+            if (!parsedKind)
+            {
+                return std::unexpected(parsedKind.error());
+            }
+
+            const AxisKind kind = *parsedKind;
             std::vector<PermutationValue> values;
             if (rawAxis.IsBooleanAxis)
             { 
