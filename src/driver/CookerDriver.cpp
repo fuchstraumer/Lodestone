@@ -12,7 +12,7 @@
 #include "driver/steps/BuildModuleStep.hpp"
 #include "driver/steps/FinalizeModuleStep.hpp"
 #include "emit/DedupeReport.hpp"
-#include "emit/Depfile.hpp"
+#include "emit/DepFile.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ResourceReport.hpp"
 #include "emit/ShaderManifestEmitter.hpp"

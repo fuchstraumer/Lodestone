@@ -25,7 +25,8 @@ public:
     SlangReflector(std::span<const std::string> entry_point_names,
                    DiagnosticSink* sink,
                    slang::IGlobalSession* global_session,
-                   AccessModel buffer_form) noexcept;
+                   AccessModel buffer_form,
+                   TargetLanguage target_language = TargetLanguage::Invalid) noexcept;
     ~SlangReflector() noexcept = default;
     SlangReflector(const SlangReflector&) noexcept = delete;
     SlangReflector& operator=(const SlangReflector&) noexcept = delete;
@@ -100,6 +101,7 @@ private:
     DiagnosticSink* sink{ nullptr };
     slang::IGlobalSession* globalSession;
     AccessModel bufferForm;
+    TargetLanguage language{ TargetLanguage::Invalid };
 };
 
 } // namespace lodestone

@@ -30,7 +30,7 @@ namespace
         "                 [--verify-deterministic] [--dump-stage=<name>]\n"
         "                 [--policy-file <path>] [--depfile] <module.slang>...\n"
         "  --output, -o    output directory (required)\n"
-        "  --target=<name> output target profile (required). Repeat it for more than one. Names: wgsl\n"
+        "  --target=<name> output target profile (required). Repeat it for more than one. Names: wgsl, spirv, spirv-modern\n"
         "  --O<level>      slang optimization level: 0-3, defaults to 0\n"
         "  --g<level>      slang debug level: 0-3, defaults to 0\n"
         "  --no-validate   skip cross-checking reflection against the emitted text\n"

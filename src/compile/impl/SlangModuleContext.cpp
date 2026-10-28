@@ -404,10 +404,16 @@ std::vector<SerializedModule> SlangModuleContext::SerializeModules() const
     serializedModules.reserve(static_cast<size_t>(moduleCount));
     for (int64_t i = 0; i < moduleCount; ++i)
     {
-        Slang::ComPtr<slang::IBlob> blob;
+        
         slang::IModule* module = session->getLoadedModule(i);
-        const SlangResult result = module->serialize(blob.writeRef());
         const char* moduleNameStr = module->getName();
+        if (moduleNameStr != nullptr && moduleNameStr == moduleName)
+        {
+            continue;
+        }
+
+        Slang::ComPtr<slang::IBlob> blob;
+        const SlangResult result = module->serialize(blob.writeRef());
         const std::string modulePath = BuildCachedModulePath(cacheDirectory, moduleNameStr);
         serializedModules.emplace_back(moduleNameStr, modulePath, result < 0 ? nullptr : blob);
     }
@@ -471,6 +477,12 @@ CookError SlangModuleContext::primeSessionFromCache(std::span<const SerializedMo
 {
     for (const SerializedModule& serializedModule : serialized_modules)
     {
+
+        if (serializedModule.Blob == nullptr || serializedModule.Name == moduleName)
+        {
+            continue;
+        }
+
         Slang::ComPtr<slang::IBlob> diagnosticsBlob;
         const slang::IModule* module = session->loadModuleFromIRBlob(serializedModule.Name.c_str(),
                                                                      serializedModule.Path.c_str(),

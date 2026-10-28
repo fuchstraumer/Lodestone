@@ -163,11 +163,13 @@ namespace lodestone
 SlangReflector::SlangReflector(std::span<const std::string> entry_point_names,
                                DiagnosticSink* _sink,
                                slang::IGlobalSession* global_session,
-                               AccessModel buffer_form) noexcept
+                               AccessModel buffer_form,
+                               TargetLanguage target_language) noexcept
     : entryPointNames(entry_point_names),
       sink(_sink),
       globalSession(global_session),
-      bufferForm(buffer_form)
+      bufferForm(buffer_form),
+      language(target_language)
 {
 }
 
@@ -544,8 +546,9 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
         }
 
         slang::VariableReflection* variable = leaf.Var->getVariable();
-        if (variable != nullptr && leaf.Path.size() >= 2u &&
-            variable->findAttributeByName(globalSession, k_ShimValueAttributeName) != nullptr)
+        const bool hasShimValueAttr =
+            variable != nullptr && variable->findAttributeByName(globalSession, k_ShimValueAttributeName) != nullptr;
+        if (variable != nullptr && leaf.Path.size() >= 2u && hasShimValueAttr)
         {
             if (out_values == nullptr)
             {
@@ -584,7 +587,8 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
             stride = static_cast<uint16_t>(leaf.Type->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM));
         }
         const bool isPointerType = leaf.Type->getKind() == slang::TypeReflection::Kind::Pointer;
-        if (isPointerType && (bufferForm != AccessModel::Pointer))
+        const bool isPermittedShimPointer = hasShimValueAttr && (language == TargetLanguage::Spirv);
+        if (isPointerType && (bufferForm != AccessModel::Pointer) && !isPermittedShimPointer)
         {
             result = ReportError(
                 *sink,

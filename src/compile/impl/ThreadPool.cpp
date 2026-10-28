@@ -114,7 +114,8 @@ void ThreadPool::runJobs(SlangModuleContext& module_context, CompileBatch& batch
         SlangReflector variantReflector(module_context.EntryPointNames(),
                                         &batch.DiagnosticSinks[jobIndexU],
                                         module_context.GlobalSession(),
-                                        module_context.BufferForm());
+                                        module_context.BufferForm(),
+                                        module_context.Language());
 
         batch.Results[jobIndexU] = variantBuildResult ? variantReflector.Reflect(*variantBuildResult, batch.Variants[jobIndexU])
                                                       : std::unexpected(variantBuildResult.error());
