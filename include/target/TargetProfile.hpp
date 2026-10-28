@@ -67,6 +67,17 @@ struct SamplerTexturePlacement
     friend bool operator==(const SamplerTexturePlacement&, const SamplerTexturePlacement&) = default;
 };
 
+/** @brief One vertex input that the emitted code reads. `ScalarType` is `Invalid` for a type that has no vertex scalar
+ * type, such as a 64-bit integer, a pointer, or a matrix. */
+struct EmittedVertexInput
+{
+    uint32_t Location{ 0u };
+    VertexScalarType ScalarType{ VertexScalarType::Invalid };
+    uint32_t ComponentCount{ 0u };
+
+    friend bool operator==(const EmittedVertexInput&, const EmittedVertexInput&) = default;
+};
+
 /** @brief Facts only the emitted code can give. Cook output, so `--no-validate` reads them too. */
 struct EmittedCodeFacts
 {
@@ -81,6 +92,8 @@ struct EmittedCodeFacts
     std::vector<std::string> CapabilityNames;
     /** Each workgroup variable counts `RoundUp(16, RoundUp(align, size))`, std430. */
     uint32_t WorkgroupMemoryBytes{ 0u };
+    /** Vertex stage only. Sorted by location, with one record for each location that the code reads. */
+    std::vector<EmittedVertexInput> VertexInputs;
 };
 
 /** The part of one binding on which the emitted code and reflection disagree. */
@@ -105,6 +118,9 @@ enum class BindingMismatchKind : uint8_t
     /** No member of the container starts at a stored value's offset, or that member has another name or type. `Emitted`
      * holds the reason. */
     StoredValue,
+    /** The code reads a vertex input that reflection does not record, or reads it with another type. `Binding` holds
+     * the location, and `Emitted` and `Reflected` hold the types as text. */
+    VertexInput,
 };
 
 std::string_view ToString(BindingMismatchKind kind) noexcept;

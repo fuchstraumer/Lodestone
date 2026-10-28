@@ -157,6 +157,7 @@ enum class CookError : uint16_t
     SlangNoConformingInterfaces = 229,
     SlangInterfaceHasResourceMember = 230,
     SlangCachedModuleWriteFailed = 231,
+    SlangVaryingParameterHoldsResource = 232, // an entry point parameter that is not uniform holds a resource or a pointer
 
     TargetValidatorUnavailable = 300,
     TargetValidationEntryPointParseFailed = 301,

@@ -39,7 +39,7 @@ struct RejectionCase
     std::string_view Claim;
 };
 
-constexpr std::array<RejectionCase, 9u> k_Cases
+constexpr std::array<RejectionCase, 14u> k_Cases
 {
     RejectionCase{ .ModuleFile = "PointerMember.slang",
                    .TargetName = "wgsl",
@@ -82,6 +82,28 @@ constexpr std::array<RejectionCase, 9u> k_Cases
                    .TargetName = "wgsl",
                    .Expected = CookError::ShimStorageFormatAxisInvalid,
                    .Claim = "a gated format axis fails the cook" },
+    // the code reads each vertex input, so reflection must record it with the same type
+    RejectionCase{ .ModuleFile = "VertexInputs/VertexInputsMatch.slang",
+                   .TargetName = "spirv",
+                   .Expected = CookError::Success,
+                   .Claim = "vertex inputs that reflection records cook on spirv" },
+    RejectionCase{ .ModuleFile = "VertexInputs/VertexInputsMatch.slang",
+                   .TargetName = "wgsl",
+                   .Expected = CookError::Success,
+                   .Claim = "vertex inputs that reflection records cook on wgsl" },
+    // Slang's SPIR-V emit crashes on this parameter, so the check runs before code generation on every profile
+    RejectionCase{ .ModuleFile = "VertexInputs/VaryingHoldsResource.slang",
+                   .TargetName = "spirv",
+                   .Expected = CookError::SlangVaryingParameterHoldsResource,
+                   .Claim = "a vertex parameter that holds a buffer shim fails the spirv cook, with no crash" },
+    RejectionCase{ .ModuleFile = "VertexInputs/VaryingHoldsResource.slang",
+                   .TargetName = "spirv-modern",
+                   .Expected = CookError::SlangVaryingParameterHoldsResource,
+                   .Claim = "a vertex parameter that holds a pointer shim fails the spirv-modern cook" },
+    RejectionCase{ .ModuleFile = "VertexInputs/VaryingHoldsResource.slang",
+                   .TargetName = "wgsl",
+                   .Expected = CookError::SlangVaryingParameterHoldsResource,
+                   .Claim = "a vertex parameter that holds a buffer shim fails the wgsl cook" },
 };
 
 /** Cooks one module into a `MemoryOutputSink`, so that rows write no files and cannot collide. */
@@ -184,6 +206,24 @@ int main(int argc, char** argv)
         {
             PrintRecords(outcome.Records);
         }
+    }
+
+    // the mismatch is a warning on the entry point, and the error does not name the module, so these rows check the warning
+    for (const std::string_view targetName : { "spirv", "wgsl" })
+    {
+        runner.BeginSection(std::format("a vertex input that reflection does not record fails the {} cook", targetName));
+
+        const std::filesystem::path modulePath = assetDirectory / "VertexInputs/VertexInputNoSemantic.slang";
+        const RowOutcome outcome = CookOneModule(modulePath, targetName);
+        runner.CheckEqual(outcome.Result, CookError::ReflectionMismatch, "the cook fails with ReflectionMismatch");
+        runner.Check(std::ranges::any_of(outcome.Records,
+                                         [](const Diagnostic& record)
+                                         {
+                                             return record.Severity == DiagnosticSeverity::Warning &&
+                                                    record.Message.contains("vertex input location 1: the code has f32x1 and "
+                                                                            "reflection has nothing");
+                                         }),
+                     "a warning states the vertex input that reflection does not record");
     }
 
     runner.BeginSection("a failed cook leaves no manifest of an earlier cook");

@@ -35,6 +35,14 @@ namespace
                             EmittedCodeFacts& facts,
                             DiagnosticSink& sink);
 
+    /** @brief Returns the inputs with a location of each vertex entry point, sorted by location. */
+    std::vector<EmittedVertexInput> ReadVertexInputs(tint::inspector::Inspector& inspector);
+
+    VertexScalarType VertexScalarTypeFromTint(tint::inspector::ComponentType component_type) noexcept;
+
+    /** @brief Returns 0 for a composition that Tint does not know. */
+    uint32_t ComponentCountFromTint(tint::inspector::CompositionType composition_type) noexcept;
+
     /** @brief Texture uses with no sampler (textureLoad) are not pairs. */
     std::vector<SamplerTexturePlacement> ReadPairs(tint::inspector::Inspector& inspector, const std::string& entry_point);
 
@@ -177,6 +185,7 @@ namespace
         std::ranges::sort(facts.CapabilityNames);
         const auto repeated = std::ranges::unique(facts.CapabilityNames);
         facts.CapabilityNames.erase(repeated.begin(), repeated.end());
+        facts.VertexInputs = ReadVertexInputs(inspector);
 
         const bool compute = std::ranges::any_of(inspector.GetEntryPoints(),
                                                  [](const tint::inspector::EntryPoint& entry_point)
@@ -202,6 +211,74 @@ namespace
         }
         facts.WorkgroupMemoryBytes = static_cast<uint32_t>(workgroup.Get().storage_size);
         return CookError::Success;
+    }
+
+    std::vector<EmittedVertexInput> ReadVertexInputs(tint::inspector::Inspector& inspector)
+    {
+        std::vector<EmittedVertexInput> inputs;
+        for (const tint::inspector::EntryPoint& entryPoint : inspector.GetEntryPoints())
+        {
+            if (entryPoint.stage != tint::inspector::PipelineStage::kVertex)
+            {
+                continue;
+            }
+
+            for (const tint::inspector::StageVariable& variable : entryPoint.input_variables)
+            {
+                if (!variable.attributes.location.has_value())
+                {
+                    continue;
+                }
+
+                inputs.push_back(EmittedVertexInput{ .Location = *variable.attributes.location,
+                                                     .ScalarType = VertexScalarTypeFromTint(variable.component_type),
+                                                     .ComponentCount = ComponentCountFromTint(variable.composition_type) });
+            }
+        }
+
+        std::ranges::sort(inputs, {}, &EmittedVertexInput::Location);
+
+        return inputs;
+    }
+
+    VertexScalarType VertexScalarTypeFromTint(tint::inspector::ComponentType component_type) noexcept
+    {
+        using tint::inspector::ComponentType;
+        switch (component_type)
+        {
+        case ComponentType::kF16:
+            return VertexScalarType::Float16;
+        case ComponentType::kF32:
+            return VertexScalarType::Float32;
+        case ComponentType::kI32:
+            return VertexScalarType::SignedInteger32;
+        case ComponentType::kU32:
+            return VertexScalarType::UnsignedInteger32;
+        case ComponentType::kUnknown:
+            return VertexScalarType::Invalid;
+        }
+
+        return VertexScalarType::Invalid;
+    }
+
+    uint32_t ComponentCountFromTint(tint::inspector::CompositionType composition_type) noexcept
+    {
+        using tint::inspector::CompositionType;
+        switch (composition_type)
+        {
+        case CompositionType::kScalar:
+            return 1u;
+        case CompositionType::kVec2:
+            return 2u;
+        case CompositionType::kVec3:
+            return 3u;
+        case CompositionType::kVec4:
+            return 4u;
+        case CompositionType::kUnknown:
+            return 0u;
+        }
+
+        return 0u;
     }
 
     std::vector<SamplerTexturePlacement> ReadPairs(tint::inspector::Inspector& inspector, const std::string& entry_point)

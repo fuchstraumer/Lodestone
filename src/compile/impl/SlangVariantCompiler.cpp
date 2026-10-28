@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <cstring>
 #include <expected>
+#include <format>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -28,6 +29,9 @@ constexpr uint32_t k_SpirvMagicNumber = 0x07230203u;
 constexpr size_t k_SpirvHeaderBytes = 5u * sizeof(uint32_t);
 
 bool IsSpirvModule(const std::vector<std::byte>& code) noexcept;
+// Slang's SPIR-V emit dereferences a null layout for such a parameter and crashes, so this runs before code generation
+CookError CheckVaryingParameters(slang::ProgramLayout* program_layout, DiagnosticSink& sink);
+bool HoldsOpaqueType(slang::TypeLayoutReflection* type_layout) noexcept;
 
 /** Codegen output, with its diagnostics, so that worker threads never touch a sink. */
 struct GeneratedEntryPoint
@@ -67,6 +71,12 @@ CookResult<LinkedVariant> SlangVariantCompiler::CompileVariant(SlangModuleContex
     }
 
     result.ProgramLayout = programLayout;
+
+    const CookError varyingError = CheckVaryingParameters(programLayout, sink);
+    if (varyingError != CookError::Success)
+    {
+        return std::unexpected(varyingError);
+    }
 
     CookResult<std::vector<LinkedVariant::EpCode>> generatedCode =
         GenerateEntryPointCode(context, linkedProgram, k_BaseTargetIndex, sink);
@@ -116,6 +126,86 @@ bool IsSpirvModule(const std::vector<std::byte>& code) noexcept
     uint32_t magic = 0u;
     std::memcpy(&magic, code.data(), sizeof(magic));
     return magic == k_SpirvMagicNumber;
+}
+
+CookError CheckVaryingParameters(slang::ProgramLayout* program_layout, DiagnosticSink& sink)
+{
+    auto isVarying = [](SlangParameterCategory category)
+    {
+        return category == SLANG_PARAMETER_CATEGORY_VARYING_INPUT || category == SLANG_PARAMETER_CATEGORY_VARYING_OUTPUT;
+    };
+
+    const SlangUInt entryPointCount = program_layout->getEntryPointCount();
+    for (SlangUInt entryPointIndex = 0u; entryPointIndex < entryPointCount; ++entryPointIndex)
+    {
+        slang::EntryPointReflection* entryPoint = program_layout->getEntryPointByIndex(entryPointIndex);
+        const unsigned int parameterCount = entryPoint->getParameterCount();
+        for (unsigned int parameterIndex = 0u; parameterIndex < parameterCount; ++parameterIndex)
+        {
+            slang::VariableLayoutReflection* parameter = entryPoint->getParameterByIndex(parameterIndex);
+            bool varying = false;
+            bool uniform = false;
+            const unsigned int categoryCount = parameter->getCategoryCount();
+            for (unsigned int categoryIndex = 0u; categoryIndex < categoryCount; ++categoryIndex)
+            {
+                const auto category = static_cast<SlangParameterCategory>(parameter->getCategoryByIndex(categoryIndex));
+                varying = varying || isVarying(category);
+                uniform = uniform || (!isVarying(category) && category != SLANG_PARAMETER_CATEGORY_NONE);
+            }
+
+            // a resource field that Slang did not lay out as uniform shows in the type only, not in the categories
+            if ((varying && uniform) || (!uniform && HoldsOpaqueType(parameter->getTypeLayout())))
+            {
+                const char* parameterName = parameter->getName();
+                return ReportError(sink,
+                                   CookError::SlangVaryingParameterHoldsResource,
+                                   std::format("entry point {} parameter {} is not a uniform parameter, and holds a "
+                                               "resource or a pointer that Slang gives no layout. Move it to a global, a "
+                                               "block, or a uniform parameter",
+                                               entryPoint->getName(),
+                                               parameterName != nullptr ? parameterName : "?"));
+            }
+        }
+    }
+
+    return CookError::Success;
+}
+
+bool HoldsOpaqueType(slang::TypeLayoutReflection* type_layout) noexcept
+{
+    if (type_layout == nullptr)
+    {
+        return false;
+    }
+
+    switch (type_layout->getKind())
+    {
+    case slang::TypeReflection::Kind::Struct:
+    {
+        const unsigned int fieldCount = type_layout->getFieldCount();
+        for (unsigned int fieldIndex = 0u; fieldIndex < fieldCount; ++fieldIndex)
+        {
+            if (HoldsOpaqueType(type_layout->getFieldByIndex(fieldIndex)->getTypeLayout()))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+    case slang::TypeReflection::Kind::Array:
+        return HoldsOpaqueType(type_layout->getElementTypeLayout());
+    case slang::TypeReflection::Kind::Resource:
+    case slang::TypeReflection::Kind::SamplerState:
+    case slang::TypeReflection::Kind::ConstantBuffer:
+    case slang::TypeReflection::Kind::ParameterBlock:
+    case slang::TypeReflection::Kind::TextureBuffer:
+    case slang::TypeReflection::Kind::ShaderStorageBuffer:
+    case slang::TypeReflection::Kind::Pointer:
+        return true;
+    default:
+        return false;
+    }
 }
 
 GeneratedEntryPoint GenerateOneEntryPoint(slang::IComponentType* linked_program, size_t index, SlangInt target_index)

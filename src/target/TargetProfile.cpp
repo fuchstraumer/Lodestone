@@ -152,6 +152,8 @@ std::string_view ToString(BindingMismatchKind kind) noexcept
         return "descriptor heap";
     case BindingMismatchKind::StoredValue:
         return "stored value";
+    case BindingMismatchKind::VertexInput:
+        return "vertex input";
     default:
         return "Invalid";
     }
@@ -175,6 +177,11 @@ std::string FormatBindingMismatch(const BindingMismatch& mismatch)
     case BindingMismatchKind::DescriptorHeap:
     case BindingMismatchKind::StoredValue:
         return std::format("  group {} binding {} {}: {}", mismatch.Group, mismatch.Binding, mismatch.Name, mismatch.Emitted);
+    case BindingMismatchKind::VertexInput:
+        return std::format("  vertex input location {}: the code has {} and reflection has {}",
+                           mismatch.Binding,
+                           mismatch.Emitted.empty() ? "nothing" : mismatch.Emitted,
+                           mismatch.Reflected.empty() ? "nothing" : mismatch.Reflected);
     default:
         return std::format("  group {} binding {} {}: {} differs, the code has {} and reflection has {}",
                            mismatch.Group,

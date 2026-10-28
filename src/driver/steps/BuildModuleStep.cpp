@@ -65,6 +65,10 @@ namespace
                                          EntryPointCode& form,
                                          std::span<const SamplerTexturePlacement> placements,
                                          DiagnosticSink& diagnostics);
+    // a vertex input that the code reads must be in reflection with the same type. A reflected input that the code does
+    // not read is fine, since an optimizer can remove an input
+    std::vector<BindingMismatch> CompareVertexInputs(std::span<const EmittedVertexInput> emitted,
+                                                     std::span<const ReflectedVertexInput> reflected);
     // no block in the code means Slang removed unread data. A block that reflection does not state, or that covers
     // more bytes, is a mismatch
     CookError ReconcileEntryPointConstants(const TargetProfile& target,
@@ -393,6 +397,9 @@ namespace
             return mismatch.Kind == BindingMismatchKind::ReflectedOnly;
         });
 
+        comparison->Mismatches.append_range(
+            CompareVertexInputs(comparison->Emitted.VertexInputs, entry_point.Reflection.Raster.VertexInputs));
+
         if (!comparison->Matches())
         {
             std::string warningStr = std::format("REFLECTION MISMATCH in {}{} ({}) for target {}, {} form:",
@@ -421,6 +428,38 @@ namespace
         }
 
         return true;
+    }
+
+    std::vector<BindingMismatch> CompareVertexInputs(std::span<const EmittedVertexInput> emitted,
+                                                     std::span<const ReflectedVertexInput> reflected)
+    {
+        auto typeText = [](VertexScalarType scalar_type, uint32_t component_count)
+        {
+            return std::format("{}x{}", ToString(scalar_type), component_count);
+        };
+
+        std::vector<BindingMismatch> mismatches;
+        for (const EmittedVertexInput& input : emitted)
+        {
+            const auto match = std::ranges::find(reflected, input.Location, [](const ReflectedVertexInput& entry)
+                                                 { return entry.Data.Location; });
+            const bool found = match != reflected.end();
+            const bool agrees = found && input.ScalarType != VertexScalarType::Invalid &&
+                                match->Data.ScalarType == input.ScalarType &&
+                                match->Data.ComponentCount == input.ComponentCount;
+            if (agrees)
+            {
+                continue;
+            }
+
+            mismatches.push_back(BindingMismatch{
+                .Kind = BindingMismatchKind::VertexInput,
+                .Binding = input.Location,
+                .Emitted = typeText(input.ScalarType, input.ComponentCount),
+                .Reflected = found ? typeText(match->Data.ScalarType, match->Data.ComponentCount) : std::string{} });
+        }
+
+        return mismatches;
     }
 
     void KeepDeclaredBindings(std::span<const ReflectedBinding> bindings,

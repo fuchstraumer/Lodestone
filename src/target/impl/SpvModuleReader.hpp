@@ -104,6 +104,9 @@ struct IdRecord
     bool LiteralIndices{ false };
     // a Function variable: the value of its one store, or ~0u after a second store
     uint32_t StoredFrom{ 0u };
+    // the Location decoration, or ~0u without one
+    uint32_t Location{ ~0u };
+    bool BuiltIn{ false };
 };
 
 struct SampledImageUse
@@ -192,6 +195,9 @@ CookResult<std::vector<SamplerTexturePlacement>> CollectSamplerTexturePairs(cons
 /** Returns the end of the last member of the push constant block, or no value without a block. */
 CookResult<std::optional<uint32_t>> ReadPushConstantExtent(const ParseState& parse_state, DiagnosticSink& sink);
 CookResult<uint32_t> ReadWorkgroupMemoryBytes(const ParseState& parse_state, DiagnosticSink& sink);
+/** Returns the vertex inputs that a vertex entry point reads, sorted by location. Other stages return none. A built-in
+ * and a variable without a location are not vertex inputs. */
+std::vector<EmittedVertexInput> CollectVertexInputs(const ParseState& parse_state);
 CookResult<EmittedCodeFacts> CollectEmittedCodeFacts(const ParseState& parse_state, DiagnosticSink& sink);
 
 } // namespace lodestone::spirv

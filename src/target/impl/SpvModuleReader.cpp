@@ -83,6 +83,12 @@ namespace
     /** Maps the curated set of `FromSlangImageFormat`. Other formats, `Unknown` included, are Invalid on both sides. */
     TextureFormat TextureFormatFromSpirv(spv::ImageFormat format) noexcept;
 
+    /** Returns the vertex scalar type of a scalar type id, or `Invalid` for a width or a type that has none. */
+    VertexScalarType VertexScalarTypeOf(const IdRecord& scalar) noexcept;
+
+    /** Reads one vertex input from the type that a variable points to. */
+    EmittedVertexInput ReadVertexInput(const ParseState& parse_state, uint32_t location, const IdRecord& pointee);
+
     void OnOpTypeScalar(ParseState& parse_state, std::span<const uint32_t> words, uint32_t result_id);
 
     void OnOpTypeArray(ParseState& parse_state, std::span<const uint32_t> words, uint32_t result_id);
@@ -425,6 +431,33 @@ std::vector<DeclaredBinding> CollectDeclaredBindings(const ParseState& parse_sta
     return declared;
 }
 
+std::vector<EmittedVertexInput> CollectVertexInputs(const ParseState& parse_state)
+{
+    std::vector<EmittedVertexInput> inputs;
+    if (parse_state.EntryPoint.Stage != ShaderStageKind::Vertex)
+    {
+        return inputs;
+    }
+
+    for (const uint32_t variableId : parse_state.EntryPoint.Interfaces)
+    {
+        const IdRecord& variable = parse_state.Ids[variableId];
+        const bool input = variable.OpCode == spv::Op::OpVariable &&
+                           variable.StorageClass == static_cast<uint32_t>(spv::StorageClass::Input);
+        if (!input || variable.BuiltIn || variable.Location == ~0u)
+        {
+            continue;
+        }
+
+        const IdRecord& pointer = parse_state.Ids[variable.TypeId];
+        inputs.push_back(ReadVertexInput(parse_state, variable.Location, parse_state.Ids[pointer.PointeeType]));
+    }
+
+    std::ranges::sort(inputs, {}, &EmittedVertexInput::Location);
+
+    return inputs;
+}
+
 CookResult<uint32_t> ReadWorkgroupMemoryBytes(const ParseState& parse_state, DiagnosticSink& sink)
 {
     uint64_t bytes = 0u;
@@ -526,6 +559,7 @@ CookResult<EmittedCodeFacts> CollectEmittedCodeFacts(const ParseState& parse_sta
     const auto repeated = std::ranges::unique(facts.CapabilityNames);
     facts.CapabilityNames.erase(repeated.begin(), repeated.end());
     facts.WorkgroupMemoryBytes = *workgroupBytes;
+    facts.VertexInputs = CollectVertexInputs(parse_state);
     
     return facts;
 }
@@ -661,6 +695,12 @@ namespace
             break;
         case spv::Decoration::ArrayStride:
             parse_state.Ids[words[1]].ArrayStride = words[3];
+            break;
+        case spv::Decoration::Location:
+            parse_state.Ids[words[1]].Location = words[3];
+            break;
+        case spv::Decoration::BuiltIn:
+            parse_state.Ids[words[1]].BuiltIn = true;
             break;
         default:
             break;
@@ -800,6 +840,43 @@ namespace
         default:
             return TextureFormat::Invalid;
         }
+    }
+
+    VertexScalarType VertexScalarTypeOf(const IdRecord& scalar) noexcept
+    {
+        if (scalar.OpCode == spv::Op::OpTypeFloat)
+        {
+            switch (scalar.ScalarWidth)
+            {
+            case 16u:
+                return VertexScalarType::Float16;
+            case 32u:
+                return VertexScalarType::Float32;
+            default:
+                return VertexScalarType::Invalid;
+            }
+        }
+
+        if (scalar.OpCode == spv::Op::OpTypeInt && scalar.ScalarWidth == 32u)
+        {
+            return scalar.ScalarSigned ? VertexScalarType::SignedInteger32 : VertexScalarType::UnsignedInteger32;
+        }
+
+        return VertexScalarType::Invalid;
+    }
+
+    EmittedVertexInput ReadVertexInput(const ParseState& parse_state, uint32_t location, const IdRecord& pointee)
+    {
+        // a struct, a matrix, an array, or a pointer has no vertex scalar type
+        if (pointee.OpCode == spv::Op::OpTypeVector)
+        {
+            const IdRecord& element = parse_state.Ids[pointee.ElementType];
+            return EmittedVertexInput{ .Location = location,
+                                       .ScalarType = VertexScalarTypeOf(element),
+                                       .ComponentCount = pointee.ComponentCount };
+        }
+
+        return EmittedVertexInput{ .Location = location, .ScalarType = VertexScalarTypeOf(pointee), .ComponentCount = 1u };
     }
 
     void OnOpTypeScalar(ParseState& parse_state, std::span<const uint32_t> words, uint32_t result_id)
