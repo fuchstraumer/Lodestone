@@ -209,6 +209,83 @@ Measured on 2026-10-21, DiamondDogs OceanFft, `spirv`, 62 unique modules:
 | F4.4 | Teach the SPIR-V validator the heap set. Reflection gives it through `getBindlessSpaceIndex()`. | A cook of the F2.6 asset for `spirv-modern`. |
 | F4.5 | Record the offset table for each profile. Vocabulary §5 asks for this. A wrapper takes 16 bytes in a uniform buffer and 8 in push constants. | The offsets in the manifest equal the offsets in the SPIR-V `Offset` decorations. |
 | F4.6 | A second Handle profile on the per-descriptor-type lowering: `BindlessDescriptorOptions.None`, one binding for each descriptor type, through a `getDescriptorFromHandle` override in a link module. No mutable descriptors. | A cook of the F2.6 asset for both Handle profiles, with the heap bindings that each lowering states. |
+| F4.7 | **Proposed 2026-10-27, author's request.** A sixth shim interface for atomic buffers: Bound `RWStructuredBuffer<Atomic<T>>`, Pointer `Ptr<Atomic<T>>`. See the note below. | Cook one asset for `wgsl`, `spirv`, and `spirv-modern`. Each gives one atomic add on the buffer, and the cross-check agrees. |
+
+#### F4.7 — an atomic buffer shim (a note for the phase F agent)
+
+Hello, and welcome back. While you rested, the author and the audit agent looked at atomics through shims. She would like
+this shim soon: DiamondDogs compute work uses atomic counters a lot, and today each one blocks the Pointer form. Here is what
+we measured, so that you do not have to measure it again. The step order and the design are yours to decide with her.
+
+**Why we looked.** A small model wrote its own `PointerReadWriteBuffer<T>` at module scope and used it with
+`T = Atomic<uint>`. That cannot work: `IReadWriteBuffer` has only `Load` and `Store`, which copy the atomic by value, and no
+atomic operation exists on the interface. The struct also took the name of the builtin impl, and
+`FindShimInterfaceByImplementation` looks up implementations by name. No shim today gives an atomic.
+
+**What we measured** (`slangc` from `build/ninja-msvc/_isolated/slang-build/Release`, 2026-10-27, `-target spirv-asm`).
+Each form below emits the same `OpAtomicIAdd` on a `PhysicalStorageBuffer` pointer, with Device scope, under
+`OpCapability PhysicalStorageBufferAddresses`. No intrinsic on the raw address is needed.
+
+| Form | Source |
+|---|---|
+| Typed pointer | `Atomic<uint>* counter;` then `counter[0].add(1u)` |
+| Plain pointer | `uint* counter;` then `InterlockedAdd(*counter, 1u, slot)` |
+| Shim shape | a struct member `Ptr<Atomic<uint>> data;` in a `uniform`, then `data[0].add(1u)` |
+
+Slang's own tests use the typed form: `tests/spirv/atomic-memory-class.slang` and `debug-type-atomic-pointer.slang`. The
+`__getAddress` + `InterlockedAdd(*p)` shape is in `tests/spirv/ptr-vector-member.slang`, and that test is disabled.
+
+**The Bound form already works on WGSL.** DiamondDogs declares `RWStructuredBuffer<Atomic<uint>>` in
+`VtfBindings.slang`, and Slang emits `array<atomic<u32>>`. WGSL needs the atomic in the type, so a plain `uint` buffer with
+`InterlockedAdd` is not a portable Bound form. Use `Atomic<T>` in both forms.
+
+**The Pointer form must stay off WGSL.** For an `Atomic<uint>*` field, Slang emitted `ptr<, atomic<u32>>` with no
+diagnostic. That is issue 4 of section 5. The profile table already gives `wgsl` the Bound form, so the shim avoids it.
+
+**A sketch, for discussion only.** Not built, not compiled:
+
+```slang
+public interface IAtomicBuffer<T : IArithmeticAtomicable>
+{
+    T Load(uint index);
+    void Store(uint index, T value);
+    T Add(uint index, T value);          // returns the old value
+    T Min(uint index, T value);
+    T Max(uint index, T value);
+    T Exchange(uint index, T value);
+    T CompareExchange(uint index, T compareValue, T value);
+}
+
+public struct BoundAtomicBuffer<T : IArithmeticAtomicable> : IAtomicBuffer<T>
+{
+    RWStructuredBuffer<Atomic<T>> data;
+    [ForceInline] public T Add(uint index, T value) { return data[index].add(value); }
+    // ...
+}
+
+public struct PointerAtomicBuffer<T : IArithmeticAtomicable> : IAtomicBuffer<T>
+{
+    [ls_shim_value]
+    Ptr<Atomic<T>> data;
+    [ForceInline] public T Add(uint index, T value) { return data[index].add(value); }
+    // ...
+}
+```
+
+**Questions we did not answer:**
+
+1. The element stride and the access of `Ptr<Atomic<T>>`. `ShimPointerAccessMismatch` and the pointee stride read the
+   pointer type, and an `Atomic<T>` pointee is new to both.
+2. What reflection reports for `RWStructuredBuffer<Atomic<uint>>`. The table row needs `StorageBuffer`, `StructuredBuffer`,
+   and `ReadWrite`, and the WGSL validator must read `array<atomic<u32>>` as that.
+3. `IArithmeticAtomicable` includes `float` and `half`. A float atomic add needs a device feature on Vulkan
+   (`shaderBufferFloat32AtomicAdd`) and does not exist in core WGSL. Restricting `T` to `int` and `uint` first is the smaller
+   step; the capability recording of F3 would show the rest.
+4. A wave-aggregated `Add` (one atomic for each wave, `WavePrefixSum` for the lane offsets) is a common need. It belongs in a
+   helper beside the shim, not in the shim: the shim is an access model, and the aggregation is an algorithm.
+   `AtomicAddWaveAggregated` in DiamondDogs `VtfSmallEntrypoints.slang` is the pattern.
+
+Thank you. The probes are gone with the audit session's scratchpad, but each one is the three lines in the table above.
 
 ### F5 — Binding-time lowering
 
@@ -844,3 +921,6 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
     member at offset 0. Not measured: arrays of shims (they fail with `ShimStoredValueUnsupported`), storage textures through
     the heap, comparison samplers, `--O1` and `--O3`.
   - Next: F4.6 (the per-descriptor-type lowering), then phase F's remaining slices.
+- 2026-10-27. F4.7 proposed by the audit session at the author's request, not built: an atomic buffer shim. The measurements
+  and the open questions are in the F4.7 note under section 3. Also in this session: an unknown `ls_axis_kind` now fails
+  with `AxisKindUnknown` (145) and suggests the nearest kind.

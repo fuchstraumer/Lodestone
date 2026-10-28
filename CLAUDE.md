@@ -494,7 +494,8 @@ skips, and the Slang workarounds it carries.
   the emitted code (Tint for WGSL, `SpvValidator` for SPIR-V) and compares its bindings with reflection. A mismatch fails
   the cook with `ReflectionMismatch`. A profile with no validator fails with `TargetValidatorUnavailable`, and
   `--no-validate` skips the check on purpose. The same read gives cook output: the sampler and texture pairs (task L7),
-  the push constant block of the entry point constants (task L14), and the source facts. `--no-validate` still reads them
+  the push constant block of the entry point constants (task L14), and the source facts. Each vertex input that the code reads must be a reflected
+  vertex input with the same type (`CompareVertexInputs`, `BindingMismatchKind::VertexInput`). `--no-validate` still reads them
   (`ReadEmittedCodeFacts`). **The code decides which bindings an entry point uses** (`KeepDeclaredBindings`): above `--O0`
   Slang gives SPIR-V to spirv-opt, which removes bindings that Slang's metadata marks used, so a reflected binding that the
   code does not declare leaves the visibility and is not a mismatch. Every other difference still fails. One Slang fault
