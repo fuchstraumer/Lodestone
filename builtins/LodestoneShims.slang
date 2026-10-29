@@ -152,11 +152,12 @@ public struct BoundWriteStorageTexture2D<F : ITexelElement> : IWriteStorageTextu
 }
 
 // The Pointer form: a buffer device address. Read access is checked by Slang's type checker only, and the SPIR-V carries no
-// NonWritable for it.
+// NonWritable for it. The pointee is std430, like the element of a StructuredBuffer, so both forms have one layout. Slang
+// reflection ignores that data layout (shader-slang/slang#13188), so the cooker computes the stride itself.
 public struct PointerReadBuffer<T> : IReadBuffer<T>
 {
     [ls_shim_value]
-    Ptr<T, Access.Read> data;
+    Ptr<T, Access.Read, AddressSpace.Device, Std430DataLayout> data;
 
     [ForceInline]
     public T Load(uint index)
@@ -168,7 +169,7 @@ public struct PointerReadBuffer<T> : IReadBuffer<T>
 public struct PointerReadWriteBuffer<T> : IReadWriteBuffer<T>
 {
     [ls_shim_value]
-    Ptr<T> data;
+    Ptr<T, Access.ReadWrite, AddressSpace.Device, Std430DataLayout> data;
 
     [ForceInline]
     public T Load(uint index)

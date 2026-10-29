@@ -33,6 +33,7 @@ using spirv::DeclaredBinding;
 using spirv::ParseModule;
 using spirv::ParseState;
 using spirv::BlockMember;
+using spirv::CollectDevicePointerMembers;
 using spirv::FindContainerStruct;
 using spirv::FindMemberAtOffset;
 using spirv::IsDevicePointerType;
@@ -50,6 +51,10 @@ namespace
     // compares the offset of each stored value with the member of its container that starts there
     std::vector<BindingMismatch> CompareStoredValues(const ParseState& parse_state,
                                                      std::span<const ReflectedBinding*> reflected);
+    // finds each device pointer that the code stores in a block and the manifest does not record
+    std::vector<BindingMismatch> CompareDevicePointers(const ParseState& parse_state,
+                                                       std::span<const ReflectedBinding*> bound,
+                                                       std::span<const ReflectedBinding*> stored);
 }
 
 SpvValidator::SpvValidator(std::optional<uint32_t> descriptor_heap_set)
@@ -101,6 +106,7 @@ CookResult<BindingComparison> SpvValidator::validateEntryPoint(std::span<const s
     BindingComparison comparison = CompareBindings(declared, bindings, sink);
     comparison.Mismatches.append_range(std::move(heapMismatches));
     comparison.Mismatches.append_range(CompareStoredValues(state, stored));
+    comparison.Mismatches.append_range(CompareDevicePointers(state, bindings, stored));
 
     CookResult<EmittedCodeFacts> facts = CollectEmittedCodeFacts(state, sink);
     if (!facts)
@@ -288,6 +294,19 @@ namespace
                                      stored->ByteOffset,
                                      stored->Kind == PlacementKind::Handle ? "uint2 handle" : "PhysicalStorageBuffer pointer");
             }
+            else if (stored->Kind == PlacementKind::Pointer)
+            {
+                // reflection ignores the data layout of a `Ptr` (shader-slang/slang#13188), so this is the second opinion.
+                // A pointer that the code never indexes has no stride
+                const uint32_t codeStride = parse_state.Ids[member->TypeId].ArrayStride;
+                if (codeStride != 0u && codeStride != binding->ElementStride)
+                {
+                    reason = std::format("the code strides the pointer at byte {} by {} bytes, and the cook computed {}",
+                                         stored->ByteOffset,
+                                         codeStride,
+                                         binding->ElementStride);
+                }
+            }
 
             if (!reason.empty())
             {
@@ -297,6 +316,65 @@ namespace
                                                       .Name = binding->Name,
                                                       .Emitted = std::move(reason) });
             }
+        }
+
+        return mismatches;
+    }
+
+    bool UniformMemberCovers(const ReflectedUniformMember& member, uint32_t byte_offset) noexcept
+    {
+        const uint64_t extent = uint64_t{ member.Data.Size } * std::max(member.Data.ArrayCount, 1u);
+        return member.Data.Offset <= byte_offset && byte_offset < uint64_t{ member.Data.Offset } + std::max<uint64_t>(extent, 1u);
+    }
+
+    bool PointerIsRecorded(const StoredValueLocation& pointer,
+                           std::span<const ReflectedBinding*> bound,
+                           std::span<const ReflectedBinding*> stored)
+    {
+        const bool isStored = std::ranges::any_of(stored, [&pointer](const ReflectedBinding* binding)
+        {
+            const StoredValuePlacement* placement = GetStoredValuePlacement(binding->Placement);
+            return placement != nullptr && placement->Container == pointer.Container &&
+                   placement->ByteOffset == pointer.ByteOffset &&
+                   (pointer.Container == StoredValueContainer::PushConstants ||
+                    (placement->Block.Group == pointer.Group && placement->Block.Binding == pointer.Binding));
+        });
+        if (isStored)
+        {
+            return true;
+        }
+
+        // an author's own `Ptr` is ordinary data, which the manifest records as a member of the uniform buffer
+        return pointer.Container == StoredValueContainer::UniformBuffer &&
+               std::ranges::any_of(bound, [&pointer](const ReflectedBinding* binding)
+        {
+            const BoundPlacement* placement = GetBoundPlacement(binding->Placement);
+            return placement != nullptr && placement->Group == pointer.Group && placement->Binding == pointer.Binding &&
+                   std::ranges::any_of(binding->UniformMembers, [&pointer](const ReflectedUniformMember& member)
+            {
+                return UniformMemberCovers(member, pointer.ByteOffset);
+            });
+        });
+    }
+
+    std::vector<BindingMismatch> CompareDevicePointers(const ParseState& parse_state,
+                                                       std::span<const ReflectedBinding*> bound,
+                                                       std::span<const ReflectedBinding*> stored)
+    {
+        std::vector<BindingMismatch> mismatches;
+        for (const StoredValueLocation& pointer : CollectDevicePointerMembers(parse_state))
+        {
+            if (PointerIsRecorded(pointer, bound, stored))
+            {
+                continue;
+            }
+
+            mismatches.push_back(BindingMismatch{ .Kind = BindingMismatchKind::StoredValue,
+                                                  .Group = pointer.Group,
+                                                  .Binding = pointer.Binding,
+                                                  .Name = {},
+                                                  .Emitted = std::format("the code stores a pointer at offset {}, and the manifest records nothing there",
+                                                                         pointer.ByteOffset) });
         }
 
         return mismatches;

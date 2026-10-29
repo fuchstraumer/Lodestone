@@ -39,7 +39,7 @@ struct RejectionCase
     std::string_view Claim;
 };
 
-constexpr std::array<RejectionCase, 14u> k_Cases
+constexpr std::array<RejectionCase, 23u> k_Cases
 {
     RejectionCase{ .ModuleFile = "PointerMember.slang",
                    .TargetName = "wgsl",
@@ -104,6 +104,43 @@ constexpr std::array<RejectionCase, 14u> k_Cases
                    .TargetName = "wgsl",
                    .Expected = CookError::SlangVaryingParameterHoldsResource,
                    .Claim = "a vertex parameter that holds a buffer shim fails the wgsl cook" },
+    // the scalar layout of a shim element must equal its std430 layout, so a renderer writes one buffer for every profile
+    RejectionCase{ .ModuleFile = "Shims/ShimPadded.slang",
+                   .TargetName = "wgsl",
+                   .Expected = CookError::Success,
+                   .Claim = "a shim element with explicit padding cooks on wgsl" },
+    RejectionCase{ .ModuleFile = "Shims/ShimPadded.slang",
+                   .TargetName = "spirv",
+                   .Expected = CookError::Success,
+                   .Claim = "a shim element with explicit padding cooks on spirv" },
+    RejectionCase{ .ModuleFile = "Shims/ShimPadded.slang",
+                   .TargetName = "spirv-modern",
+                   .Expected = CookError::Success,
+                   .Claim = "a shim element with explicit padding cooks on spirv-modern" },
+    RejectionCase{ .ModuleFile = "Shims/ShimPaddingUv.slang",
+                   .TargetName = "wgsl",
+                   .Expected = CookError::ShimElementImplicitPadding,
+                   .Claim = "a float2 after a float3 in a shim element fails the wgsl cook" },
+    RejectionCase{ .ModuleFile = "Shims/ShimPaddingUv.slang",
+                   .TargetName = "spirv",
+                   .Expected = CookError::ShimElementImplicitPadding,
+                   .Claim = "a float2 after a float3 in a shim element fails the spirv cook" },
+    RejectionCase{ .ModuleFile = "Shims/ShimPaddingUv.slang",
+                   .TargetName = "spirv-modern",
+                   .Expected = CookError::ShimElementImplicitPadding,
+                   .Claim = "a float2 after a float3 in a shim element fails the spirv-modern cook" },
+    RejectionCase{ .ModuleFile = "Shims/ShimPaddingTwoFloat3.slang",
+                   .TargetName = "wgsl",
+                   .Expected = CookError::ShimElementImplicitPadding,
+                   .Claim = "a float3 after a float3 in a shim element fails the wgsl cook" },
+    RejectionCase{ .ModuleFile = "Shims/ShimPaddingTwoFloat3.slang",
+                   .TargetName = "spirv",
+                   .Expected = CookError::ShimElementImplicitPadding,
+                   .Claim = "a float3 after a float3 in a shim element fails the spirv cook" },
+    RejectionCase{ .ModuleFile = "Shims/ShimPaddingTwoFloat3.slang",
+                   .TargetName = "spirv-modern",
+                   .Expected = CookError::ShimElementImplicitPadding,
+                   .Claim = "a float3 after a float3 in a shim element fails the spirv-modern cook" },
 };
 
 /** Cooks one module into a `MemoryOutputSink`, so that rows write no files and cannot collide. */

@@ -6,6 +6,7 @@
 #include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "magic_enum/magic_enum.hpp"
+#include "model/BufferLayout.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
@@ -116,6 +117,9 @@ std::optional<ParameterBlockInfo> ReadParameterBlock(DiagnosticSink& sink,
                                                      SlangInt sub_object_index,
                                                      const BindingScope& scope);
 
+/** True for a constant buffer whose element has resources and no ordinary data. Slang allocates no buffer for it. */
+bool IsBufferOfResourcesOnly(slang::TypeLayoutReflection* leaf_layout);
+
 /** Moves the drafts into the binding list. The caller sorts them first, because `BindingIndex` is the position. */
 void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
                          std::vector<RawBinding>& out_bindings,
@@ -140,6 +144,10 @@ void AddVisibleStoredValues(std::span<const RawBinding> bindings,
 std::string_view TypeArgumentOf(std::string_view full_name) noexcept;
 
 std::string FullNameOf(slang::TypeReflection* type);
+
+/** Reads the access from the second type argument of a `Ptr` full name. The pointee, the address space, and the data layout
+ * that follow it are ignored. */
+ResourceAccess PointerAccessOf(std::string_view full_name) noexcept;
 
 ResourceAccess FromSlangAccessType(SlangResourceAccess access);
 
@@ -691,6 +699,12 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
             continue;
         }
 
+        // no buffer exists for it, and collectSubObjectDrafts reads the resources
+        if (IsBufferOfResourcesOnly(leafType))
+        {
+            continue;
+        }
+
         // Slang's buffer of global ordinary data has no leaf variable, and its members are the globals
         const bool globalContainer = leafName == nullptr && bindingType == slang::BindingType::ConstantBuffer;
 
@@ -863,15 +877,7 @@ CookError SlangReflector::appendStoredValueDrafts(std::span<const StoredValueLea
         {
             // the full name keeps the access of the pointer, so it is compared with the access of the interface
             const std::string pointerName = FullNameOf(value.Member->getType());
-            ResourceAccess pointerAccess = ResourceAccess::Invalid;
-            if (pointerName.contains("Access.ReadWrite"))
-            {
-                pointerAccess = ResourceAccess::ReadWrite;
-            }
-            else if (pointerName.contains("Access.Read"))
-            {
-                pointerAccess = ResourceAccess::ReadOnly;
-            }
+            const ResourceAccess pointerAccess = PointerAccessOf(pointerName);
 
             if (pointerAccess != row->Resource.Access)
             {
@@ -888,7 +894,21 @@ CookError SlangReflector::appendStoredValueDrafts(std::span<const StoredValueLea
             slang::TypeLayoutReflection* pointee = value.Member->getElementTypeLayout();
             if (pointee != nullptr)
             {
-                draft.Binding.ElementStride = static_cast<uint32_t>(pointee->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
+                // reflection ignores the data layout of the `Ptr` (shader-slang/slang#13188), so the stride comes from our
+                // own std430 calculation, and the validator compares it with the code
+                LayoutNode pointeeNode;
+                std::string unsupported;
+                if (!BuildLayoutNode(pointee, pointeeNode, unsupported))
+                {
+                    return ReportError(*sink,
+                                       CookError::ShimElementTypeUnsupported,
+                                       std::format("{}.{} points to {}, which has no buffer layout",
+                                                   draft.Binding.ScopeName,
+                                                   value.Name,
+                                                   unsupported));
+                }
+
+                draft.Binding.ElementStride = ComputeElementStride(pointeeNode, BufferLayoutRule::Std430);
                 const CookError pointeeError = collectStructMembers(pointee, draft.Binding.UniformMembers, nullptr);
                 if (!pointeeError)
                 {
@@ -917,6 +937,12 @@ CookError SlangReflector::collectSubObjectDrafts(slang::TypeLayoutReflection* co
             ReadParameterBlock(*sink, containing_layout, subObjectIndex, scope);
         if (!block)
         {
+            const CookError contentsError = collectConstantBufferContents(containing_layout, subObjectIndex, scope, out_drafts);
+            if (!contentsError)
+            {
+                return contentsError;
+            }
+
             continue;
         }
 
@@ -938,6 +964,42 @@ CookError SlangReflector::collectSubObjectDrafts(slang::TypeLayoutReflection* co
     }
 
     return CookError::Success;
+}
+
+/** Drafts the resources in the element of a constant buffer, such as a shim in the Bound form. Slang places them in
+ * the slots after the buffer, in the space of the buffer. A buffer of the global data has no variable, and its members
+ * are already drafted by the range walk. */
+CookError SlangReflector::collectConstantBufferContents(slang::TypeLayoutReflection* containing_layout,
+                                                        SlangInt sub_object_index,
+                                                        const BindingScope& scope,
+                                                        std::vector<RawBindingDraft>& out_drafts) const
+{
+    const SlangInt rangeIndex = containing_layout->getSubObjectRangeBindingRangeIndex(sub_object_index);
+    slang::TypeLayoutReflection* leafLayout = containing_layout->getBindingRangeLeafTypeLayout(rangeIndex);
+    slang::VariableReflection* bufferVariable = containing_layout->getBindingRangeLeafVariable(rangeIndex);
+    if (leafLayout == nullptr || bufferVariable == nullptr || leafLayout->getKind() != slang::TypeReflection::Kind::ConstantBuffer)
+    {
+        return CookError::Success;
+    }
+
+    slang::TypeLayoutReflection* elementLayout = leafLayout->getElementTypeLayout();
+    if (elementLayout == nullptr || elementLayout->getBindingRangeCount() == 0)
+    {
+        return CookError::Success;
+    }
+
+    const std::optional<uint32_t> slotOffset = ReadOffset(containing_layout->getSubObjectRangeOffset(sub_object_index),
+                                                          SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+    if (!slotOffset)
+    {
+        ReportUnresolvedLocation(*sink, "constant buffer", rangeIndex);
+        return CookError::Success;
+    }
+
+    const BindingScope contents{ .Base = BoundPlacement{ .Group = scope.Base.Group, .Binding = scope.Base.Binding + *slotOffset },
+                                 .SpaceBase = scope.SpaceBase,
+                                 .Name = JoinScopeName(scope.Name, bufferVariable->getName()) };
+    return collectBindingRangeDrafts(elementLayout, contents, out_drafts);
 }
 
 // NOLINTEND(misc-no-recursion)
@@ -980,11 +1042,30 @@ CookError SlangReflector::extractRawBindings(slang::ProgramLayout* program_layou
                                              std::vector<RawSizeAttribute>& out_attributes) const
 {
     std::vector<RawBindingDraft> drafts;
-    const CookError walkError =
-        collectBindingRangeDrafts(program_layout->getGlobalParamsTypeLayout(), BindingScope{}, drafts);
+    slang::TypeLayoutReflection* globals = program_layout->getGlobalParamsTypeLayout();
+    const CookError walkError = collectBindingRangeDrafts(globals, BindingScope{}, drafts);
     if (!walkError)
     {
         return walkError;
+    }
+
+    // with global ordinary data, Slang wraps the globals in a buffer, and the global resources are in its element
+    if (globals->getKind() == slang::TypeReflection::Kind::ConstantBuffer)
+    {
+        const std::optional<uint32_t> elementBinding =
+            ReadOffset(globals->getElementVarLayout(), SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+        if (!elementBinding)
+        {
+            ReportUnresolvedLocation(*sink, "global resources", 0);
+            return CookError::ReflectionUnavailable;
+        }
+
+        const BindingScope elementScope{ .Base = BoundPlacement{ .Group = 0u, .Binding = *elementBinding } };
+        const CookError elementError = collectBindingRangeDrafts(globals->getElementTypeLayout(), elementScope, drafts);
+        if (!elementError)
+        {
+            return elementError;
+        }
     }
 
     // todo-ship: equal placements are an error, so stable_sort may be unnecessary
@@ -1504,6 +1585,18 @@ std::optional<ParameterBlockInfo> ReadParameterBlock(DiagnosticSink& sink,
     return block;
 }
 
+bool IsBufferOfResourcesOnly(slang::TypeLayoutReflection* leaf_layout)
+{
+    if (leaf_layout->getKind() != slang::TypeReflection::Kind::ConstantBuffer)
+    {
+        return false;
+    }
+
+    slang::TypeLayoutReflection* elementLayout = leaf_layout->getElementTypeLayout();
+    return elementLayout != nullptr && elementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) == 0u &&
+           elementLayout->getBindingRangeCount() > 0;
+}
+
 void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
                          std::vector<RawBinding>& out_bindings,
                          std::vector<RawSizeAttribute>& out_attributes)
@@ -1631,6 +1724,49 @@ std::string FullNameOf(slang::TypeReflection* type)
         return {};
     }
     return std::string{ static_cast<const char*>(fullName->getBufferPointer()) };
+}
+
+ResourceAccess PointerAccessOf(std::string_view full_name) noexcept
+{
+    const std::string_view arguments = TypeArgumentOf(full_name);
+
+    // the commas inside the pointee type (`Vertex<float, 2>`) do not separate arguments of the `Ptr`
+    int32_t depth = 0;
+    size_t argumentStart = 0u;
+    size_t argumentIndex = 0u;
+    for (size_t position = 0u; position <= arguments.size(); ++position)
+    {
+        const bool atEnd = position == arguments.size();
+        if (!atEnd && arguments[position] == '<')
+        {
+            ++depth;
+        }
+        else if (!atEnd && arguments[position] == '>')
+        {
+            --depth;
+        }
+
+        if (!atEnd && (arguments[position] != ',' || depth != 0))
+        {
+            continue;
+        }
+
+        if (argumentIndex == 1u)
+        {
+            const std::string_view access = arguments.substr(argumentStart, position - argumentStart);
+            if (access.contains("ReadWrite"))
+            {
+                return ResourceAccess::ReadWrite;
+            }
+
+            return access.contains("Read") ? ResourceAccess::ReadOnly : ResourceAccess::Invalid;
+        }
+
+        ++argumentIndex;
+        argumentStart = position + 1u;
+    }
+
+    return ResourceAccess::Invalid;
 }
 
 ResourceAccess FromSlangAccessType(SlangResourceAccess access)

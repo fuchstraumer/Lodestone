@@ -2,7 +2,9 @@
 #ifndef LODESTONE_SHADER_COMPILER_SLANG_COMPILER_TYPES_HPP
 #define LODESTONE_SHADER_COMPILER_SLANG_COMPILER_TYPES_HPP
 #include "compile/RawLibrary.hpp"
+#include "model/BufferLayout.hpp"
 #include "model/ShaderDataSchema.hpp"
+#include "permute/PermutationTypes.hpp"
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "target/TargetProfile.hpp"
@@ -316,10 +318,19 @@ struct CompilerOptionRow
     };
 };
 
+// Any warnings that we don't explicitly disable below need to be errors, so we catch potential issues
+// before packaging baked shaders/manifests
 constexpr const char* k_AllWarningsAsErrors = "all";
-// 41012 checks the entry point before specialization, so a capability axis fails every variant. Device capabilities
-// are ours to record, from the emitted code
-constexpr const char* k_DisabledWarnings = "31010,41012";
+// Pre-disable some warnings that we've found to cause problems, or which we handle internally in the
+// reflection and cross-check mechanisms:
+// - 41012 checks the entry point before specialization, so a capability axis fails every variant.
+//   Device capabilities  are ours to record, from the emitted code.
+// - 31106 and 31107 warn that a resource in a constant buffer moves to a binding of its own. A shim
+//   in the Bound form is such a resource, and reflection and the cross-check record where it went
+// - 31010 warns about link-time sizing of resources, which is normally risky - but we handle it safely
+//   as part of how our link-time specialization system works anyways (and its written to the manifest)
+constexpr const char* k_DisabledWarnings = "31010,41012,31106,31107";
+
 // the two warning level rows must stay in this order. Slang keeps the first value of a repeated option, so the
 // options that MakeCompilerOptions appends (optimization, debug information) must have no row here
 constexpr std::array<CompilerOptionRow, 8u> k_CompilerOptionRows
@@ -414,6 +425,10 @@ std::vector<std::byte> BlobToBytes(slang::IBlob* blob);
 std::string BlobToString(slang::IBlob* blob);
 
 void ReportDiagnostics(class DiagnosticSink& sink, std::string_view context, slang::IBlob* blob);
+
+/** Reads the shape of a type layout into a `LayoutNode`, which is all the layout calculator needs. Returns false when the
+ * type holds something with no buffer layout (a resource, a pointer, or an unbounded array), and stores its name. */
+bool BuildLayoutNode(slang::TypeLayoutReflection* type_layout, LayoutNode& out_node, std::string& out_unsupported);
 
 } // namespace lodestone
 

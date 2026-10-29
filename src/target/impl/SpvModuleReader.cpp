@@ -132,6 +132,12 @@ namespace
     /** Returns the handle that indexes the heap variable on the way from `id` to `heap_variable`, or nothing. */
     std::optional<StoredValueLocation> TraceHeapHandle(const ParseState& parse_state, uint32_t id, uint32_t heap_variable);
 
+    /** Appends the location of each device pointer in the type, which is at the block's offset. */
+    void AppendDevicePointers(const ParseState& parse_state,
+                              uint32_t type_id,
+                              const StoredValueLocation& block,
+                              std::vector<StoredValueLocation>& out_locations);
+
     /** The bytes a value covers, with no trailing padding. SPIR-V `ColMajor` puts a column at each matrix stride. */
     std::optional<uint64_t> TypeExtent(const ParseState& parse_state,
                                        uint32_t type_id,
@@ -351,6 +357,39 @@ bool IsHandleType(const ParseState& parse_state, uint32_t type_id) noexcept
 
     const IdRecord& component = parse_state.Ids[record.ElementType];
     return component.OpCode == spv::Op::OpTypeInt && component.ScalarWidth == 32u && !component.ScalarSigned;
+}
+
+std::vector<StoredValueLocation> CollectDevicePointerMembers(const ParseState& parse_state)
+{
+    std::vector<StoredValueLocation> locations;
+    for (const IdRecord& record : parse_state.Ids)
+    {
+        if (record.OpCode != spv::Op::OpVariable)
+        {
+            continue;
+        }
+
+        const spv::StorageClass storageClass = static_cast<spv::StorageClass>(record.StorageClass);
+        if (storageClass == spv::StorageClass::Uniform && record.Group != ~0u)
+        {
+            AppendDevicePointers(parse_state,
+                                 parse_state.Ids[record.TypeId].PointeeType,
+                                 StoredValueLocation{ .Container = StoredValueContainer::UniformBuffer,
+                                                      .Group = record.Group,
+                                                      .Binding = record.Binding,
+                                                      .ByteOffset = 0u },
+                                 locations);
+        }
+        else if (storageClass == spv::StorageClass::PushConstant)
+        {
+            AppendDevicePointers(parse_state,
+                                 parse_state.Ids[record.TypeId].PointeeType,
+                                 StoredValueLocation{ .Container = StoredValueContainer::PushConstants },
+                                 locations);
+        }
+    }
+
+    return locations;
 }
 
 bool IsDevicePointerType(const ParseState& parse_state, uint32_t type_id) noexcept
@@ -1324,6 +1363,39 @@ namespace
         }
 
         return std::nullopt;
+    }
+
+    void AppendDevicePointers(const ParseState& parse_state,
+                              uint32_t type_id,
+                              const StoredValueLocation& block,
+                              std::vector<StoredValueLocation>& out_locations)
+    {
+        const IdRecord& record = parse_state.Ids[type_id];
+        if (IsDevicePointerType(parse_state, type_id))
+        {
+            out_locations.push_back(block);
+        }
+        else if (record.OpCode == spv::Op::OpTypeStruct)
+        {
+            for (const MemberRecord& member : std::span{ parse_state.Members }.subspan(record.FirstMember, record.MemberCount))
+            {
+                StoredValueLocation inner = block;
+                inner.ByteOffset += member.Offset;
+                AppendDevicePointers(parse_state, member.TypeId, inner, out_locations);
+            }
+        }
+        else if (record.OpCode == spv::Op::OpTypeArray && record.ArrayStride != 0u)
+        {
+            // a runtime or specialized length cannot be counted, so only the first element is read
+            const IdRecord& length = parse_state.Ids[record.LengthId];
+            const uint64_t count = length.Constant == ConstantKind::Constant ? length.ConstantBits : 1u;
+            for (uint64_t element = 0u; element < count; ++element)
+            {
+                StoredValueLocation inner = block;
+                inner.ByteOffset += static_cast<uint32_t>(element) * record.ArrayStride;
+                AppendDevicePointers(parse_state, record.ElementType, inner, out_locations);
+            }
+        }
     }
 
     std::optional<StoredValueLocation> TraceHeapHandle(const ParseState& parse_state, uint32_t id, uint32_t heap_variable)

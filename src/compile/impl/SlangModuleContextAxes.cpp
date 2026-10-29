@@ -5,6 +5,7 @@
 #include "compile/EnumTagDecode.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/SlangCompiler.hpp"
+#include "model/BufferLayout.hpp"
 #include "slang-com-ptr.h"
 #include "slang.h"
 
@@ -62,6 +63,38 @@ std::optional<std::string> SlangModuleContext::FindTypeDeclaringModule(std::stri
     }
     
     return std::string{ FindDeclaringModule(session, type) };
+}
+
+CookResult<LayoutNode> SlangModuleContext::ReadTypeLayoutNode(std::string_view type_name, const ShaderLocation& where) const
+{
+    Slang::ComPtr<slang::IBlob> diagBlob;
+    slang::ProgramLayout* programLayout = rootModule->getLayout(0, diagBlob.writeRef());
+    const std::string name{ type_name };
+    slang::TypeReflection* type = programLayout != nullptr ? programLayout->findTypeByName(name.c_str()) : nullptr;
+    slang::TypeLayoutReflection* layout =
+        type != nullptr ? session->getTypeLayout(type, k_BaseTargetIndex, slang::LayoutRules::Default, diagBlob.writeRef())
+                        : nullptr;
+    if (layout == nullptr)
+    {
+        return std::unexpected(ReportError(*diagnosticSink,
+                                           CookError::ShimElementTypeUnsupported,
+                                           where,
+                                           std::format("Slang gives no layout for the element type '{}'", type_name)));
+    }
+
+    LayoutNode node;
+    std::string unsupported;
+    if (!BuildLayoutNode(layout, node, unsupported))
+    {
+        return std::unexpected(ReportError(*diagnosticSink,
+                                           CookError::ShimElementTypeUnsupported,
+                                           where,
+                                           std::format("the element type '{}' holds {}, which has no buffer layout",
+                                                       type_name,
+                                                       unsupported)));
+    }
+
+    return node;
 }
 
 CookResult<std::vector<RawAxisDeclaration>> SlangModuleContext::BuildDeclaredAxes() const

@@ -7,8 +7,8 @@
 #include "compile/RawLibrary.hpp"
 #include "compile/ShimLinkSource.hpp"
 #include "compile/SlangCompiler.hpp"
+#include "model/BufferLayout.hpp"
 #include "target/TargetProfile.hpp"
-#include "ShaderLibraryTypes.hpp"
 #include "slang.h"
 #include "slang-com-ptr.h"
 #include <cstddef>
@@ -47,6 +47,9 @@ public:
     [[nodiscard]] std::vector<std::string> BuildModuleScopeStructNames() const;
     [[nodiscard]] std::vector<StructStringAttribute> BuildStructStringAttributes(std::string_view attribute_name) const;
     [[nodiscard]] std::optional<std::string> FindTypeDeclaringModule(std::string_view type_name) const;
+    /** @brief Reads the shape of a type that the module can see, for the layout calculator. Reports an error when the type
+      * has no buffer layout. */
+    [[nodiscard]] CookResult<LayoutNode> ReadTypeLayoutNode(std::string_view type_name, const ShaderLocation& where) const;
     [[nodiscard]] CookError LoadShimLinkModule(std::string_view source);
     [[nodiscard]] slang::IModule* ShimLinkModule() const noexcept;
     [[nodiscard]] CookError LoadShimFormatModules(std::span<const ShimFormatLinkSource> sources);

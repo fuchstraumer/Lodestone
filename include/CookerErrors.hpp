@@ -135,6 +135,8 @@ enum class CookError : uint16_t
     ShimPointerAccessMismatch = 184, // the access of a Pointer shim's `Ptr` differs from the access of its interface
     ManifestBaseHashMismatch = 185, // an entry point instance's base hash read back differently than the cook computed it
     DeliveredFormExceedsBase = 186, // the delivered code needs a binding, pair, capability, or size that the base code does not
+    ShimElementImplicitPadding = 187, // the scalar layout and the std430 layout of a shim buffer element type differ
+    ShimElementTypeUnsupported = 188, // the element type of a shim buffer has no buffer layout: a resource, pointer, or unsized array
 
     SystemError = 200,
     DirectoryDoesNotExist = 201,

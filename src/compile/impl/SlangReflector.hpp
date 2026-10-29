@@ -55,6 +55,10 @@ private:
     [[nodiscard]] CookError collectSubObjectDrafts(slang::TypeLayoutReflection* containing_layout,
                                                    const BindingScope& scope,
                                                    std::vector<RawBindingDraft>& out_drafts) const;
+    [[nodiscard]] CookError collectConstantBufferContents(slang::TypeLayoutReflection* containing_layout,
+                                                          SlangInt sub_object_index,
+                                                          const BindingScope& scope,
+                                                          std::vector<RawBindingDraft>& out_drafts) const;
     [[nodiscard]] CookResult<slang::TypeLayoutReflection*> readEntryPointConstants(
         const LinkedVariant& linked_variant,
         int64_t entry_point_index,

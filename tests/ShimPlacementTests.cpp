@@ -289,8 +289,13 @@ int main(int argc, char** argv)
     {
         uint32_t containers = 0u;
         uint32_t pointers = 0u;
+        uint32_t plainBuffers = 0u;
         for (const manifest::ResolvedResource resource : globalEnvironment->VariantAt(0u).EntryPoint(0u).Layout())
         {
+            plainBuffers += resource.Kind() == BindingKind::StorageBuffer && resource.Name() == "plain" &&
+                                    resource.Placement() == PlacementKind::Bound
+                                ? 1u
+                                : 0u;
             containers += resource.Kind() == BindingKind::UniformBuffer && resource.Name() == "globalParams" ? 1u : 0u;
             pointers += resource.Placement() == PlacementKind::Pointer &&
                                 resource.ValueContainer() == StoredValueContainer::UniformBuffer
@@ -300,6 +305,70 @@ int main(int argc, char** argv)
 
         runner.CheckEqual(containers, 1u, "the container is the uniform buffer globalParams");
         runner.CheckEqual(pointers, 2u, "both buffers are pointers in that uniform buffer");
+        runner.CheckEqual(plainBuffers, 1u, "the plain global buffer, in the element of that uniform buffer, is a bound binding");
+    }
+
+    runner.BeginSection("a shim in a ConstantBuffer cooks on every profile, as a buffer or as a stored pointer");
+    for (const std::string_view target : { "spirv", "wgsl", "spirv-modern" })
+    {
+        const CookOutcome constantBuffer = Cook(assetDirectory / "ShimConstantBuffer.slang", target);
+        if (!runner.CheckEqual(constantBuffer.Result, CookError::Success, std::format("the module cooks for {}", target)))
+        {
+            PrintErrors(constantBuffer);
+        }
+        const manifest::ManifestResult<manifest::BundleView> cbBundle = manifest::BundleView::Open(constantBuffer.Bytes);
+        const manifest::ManifestResult<manifest::EnvironmentView> cbEnvironment =
+            cbBundle.has_value() ? cbBundle->OpenEnvironment(0u, 0u) : std::unexpected(cbBundle.error());
+        if (!runner.CheckOk(cbEnvironment, std::format("the environment opens for {}", target)))
+        {
+            continue;
+        }
+
+        uint32_t uniformBuffers = 0u;
+        uint32_t boundStorage = 0u;
+        uint32_t pointers = 0u;
+        for (const manifest::ResolvedResource resource : cbEnvironment->VariantAt(0u).EntryPoint(0u).Layout())
+        {
+            uniformBuffers += resource.Placement() == PlacementKind::Bound && resource.Kind() == BindingKind::UniformBuffer ? 1u : 0u;
+            boundStorage += resource.Placement() == PlacementKind::Bound && resource.Kind() == BindingKind::StorageBuffer ? 1u : 0u;
+            pointers += resource.Placement() == PlacementKind::Pointer &&
+                                resource.ValueContainer() == StoredValueContainer::UniformBuffer
+                            ? 1u
+                            : 0u;
+        }
+
+        const bool modern = target == "spirv-modern";
+        runner.CheckEqual(uniformBuffers, 1u, std::format("{}: the constant buffer is one uniform buffer", target));
+        runner.CheckEqual(boundStorage, modern ? 1u : 2u,
+                          std::format("{}: the output, and the shim as a bound storage buffer unless it is a pointer", target));
+        runner.CheckEqual(pointers, modern ? 1u : 0u, std::format("{}: the shim is a pointer stored in the uniform buffer", target));
+    }
+
+    runner.BeginSection("a padded shim element has the same 64-byte stride on every profile");
+    for (const std::string_view target : { "wgsl", "spirv", "spirv-modern" })
+    {
+        const CookOutcome padded = Cook(assetDirectory / "ShimPadded.slang", target);
+        if (!runner.CheckEqual(padded.Result, CookError::Success, std::format("the module cooks for {}", target)))
+        {
+            PrintErrors(padded);
+        }
+        const manifest::ManifestResult<manifest::BundleView> paddedBundle = manifest::BundleView::Open(padded.Bytes);
+        const manifest::ManifestResult<manifest::EnvironmentView> paddedEnvironment =
+            paddedBundle.has_value() ? paddedBundle->OpenEnvironment(0u, 0u) : std::unexpected(paddedBundle.error());
+        if (!runner.CheckOk(paddedEnvironment, std::format("the environment opens for {}", target)))
+        {
+            continue;
+        }
+
+        const std::optional<manifest::ResolvedResource> vertices =
+            FindResource(paddedEnvironment->VariantAt(0u).EntryPoint(0u).Layout(), "geometry_vertices", "data");
+        if (runner.Check(vertices.has_value(), std::format("{}: the vertex buffer is in the layout", target)))
+        {
+            runner.CheckEqual(vertices->ElementStride(), 64u, std::format("{}: the element stride is 64", target));
+            runner.CheckEqual(vertices->Placement(),
+                              target == "spirv-modern" ? PlacementKind::Pointer : PlacementKind::Bound,
+                              std::format("{}: the form of the profile", target));
+        }
     }
 
     runner.BeginSection("wgsl and spirv-modern cook together");

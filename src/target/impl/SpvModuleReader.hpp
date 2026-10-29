@@ -180,6 +180,9 @@ uint32_t FindContainerStruct(const ParseState& parse_state, const StoredValueLoc
 std::optional<BlockMember> FindMemberAtOffset(const ParseState& parse_state, uint32_t struct_type, uint32_t byte_offset);
 bool IsHandleType(const ParseState& parse_state, uint32_t type_id) noexcept;
 bool IsDevicePointerType(const ParseState& parse_state, uint32_t type_id) noexcept;
+/** Returns every `PhysicalStorageBuffer` pointer that a uniform buffer block or the push constant block declares, through
+ * nested structs and arrays of structs. Each location has the block's group and binding, and the pointer's byte offset. */
+std::vector<StoredValueLocation> CollectDevicePointerMembers(const ParseState& parse_state);
 /** The device features that a dynamic index into a binding array needs. Slang does not state them as capabilities. The
  * names repeat when several accesses need one. A texel buffer array is not covered. */
 std::vector<std::string_view> CollectDynamicIndexingCapabilities(const ParseState& parse_state);

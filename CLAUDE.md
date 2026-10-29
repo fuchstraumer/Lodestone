@@ -129,7 +129,7 @@ contents. `Check` returns its condition, so the check can guard the checks that 
 check fails, so a guard that fails cannot hide the checks behind it. To read the diagnostics of a cook, pass a
 `RecordingDiagnosticSink` to the three-argument `RunCook`.
 
-Forty-nine test targets exist: forty-two unit tests and seven cook tests. `tests/README.md` lists what each one proves. Read it before you add or change a test, and add a row there for each new target.
+Fifty test targets exist: forty-three unit tests and seven cook tests. `tests/README.md` lists what each one proves. Read it before you add or change a test, and add a row there for each new target.
 
 Each cook test writes into its own output directory. The bundle and the dedup report hold every module
 of one cook, so a module added to a cook changes those files.
@@ -190,7 +190,11 @@ member in the ordinary data of a parameter block, a `ConstantBuffer`, or the ent
 with a `StoredValuePlacement` (the form, the container, the container's group and binding, and the byte offset). The shim
 table row states the resource (`ShimInterface::Resource`); a storage handle takes its format from the implementation's type
 argument, and a pointer its element stride from the pointee. The access in a `Ptr` type's full name must equal the row's
-(`ShimPointerAccessMismatch`). An array of Pointer or Handle shims, and one in a storage buffer element, fail with
+(`ShimPointerAccessMismatch`). The Pointer impls state `Std430DataLayout`, so both forms have one layout. Reflection ignores that
+layout (shader-slang/slang#13188), so the cooker computes the std430 stride itself (`model/BufferLayout`), and `SpvValidator` compares
+it with the `ArrayStride` of the pointer type in the code. A shim buffer element whose scalar layout differs from its std430 layout
+has implicit padding (a `float3` followed by a `float2`, for example). It fails the cook on every profile with
+`ShimElementImplicitPadding`, from `PrepareRawModule`, and the author adds the padding member. An array of Pointer or Handle shims, and one in a storage buffer element, fail with
 `ShimStoredValueUnsupported`. A stored value is visible to an entry point when its container is: a used uniform buffer, or the
 entry point's own push constants. `ResolvedLibraryValidator::ValidateEntryPoint` gives a validator the bound bindings,
 sorted, and the stored values apart. `SpvValidator` compares the descriptor heap set with the mutable descriptor lowering
@@ -227,7 +231,7 @@ is therefore a visible word in a diff: the day a file in `emit/` writes
 |---|---|---|
 | `permute/` | `PermutationValue`, `PermutationAxis`, `PermutationAssignment`, `PermutationSpace`, `PolicyDocument`, `AttributeExpression` | The authoring parameter domain. Stages 1 and 2. Phase E filled this folder. |
 | `compile/` | `SlangCompiler`, `SlangDiagnosticParser`, `RawLibrary`, `ShimLinkSource`, `Diagnostics`, and `src/compile/impl/` | **The Slang wall. No file outside this folder names a Slang type.** |
-| `model/` | `ResolveStage`, `ShaderDataSchema`, `ContentHash`, `ContentInterner`, `CookedLibrary`, `AxisInfluence` | The data that flows, interns, and freezes. Stages 4, 6, and 7. |
+| `model/` | `ResolveStage`, `ShaderDataSchema`, `BufferLayout`, `ContentHash`, `ContentInterner`, `CookedLibrary`, `AxisInfluence` | The data that flows, interns, and freezes. Stages 4, 6, and 7. |
 | `target/` | `TargetProfile`, `ShimTable`, `StorageFormatTable`, `TargetUtils`, `WgslValidator`, `SpvValidator` | A target, its access model, and its validator. Phase F fills this folder. |
 | `emit/` | `ShaderLibraryEmitter`, `ShaderManifestEmitter`, `OutputSink`, `StageDump`, `DedupeReport` | Everything that writes through a sink. Stage 8, plus the two reports. |
 | `driver/` | `CookerDriver`, `CookerOptions` | The loop and its command line. |

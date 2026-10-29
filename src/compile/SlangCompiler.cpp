@@ -8,6 +8,7 @@
 #include "impl/SlangCompilerTypes.hpp"
 #include "impl/SlangModuleContext.hpp"
 #include "impl/ThreadPool.hpp"
+#include "model/BufferLayout.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "target/ShimTable.hpp"
@@ -30,6 +31,18 @@
 
 namespace lodestone
 {
+
+namespace
+{
+
+    // fails when the scalar layout and the std430 layout of the element type differ
+    CookError CheckElementPadding(const SlangModuleContext& context,
+                                  const RawShimExtern& shim_extern,
+                                  const ShaderLocation& where,
+                                  std::string_view element_type,
+                                  DiagnosticSink& sink);
+
+} // namespace
 
 SlangCompiler::SlangCompiler() noexcept
     : compilePool{ nullptr },
@@ -192,6 +205,17 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
             }
         }
 
+        // implicit padding fails on every profile, so a renderer writes one buffer for all of them
+        if (shimInterface->Class == ShimResourceClass::Buffer && arguments.size() == shimInterface->TypeParameterCount)
+        {
+            const CookError paddingError =
+                CheckElementPadding(*bootstrapContext, shimExtern, where, arguments.front(), *diagnosticSink);
+            if (!paddingError)
+            {
+                return std::unexpected(paddingError);
+            }
+        }
+
         module.ShimExterns.push_back(std::move(shimExtern));
     }
 
@@ -258,5 +282,34 @@ const SymbolTable& SlangCompiler::GetSymbolTable() const noexcept
 {
     return symbolTable;
 }
+
+namespace
+{
+
+    CookError CheckElementPadding(const SlangModuleContext& context,
+                                  const RawShimExtern& shim_extern,
+                                  const ShaderLocation& where,
+                                  std::string_view element_type,
+                                  DiagnosticSink& sink)
+    {
+        const CookResult<LayoutNode> element = context.ReadTypeLayoutNode(element_type, where);
+        if (!element)
+        {
+            return element.error();
+        }
+
+        const std::optional<LayoutDifference> difference = FindLayoutDifference(element.value());
+        if (!difference)
+        {
+            return CookError::Success;
+        }
+
+        return ReportError(sink,
+                           CookError::ShimElementImplicitPadding,
+                           where,
+                           std::format("{}: {}", DescribeShimExtern(shim_extern), DescribeLayoutDifference(*difference)));
+    }
+
+} // namespace
 
 } // namespace lodestone

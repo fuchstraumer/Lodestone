@@ -525,6 +525,67 @@ std::vector<ReflectedBinding> MakeHandleReflection()
     return reflected;
 }
 
+// A uniform block at set 0 binding 0 with a device pointer at byte 0, inside a nested struct, and a float4 at byte 16.
+constexpr std::string_view k_PointerBlockCs = R"(
+               OpCapability Shader
+               OpCapability PhysicalStorageBufferAddresses
+               OpExtension "SPV_KHR_physical_storage_buffer"
+               OpMemoryModel PhysicalStorageBuffer64 GLSL450
+               OpEntryPoint GLCompute %ReadCS "main" %geo
+               OpExecutionMode %ReadCS LocalSize 8 1 1
+               OpName %Item "Item"
+               OpMemberName %Item 0 "value"
+               OpName %Holder "Holder"
+               OpMemberName %Holder 0 "buf"
+               OpName %Geo "Geo"
+               OpMemberName %Geo 0 "holder"
+               OpMemberName %Geo 1 "tint"
+               OpName %geo "geo"
+               OpDecorate %Item Block
+               OpMemberDecorate %Item 0 Offset 0
+               OpMemberDecorate %Holder 0 Offset 0
+               OpDecorate %Geo Block
+               OpMemberDecorate %Geo 0 Offset 0
+               OpMemberDecorate %Geo 1 Offset 16
+               OpDecorate %geo DescriptorSet 0
+               OpDecorate %geo Binding 0
+       %void = OpTypeVoid
+     %fnVoid = OpTypeFunction %void
+        %int = OpTypeInt 32 1
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+      %int_0 = OpConstant %int 0
+       %Item = OpTypeStruct %v4float
+    %ptrItem = OpTypePointer PhysicalStorageBuffer %Item
+%ptrItemValue = OpTypePointer PhysicalStorageBuffer %v4float
+     %Holder = OpTypeStruct %ptrItem
+        %Geo = OpTypeStruct %Holder %v4float
+     %ptrGeo = OpTypePointer Uniform %Geo
+  %ptrBuffer = OpTypePointer Uniform %ptrItem
+        %geo = OpVariable %ptrGeo Uniform
+     %ReadCS = OpFunction %void None %fnVoid
+      %entry = OpLabel
+  %bufferPtr = OpAccessChain %ptrBuffer %geo %int_0 %int_0
+     %buffer = OpLoad %ptrItem %bufferPtr
+ %valuePtr = OpAccessChain %ptrItemValue %buffer %int_0
+      %value = OpLoad %v4float %valuePtr Aligned 16
+               OpReturn
+               OpFunctionEnd
+)";
+
+ReflectedBinding MakePointerValue(std::string_view name, uint32_t byte_offset)
+{
+    ReflectedBinding reflected;
+    reflected.Name = std::string{ name };
+    reflected.Placement = lodestone::StoredValuePlacement{ .Kind = lodestone::PlacementKind::Pointer,
+                                                           .Container = lodestone::StoredValueContainer::UniformBuffer,
+                                                           .Block = lodestone::BoundPlacement{ .Group = 0u, .Binding = 0u },
+                                                           .ByteOffset = byte_offset };
+    reflected.Kind = BindingKind::StorageBuffer;
+    reflected.Access = ResourceAccess::ReadOnly;
+    return reflected;
+}
+
 } // namespace
 
 int main()
@@ -898,6 +959,92 @@ int main()
         runner.CheckEqual(copiedMatch->Emitted.SamplerTexturePairs, handlePairs,
                           "a wrapper copied to a Function variable gives the same pair");
     }
+
+    runner.BeginSection("a device pointer in a block must be recorded as a stored value or a uniform member");
+    const std::vector<std::byte> pointerBlock = Assemble(std::string{ k_PointerBlockCs });
+    runner.Check(!pointerBlock.empty(), "the pointer block fixture assembles");
+
+    auto pointerMismatches = [&](const std::vector<ReflectedBinding>& reflected)
+    {
+        std::vector<const ReflectedBinding*> pointers = PointersTo(reflected);
+        const CookResult<BindingComparison> comparison = validator.ValidateEntryPoint(pointerBlock, pointers, sink);
+        runner.CheckOk(comparison, "the pointer block fixture passes spirv-val");
+        size_t count = 0u;
+        if (comparison.has_value())
+        {
+            for (const lodestone::BindingMismatch& mismatch : comparison->Mismatches)
+            {
+                if (mismatch.Kind == BindingMismatchKind::StoredValue)
+                {
+                    ++count;
+                }
+            }
+        }
+
+        return count;
+    };
+
+    const std::vector<ReflectedBinding> geoOnly{ MakeReflected("geo", 0u, 0u, BindingKind::UniformBuffer,
+                                                               ResourceShape::Invalid, ResourceAccess::ReadOnly) };
+    runner.CheckEqual(pointerMismatches(geoOnly), 1u,
+                      "a pointer in a nested struct of a block that no stored value or member records is a mismatch");
+
+    const CookResult<BindingComparison> unrecorded = [&]
+    {
+        std::vector<const ReflectedBinding*> pointers = PointersTo(geoOnly);
+        return validator.ValidateEntryPoint(pointerBlock, pointers, sink);
+    }();
+    if (unrecorded.has_value())
+    {
+        const auto found = std::ranges::find(unrecorded->Mismatches, BindingMismatchKind::StoredValue, &lodestone::BindingMismatch::Kind);
+        runner.Check(found != unrecorded->Mismatches.end() &&
+                         found->Emitted == "the code stores a pointer at offset 0, and the manifest records nothing there",
+                     "the mismatch states the offset of the pointer");
+    }
+
+    std::vector<ReflectedBinding> withStored = geoOnly;
+    withStored.push_back(MakePointerValue("buf", 0u));
+    runner.CheckEqual(pointerMismatches(withStored), 0u, "a stored value at the offset of the pointer records it");
+
+    std::vector<ReflectedBinding> storedElsewhere = geoOnly;
+    storedElsewhere.push_back(MakePointerValue("buf", 16u));
+    runner.Check(pointerMismatches(storedElsewhere) >= 1u, "a stored value at another offset does not record the pointer");
+
+    std::vector<ReflectedBinding> withMember = geoOnly;
+    withMember[0].UniformMembers.push_back(lodestone::ReflectedUniformMember{
+        .Name = "buf", .Data = { .Offset = 0u, .Size = 8u, .ArrayCount = 1u } });
+    runner.CheckEqual(pointerMismatches(withMember), 0u, "a uniform member at the offset records the author's own Ptr");
+
+    runner.BeginSection("the stride of a stored pointer is compared with the ArrayStride of its type");
+    const std::vector<std::byte> stridedPointer =
+        Assemble(Replace(k_PointerBlockCs, "OpDecorate %Item Block", "OpDecorate %Item Block\n               OpDecorate %ptrItem ArrayStride 16"));
+    runner.Check(!stridedPointer.empty(), "the fixture with an ArrayStride on the pointer type assembles");
+
+    auto strideMismatches = [&](uint32_t cooked_stride)
+    {
+        ReflectedBinding stored = MakePointerValue("buf", 0u);
+        stored.ElementStride = cooked_stride;
+        const std::vector<ReflectedBinding> reflected{ geoOnly[0], stored };
+        std::vector<const ReflectedBinding*> pointers = PointersTo(reflected);
+        const CookResult<BindingComparison> comparison = validator.ValidateEntryPoint(stridedPointer, pointers, sink);
+        runner.CheckOk(comparison, "the strided pointer fixture passes spirv-val");
+        size_t count = 0u;
+        if (comparison.has_value())
+        {
+            for (const lodestone::BindingMismatch& mismatch : comparison->Mismatches)
+            {
+                count += mismatch.Kind == BindingMismatchKind::StoredValue ? 1u : 0u;
+            }
+        }
+
+        return count;
+    };
+
+    runner.CheckEqual(strideMismatches(16u), 0u, "a cooked stride equal to the ArrayStride of the code matches");
+    runner.CheckEqual(strideMismatches(12u), 1u, "a cooked stride that differs from the ArrayStride of the code is a mismatch");
+
+    // a pointer that the code never indexes has no stride to disagree with
+    runner.CheckEqual(pointerMismatches(withStored), 0u, "a pointer type with no ArrayStride is not compared");
 
     return runner.Report();
 }
