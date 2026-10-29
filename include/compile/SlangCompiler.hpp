@@ -24,7 +24,7 @@ namespace lodestone
 {
 
 class DiagnosticSink;
-struct SlangReflector;
+class SlangReflector;
 class SlangModuleContext;
 
 struct SlangCompilerCreateInfo
