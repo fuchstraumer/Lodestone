@@ -47,7 +47,8 @@ namespace
                                       DiagnosticSink& sink);
     std::vector<BindingMismatch> CompareDescriptorHeap(std::span<const DeclaredBinding> heap,
                                                        std::span<const ReflectedBinding*> reflected,
-                                                       uint32_t heap_set);
+                                                       uint32_t heap_set,
+                                                       manifest::DescriptorHeapLowering heap_lowering);
     // compares the offset of each stored value with the member of its container that starts there
     std::vector<BindingMismatch> CompareStoredValues(const ParseState& parse_state,
                                                      std::span<const ReflectedBinding*> reflected);
@@ -57,9 +58,10 @@ namespace
                                                        std::span<const ReflectedBinding*> stored);
 }
 
-SpvValidator::SpvValidator(std::optional<uint32_t> descriptor_heap_set)
+SpvValidator::SpvValidator(std::optional<uint32_t> descriptor_heap_set, manifest::DescriptorHeapLowering heap_lowering)
     : context{ spvContextCreate(SPV_ENV_VULKAN_1_2) },
-      descriptorHeapSet{ descriptor_heap_set }
+      descriptorHeapSet{ descriptor_heap_set },
+      heapLowering{ heap_lowering }
 {
 }
 
@@ -99,7 +101,10 @@ CookResult<BindingComparison> SpvValidator::validateEntryPoint(std::span<const s
         {
             return binding.Group == *descriptorHeapSet;
         });
-        heapMismatches = CompareDescriptorHeap(std::span{ heapBegin.begin(), heapBegin.end() }, bindings, *descriptorHeapSet);
+        heapMismatches = CompareDescriptorHeap(std::span{ heapBegin.begin(), heapBegin.end() },
+                                               bindings,
+                                               *descriptorHeapSet,
+                                               heapLowering);
         declared.erase(heapBegin.begin(), heapBegin.end());
     }
 
@@ -230,7 +235,7 @@ namespace
         }
     }
 
-    bool HeapBindingAllows(uint32_t binding, BindingKind kind) noexcept
+    bool MutableHeapBindingAllows(uint32_t binding, BindingKind kind) noexcept
     {
         switch (binding)
         {
@@ -244,6 +249,43 @@ namespace
         default:
             return false;
         }
+    }
+
+    // each binding has one descriptor type, so two kinds at one binding fail here. The read and read-write views of a storage
+    // buffer are one type, and a texel buffer is one kind for both of its types
+    bool TypedHeapBindingAllows(uint32_t binding, BindingKind kind) noexcept
+    {
+        switch (binding)
+        {
+        case manifest::k_TypedHeapSamplerBinding:
+            return kind == BindingKind::Sampler;
+        case manifest::k_TypedHeapCombinedImageSamplerBinding:
+            return kind == BindingKind::CombinedTextureSampler;
+        case manifest::k_TypedHeapSampledImageBinding:
+            return kind == BindingKind::Texture;
+        case manifest::k_TypedHeapStorageImageBinding:
+            return kind == BindingKind::StorageTexture;
+        case manifest::k_TypedHeapUniformTexelBufferBinding:
+        case manifest::k_TypedHeapStorageTexelBufferBinding:
+            return kind == BindingKind::TexelBuffer;
+        case manifest::k_TypedHeapUniformBufferBinding:
+            return kind == BindingKind::UniformBuffer;
+        case manifest::k_TypedHeapStorageBufferBinding:
+            return kind == BindingKind::StorageBuffer;
+        default:
+            return false;
+        }
+    }
+
+    bool HeapBindingAllows(manifest::DescriptorHeapLowering heap_lowering, uint32_t binding, BindingKind kind) noexcept
+    {
+        return heap_lowering == manifest::DescriptorHeapLowering::PerDescriptorType ? TypedHeapBindingAllows(binding, kind)
+                                                                                     : MutableHeapBindingAllows(binding, kind);
+    }
+
+    std::string_view HeapLoweringName(manifest::DescriptorHeapLowering heap_lowering) noexcept
+    {
+        return heap_lowering == manifest::DescriptorHeapLowering::PerDescriptorType ? "per-descriptor-type" : "mutable descriptor";
     }
 
     std::vector<BindingMismatch> CompareStoredValues(const ParseState& parse_state,
@@ -382,7 +424,8 @@ namespace
 
     std::vector<BindingMismatch> CompareDescriptorHeap(std::span<const DeclaredBinding> heap,
                                                        std::span<const ReflectedBinding*> reflected,
-                                                       uint32_t heap_set)
+                                                       uint32_t heap_set,
+                                                       manifest::DescriptorHeapLowering heap_lowering)
     {
         std::vector<BindingMismatch> mismatches;
         for (const DeclaredBinding& variable : heap)
@@ -392,10 +435,11 @@ namespace
             {
                 reason = "a variable in the descriptor heap set that is not an unbounded array";
             }
-            else if (!HeapBindingAllows(variable.Binding, variable.Kind))
+            else if (!HeapBindingAllows(heap_lowering, variable.Binding, variable.Kind))
             {
-                reason = std::format("a heap of {} at a binding that the mutable descriptor lowering gives to other kinds",
-                                     ToString(variable.Kind));
+                reason = std::format("a heap of {} at a binding that the {} lowering gives to other kinds",
+                                     ToString(variable.Kind),
+                                     HeapLoweringName(heap_lowering));
             }
 
             if (!reason.empty())

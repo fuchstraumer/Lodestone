@@ -3,6 +3,7 @@
 #define LODESTONE_TARGET_PROFILE_HPP
 #include "CookerErrors.hpp"
 #include "ShaderLibraryTypes.hpp"
+#include "ShaderManifestFormat.hpp"
 #include <cstdint>
 #include <optional>
 #include <utility>
@@ -189,6 +190,8 @@ struct TargetProfile
     ShimForms Forms;
     /** @brief The descriptor set of the descriptor heap that handles index. No value without a Handle form. */
     std::optional<uint32_t> DescriptorHeapSet;
+    /** @brief How the heap is laid out, and which link module overrides Slang's default. `None` without a Handle form. */
+    manifest::DescriptorHeapLowering HeapLowering{ manifest::DescriptorHeapLowering::None };
     /** @brief Null when this target cannot check its own output. */
     const ResolvedLibraryValidator* Validator{ nullptr };
     /** @brief The push constant bytes every device supports: 128 for Vulkan. Zero without push constants. */

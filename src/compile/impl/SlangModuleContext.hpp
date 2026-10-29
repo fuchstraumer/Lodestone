@@ -53,6 +53,10 @@ public:
     [[nodiscard]] CookError LoadShimLinkModule(std::string_view source);
     [[nodiscard]] slang::IModule* ShimLinkModule() const noexcept;
     [[nodiscard]] CookError LoadShimFormatModules(std::span<const ShimFormatLinkSource> sources);
+    /** @brief Loads the builtin that overrides Slang's heap lowering, for the lowerings that need one. */
+    [[nodiscard]] CookError LoadHeapLoweringModule();
+    /** @brief Null when the profile uses Slang's default heap lowering. */
+    [[nodiscard]] slang::IModule* HeapLoweringModule() const noexcept;
     /** @brief Null when no extern names the axis. */
     [[nodiscard]] slang::IModule* ShimFormatLinkModule(std::string_view axis_name, uint32_t case_ordinal) const noexcept;
     [[nodiscard]] slang::IGlobalSession* GlobalSession() const noexcept;
@@ -119,6 +123,8 @@ private:
     Slang::ComPtr<slang::ISession> session;
     slang::IModule* rootModule{ nullptr };
     slang::IModule* shimLinkModule{ nullptr };
+    slang::IModule* heapLoweringModule{ nullptr };
+    manifest::DescriptorHeapLowering heapLowering{ manifest::DescriptorHeapLowering::None };
 
     struct ShimFormatModule
     {

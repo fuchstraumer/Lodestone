@@ -84,6 +84,11 @@ CookError ThreadPool::prepareContext(SlangModuleContext& module_context,
         error = module_context.LoadShimFormatModules(batch.ShimFormatSources);
     }
 
+    if (error == CookError::Success)
+    {
+        error = module_context.LoadHeapLoweringModule();
+    }
+
     if (error != CookError::Success)
     {
         // the usual cause is a module cache from another Slang version

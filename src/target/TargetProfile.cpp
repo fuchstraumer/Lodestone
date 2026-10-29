@@ -40,13 +40,20 @@ namespace
 
     constexpr std::string_view k_WgslName = "wgsl";
     constexpr std::string_view k_SpirvName = "spirv";
-    constexpr std::string_view k_SpirvModernName = "spirv-modern";
+    constexpr std::string_view k_SpirvModernMutableName = "spirv-modern-mutable";
+    constexpr std::string_view k_SpirvModernTypedName = "spirv-modern-typed";
 
     // Vulkan guarantees 4 descriptor sets, so set 3 is the last one that every device has
     constexpr uint32_t k_SpirvModernHeapSet = 3u;
 
-    static SpvValidator k_SpvValidator{ std::nullopt };
-    static SpvValidator k_SpvModernValidator{ k_SpirvModernHeapSet };
+    static SpvValidator k_SpvValidator{ std::nullopt, manifest::DescriptorHeapLowering::None };
+    static SpvValidator k_SpvModernMutableValidator{ k_SpirvModernHeapSet, manifest::DescriptorHeapLowering::MutableDescriptor };
+    static SpvValidator k_SpvModernTypedValidator{ k_SpirvModernHeapSet, manifest::DescriptorHeapLowering::PerDescriptorType };
+
+    constexpr ShimForms k_ModernForms{ .Buffer = AccessModel::Pointer,
+                                       .Texture = AccessModel::Handle,
+                                       .Sampler = AccessModel::Handle,
+                                       .StorageTexture = AccessModel::Handle };
 
     constexpr ShimForms k_AllBound{ .Buffer = AccessModel::Bound,
                                     .Texture = AccessModel::Bound,
@@ -61,7 +68,7 @@ namespace
 #endif
 
     // Slang has no WGSL profile, and ignores one that does not imply the target. Vulkan 1.2 guarantees SPIR-V 1.5
-    const std::array<TargetProfile, 3u> k_TargetProfiles
+    const std::array<TargetProfile, 4u> k_TargetProfiles
     {
         TargetProfile{ .Name = k_WgslName,
                            .Language = TargetLanguage::Wgsl,
@@ -75,25 +82,35 @@ namespace
                            .Validator = &k_SpvValidator,
                            .MaxPushConstantBytes = 128u,
                            .VulkanApiVersion = (1u << 22u) | (2u << 12u) },
-        // buffers through buffer device addresses, and textures and samplers through descriptor handles
-        TargetProfile{ .Name = k_SpirvModernName,
+        // buffers through buffer device addresses, and textures and samplers through descriptor handles into a heap of
+        // mutable descriptors
+        TargetProfile{ .Name = k_SpirvModernMutableName,
                            .Language = TargetLanguage::Spirv,
                            .SlangProfileName = "spirv_1_5",
-                           .Forms = ShimForms{ .Buffer = AccessModel::Pointer,
-                                               .Texture = AccessModel::Handle,
-                                               .Sampler = AccessModel::Handle,
-                                               .StorageTexture = AccessModel::Handle },
+                           .Forms = k_ModernForms,
                            .DescriptorHeapSet = k_SpirvModernHeapSet,
-                           .Validator = &k_SpvModernValidator,
+                           .HeapLowering = manifest::DescriptorHeapLowering::MutableDescriptor,
+                           .Validator = &k_SpvModernMutableValidator,
+                           .MaxPushConstantBytes = 128u,
+                           .VulkanApiVersion = (1u << 22u) | (2u << 12u) },
+        // the same forms, with one heap binding for each descriptor type
+        TargetProfile{ .Name = k_SpirvModernTypedName,
+                           .Language = TargetLanguage::Spirv,
+                           .SlangProfileName = "spirv_1_5",
+                           .Forms = k_ModernForms,
+                           .DescriptorHeapSet = k_SpirvModernHeapSet,
+                           .HeapLowering = manifest::DescriptorHeapLowering::PerDescriptorType,
+                           .Validator = &k_SpvModernTypedValidator,
                            .MaxPushConstantBytes = 128u,
                            .VulkanApiVersion = (1u << 22u) | (2u << 12u) },
     };
 
-    constexpr std::array<std::string_view, 3u> k_TargetProfileNames
+    constexpr std::array<std::string_view, 4u> k_TargetProfileNames
     {
         k_WgslName,
         k_SpirvName,
-        k_SpirvModernName,
+        k_SpirvModernMutableName,
+        k_SpirvModernTypedName,
     };
 
 } // namespace

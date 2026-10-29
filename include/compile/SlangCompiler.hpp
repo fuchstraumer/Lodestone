@@ -6,7 +6,7 @@
 #include "compile/ShimLinkSource.hpp"
 #include "compile/SymbolTable.hpp"
 #include "permute/PermutationSpace.hpp"
-#include "ShaderLibraryTypes.hpp"
+#include "ShaderManifestFormat.hpp"
 #include "target/TargetProfile.hpp"
 
 #include <cstddef>
@@ -14,7 +14,6 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
-#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -43,6 +42,8 @@ struct SlangCompilerCreateInfo
     ShimForms Forms;
     /** @brief Given to Slang as the bindless space index. */
     std::optional<uint32_t> DescriptorHeapSet;
+    /** @brief `PerDescriptorType` makes each worker load the link module that overrides Slang's default heap lowering. */
+    manifest::DescriptorHeapLowering HeapLowering{ manifest::DescriptorHeapLowering::None };
     std::string_view TargetName;
 };
 

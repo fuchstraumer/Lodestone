@@ -547,7 +547,17 @@ int main()
     runner.CheckEqual(BundleErrorFrom(badLowering), ErrorCode::InvalidProfileDescriptorHeap,
                       "an unknown heap lowering is rejected when the bundle opens");
 
+    std::vector<std::byte> nextLowering = valid;
+    WriteValue(nextLowering, firstLoweringOffset, uint8_t{ 3u });
+    runner.CheckEqual(BundleErrorFrom(nextLowering), ErrorCode::InvalidProfileDescriptorHeap,
+                      "the value after the per-descriptor-type lowering is rejected when the bundle opens");
+
     const size_t firstHeapSetOffset = header.Profiles.Offset + offsetof(lodestone::manifest::Profile, DescriptorHeapSet);
+    std::vector<std::byte> typedHeap = valid;
+    WriteValue(typedHeap, firstLoweringOffset, lodestone::manifest::DescriptorHeapLowering::PerDescriptorType);
+    WriteValue(typedHeap, firstHeapSetOffset, uint32_t{ 3u });
+    runner.Check(BundleView::Open(typedHeap).has_value(), "the per-descriptor-type lowering with a heap set opens");
+
     std::vector<std::byte> strayHeapSet = valid;
     WriteValue(strayHeapSet, firstHeapSetOffset, uint32_t{ 3u });
     runner.CheckEqual(BundleErrorFrom(strayHeapSet), ErrorCode::InvalidProfileDescriptorHeap,

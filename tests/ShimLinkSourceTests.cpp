@@ -202,12 +202,12 @@ int main()
                           singleClaim);
     }
 
-    runner.BeginSection("spirv-modern links each class in its own form: Pointer buffers, Handle textures and samplers");
-    const CookResult<TargetProfile> modern = FindTargetProfile("spirv-modern");
-    if (runner.CheckOk(modern, "the build has a spirv-modern profile"))
+    runner.BeginSection("spirv-modern-mutable links each class in its own form: Pointer buffers, Handle textures and samplers");
+    const CookResult<TargetProfile> modern = FindTargetProfile("spirv-modern-mutable");
+    if (runner.CheckOk(modern, "the build has a spirv-modern-mutable profile"))
     {
-        const CookResult<std::string> modernSource = MakeShimLinkSource(externs, modern->Forms, "Probe", "spirv-modern", sink);
-        if (runner.CheckOk(modernSource, "every cell of spirv-modern has an implementation"))
+        const CookResult<std::string> modernSource = MakeShimLinkSource(externs, modern->Forms, "Probe", "spirv-modern-mutable", sink);
+        if (runner.CheckOk(modernSource, "every cell of spirv-modern-mutable has an implementation"))
         {
             runner.CheckEqual(*modernSource,
                               "import LodestoneShims;\n"
@@ -221,7 +221,7 @@ int main()
         }
         const CookResult<std::vector<ShimFormatLinkSource>> modernFormats =
             MakeShimFormatLinkSources(withFormats, formatSpace, modern->Forms, "Probe", sink);
-        if (runner.CheckOk(modernFormats, "the format modules of spirv-modern link") && !modernFormats->empty())
+        if (runner.CheckOk(modernFormats, "the format modules of spirv-modern-mutable link") && !modernFormats->empty())
         {
             runner.CheckEqual(modernFormats->front().Source,
                               "import LodestoneShims;\n"
@@ -229,9 +229,21 @@ int main()
                               "export struct Half : IWriteStorageTexture2D = HandleWriteStorageTexture2D<RGBA16F>;\n",
                               "a storage texture links the Handle form with the format of the variant");
         }
-        runner.CheckEqual(SingleForm(modern->Forms), AccessModel::Invalid, "spirv-modern has no single form for every class");
-        runner.Check(modern->DescriptorHeapSet == std::optional<uint32_t>{ 3u }, "spirv-modern puts the descriptor heap in set 3");
+        runner.CheckEqual(SingleForm(modern->Forms), AccessModel::Invalid, "spirv-modern-mutable has no single form for every class");
+        runner.Check(modern->DescriptorHeapSet == std::optional<uint32_t>{ 3u }, "spirv-modern-mutable puts the descriptor heap in set 3");
     }
+
+    runner.BeginSection("the two modern profiles share the forms and the heap set, and differ in the heap lowering");
+    const CookResult<TargetProfile> typed = FindTargetProfile("spirv-modern-typed");
+    if (runner.CheckOk(typed, "the build has a spirv-modern-typed profile") && runner.CheckOk(modern, "the build has a spirv-modern-mutable profile"))
+    {
+        runner.CheckEqual(typed->Forms.Buffer, modern->Forms.Buffer, "the buffer form is the same");
+        runner.CheckEqual(typed->Forms.Texture, modern->Forms.Texture, "the texture form is the same");
+        runner.Check(typed->DescriptorHeapSet == modern->DescriptorHeapSet, "the heap set is the same");
+        runner.CheckEqual(modern->HeapLowering, manifest::DescriptorHeapLowering::MutableDescriptor, "the mutable profile's lowering");
+        runner.CheckEqual(typed->HeapLowering, manifest::DescriptorHeapLowering::PerDescriptorType, "the typed profile's lowering");
+    }
+    runner.CheckError(FindTargetProfile("spirv-modern"), CookError::TargetProfileNotFound, "the old name spirv-modern is an unknown target");
 
     runner.BeginSection("the format axis must exist, and be an ungated enum axis over StorageFormat");
     runner.CheckEqual(FormatErrorOf({ MakeFormatExtern("Dst", "MISSING") }, formatSpace), CookError::ShimStorageFormatAxisUnknown,

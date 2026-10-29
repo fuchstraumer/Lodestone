@@ -377,7 +377,7 @@ bool Mismatches(const CookResult<BindingComparison>& comparison, BindingMismatch
            std::ranges::any_of(comparison->Mismatches, [kind](const lodestone::BindingMismatch& mismatch) { return mismatch.Kind == kind; });
 }
 
-// The shape of Slang's spirv-modern output for a block of two handles: the block at set 1 binding 0 holds the texture
+// The shape of Slang's spirv-modern-mutable output for a block of two handles: the block at set 1 binding 0 holds the texture
 // handle at byte 0 and the sampler handle at byte 16, and the heap variables are at set 3 binding 2 (images) and binding 0
 // (samplers). A third member, `Scale`, is not a handle. The prologue ends at the function; a body supplies %texIndex and
 // %samplerIndex, and the tail samples.
@@ -525,6 +525,44 @@ std::vector<ReflectedBinding> MakeHandleReflection()
     return reflected;
 }
 
+// Two heap variables of storage buffers at set 3 binding 7, as the per-descriptor-type lowering emits for the read and the
+// read-write view of a storage buffer.
+constexpr std::string_view k_StorageBufferHeapCs = R"(
+               OpCapability Shader
+               OpCapability RuntimeDescriptorArray
+               OpExtension "SPV_KHR_storage_buffer_storage_class"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %Main "main" %heapRead %heapWrite
+               OpExecutionMode %Main LocalSize 1 1 1
+               OpDecorate %data ArrayStride 16
+               OpDecorate %ReadBuffer Block
+               OpMemberDecorate %ReadBuffer 0 NonWritable
+               OpMemberDecorate %ReadBuffer 0 Offset 0
+               OpDecorate %WriteBuffer Block
+               OpMemberDecorate %WriteBuffer 0 Offset 0
+               OpDecorate %heapRead DescriptorSet 3
+               OpDecorate %heapRead Binding 7
+               OpDecorate %heapWrite DescriptorSet 3
+               OpDecorate %heapWrite Binding 7
+       %void = OpTypeVoid
+     %fnVoid = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+       %data = OpTypeRuntimeArray %v4float
+ %ReadBuffer = OpTypeStruct %data
+%WriteBuffer = OpTypeStruct %data
+%readArray = OpTypeRuntimeArray %ReadBuffer
+%writeArray = OpTypeRuntimeArray %WriteBuffer
+%ptrReadArray = OpTypePointer StorageBuffer %readArray
+%ptrWriteArray = OpTypePointer StorageBuffer %writeArray
+   %heapRead = OpVariable %ptrReadArray StorageBuffer
+  %heapWrite = OpVariable %ptrWriteArray StorageBuffer
+       %Main = OpFunction %void None %fnVoid
+      %entry = OpLabel
+               OpReturn
+               OpFunctionEnd
+)";
+
 // A uniform block at set 0 binding 0 with a device pointer at byte 0, inside a nested struct, and a float4 at byte 16.
 constexpr std::string_view k_PointerBlockCs = R"(
                OpCapability Shader
@@ -592,7 +630,7 @@ int main()
 {
     lodestone::tests::TestRunner runner{ "SpvValidatorTests" };
 
-    const SpvValidator validator{ std::nullopt };
+    const SpvValidator validator{ std::nullopt, lodestone::manifest::DescriptorHeapLowering::None };
     lodestone::StderrDiagnosticSink sink;
     const std::vector<std::byte> shadeCs = Assemble(k_ShadeCs);
     runner.Check(!shadeCs.empty(), "the fixture assembles");
@@ -863,7 +901,7 @@ int main()
 
     // reflection does not state the descriptor heap, so its variables are compared with the mutable descriptor lowering
     runner.BeginSection("the descriptor heap is compared with the heap lowering, not with reflection");
-    const SpvValidator heapValidator{ 3u };
+    const SpvValidator heapValidator{ 3u, lodestone::manifest::DescriptorHeapLowering::MutableDescriptor };
     const std::string heapText = Replace(Replace(Replace(k_ImageArrayCs, "%Levels DescriptorSet 0", "%Levels DescriptorSet 3"),
                                                  "%Levels Binding 3",
                                                  "%Levels Binding 2"),
@@ -888,6 +926,75 @@ int main()
     std::vector<const ReflectedBinding*> inHeapSetPointers = PointersTo(inHeapSet);
     runner.Check(Mismatches(heapValidator.ValidateEntryPoint(heap, inHeapSetPointers, sink), BindingMismatchKind::DescriptorHeap),
                  "a reflected resource in the heap set is a mismatch");
+
+    runner.BeginSection("the per-descriptor-type heap has one binding for each descriptor type");
+    const SpvValidator typedValidator{ 3u, lodestone::manifest::DescriptorHeapLowering::PerDescriptorType };
+    runner.Check(Mismatches(typedValidator.ValidateEntryPoint(heap, noReflection, sink), BindingMismatchKind::DescriptorHeap),
+                 "storage images at the sampled image binding are a mismatch");
+    const std::vector<std::byte> storageImagesAtThree = Assemble(Replace(heapText, "%Levels Binding 2", "%Levels Binding 3"));
+    runner.Check(!storageImagesAtThree.empty(), "the storage image heap fixture assembles");
+    const CookResult<BindingComparison> storageImageMatch = typedValidator.ValidateEntryPoint(storageImagesAtThree, noReflection, sink);
+    runner.Check(storageImageMatch.has_value() && storageImageMatch->Matches(),
+                 "storage images at the storage image binding match");
+    runner.Check(Mismatches(heapValidator.ValidateEntryPoint(storageImagesAtThree, noReflection, sink),
+                            BindingMismatchKind::DescriptorHeap),
+                 "the mutable lowering has no binding 3");
+    runner.Check(Mismatches(typedValidator.ValidateEntryPoint(heapAtSamplers, noReflection, sink), BindingMismatchKind::DescriptorHeap),
+                 "storage images at the sampler binding are a mismatch");
+
+    const std::vector<std::byte> storageBuffers = Assemble(std::string{ k_StorageBufferHeapCs });
+    runner.Check(!storageBuffers.empty(), "the storage buffer heap fixture assembles");
+    const CookResult<BindingComparison> storageBufferMatch = typedValidator.ValidateEntryPoint(storageBuffers, noReflection, sink);
+    runner.CheckOk(storageBufferMatch, "the storage buffer heap fixture passes spirv-val");
+    runner.Check(storageBufferMatch.has_value() && storageBufferMatch->Matches(),
+                 "the read and the read-write view of a storage buffer share binding 7");
+    runner.Check(Mismatches(heapValidator.ValidateEntryPoint(storageBuffers, noReflection, sink), BindingMismatchKind::DescriptorHeap),
+                 "the mutable lowering has no binding 7");
+    const std::vector<std::byte> storageBuffersAtTwo =
+        Assemble(Replace(Replace(std::string{ k_StorageBufferHeapCs }, "%heapRead Binding 7", "%heapRead Binding 2"),
+                         "%heapWrite Binding 7",
+                         "%heapWrite Binding 2"));
+    runner.Check(Mismatches(typedValidator.ValidateEntryPoint(storageBuffersAtTwo, noReflection, sink), BindingMismatchKind::DescriptorHeap),
+                 "storage buffers at the sampled image binding are a mismatch");
+    const CookResult<BindingComparison> mutableStorageBuffers = heapValidator.ValidateEntryPoint(storageBuffersAtTwo, noReflection, sink);
+    runner.Check(mutableStorageBuffers.has_value() && mutableStorageBuffers->Matches(),
+                 "the mutable lowering accepts storage buffers at its resource binding");
+
+    const std::vector<std::byte> typedHandles = Assemble(MakeHandleFixture(k_HandleBodyDirect));
+    std::vector<ReflectedBinding> typedHandleReflection = MakeHandleReflection();
+    std::vector<const ReflectedBinding*> typedHandlePointers = PointersTo(typedHandleReflection);
+    const CookResult<BindingComparison> typedHandleMatch = typedValidator.ValidateEntryPoint(typedHandles, typedHandlePointers, sink);
+    runner.Check(typedHandleMatch.has_value() && typedHandleMatch->Matches(),
+                 "sampled images at binding 2 and samplers at binding 0 match, with the stored values");
+    if (runner.CheckOk(typedHandleMatch, "the pair is traced to the handles under the per-descriptor-type lowering"))
+    {
+        runner.CheckEqual(typedHandleMatch->Emitted.SamplerTexturePairs.size(), 1u,
+                          "the pair is traced to the handles under the per-descriptor-type lowering");
+    }
+
+    // a storage image array and a sampled image array at one binding: one mutable descriptor array can hold both, and one
+    // typed array cannot
+    const std::string aliasedText =
+        Replace(Replace(Replace(MakeHandleFixture(k_HandleBodyDirect),
+                                "%heapImages %heapSamplers %material",
+                                "%heapImages %heapSamplers %heapStorage %material"),
+                        "OpDecorate %heapSamplers Binding 0",
+                        "OpDecorate %heapSamplers Binding 0\n"
+                        "               OpDecorate %heapStorage DescriptorSet 3\n"
+                        "               OpDecorate %heapStorage Binding 2"),
+                "   %material = OpVariable %ptrMaterial Uniform",
+                "%storageImage = OpTypeImage %float 2D 0 0 0 2 Rgba8\n"
+                "%storageArray = OpTypeRuntimeArray %storageImage\n"
+                "%ptrStorageArray = OpTypePointer UniformConstant %storageArray\n"
+                "   %material = OpVariable %ptrMaterial Uniform\n"
+                " %heapStorage = OpVariable %ptrStorageArray UniformConstant");
+    const std::vector<std::byte> aliased = Assemble(aliasedText);
+    runner.Check(!aliased.empty(), "the aliased heap fixture assembles");
+    const CookResult<BindingComparison> aliasedMutable = heapValidator.ValidateEntryPoint(aliased, typedHandlePointers, sink);
+    runner.Check(aliasedMutable.has_value() && aliasedMutable->Matches(),
+                 "the mutable lowering accepts two descriptor types at one binding");
+    runner.Check(Mismatches(typedValidator.ValidateEntryPoint(aliased, typedHandlePointers, sink), BindingMismatchKind::DescriptorHeap),
+                 "two descriptor types at one binding of the per-descriptor-type heap are a mismatch");
 
     runner.BeginSection("a handle read from a block indexes the heap, and its place is compared with reflection");
     const std::vector<std::byte> handles = Assemble(MakeHandleFixture(k_HandleBodyDirect));

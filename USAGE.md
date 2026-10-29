@@ -237,8 +237,8 @@ Obey these rules. The cook fails if you do not.
   `uniform` parameter. Do not declare a shim as a local variable in a function.
 - Make the type argument `public` in its module.
 - Write the type argument as a plain name: `IReadBuffer<Item>`. Do not write a generic expression in it.
-- Do not make an array of shims, if you cook for `spirv-modern`.
-- Do not put a shim inside the element of a storage buffer, if you cook for `spirv-modern`.
+- Do not make an array of shims, if you cook for a `spirv-modern` profile.
+- Do not put a shim inside the element of a storage buffer, if you cook for a `spirv-modern` profile.
 - A shim is not an axis. Do not put an `ls_axis_*` attribute on it.
 
 #### Storage texture shims
@@ -266,7 +266,8 @@ extern struct Destination : IWriteStorageTexture2D;
 |---|---|---|---|---|
 | `wgsl` | Bound | Bound | Bound | Bound |
 | `spirv` | Bound | Bound | Bound | Bound |
-| `spirv-modern` | Pointer | Handle | Handle | Handle |
+| `spirv-modern-mutable` | Pointer | Handle | Handle | Handle |
+| `spirv-modern-typed` | Pointer | Handle | Handle | Handle |
 
 - **Bound**: an ordinary descriptor binding.
 - **Pointer**: a buffer device address, stored as a value in a uniform block.
@@ -288,7 +289,7 @@ void LooseCS(uint3 threadId : SV_DispatchThreadID, uniform float4 tint, uniform 
 }
 ```
 
-- On `spirv` and `spirv-modern`, the cooker delivers these constants as push constants. The limit is 128 bytes.
+- On `spirv` and the `spirv-modern` profiles, the cooker delivers these constants as push constants. The limit is 128 bytes.
 - On `wgsl`, Slang puts them in a uniform buffer with the std140 layout.
 - The two layouts can have different sizes. The manifest records each layout. Do not compute offsets in C++.
 
@@ -318,7 +319,7 @@ LEVEL_FORMAT = ["Rgba16Float", "R32Float"]
 | `<Module>.targets.<target>.CookValues.<AXIS>` | Array of booleans, integers, or enum case names. | Cook only these values. |
 | `<Module>.targets.<target>.CookIf` | String expression. | Cook only the variants where the expression is true. |
 
-Use these target names: `wgsl`, `spirv`, `spirv-modern`. An unknown target name fails the load.
+Use these target names: `wgsl`, `spirv`, `spirv-modern-mutable`, `spirv-modern-typed`. An unknown target name fails the load.
 
 If a module has a section for one target and no section for the cooked target, the cooker shows a warning.
 
@@ -354,7 +355,7 @@ Three things are required: `-o`, at least one `--target=`, and at least one modu
 | Flag | Meaning |
 |---|---|
 | `--output`, `-o <dir>` | The output directory. |
-| `--target=<name>` | `wgsl`, `spirv`, or `spirv-modern`. Repeat it for two or more targets. |
+| `--target=<name>` | `wgsl`, `spirv`, `spirv-modern-mutable`, or `spirv-modern-typed`. Repeat it for two or more targets. |
 | `--include-dir`, `-I <dir>` | A folder to search for imported modules. Repeat it as necessary. |
 | `--policy-file <path>` | The policy file. |
 | `--O0` to `--O3` | The Slang optimization level. The default is 0. |

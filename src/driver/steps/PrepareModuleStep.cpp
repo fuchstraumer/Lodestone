@@ -37,6 +37,7 @@ CookResult<PreparedCompiler> PrepareModuleStep::operator()(const SharedCookState
     createInfo.SlangProfileName = targetProfileResult->SlangProfileName;
     createInfo.Forms = targetProfileResult->Forms;
     createInfo.DescriptorHeapSet = targetProfileResult->DescriptorHeapSet;
+    createInfo.HeapLowering = targetProfileResult->HeapLowering;
     createInfo.TargetName = target_name;
 
     PreparedCompiler result{ std::make_unique<SlangCompiler>() };

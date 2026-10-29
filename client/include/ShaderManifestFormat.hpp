@@ -13,7 +13,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 18u;
+inline constexpr uint32_t k_ShaderManifestVersion = 19u;
 
 // NOLINTBEGIN(readability-enum-initial-value, performance-enum-size)
 enum class ErrorCode : uint32_t
@@ -217,12 +217,26 @@ enum class DescriptorHeapLowering : uint8_t
     None = 0,
     // VK_EXT_mutable_descriptor_type, one unbounded array for each binding below
     MutableDescriptor = 1,
+    // one unbounded array for each descriptor type, at the bindings of `k_TypedHeap*Binding`
+    PerDescriptorType = 2,
 };
 
 inline constexpr uint32_t k_MutableHeapSamplerBinding = 0u;
 inline constexpr uint32_t k_MutableHeapCombinedImageSamplerBinding = 1u;
 // textures, storage textures, texel buffers, storage buffers, and uniform buffers
 inline constexpr uint32_t k_MutableHeapResourceBinding = 2u;
+
+// These equal `DefaultVkBindlessBindings` in Slang's hlsl.meta.slang, which `BindlessDescriptorOptions.None` uses. The
+// storage buffer views (read and read-write) share one binding because they are one descriptor type. HeapBindingTableTest
+// compiles a probe and compares the emitted bindings with these values.
+inline constexpr uint32_t k_TypedHeapSamplerBinding = 0u;
+inline constexpr uint32_t k_TypedHeapCombinedImageSamplerBinding = 1u;
+inline constexpr uint32_t k_TypedHeapSampledImageBinding = 2u;
+inline constexpr uint32_t k_TypedHeapStorageImageBinding = 3u;
+inline constexpr uint32_t k_TypedHeapUniformTexelBufferBinding = 4u;
+inline constexpr uint32_t k_TypedHeapStorageTexelBufferBinding = 5u;
+inline constexpr uint32_t k_TypedHeapUniformBufferBinding = 6u;
+inline constexpr uint32_t k_TypedHeapStorageBufferBinding = 7u;
 
 /** @brief One cooked form: a target and the placement of each class of shim resource. */
 struct alignas(8) Profile

@@ -195,7 +195,7 @@ target_compile_definitions(ShimArrayTest PRIVATE
 add_lodestone_unit_test(OptimizedLayoutTest OptimizedLayoutTests.cpp)
 target_compile_definitions(OptimizedLayoutTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/OptimizedLayout")
-# Shim resources in the Pointer and Handle forms, cooked for spirv-modern through the test-only switch: each stored value
+# Shim resources in the Pointer and Handle forms, cooked for both modern profiles: each stored value
 # reads back with its container and offset, and the resource of each equals the reflection of its Bound form.
 add_lodestone_unit_test(ShimPlacementTest ShimPlacementTests.cpp)
 target_compile_definitions(ShimPlacementTest PRIVATE
@@ -205,6 +205,12 @@ add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
 # A canary for shader-slang/slang#13895, the missing NonReadable on an array of write-only storage images: it fails when Slang decorates the array,
 # so the SPIR-V validator's workaround cannot outlive the fault.
 add_lodestone_unit_test(SlangNonReadableCanaryTest SlangNonReadableCanaryTests.cpp)
+# The heap bindings of both lowerings (phase F step F4.6): a probe with a descriptor handle of every descriptor type is compiled with and
+# without the builtins/LodestoneHeapTyped.slang override, and the emitted bindings must equal the constants in ShaderManifestFormat.hpp.
+# It fails when Slang changes DefaultVkBindlessBindings or VkMutableBindlessBindings.
+add_lodestone_unit_test(HeapBindingTableTest HeapBindingTableTests.cpp)
+target_compile_definitions(HeapBindingTableTest PRIVATE
+    LODESTONE_BUILTIN_DIR="${PROJECT_SOURCE_DIR}/builtins")
 # The command line, which every later step trusts. It needs no Slang.
 add_lodestone_unit_test(CookerOptionsTest CookerOptionsTests.cpp)
 target_compile_definitions(CookerOptionsTest PRIVATE

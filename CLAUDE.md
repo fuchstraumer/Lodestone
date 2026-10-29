@@ -129,7 +129,7 @@ contents. `Check` returns its condition, so the check can guard the checks that 
 check fails, so a guard that fails cannot hide the checks behind it. To read the diagnostics of a cook, pass a
 `RecordingDiagnosticSink` to the three-argument `RunCook`.
 
-Fifty test targets exist: forty-three unit tests and seven cook tests. `tests/README.md` lists what each one proves. Read it before you add or change a test, and add a row there for each new target.
+Fifty-one test targets exist: forty-four unit tests and seven cook tests. `tests/README.md` lists what each one proves. Read it before you add or change a test, and add a row there for each new target.
 
 Each cook test writes into its own output directory. The bundle and the dedup report hold every module
 of one cook, so a module added to a cook changes those files.
@@ -175,14 +175,21 @@ the priming error names `--include-dir`. `lodestone_add_shader_cook` takes `INCL
 `ParseCommandLine` fails with `NoTargetSpecified`. Repeat the flag for more than one target. An unknown
 name is rejected at the command line and never in the driver, so a name that reaches `CookerOptions` is
 a name `FindTargetProfile` accepts. This build has `wgsl` and `spirv`. Each has a validator:
-`WgslValidator` (Tint) and `SpvValidator` (SPIRV-Tools). A third profile, `spirv-modern` (buffers through buffer device
-addresses, textures and samplers through descriptor handles, phase F step F4), exists and cooks. A profile has one access
+`WgslValidator` (Tint) and `SpvValidator` (SPIRV-Tools). Two more profiles, `spirv-modern-mutable` and `spirv-modern-typed` (buffers through buffer device
+addresses, textures and samplers through descriptor handles, phase F steps F4 and F4.6), exist and cook. A profile has one access
 model for each class of shim resource (`TargetProfile::Forms`, a
-`ShimForms`), and `ShimLinkSource` links each extern in the form of its class. `spirv-modern` gives buffers the Pointer
+`ShimForms`), and `ShimLinkSource` links each extern in the form of its class. Both modern profiles give buffers the Pointer
 form and textures, samplers, and storage textures the Handle form, with the descriptor heap in set 3
-(`TargetProfile::DescriptorHeapSet`, given to Slang as its bindless space index). The manifest records the form of each
-class (`Profile::Forms`, format 17), and the heap (`Profile::HeapLowering` and `Profile::DescriptorHeapSet`, format 18). A
-name in the policy file can name it.
+(`TargetProfile::DescriptorHeapSet`, given to Slang as its bindless space index). The profiles differ in the heap
+lowering (`TargetProfile::HeapLowering`). `spirv-modern-mutable` is Slang's default: `VK_EXT_mutable_descriptor_type`, with samplers
+at binding 0, combined image samplers at 1, and every other resource at 2. `spirv-modern-typed` is `BindlessDescriptorOptions.None`:
+one binding for each descriptor type, which are Slang's `DefaultVkBindlessBindings`. A profile with that lowering makes every
+worker session load the builtin `builtins/LodestoneHeapTyped.slang`, which exports `getDescriptorFromHandle`, and `LinkVariant`
+adds it to every variant. The binding numbers are stated once, as `k_TypedHeap*Binding` and `k_MutableHeap*Binding` in
+`ShaderManifestFormat.hpp`, and `HeapBindingTableTest` compiles a probe and compares the emitted bindings with them. The manifest
+records the form of each class (`Profile::Forms`, format 17), and the heap (`Profile::HeapLowering` and
+`Profile::DescriptorHeapSet`, formats 18 and 19). The old name `spirv-modern` is an unknown target. A name in the policy file can
+name a profile.
 
 A Pointer or Handle member stores a value in a block: `[ls_shim_value]` marks it in `builtins/LodestoneShims.slang`, because
 reflection gives a descriptor handle as a plain `uint2` and a pointer with no resource type. The reflector finds the marked
@@ -726,6 +733,7 @@ What each version added (details in `client/FORMAT.md`):
 - 16: `Binding::ArrayCount` of 0 for an unbounded binding array.
 - 17: stored values for the Handle and Pointer forms (`Binding::ValueContainer`, `Binding::ValueOffset`, `Profile::Forms`).
 - 18: the cook's `--O` and `--g` levels (`Profile::OptimizationLevel`, `Profile::DebugLevel`), the base form's hash for each entry point instance (`EntryPointInstance::BaseHash`), and the descriptor heap (`Profile::HeapLowering`, `Profile::DescriptorHeapSet`).
+- 19: `DescriptorHeapLowering::PerDescriptorType`, for the profile `spirv-modern-typed`, and the `k_TypedHeap*Binding` constants.
 
 Read `client/FORMAT.md` before you change the manifest format or the client views.
 

@@ -64,11 +64,15 @@ namespace
 
 constexpr bool k_UseSlangWorkaround = true;
 
+// the builtin module in builtins/ that exports `getDescriptorFromHandle` with the per-descriptor-type lowering
+constexpr std::string_view k_HeapTypedModuleName = "LodestoneHeapTyped";
+
 CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink)
 {
     diagnosticSink = &sink;
     bufferForm = create_info.Forms.Buffer;
     language = create_info.Language;
+    heapLowering = create_info.HeapLowering;
     compilesDeliveredForm = !AreBaseFlags(create_info.OptimizationLevel, create_info.DebugLevel);
     
     if (k_UseSlangWorkaround)
@@ -315,6 +319,24 @@ CookError SlangModuleContext::LoadShimFormatModules(std::span<const ShimFormatLi
         shimFormatModules.push_back(ShimFormatModule{ .AxisName = source.AxisName, .CaseOrdinal = source.CaseOrdinal, .Module = module });
     }
     return CookError::Success;
+}
+
+CookError SlangModuleContext::LoadHeapLoweringModule()
+{
+    if (heapLowering != manifest::DescriptorHeapLowering::PerDescriptorType)
+    {
+        return CookError::Success;
+    }
+
+    Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+    heapLoweringModule = session->loadModule(k_HeapTypedModuleName.data(), diagnosticsBlob.writeRef());
+    ReportDiagnostics(*diagnosticSink, "SlangModuleContext::LoadHeapLoweringModule", diagnosticsBlob);
+    return heapLoweringModule != nullptr ? CookError::Success : CookError::ModuleLoadFailed;
+}
+
+slang::IModule* SlangModuleContext::HeapLoweringModule() const noexcept
+{
+    return heapLoweringModule;
 }
 
 slang::IModule* SlangModuleContext::ShimFormatLinkModule(std::string_view axis_name, uint32_t case_ordinal) const noexcept

@@ -408,9 +408,7 @@ namespace
                                                           .CodeFactsRead = profile.Validator != nullptr,
                                                           .OptimizationLevel = cook_state.Options.OptimizationLevel,
                                                           .DebugLevel = cook_state.Options.DebugLevel,
-                                                          .HeapLowering = profile.DescriptorHeapSet.has_value()
-                                                                              ? manifest::DescriptorHeapLowering::MutableDescriptor
-                                                                              : manifest::DescriptorHeapLowering::None,
+                                                          .HeapLowering = profile.HeapLowering,
                                                           .DescriptorHeapSet = profile.DescriptorHeapSet.value_or(0u) });
         }
 

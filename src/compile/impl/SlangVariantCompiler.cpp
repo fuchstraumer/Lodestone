@@ -263,6 +263,11 @@ CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext&
         components.push_back(context.ShimLinkModule());
     }
 
+    if (context.HeapLoweringModule() != nullptr)
+    {
+        components.push_back(context.HeapLoweringModule());
+    }
+
     for (const PermutationBinding& binding : descriptor.Active)
     {
         const std::string variantModuleName = MakeVariantModuleName(*binding.Axis, binding.Value);

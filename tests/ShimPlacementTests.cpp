@@ -110,10 +110,10 @@ int main(int argc, char** argv)
     const std::filesystem::path assetDirectory{ argc > 1 ? argv[1] : LODESTONE_TEST_ASSET_DIR };
     tests::TestRunner runner{ "ShimPlacement" };
 
-    runner.BeginSection("the shim material cooks for spirv-modern, with every round trip and two identical cooks");
-    const CookOutcome modern = Cook(assetDirectory / "ShimMaterial.slang", "spirv-modern");
+    runner.BeginSection("the shim material cooks for spirv-modern-mutable, with every round trip and two identical cooks");
+    const CookOutcome modern = Cook(assetDirectory / "ShimMaterial.slang", "spirv-modern-mutable");
     const CookOutcome bound = Cook(assetDirectory / "ShimMaterial.slang", "spirv");
-    if (!runner.CheckEqual(modern.Result, CookError::Success, "the spirv-modern cook succeeds"))
+    if (!runner.CheckEqual(modern.Result, CookError::Success, "the spirv-modern-mutable cook succeeds"))
     {
         PrintErrors(modern);
     }
@@ -125,7 +125,7 @@ int main(int argc, char** argv)
         modernBundle.has_value() ? modernBundle->OpenEnvironment(0u, 0u) : std::unexpected(modernBundle.error());
     const manifest::ManifestResult<manifest::EnvironmentView> boundEnvironment =
         boundBundle.has_value() ? boundBundle->OpenEnvironment(0u, 0u) : std::unexpected(boundBundle.error());
-    if (!runner.CheckOk(modernEnvironment, "the spirv-modern environment opens, with every stored value checked") ||
+    if (!runner.CheckOk(modernEnvironment, "the spirv-modern-mutable environment opens, with every stored value checked") ||
         !runner.CheckOk(boundEnvironment, "the spirv environment opens"))
     {
         return runner.Report();
@@ -133,6 +133,9 @@ int main(int argc, char** argv)
 
     runner.BeginSection("the profile records the form of each class");
     const PlacementForms forms = modernBundle->Profiles()[0].Forms;
+    runner.CheckEqual(modernBundle->Profiles()[0].HeapLowering, manifest::DescriptorHeapLowering::MutableDescriptor,
+                      "spirv-modern-mutable records the mutable descriptor lowering");
+    runner.CheckEqual(modernBundle->Profiles()[0].DescriptorHeapSet, 3u, "the heap is in set 3");
     runner.CheckEqual(forms.Buffer, PlacementKind::Pointer, "buffers are Pointer");
     runner.Check(forms.Texture == PlacementKind::Handle && forms.Sampler == PlacementKind::Handle &&
                      forms.StorageTexture == PlacementKind::Handle,
@@ -211,8 +214,8 @@ int main(int argc, char** argv)
     }
 
     runner.BeginSection("a storage handle takes the format of each variant");
-    const CookOutcome storage = Cook(assetDirectory / "ShimStorageAxis.slang", "spirv-modern");
-    if (!runner.CheckEqual(storage.Result, CookError::Success, "the format axis module cooks for spirv-modern"))
+    const CookOutcome storage = Cook(assetDirectory / "ShimStorageAxis.slang", "spirv-modern-mutable");
+    if (!runner.CheckEqual(storage.Result, CookError::Success, "the format axis module cooks for spirv-modern-mutable"))
     {
         PrintErrors(storage);
     }
@@ -243,8 +246,8 @@ int main(int argc, char** argv)
     }
 
     runner.BeginSection("a pipeline merges each stored value once, apart from the uniform buffer that stores it");
-    const CookOutcome stages = Cook(assetDirectory / "ShimStages.slang", "spirv-modern");
-    if (!runner.CheckEqual(stages.Result, CookError::Success, "the vertex and fragment module cooks for spirv-modern"))
+    const CookOutcome stages = Cook(assetDirectory / "ShimStages.slang", "spirv-modern-mutable");
+    if (!runner.CheckEqual(stages.Result, CookError::Success, "the vertex and fragment module cooks for spirv-modern-mutable"))
     {
         PrintErrors(stages);
     }
@@ -277,8 +280,8 @@ int main(int argc, char** argv)
     }
 
     runner.BeginSection("a global shim is stored in the uniform buffer of global data, named as the code names it");
-    const CookOutcome global = Cook(assetDirectory / "ShimGlobal.slang", "spirv-modern");
-    if (!runner.CheckEqual(global.Result, CookError::Success, "the global shim module cooks for spirv-modern"))
+    const CookOutcome global = Cook(assetDirectory / "ShimGlobal.slang", "spirv-modern-mutable");
+    if (!runner.CheckEqual(global.Result, CookError::Success, "the global shim module cooks for spirv-modern-mutable"))
     {
         PrintErrors(global);
     }
@@ -309,7 +312,7 @@ int main(int argc, char** argv)
     }
 
     runner.BeginSection("a shim in a ConstantBuffer cooks on every profile, as a buffer or as a stored pointer");
-    for (const std::string_view target : { "spirv", "wgsl", "spirv-modern" })
+    for (const std::string_view target : { "spirv", "wgsl", "spirv-modern-mutable" })
     {
         const CookOutcome constantBuffer = Cook(assetDirectory / "ShimConstantBuffer.slang", target);
         if (!runner.CheckEqual(constantBuffer.Result, CookError::Success, std::format("the module cooks for {}", target)))
@@ -337,7 +340,7 @@ int main(int argc, char** argv)
                             : 0u;
         }
 
-        const bool modern = target == "spirv-modern";
+        const bool modern = target == "spirv-modern-mutable";
         runner.CheckEqual(uniformBuffers, 1u, std::format("{}: the constant buffer is one uniform buffer", target));
         runner.CheckEqual(boundStorage, modern ? 1u : 2u,
                           std::format("{}: the output, and the shim as a bound storage buffer unless it is a pointer", target));
@@ -345,7 +348,7 @@ int main(int argc, char** argv)
     }
 
     runner.BeginSection("a padded shim element has the same 64-byte stride on every profile");
-    for (const std::string_view target : { "wgsl", "spirv", "spirv-modern" })
+    for (const std::string_view target : { "wgsl", "spirv", "spirv-modern-mutable" })
     {
         const CookOutcome padded = Cook(assetDirectory / "ShimPadded.slang", target);
         if (!runner.CheckEqual(padded.Result, CookError::Success, std::format("the module cooks for {}", target)))
@@ -366,16 +369,16 @@ int main(int argc, char** argv)
         {
             runner.CheckEqual(vertices->ElementStride(), 64u, std::format("{}: the element stride is 64", target));
             runner.CheckEqual(vertices->Placement(),
-                              target == "spirv-modern" ? PlacementKind::Pointer : PlacementKind::Bound,
+                              target == "spirv-modern-mutable" ? PlacementKind::Pointer : PlacementKind::Bound,
                               std::format("{}: the form of the profile", target));
         }
     }
 
-    runner.BeginSection("wgsl and spirv-modern cook together");
+    runner.BeginSection("wgsl and spirv-modern-mutable cook together");
     {
         CookerOptions options;
         options.ModulePaths.push_back(assetDirectory / "ShimMaterial.slang");
-        options.TargetNames = { "wgsl", "spirv-modern" };
+        options.TargetNames = { "wgsl", "spirv-modern-mutable" };
         options.OutputPath = "ShimPlacementTogether";
         MemoryOutputSink sink;
         RecordingDiagnosticSink diagnostics;
@@ -383,6 +386,98 @@ int main(int argc, char** argv)
         if (!runner.CheckOk(together, "the cross-profile checks accept a Bound profile beside a Handle profile"))
         {
             PrintErrors(CookOutcome{ .Records = std::move(diagnostics.Records()) });
+        }
+    }
+
+    runner.BeginSection("every shim asset cooks for spirv-modern-typed, with the same forms and the per-descriptor-type heap");
+    for (const std::string_view asset : { "ShimMaterial", "ShimStorageAxis", "ShimStages", "ShimGlobal", "ShimConstantBuffer", "ShimPadded" })
+    {
+        const CookOutcome typed = Cook(assetDirectory / std::format("{}.slang", asset), "spirv-modern-typed");
+        if (!runner.CheckEqual(typed.Result, CookError::Success, std::format("{} cooks for spirv-modern-typed", asset)))
+        {
+            PrintErrors(typed);
+            continue;
+        }
+
+        const manifest::ManifestResult<manifest::BundleView> typedBundle = manifest::BundleView::Open(typed.Bytes);
+        if (!runner.CheckOk(typedBundle, std::format("{}: the typed bundle opens", asset)))
+        {
+            continue;
+        }
+
+        const manifest::Profile typedProfile = typedBundle->Profiles()[0];
+        runner.CheckEqual(typedProfile.HeapLowering, manifest::DescriptorHeapLowering::PerDescriptorType,
+                          std::format("{}: the profile records the per-descriptor-type lowering", asset));
+        runner.CheckEqual(typedProfile.DescriptorHeapSet, 3u, std::format("{}: the heap is in set 3", asset));
+        runner.CheckEqual(typedProfile.Forms.Buffer, PlacementKind::Pointer, std::format("{}: buffers are Pointer", asset));
+        runner.CheckEqual(typedProfile.Forms.Texture, PlacementKind::Handle, std::format("{}: textures are Handle", asset));
+    }
+
+    runner.BeginSection("the material gives the same stored values and pair under both lowerings");
+    {
+        const CookOutcome typedMaterial = Cook(assetDirectory / "ShimMaterial.slang", "spirv-modern-typed");
+        const manifest::ManifestResult<manifest::BundleView> typedBundle = manifest::BundleView::Open(typedMaterial.Bytes);
+        const manifest::ManifestResult<manifest::EnvironmentView> typedEnvironment =
+            typedBundle.has_value() ? typedBundle->OpenEnvironment(0u, 0u) : std::unexpected(typedBundle.error());
+        if (runner.CheckOk(typedEnvironment, "the typed environment opens, with every stored value checked"))
+        {
+            for (const ExpectedValue& expected : k_Expected)
+            {
+                const manifest::ManifestResult<uint32_t> entry = typedBundle->Module(0u).FindEntryPointIndex(expected.EntryPoint);
+                const manifest::ManifestResult<uint32_t> modernEntry = modernBundle->Module(0u).FindEntryPointIndex(expected.EntryPoint);
+                if (!runner.CheckOk(entry, "the entry point exists") || !runner.CheckOk(modernEntry, "the entry point exists"))
+                {
+                    continue;
+                }
+
+                const std::optional<manifest::ResolvedResource> typedValue =
+                    FindResource(typedEnvironment->VariantAt(0u).EntryPoint(*entry).Layout(), expected.Scope, expected.Name);
+                const std::optional<manifest::ResolvedResource> mutableValue =
+                    FindResource(modernEnvironment->VariantAt(0u).EntryPoint(*modernEntry).Layout(), expected.Scope, expected.Name);
+                if (runner.Check(typedValue.has_value() && mutableValue.has_value(), std::format("{}.{} is in both layouts", expected.Scope, expected.Name)))
+                {
+                    runner.CheckEqual(typedValue->Placement(), mutableValue->Placement(), "the same form");
+                    runner.CheckEqual(typedValue->ValueOffset(), mutableValue->ValueOffset(), "the same byte offset");
+                    runner.CheckEqual(typedValue->ValueContainer(), mutableValue->ValueContainer(), "the same container");
+                }
+            }
+
+            const manifest::ManifestResult<uint32_t> blockEntry = typedBundle->Module(0u).FindEntryPointIndex("BlockCS");
+            if (runner.CheckOk(blockEntry, "BlockCS exists"))
+            {
+                runner.CheckEqual(typedEnvironment->VariantAt(0u).EntryPoint(*blockEntry).SamplerTexturePairs().size(), 1u,
+                                  "the pair of the texture and the sampler handle is traced under the typed lowering");
+            }
+        }
+    }
+
+    runner.BeginSection("both modern profiles cook together, and the manifest keeps the lowering of each");
+    {
+        CookerOptions options;
+        options.ModulePaths.push_back(assetDirectory / "ShimMaterial.slang");
+        options.TargetNames = { "spirv-modern-mutable", "spirv-modern-typed" };
+        options.OutputPath = "ShimPlacementModern";
+        MemoryOutputSink sink;
+        RecordingDiagnosticSink diagnostics;
+        const CookResult<CookStatistics> together = RunCook(options, sink, diagnostics);
+        if (!runner.CheckOk(together, "the cross-profile checks accept the two lowerings"))
+        {
+            PrintErrors(CookOutcome{ .Records = std::move(diagnostics.Records()) });
+        }
+
+        const auto manifestFile = sink.GetArtifacts().find(std::string{ k_ManifestFileName });
+        if (runner.Check(manifestFile != sink.GetArtifacts().end(), "the cook wrote a manifest"))
+        {
+            std::vector<std::byte> bytes(manifestFile->second.size());
+            std::memcpy(bytes.data(), manifestFile->second.data(), bytes.size());
+            const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(bytes);
+            if (runner.CheckOk(bundle, "the bundle opens") && runner.CheckEqual(bundle->Profiles().size(), 2u, "two profiles"))
+            {
+                runner.CheckEqual(bundle->Profiles()[0].HeapLowering, manifest::DescriptorHeapLowering::MutableDescriptor,
+                                  "the first profile is mutable");
+                runner.CheckEqual(bundle->Profiles()[1].HeapLowering, manifest::DescriptorHeapLowering::PerDescriptorType,
+                                  "the second profile is typed");
+            }
         }
     }
 

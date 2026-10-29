@@ -344,7 +344,7 @@ namespace
             }
 
             const bool noHeap = profile.HeapLowering == DescriptorHeapLowering::None;
-            if (profile.HeapLowering > DescriptorHeapLowering::MutableDescriptor || (noHeap && profile.DescriptorHeapSet != 0u))
+            if (profile.HeapLowering > DescriptorHeapLowering::PerDescriptorType || (noHeap && profile.DescriptorHeapSet != 0u))
             {
                 return { .Code = ErrorCode::InvalidProfileDescriptorHeap,
                          .Table = ShaderManifestTable::Profiles,

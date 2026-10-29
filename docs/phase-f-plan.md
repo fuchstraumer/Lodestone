@@ -52,7 +52,8 @@ Profile table, one form for each class:
 |---|---|---|---|---|
 | `wgsl` | WGSL | Bound | Bound | Bound |
 | `spirv` | SPIR-V | Bound | Bound | Bound |
-| `spirv-modern` | SPIR-V | Pointer | Handle (mutable) | Handle (mutable) |
+| `spirv-modern-mutable` | SPIR-V | Pointer | Handle (mutable) | Handle (mutable) |
+| `spirv-modern-typed` | SPIR-V | Pointer | Handle (one binding per descriptor type) | Handle (one binding per descriptor type) |
 
 The rows above are the first set, not the final set. The Pointer impl takes the access of its row:
 `IReadBuffer` gives `Ptr<T, Access.Read>`, so the Pointer form cannot widen the access that the Bound
@@ -199,7 +200,10 @@ Measured on 2026-10-21, DiamondDogs OceanFft, `spirv`, 62 unique modules:
   language limit, so it is Slang's to reject.
 - KsVolume `float g_tile[64]` is 256 bytes on both targets.
 
-### F4 — `spirv-modern`: Pointer buffers and Handle textures
+### F4 — `spirv-modern-mutable` and `spirv-modern-typed`: Pointer buffers and Handle textures
+
+Note 2026-10-29: the profile `spirv-modern` is now `spirv-modern-mutable`, and F4.6 added `spirv-modern-typed`. The steps and progress
+entries below keep the old name where they were written before the rename.
 
 | Step | Work | Proof |
 |---|---|---|
@@ -210,6 +214,43 @@ Measured on 2026-10-21, DiamondDogs OceanFft, `spirv`, 62 unique modules:
 | F4.5 | Record the offset table for each profile. Vocabulary §5 asks for this. A wrapper takes 16 bytes in a uniform buffer and 8 in push constants. | The offsets in the manifest equal the offsets in the SPIR-V `Offset` decorations. |
 | F4.6 | A second Handle profile on the per-descriptor-type lowering: `BindlessDescriptorOptions.None`, one binding for each descriptor type, through a `getDescriptorFromHandle` override in a link module. No mutable descriptors. | A cook of the F2.6 asset for both Handle profiles, with the heap bindings that each lowering states. |
 | F4.7 | **Proposed 2026-10-27, author's request.** A sixth shim interface for atomic buffers: Bound `RWStructuredBuffer<Atomic<T>>`, Pointer `Ptr<Atomic<T>>`. See the note below. | Cook one asset for `wgsl`, `spirv`, and `spirv-modern`. Each gives one atomic add on the buffer, and the cross-check agrees. |
+
+#### F4.6 — the per-descriptor-type heap lowering (plan, 2026-10-29)
+
+**Measured** (spike, scratchpad `f46/`, isolated `slangc`; I checked the table and the `None` output):
+
+- Slang selects the lowering with a `constexpr BindlessDescriptorOptions` argument of `defaultGetDescriptorFromHandle`
+  (`hlsl.meta.slang:29520`, default `VkMutable`). A program overrides `export T getDescriptorFromHandle<T : IOpaqueDescriptor>(
+  DescriptorHandle<T>)` (extern at `:29564`) and passes `BindlessDescriptorOptions.None`. Slang's own test does this
+  (`tests/language-feature/descriptor-handle/desc-handle-default.slang`).
+- `None` uses `DefaultVkBindlessBindings` (`:29313`): sampler 0, combined image sampler 1, sampled image 2, storage image 3,
+  uniform texel buffer 4, storage texel buffer 5, uniform buffer 6, storage buffer 7 (read and read-write), other 8.
+  The only shared binding is the two storage buffer views, which are one descriptor type. So no mutable descriptor is needed.
+- The override works from a **separate precompiled module**, linked as the shim link modules are. The heap set still comes from
+  `-bindless-space-index`, and reflection reports it.
+- No new SPIR-V capability or extension against `VkMutable`. WGSL output is byte-identical with or without the override.
+- A custom table (our own heap arrays) also works, but reflection then lists the heaps as ordinary globals and Slang still
+  reserves the bindless set, so the heaps must sit in another set.
+
+**Proposed steps:**
+
+| Step | Work | Proof |
+|---|---|---|
+| F4.6a | A builtin link module that exports the override with `BindlessDescriptorOptions.None`, and a `HeapLowering` value in `TargetProfile` that selects it. `LinkVariant` adds the module for that lowering only. | The `spirv-modern` cooks do not change (known-good and `ShimPlacementTest`). |
+| F4.6b | A new profile row: the `spirv-modern` forms, heap set 3, the per-type lowering. | `ShimMaterial.slang` cooks for both Handle profiles. |
+| F4.6c | `SpvValidator` takes the binding table of the profile's lowering, not the `k_MutableHeap*` constants. Under the per-type lowering, two heap variables of different descriptor types at one binding fail (`DescriptorHeap`). | `SpvValidatorTest` rows for each lowering. |
+| F4.6d | The manifest records the new `HeapLowering` case, and the client header gives the binding of each descriptor type for each lowering. | The manifest round trip, `ShaderManifestRejectTest` for an unknown lowering. |
+
+**Decided 2026-10-29, author:** (1) `spirv-modern` is `spirv-modern-mutable`, with no alias, and the new profile is `spirv-modern-typed`.
+(2) Slang's own `None` table, stated once as `k_TypedHeap*Binding`, with `HeapBindingTableTest` as the proof. (3) Format version 19.
+
+**Decisions for the author (answered above):**
+
+1. The profile name. I propose `spirv-modern-typed`. Rename `spirv-modern` to `spirv-modern-mutable` at the same time, or keep it?
+2. Slang's own `None` table, or a compact table of our own (for example 0 to 3)? I recommend Slang's table: no table of ours
+   can drift from Slang, and a renderer allocates nine small bindings once. Our own table needs the heaps in another set.
+3. A new manifest format version (19) for the new `HeapLowering` value? A version-18 reader rejects an unknown value, so a
+   bump states the change. I recommend the bump.
 
 #### F4.7 — an atomic buffer shim (a note for the phase F agent)
 
@@ -272,6 +313,9 @@ public struct PointerAtomicBuffer<T : IArithmeticAtomicable> : IAtomicBuffer<T>
 }
 ```
 
+**Decided 2026-10-29, author:** F4.6 comes before F4.7. Question 3 below: `int` and `uint` only. Float atomics are
+deferred until a use appears, and they extend the shim through the F3 capability recording.
+
 **Questions we did not answer:**
 
 1. The element stride and the access of `Ptr<Atomic<T>>`. `ShimPointerAccessMismatch` and the pointee stride read the
@@ -288,6 +332,10 @@ public struct PointerAtomicBuffer<T : IArithmeticAtomicable> : IAtomicBuffer<T>
 Thank you. The probes are gone with the audit session's scratchpad, but each one is the three lines in the table above.
 
 ### F5 — Binding-time lowering
+
+**Deferred 2026-10-29, author's decision.** No consumer needs it yet. DiamondDogs uses shader objects, where a
+specialization constant binds at `vkCreateShadersEXT` (`VkShaderCreateInfoEXT::pSpecializationInfo`), so F5 would cut cooked
+variants but give no runtime gain. Schedule it when a use case appears, as F4.7 did.
 
 | Step | Work | Proof |
 |---|---|---|
@@ -924,3 +972,15 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
 - 2026-10-27. F4.7 proposed by the audit session at the author's request, not built: an atomic buffer shim. The measurements
   and the open questions are in the F4.7 note under section 3. Also in this session: an unknown `ls_axis_kind` now fails
   with `AxisKindUnknown` (145) and suggests the nearest kind.
+- 2026-10-29. **F4.6 done, not committed.** 51 of 51 tests, 60 of 60 known-good dumps (no dump changed). Details:
+  - `spirv-modern` is renamed `spirv-modern-mutable` everywhere (output unchanged), and `spirv-modern-typed` is new. The old name is an
+    unknown target. `TargetProfile::HeapLowering` replaces the old rule that a heap set means the mutable lowering.
+  - `builtins/LodestoneHeapTyped.slang` exports `getDescriptorFromHandle` with `BindlessDescriptorOptions.None`. Each worker session
+    loads it by name through the embedded file system (`SlangModuleContext::LoadHeapLoweringModule`, from `ThreadPool::prepareContext`)
+    and `LinkVariant` adds it to the composite, only for the per-descriptor-type lowering.
+  - `SpvValidator` takes the lowering. Under the typed lowering each heap binding allows one kind, so a sampled image array and a
+    storage image array at one binding fail (`DescriptorHeap`), and the two storage buffer views at binding 7 pass.
+    `TraceHeapHandle` and `CompareStoredValues` needed no change: they work from variables, not from binding numbers.
+  - Format 19 adds `DescriptorHeapLowering::PerDescriptorType` and the `k_TypedHeap*Binding` constants. `HeapBindingTableTest`
+    compiles a probe with a handle of every descriptor type and compares the emitted bindings with both constant sets.
+  - `ShimPlacementTest` cooks every shim asset for the typed profile, and both modern profiles cook together.
