@@ -183,7 +183,7 @@ A shim resource is a resource that the **target profile** lowers. You write the 
 target, the shim is an ordinary binding. On another target, the shim is a buffer device address or a
 descriptor heap index. You do not change the shader.
 
-#### The five shim interfaces
+#### The six shim interfaces
 
 These are all of the shim interfaces. There are no others.
 
@@ -191,6 +191,7 @@ These are all of the shim interfaces. There are no others.
 |---|---|---|---|
 | `IReadBuffer<T>` | A read-only structured buffer. | `T Load(uint index)` | Yes: the element type. |
 | `IReadWriteBuffer<T>` | A read-write structured buffer. | `T Load(uint index)`, `void Store(uint index, T value)` | Yes: the element type. |
+| `IAtomicBuffer<T>` | A read-write structured buffer of atomic integers. | `Load`, `Store`, `Add`, `Sub`, `Min`, `Max`, `And`, `Or`, `Xor`, `Increment`, `Decrement`, `Exchange`, `CompareExchange` | Yes: `int` or `uint` only. |
 | `ITexture2DRef` | A `Texture2D<float4>`. | `Texture2D<float4> Get()` | No. |
 | `ISamplerRef` | A `SamplerState`. | `SamplerState Get()` | No. |
 | `IWriteStorageTexture2D` | A write-only 2D storage texture. | `void Store(uint2 coordinate, float4 value)` | No. The format comes from an axis. |
@@ -240,6 +241,43 @@ Obey these rules. The cook fails if you do not.
 - Do not make an array of shims, if you cook for a `spirv-modern` profile.
 - Do not put a shim inside the element of a storage buffer, if you cook for a `spirv-modern` profile.
 - A shim is not an axis. Do not put an `ls_axis_*` attribute on it.
+
+#### Atomic buffer shims
+
+`IAtomicBuffer<T>` is a read-write buffer where every element is an atomic. Declare it like any other shim:
+
+```slang
+extern struct Counters : IAtomicBuffer<uint>;
+
+ParameterBlock<Counters> counters;
+
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void CountCS(uint3 id : SV_DispatchThreadID)
+{
+    const uint ticket = counters.Add(0u, 1u);
+}
+```
+
+- `T` must be `int` or `uint`. Any other type, `float` and `int64_t` included, fails the cook with a Slang conformance error
+  (E38029, `ModuleLoadFailed`). Float atomics need a device feature on Vulkan and do not exist in core WebGPU.
+- Every read-modify-write method returns the old value, as `Atomic<T>` does. `CompareExchange(index, compare_value, value)`
+  also returns the old value. `Increment(index)` and `Decrement(index)` take no value.
+- The methods take no memory order. They use Slang's default, `Relaxed`.
+- The wgsl and spirv profiles bind a `RWStructuredBuffer<Atomic<T>>`. The `spirv-modern` profiles store a buffer device
+  address. Both have an element stride of 4 bytes.
+
+`AtomicAddWaveAggregated(buffer, index, value)` is a free function in `LodestoneShims`. It does one `Add` for each wave
+and returns, for each lane, what an ordinary `Add` returns. It takes any `IAtomicBuffer<uint>`:
+
+```slang
+const uint slot = AtomicAddWaveAggregated(counters, 0u, 1u);
+```
+
+- The function needs the subgroup capabilities (`GroupNonUniform*` in SPIR-V, `enable subgroups;` in WGSL). The manifest
+  records them for each entry point that calls it, and for no other entry point.
+- Give the same `index` on every lane that calls it. The first active lane adds the whole wave's total at its own `index`.
+  A branch around the call is safe: the wave operations count only the lanes that call it.
 
 #### Storage texture shims
 

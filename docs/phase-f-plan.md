@@ -331,6 +331,51 @@ deferred until a use appears, and they extend the shim through the F3 capability
 
 Thank you. The probes are gone with the audit session's scratchpad, but each one is the three lines in the table above.
 
+#### F4.7 — plan (2026-10-29)
+
+**Measured** (spike, scratchpad `f47/`; I checked the interface hierarchy in `core.meta.slang:4149-4166`):
+
+- Answers to the note's questions 1 and 2:
+  - `Ptr<Atomic<uint>, Access.ReadWrite, AddressSpace.Device, Std430DataLayout>` compiles, `ArrayStride 4`, `OpAtomicIAdd` with
+    Device scope, and `spirv-val` passes. `Access.Read` with an add fails in Slang (E30050), so the access check stays correct.
+  - `RWStructuredBuffer<Atomic<uint>>` gives `array<atomic<u32>>` in WGSL and a plain runtime array of `uint` in SPIR-V.
+    Reflection erases the wrapper: a read-write structured buffer of `uint32`, size 4. So the shim table row states the
+    resource, as it does for the other shims, and the V1 layout calculator reads the element as a scalar (stride 4).
+- A plain `RWStructuredBuffer<Atomic<uint>>` already cooks for all four profiles.
+- A candidate `IAtomicBuffer<T>` (Load, Store, Add, Min, Max, Exchange, CompareExchange) with Bound and Pointer impls,
+  linked through an extern, compiles for WGSL (Bound) and SPIR-V (both), and `spirv-val` passes. SPIR-V picks the
+  unsigned ops (`UMin`) for `uint`. The Pointer form gives invalid WGSL (section 5 issue 4), so it stays off WGSL, as the
+  forms table already says.
+- `T` restricted to `int` and `uint`: `IBitAtomicable` excludes `float` and `half`, but admits 64-bit and 8/16-bit integers,
+  and Slang's atomic interfaces are `[sealed]`, so no interface can derive from them. A marker interface works:
+  `interface IShimAtomicScalar {}`, `extension int : IShimAtomicScalar`, `extension uint : IShimAtomicScalar`, and
+  `struct BoundAtomicBuffer<T : IShimAtomicScalar> where T : IBitAtomicable`. It rejects `float` and `int64_t` with a plain
+  conformance error.
+- A wave-aggregated add (`WaveActiveSum`, `WavePrefixSum`, `WaveIsFirstLane`, `WaveReadLaneFirst`) compiles over
+  `IAtomicBuffer<uint>` for both languages. SPIR-V adds the `GroupNonUniform*` capabilities, and WGSL adds `enable
+  subgroups;`, which the F3 capability recording already reads.
+
+**Proposed steps:**
+
+| Step | Work | Proof |
+|---|---|---|
+| F4.7a | `IAtomicBuffer<T>`, `BoundAtomicBuffer<T>`, `PointerAtomicBuffer<T>` (std430, `[ls_shim_value]`), and the marker interface, in `LodestoneShims.slang`. A shim table row: the class Buffer, a read-write storage buffer. | One asset cooks for `wgsl`, `spirv`, and both `spirv-modern-*` profiles, every cross-check agrees, and the stride is 4. |
+| F4.7b | Reject rows: `IAtomicBuffer<float>` and `IAtomicBuffer<int64_t>` fail at the shim's constraint. | `AccessModelRejectTest`. |
+| F4.7c | The wave-aggregated add as a free function beside the shim. | A cook records the subgroup capability names for the variant that calls it, and none for one that does not. |
+| F4.7d | `USAGE.md`, CLAUDE.md, and `tests/README.md`. | Review. |
+
+**Decisions for the author:**
+
+1. **The operation set.** The spike's set is Load, Store, Add, Min, Max, Exchange, CompareExchange. `IBitAtomicable` also gives
+   Sub, And, Or, Xor, Increment, and Decrement at no cost. I recommend all of them: a counter wants Increment, and a flag
+   set wants Or.
+2. **Memory order.** Every `Atomic<T>` method takes a `MemoryOrder`, with `Relaxed` as Slang's default. I recommend that the
+   shim methods take no order, and use Slang's default: a counter needs `Relaxed`, and a method that took an order would
+   need one more parameter at every call site. Add ordered methods when a use appears.
+3. **The wave helper.** A free function `AtomicAddWaveAggregated` in `LodestoneShims.slang`, or a separate builtin module
+   (`LodestoneWave`)? I recommend the shims module: it is a function of the shim's interface, and it costs nothing unless
+   called.
+
 ### F5 — Binding-time lowering
 
 **Deferred 2026-10-29, author's decision.** No consumer needs it yet. DiamondDogs uses shader objects, where a
@@ -984,3 +1029,12 @@ notes), F3.4d (the layout limits: bindings of each kind per stage, and bind grou
   - Format 19 adds `DescriptorHeapLowering::PerDescriptorType` and the `k_TypedHeap*Binding` constants. `HeapBindingTableTest`
     compiles a probe with a handle of every descriptor type and compares the emitted bindings with both constant sets.
   - `ShimPlacementTest` cooks every shim asset for the typed profile, and both modern profiles cook together.
+- 2026-10-29. **F4.7 done, not committed.** Details:
+  - `IAtomicBuffer<T>`, `BoundAtomicBuffer<T>`, `PointerAtomicBuffer<T>`, and `IShimAtomicScalar` are in `LodestoneShims.slang`, with the
+    thirteen methods of decision 1 and no memory order. The shim table has a sixth row: the class Buffer, a read-write storage buffer.
+  - `ShimAtomic.slang` cooks on `wgsl`, `spirv`, and both `spirv-modern-*` profiles with every cross-check in agreement and a stride of 4.
+    No change to the layout calculator, `PointerAccessOf`, or `SpvValidator` was needed.
+  - Rejects: `IAtomicBuffer<float>` and `IAtomicBuffer<int64_t>` fail with `ModuleLoadFailed` (Slang E38029).
+  - `AtomicAddWaveAggregated` is a free function in the shims module. `ShimAtomicWave.slang` shows that only the entry point that calls it
+    records the subgroup capabilities.
+  - `ShimTableTest` uses `uint` as the type argument of the atomic row.

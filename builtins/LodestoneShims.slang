@@ -50,6 +50,60 @@ public interface IReadWriteBuffer<T>
     void Store(uint index, T value);
 }
 
+// Marks the scalar types that an atomic buffer accepts: int and uint. IBitAtomicable also admits 64-bit and 8-bit and 16-bit
+// integers, which WebGPU lacks, and IArithmeticAtomicable admits float and half, which need a device feature. Slang seals both
+// interfaces, so a marker interface is the way to narrow them.
+public interface IShimAtomicScalar
+{
+}
+
+extension int : IShimAtomicScalar
+{
+}
+
+extension uint : IShimAtomicScalar
+{
+}
+
+// An atomic buffer. Every read-modify-write method returns the old value, as Atomic<T> does. The methods use Slang's default
+// memory order, Relaxed.
+public interface IAtomicBuffer<T : IShimAtomicScalar>
+{
+    T Load(uint index);
+    void Store(uint index, T value);
+    T Add(uint index, T value);
+    T Sub(uint index, T value);
+    T Min(uint index, T value);
+    T Max(uint index, T value);
+    T And(uint index, T value);
+    T Or(uint index, T value);
+    T Xor(uint index, T value);
+    T Increment(uint index);
+    T Decrement(uint index);
+    T Exchange(uint index, T value);
+    T CompareExchange(uint index, T compare_value, T value);
+}
+
+// Adds a value for each lane with one atomic for each wave, and returns what Add returns for that lane. The prefix sum
+// gives each lane its offset into the wave's share. `index` must be the same on every lane that calls it, because the first
+// active lane adds the wave's total there. This needs the subgroup capabilities, and only an entry point that calls it
+// records them.
+public uint AtomicAddWaveAggregated<B : IAtomicBuffer<uint>>(B buffer, uint index, uint value)
+{
+    uint waveTotal = WaveActiveSum(value);
+    uint laneOffset = WavePrefixSum(value);
+    uint firstLaneOld = 0u;
+
+    if (WaveIsFirstLane())
+    {
+        firstLaneOld = buffer.Add(index, waveTotal);
+    }
+
+    uint waveBase = WaveReadLaneFirst(firstLaneOld);
+
+    return waveBase + laneOffset;
+}
+
 public interface ITexture2DRef
 {
     Texture2D<float4> Get();
@@ -113,6 +167,90 @@ public struct BoundReadWriteBuffer<T> : IReadWriteBuffer<T>
     public void Store(uint index, T value)
     {
         data[index] = value;
+    }
+}
+
+public struct BoundAtomicBuffer<T : IShimAtomicScalar> : IAtomicBuffer<T>
+    where T : IBitAtomicable
+{
+    RWStructuredBuffer<Atomic<T>> data;
+
+    [ForceInline]
+    public T Load(uint index)
+    {
+        return data[index].load();
+    }
+
+    [ForceInline]
+    public void Store(uint index, T value)
+    {
+        data[index].store(value);
+    }
+
+    [ForceInline]
+    public T Add(uint index, T value)
+    {
+        return data[index].add(value);
+    }
+
+    [ForceInline]
+    public T Sub(uint index, T value)
+    {
+        return data[index].sub(value);
+    }
+
+    [ForceInline]
+    public T Min(uint index, T value)
+    {
+        return data[index].min(value);
+    }
+
+    [ForceInline]
+    public T Max(uint index, T value)
+    {
+        return data[index].max(value);
+    }
+
+    [ForceInline]
+    public T And(uint index, T value)
+    {
+        return data[index].and(value);
+    }
+
+    [ForceInline]
+    public T Or(uint index, T value)
+    {
+        return data[index].or(value);
+    }
+
+    [ForceInline]
+    public T Xor(uint index, T value)
+    {
+        return data[index].xor(value);
+    }
+
+    [ForceInline]
+    public T Increment(uint index)
+    {
+        return data[index].increment();
+    }
+
+    [ForceInline]
+    public T Decrement(uint index)
+    {
+        return data[index].decrement();
+    }
+
+    [ForceInline]
+    public T Exchange(uint index, T value)
+    {
+        return data[index].exchange(value);
+    }
+
+    [ForceInline]
+    public T CompareExchange(uint index, T compare_value, T value)
+    {
+        return data[index].compareExchange(compare_value, value);
     }
 }
 
@@ -181,6 +319,93 @@ public struct PointerReadWriteBuffer<T> : IReadWriteBuffer<T>
     public void Store(uint index, T value)
     {
         data[index] = value;
+    }
+}
+
+// The pointee is Atomic<T>, so a write access is the only one that Slang accepts. The WGSL profile never uses this form:
+// Slang emits invalid WGSL for a pointer to an atomic.
+public struct PointerAtomicBuffer<T : IShimAtomicScalar> : IAtomicBuffer<T>
+    where T : IBitAtomicable
+{
+    [ls_shim_value]
+    Ptr<Atomic<T>, Access.ReadWrite, AddressSpace.Device, Std430DataLayout> data;
+
+    [ForceInline]
+    public T Load(uint index)
+    {
+        return data[index].load();
+    }
+
+    [ForceInline]
+    public void Store(uint index, T value)
+    {
+        data[index].store(value);
+    }
+
+    [ForceInline]
+    public T Add(uint index, T value)
+    {
+        return data[index].add(value);
+    }
+
+    [ForceInline]
+    public T Sub(uint index, T value)
+    {
+        return data[index].sub(value);
+    }
+
+    [ForceInline]
+    public T Min(uint index, T value)
+    {
+        return data[index].min(value);
+    }
+
+    [ForceInline]
+    public T Max(uint index, T value)
+    {
+        return data[index].max(value);
+    }
+
+    [ForceInline]
+    public T And(uint index, T value)
+    {
+        return data[index].and(value);
+    }
+
+    [ForceInline]
+    public T Or(uint index, T value)
+    {
+        return data[index].or(value);
+    }
+
+    [ForceInline]
+    public T Xor(uint index, T value)
+    {
+        return data[index].xor(value);
+    }
+
+    [ForceInline]
+    public T Increment(uint index)
+    {
+        return data[index].increment();
+    }
+
+    [ForceInline]
+    public T Decrement(uint index)
+    {
+        return data[index].decrement();
+    }
+
+    [ForceInline]
+    public T Exchange(uint index, T value)
+    {
+        return data[index].exchange(value);
+    }
+
+    [ForceInline]
+    public T CompareExchange(uint index, T compare_value, T value)
+    {
+        return data[index].compareExchange(compare_value, value);
     }
 }
 

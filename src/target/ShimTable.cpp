@@ -12,7 +12,7 @@ namespace lodestone
 namespace
 {
     // a buffer device address addresses buffers only, so textures have no Pointer form, and buffers use no Handle
-    constexpr std::array<ShimInterface, 5u> k_ShimInterfaces
+    constexpr std::array<ShimInterface, 6u> k_ShimInterfaces
     {
         ShimInterface
         { 
@@ -38,6 +38,22 @@ namespace
             .Bound = "BoundReadWriteBuffer",
             .Handle = {},
             .Pointer = "PointerReadWriteBuffer",
+            .ImplementationTakesFormat = false,
+            .Resource = ShimResource
+            {
+                .Kind = BindingKind::StorageBuffer,
+                .Shape = ResourceShape::StructuredBuffer,
+                .Access = ResourceAccess::ReadWrite
+            },
+        },
+        ShimInterface
+        { 
+            .Name = "IAtomicBuffer",
+            .Class = ShimResourceClass::Buffer,
+            .TypeParameterCount = 1u,
+            .Bound = "BoundAtomicBuffer",
+            .Handle = {},
+            .Pointer = "PointerAtomicBuffer",
             .ImplementationTakesFormat = false,
             .Resource = ShimResource
             {

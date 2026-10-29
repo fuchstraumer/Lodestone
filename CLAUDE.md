@@ -201,7 +201,7 @@ argument, and a pointer its element stride from the pointee. The access in a `Pt
 layout (shader-slang/slang#13188), so the cooker computes the std430 stride itself (`model/BufferLayout`), and `SpvValidator` compares
 it with the `ArrayStride` of the pointer type in the code. A shim buffer element whose scalar layout differs from its std430 layout
 has implicit padding (a `float3` followed by a `float2`, for example). It fails the cook on every profile with
-`ShimElementImplicitPadding`, from `PrepareRawModule`, and the author adds the padding member. An array of Pointer or Handle shims, and one in a storage buffer element, fail with
+`ShimElementImplicitPadding`, from `PrepareRawModule`, and the author adds the padding member. `IAtomicBuffer<T>` is the buffer row with atomic elements: Bound `RWStructuredBuffer<Atomic<T>>`, Pointer `Ptr<Atomic<T>, Access.ReadWrite, ...>`, stride 4. `IShimAtomicScalar` (implemented by `int` and `uint` only) restricts `T`, because Slang seals `IBitAtomicable`. `AtomicAddWaveAggregated` is a free function in the same module, so only an entry point that calls it records the subgroup capabilities. An array of Pointer or Handle shims, and one in a storage buffer element, fail with
 `ShimStoredValueUnsupported`. A stored value is visible to an entry point when its container is: a used uniform buffer, or the
 entry point's own push constants. `ResolvedLibraryValidator::ValidateEntryPoint` gives a validator the bound bindings,
 sorted, and the stored values apart. `SpvValidator` compares the descriptor heap set with the mutable descriptor lowering

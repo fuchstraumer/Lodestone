@@ -85,6 +85,10 @@ std::optional<manifest::ResolvedResource> FindResource(const manifest::LayoutRan
     return std::nullopt;
 }
 
+bool InstanceNeedsCapabilityContaining(const manifest::EnvironmentView& environment,
+                                       const manifest::EntryPointInstanceView& instance,
+                                       std::string_view fragment);
+
 struct ExpectedValue
 {
     std::string_view EntryPoint;
@@ -481,5 +485,88 @@ int main(int argc, char** argv)
         }
     }
 
+    runner.BeginSection("an atomic buffer shim is a read-write storage buffer with a 4-byte stride on every profile");
+    for (const std::string_view target : { "wgsl", "spirv", "spirv-modern-mutable", "spirv-modern-typed" })
+    {
+        const CookOutcome atomic = Cook(assetDirectory / "ShimAtomic.slang", target);
+        if (!runner.CheckEqual(atomic.Result, CookError::Success, std::format("ShimAtomic cooks for {}", target)))
+        {
+            PrintErrors(atomic);
+            continue;
+        }
+
+        const manifest::ManifestResult<manifest::BundleView> atomicBundle = manifest::BundleView::Open(atomic.Bytes);
+        const manifest::ManifestResult<manifest::EnvironmentView> atomicEnvironment =
+            atomicBundle.has_value() ? atomicBundle->OpenEnvironment(0u, 0u) : std::unexpected(atomicBundle.error());
+        if (!runner.CheckOk(atomicEnvironment, std::format("the environment opens for {}", target)))
+        {
+            continue;
+        }
+
+        const std::optional<manifest::ResolvedResource> totals =
+            FindResource(atomicEnvironment->VariantAt(0u).EntryPoint(0u).Layout(), "params_Totals", "data");
+        if (runner.Check(totals.has_value(), std::format("{}: the atomic buffer is in the layout", target)))
+        {
+            const bool pointerForm = target.starts_with("spirv-modern");
+            runner.CheckEqual(totals->Kind(), BindingKind::StorageBuffer, std::format("{}: a storage buffer", target));
+            runner.CheckEqual(totals->Access(), ResourceAccess::ReadWrite, std::format("{}: read-write", target));
+            runner.CheckEqual(totals->ElementStride(), 4u, std::format("{}: the element stride is 4", target));
+            runner.CheckEqual(totals->Placement(), pointerForm ? PlacementKind::Pointer : PlacementKind::Bound,
+                              std::format("{}: the form of the profile", target));
+        }
+    }
+
+    runner.BeginSection("only the entry point that calls the wave-aggregated add records the subgroup capabilities");
+    for (const std::string_view target : { "wgsl", "spirv", "spirv-modern-mutable", "spirv-modern-typed" })
+    {
+        const CookOutcome wave = Cook(assetDirectory / "ShimAtomicWave.slang", target);
+        if (!runner.CheckEqual(wave.Result, CookError::Success, std::format("ShimAtomicWave cooks for {}", target)))
+        {
+            PrintErrors(wave);
+            continue;
+        }
+
+        const manifest::ManifestResult<manifest::BundleView> waveBundle = manifest::BundleView::Open(wave.Bytes);
+        const manifest::ManifestResult<manifest::EnvironmentView> waveEnvironment =
+            waveBundle.has_value() ? waveBundle->OpenEnvironment(0u, 0u) : std::unexpected(waveBundle.error());
+        if (!runner.CheckOk(waveEnvironment, std::format("the environment opens for {}", target)))
+        {
+            continue;
+        }
+
+        const manifest::ManifestResult<uint32_t> waveEntry = waveBundle->Module(0u).FindEntryPointIndex("WaveCS");
+        const manifest::ManifestResult<uint32_t> plainEntry = waveBundle->Module(0u).FindEntryPointIndex("PlainCS");
+        if (!runner.CheckOk(waveEntry, "WaveCS exists") || !runner.CheckOk(plainEntry, "PlainCS exists"))
+        {
+            continue;
+        }
+
+        const std::string_view fragment = target == "wgsl" ? "subgroups" : "GroupNonUniform";
+        runner.Check(InstanceNeedsCapabilityContaining(*waveEnvironment, waveEnvironment->VariantAt(0u).EntryPoint(*waveEntry), fragment),
+                     std::format("{}: WaveCS records a subgroup capability", target));
+        runner.Check(!InstanceNeedsCapabilityContaining(*waveEnvironment, waveEnvironment->VariantAt(0u).EntryPoint(*plainEntry), fragment),
+                     std::format("{}: PlainCS records none", target));
+    }
+
     return runner.Report();
 }
+
+namespace
+{
+
+bool InstanceNeedsCapabilityContaining(const manifest::EnvironmentView& environment,
+                                       const manifest::EntryPointInstanceView& instance,
+                                       std::string_view fragment)
+{
+    for (uint32_t index = 0u; index < environment.CapabilityNames().size(); ++index)
+    {
+        if (environment.CapabilityName(index).contains(fragment) && instance.RequiresCapability(index))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+} // namespace

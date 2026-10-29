@@ -39,7 +39,7 @@ struct RejectionCase
     std::string_view Claim;
 };
 
-constexpr std::array<RejectionCase, 23u> k_Cases
+constexpr std::array<RejectionCase, 25u> k_Cases
 {
     RejectionCase{ .ModuleFile = "PointerMember.slang",
                    .TargetName = "wgsl",
@@ -140,7 +140,15 @@ constexpr std::array<RejectionCase, 23u> k_Cases
     RejectionCase{ .ModuleFile = "Shims/ShimPaddingTwoFloat3.slang",
                    .TargetName = "spirv-modern-mutable",
                    .Expected = CookError::ShimElementImplicitPadding,
-                   .Claim = "a float3 after a float3 in a shim element fails the spirv-modern-mutable cook" },
+                   .Claim = "a float3 after a float3 in a shim element fails the spirv-modern-mutable cook" },    // an atomic buffer shim accepts int and uint only: IShimAtomicScalar fails the conformance of every other type
+    RejectionCase{ .ModuleFile = "Shims/ShimAtomicFloat.slang",
+                   .TargetName = "wgsl",
+                   .Expected = CookError::ModuleLoadFailed,
+                   .Claim = "an atomic buffer shim over float fails the cook" },
+    RejectionCase{ .ModuleFile = "Shims/ShimAtomicInt64.slang",
+                   .TargetName = "spirv",
+                   .Expected = CookError::ModuleLoadFailed,
+                   .Claim = "an atomic buffer shim over int64_t fails the cook" },
 };
 
 /** Cooks one module into a `MemoryOutputSink`, so that rows write no files and cannot collide. */

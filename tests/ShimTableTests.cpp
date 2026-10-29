@@ -27,13 +27,20 @@ using namespace lodestone;
 
 constexpr std::array<AccessModel, 3u> k_AccessModels{ AccessModel::Bound, AccessModel::Handle, AccessModel::Pointer };
 
+/** The type argument that a row accepts: an atomic buffer takes an integer, and every other buffer takes any type. */
+std::string_view TypeArgumentOf(std::string_view interface_name)
+{
+    return interface_name == "IAtomicBuffer" ? "uint" : "float4";
+}
+
 /** `Name<float4, ...>` with the type arguments of the row, or the bare name. */
-std::string Spell(std::string_view name, uint32_t type_parameter_count)
+std::string Spell(std::string_view name, uint32_t type_parameter_count, std::string_view type_argument)
 {
     std::string spelled{ name };
     for (uint32_t i = 0u; i < type_parameter_count; ++i)
     {
-        spelled += i == 0u ? "<float4" : ", float4";
+        spelled += i == 0u ? "<" : ", ";
+        spelled += type_argument;
     }
     return type_parameter_count == 0u ? spelled : spelled + ">";
 }
@@ -71,8 +78,8 @@ std::string MakeAgreementSource(std::span<const ShimInterface> table)
 
             source += std::format("struct Check{0}<T : {1}> {{}};\ntypealias Cell{0} = Check{0}<{2}>;\n",
                                   cell,
-                                  Spell(row.Name, row.TypeParameterCount),
-                                  Spell(impl, row.TypeParameterCount));
+                                  Spell(row.Name, row.TypeParameterCount, TypeArgumentOf(row.Name)),
+                                  Spell(impl, row.TypeParameterCount, TypeArgumentOf(row.Name)));
             ++cell;
         }
     }
@@ -106,7 +113,7 @@ int main()
 
     runner.BeginSection("the table holds the interfaces of the shim module, and the Bound form is complete");
     const std::span<const ShimInterface> table = GetShimInterfaces();
-    runner.CheckEqual(table.size(), 5u, "five interfaces: two buffers, a texture, a sampler, and a write-only storage texture");
+    runner.CheckEqual(table.size(), 6u, "six interfaces: three buffers, a texture, a sampler, and a write-only storage texture");
     bool boundComplete = true;
     for (const ShimInterface& row : table)
     {
