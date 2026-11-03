@@ -1,3 +1,6 @@
+#include "CookerErrors.hpp"
+#include "ShaderManifestDevice.hpp"
+#include "ShaderManifestFormat.hpp"
 #include "ShaderManifestIndex.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifest.hpp"
@@ -233,6 +236,23 @@ std::vector<std::byte> EmitBytes(const lodestone::CookedLibrary& library)
     return std::move(*manifest);
 }
 
+// The names of the axes that an AmbiguousVariant error gives, in axis order.
+std::vector<std::string_view> VaryingAxisNames(const ManifestIndex& index, const lodestone::QueryError& error)
+{
+    using namespace lodestone;
+    using namespace lodestone::manifest;
+    std::vector<std::string_view> names;
+    const EnvironmentView& view = index.View();
+    const ModuleView& module = view.Module();
+
+    for (const uint32_t axisIndex : error.VaryingAxes)
+    {
+        const Axis& axisData = module.AxisData(axisIndex);
+        names.push_back(view.String(axisData.NameString));
+    }
+    return names;
+}
+
 lodestone::CookedProfile MakeProfile(std::string target_name)
 {
     return lodestone::CookedProfile{ .TargetName = std::move(target_name),
@@ -403,7 +423,7 @@ void CheckAxisRelevance(lodestone::tests::TestRunner& runner)
             const std::string allAxesClaim = std::format("keepDebugOn = {}: Single still counts an axis that changes nothing", keepDebugOn);
             if (runner.CheckError(allAxes, lodestone::QueryErrorCode::AmbiguousVariant, allAxesClaim))
             {
-                runner.CheckEqual(allAxes.error().AxisName, "DEBUG", allAxesClaim);
+                runner.CheckEqual(VaryingAxisNames(index, allAxes.error()), std::vector<std::string_view>{ "DEBUG" }, allAxesClaim);
             }
             const std::expected<VariantKey, lodestone::QueryError> fogPinned = index.Query().Where("FOG", true).SingleFor(fog);
             const lodestone::QueryResult<std::vector<VariantKey>> fogKeys = index.Query().Where("FOG", true).Keys();
@@ -417,7 +437,7 @@ void CheckAxisRelevance(lodestone::tests::TestRunner& runner)
             const std::string fogUnpinnedClaim = std::format("keepDebugOn = {}: SingleFor names only the relevant axes that still vary", keepDebugOn);
             if (runner.CheckError(fogUnpinned, lodestone::QueryErrorCode::AmbiguousVariant, fogUnpinnedClaim))
             {
-                runner.CheckEqual(fogUnpinned.error().AxisName, "FOG", fogUnpinnedClaim);
+                runner.CheckEqual(VaryingAxisNames(index, fogUnpinned.error()), std::vector<std::string_view>{ "FOG" }, fogUnpinnedClaim);
                 runner.CheckEqual(fogUnpinned.error().Detail, 4u, fogUnpinnedClaim);
             }
             runner.CheckOk(index.Query().SingleFor(plain),
@@ -457,7 +477,7 @@ void CheckAxisRelevance(lodestone::tests::TestRunner& runner)
             const std::string joinedClaim = std::format("keepDebugOn = {}: a pipeline counts every axis that any of its entry points reads", keepDebugOn);
             if (runner.Check(!joined.has_value(), joinedClaim))
             {
-                runner.CheckEqual(joined.error().AxisName, "FOG", joinedClaim);
+                runner.CheckEqual(VaryingAxisNames(index, joined.error()), std::vector<std::string_view>{ "FOG" }, joinedClaim);
             }
             const std::array<std::string_view, 1u> typo{ "FogC" };
             const std::expected<VariantKey, lodestone::QueryError> unknown = index.Query().SingleFor(typo);
@@ -839,7 +859,8 @@ void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
         const char* const highQualityClaim = "SingleFor does not choose between the two code paths of the broken chain";
         if (runner.CheckError(highQuality, QueryErrorCode::AmbiguousVariant, highQualityClaim))
         {
-            runner.CheckEqual(highQuality.error().AxisName, "A, B", highQualityClaim);
+            runner.CheckEqual(VaryingAxisNames(chainIndex, highQuality.error()), std::vector<std::string_view>{ "A", "B" },
+                              highQualityClaim);
         }
     }
 
@@ -1116,7 +1137,9 @@ int main()
     runner.CheckError(partial, QueryErrorCode::AmbiguousVariant, "two pinned axes of four are ambiguous");
     if (!partial.has_value())
     {
-        runner.CheckEqual(partial.error().AxisName, "QUALITY, SHADE", "the error names the unpinned axes, in axis order");
+        runner.CheckEqual(partial.error().VaryingAxes, std::vector<uint32_t>{ k_QualityAxis, k_ShadeAxis },
+                          "the error names the unpinned axes, in axis order");
+        runner.Check(partial.error().AxisName.empty(), "the library does not format the axis names into one string");
         runner.CheckEqual(partial.error().Detail, 6u, "the error counts the matches");
     }
     const std::expected<VariantKey, lodestone::QueryError> badSingle = index.Query().Where("DITHR", true).Single();
@@ -1163,7 +1186,35 @@ int main()
         runner.Check(absentValue.IsValid(), "a declared value is not an error");
         runner.CheckEqual(KeyCount(absentValue), 0u, "but it names no cooked variant, so the result is empty");
         const std::expected<VariantKey, lodestone::QueryError> absentSingle = absentValue.Single();
-        runner.CheckError(absentSingle, QueryErrorCode::NoVariantForConstraints, "Single reports the empty result as NoVariantForConstraints");
+        if (runner.CheckError(absentSingle, QueryErrorCode::NoVariantForConstraints, "Single reports the empty result as NoVariantForConstraints"))
+        {
+            runner.CheckEqual(absentSingle.error().AxisName, "TILE", "the error names the constraint that empties the set");
+        }
+        const std::expected<VariantKey, lodestone::QueryError> blockedMiddle =
+            sparse.Query().Where("DITHER", true).Where("TILE", 32u).Where("QUALITY", AxisValueDomain::Enum, "High").Single();
+        if (runner.CheckError(blockedMiddle, QueryErrorCode::NoVariantForConstraints, "a middle constraint can empty the set"))
+        {
+            runner.CheckEqual(blockedMiddle.error().AxisName, "TILE", "removing the middle constraint alone gives a match");
+        }
+    }
+
+    // no variant has DITHER false, and none has TILE 32. Each of the two pins empties the set alone, so removing one
+    // pin gives no match, and the error names no axis
+    runner.BeginSection("NoVariantForConstraints names an axis only when one removal gives a match");
+    const std::vector<std::byte> twoHolesBytes =
+        BuildManifest([](const std::array<uint32_t, 4>& digits)
+                      { return digits[k_DitherAxis] != 0u && digits[k_TileAxis] != 2u; },
+                      &AllActive);
+    const ManifestResult<EnvironmentView> twoHolesOpened = OpenEnvironment(twoHolesBytes, 0u, 0u);
+    if (runner.CheckOk(twoHolesOpened, "the manifest with two holes opens"))
+    {
+        const ManifestIndex twoHoles{ twoHolesOpened.value() };
+        const std::expected<VariantKey, lodestone::QueryError> both =
+            twoHoles.Query().Where("DITHER", false).Where("TILE", 32u).Single();
+        if (runner.CheckError(both, QueryErrorCode::NoVariantForConstraints, "two absent values match nothing"))
+        {
+            runner.Check(both.error().AxisName.empty(), "no single constraint is the cause, so the error names none");
+        }
     }
 
     // SHADE is gated on DITHER, so no variant has DITHER false and SHADE Phong
@@ -1203,7 +1254,7 @@ int main()
         if (runner.Check(!gatedSingle.has_value(),
                          "an axis that is inactive in every match does not vary, so Single does not name it"))
         {
-            runner.CheckEqual(gatedSingle.error().AxisName, "QUALITY, TILE",
+            runner.CheckEqual(gatedSingle.error().VaryingAxes, std::vector<uint32_t>{ k_QualityAxis, k_TileAxis },
                               "an axis that is inactive in every match does not vary, so Single does not name it");
         }
 

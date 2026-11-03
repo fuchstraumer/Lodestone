@@ -425,9 +425,10 @@ public:
         std::array<uint32_t, k_MaxPipelineStages> positions{};
     };
 
-    /** @brief Merges one instance for each stage, checking each shared placement once. Fails on too many stages, a
-     * repeated stage, a placement that is not Bound, resources at one placement that differ in anything but name, or
-     * push constant blocks that differ where they overlap. `RecordIndex` is the binding, `Detail` the instance. */
+    /** @brief Merges one instance for each stage, checking each shared placement once. A stored value (Handle or
+     * Pointer) merges by its container and offset. Fails on too many stages, a repeated stage, resources at one
+     * placement that differ in anything but name, or push constant blocks that differ where they overlap.
+     * `RecordIndex` is the binding, `Detail` the instance. */
     [[nodiscard]] static ManifestResult<MergedLayoutView> Merge(
         std::span<const EntryPointInstanceView> entry_points) noexcept;
 

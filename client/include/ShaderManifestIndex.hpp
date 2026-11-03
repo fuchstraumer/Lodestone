@@ -67,8 +67,9 @@ enum class QueryErrorCode : uint8_t
     ValueNotInAxis,
     IncorrectValueDomain,    // e.g, tried to use a uint with a bool axis
     EmptyConstraintSet,      // you can't provide an empty value set to a constraint function
-    NoVariantForConstraints, // Single() matched no variant
-    AmbiguousVariant,   // Single() matched more than one variant. AxisName lists the axes that still vary
+    NoVariantForConstraints, // Single() matched no variant. AxisName names an axis whose constraint alone empties the
+                             // set, and is empty when no one constraint does
+    AmbiguousVariant,   // Single() matched more than one variant. VaryingAxes holds the axes that still vary
     UnknownEntryPoint,  // SingleFor() got an entry point name the module does not declare. AxisName holds the name
     EmptyEntryPointSet, // SingleFor() got no entry point names
     DeviceFactsUnavailable, // ForDevice() on a profile whose cook did not read the capabilities and workgroup  memory
@@ -83,6 +84,7 @@ struct QueryError
     std::string AxisName;        // can name user input, so can't be a string_view
     uint32_t Detail{};           // additional context-specific detail about the error
     std::string_view Suggestion; // read from manifest blob, can be a view
+    std::vector<uint32_t> VaryingAxes; // module axis indices, for AmbiguousVariant only
 };
 
 /** @brief A constraint that had no effect. Notes never fail a terminal. */
@@ -193,8 +195,8 @@ struct ManifestQueryBuilder
     /** @brief A cheaper `Variants()` when `Keys()` already ran. */
     [[nodiscard]] std::vector<DecodedVariant> VariantsFromKeys(
         const std::vector<VariantKey>& keys) const noexcept;
-    /** @brief Returns the key when exactly one variant matches. `AmbiguousVariant` lists the varying axes in
-     * `AxisName` and the match count in `Detail`. */
+    /** @brief Returns the key when exactly one variant matches. `AmbiguousVariant` gives the varying axes in
+     * `VaryingAxes` and the match count in `Detail`. */
     [[nodiscard]] std::expected<VariantKey, QueryError> Single() const noexcept;
     /** @brief `Single` for a pipeline of the named entry points. Axes that cannot change any of them
      * (`EnvironmentView::IsAxisRelevant`) do not count, and the smallest of the matching keys is returned. */
@@ -219,6 +221,8 @@ private:
                           std::vector<QueryAxisValue> allowed,
                           PinMode mode);
 
+    /** @brief The name of the first constrained axis whose removal gives a match, or empty. */
+    [[nodiscard]] std::string_view blockingAxisName() const;
     [[nodiscard]] std::expected<VariantKey, QueryError> singleOver(
         std::span<const uint64_t> relevant_axes, std::span<const uint32_t> entry_points) const noexcept;
     /** @brief Fills `entry_points` with the index of each name. */

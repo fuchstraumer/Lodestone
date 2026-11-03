@@ -294,3 +294,18 @@ One line for each step. Git history holds the full text.
 - **2026-10-24 (F4.2 to F4.4).** Format 17: stored values (`StoredValuePlacement`, `Binding::ValueOffset` and `ValueContainer`,
   `Profile::Forms`, `PlacementOrderKey`), `[ls_shim_value]`, the heap compared with the mutable lowering, `ShimPlacementTest`.
 - **2026-10-25 (optimization levels).** No test cooked above `--O0`. Above it spirv-opt removes bindings and workgroup memory that Slang's metadata keeps (DiamondDogs `NvproPyramid` at `--O2`, KitchenSink at `--O1`). The used bindings now come from the code (`KeepDeclaredBindings`), the pair check compares bindings both profiles use, and the source facts check is one-way for an optimized profile (`CookedProfile::CodeOptimized`). `OptimizedLayoutTest` and `KitchenSinkOptimizedCookTest` (`--O2`). Also fixed: a span over `rawVariant.Bindings` held across `AppendBindingDrafts` in `SlangReflector::Reflect` (from `28bccf3`) read freed memory, and failed `EntryPointParamsCookTest` about one run in seven. 48 of 48 tests, 60 of 60 known-good.
+
+## Update 2026-10-29 (phase F state)
+
+- F4 is complete and committed (through `dfee780`): F4.5, X1-X4 (shim reflection holes: global shims, the vertex input
+  cross-check, a shim in a varying parameter, a shim in a `ConstantBuffer`, the reverse stored-value check), V1 (std430
+  Pointer pointee and the implicit padding rule), F4.6 (`spirv-modern-mutable` and `spirv-modern-typed`, format 19), and F4.7
+  (the atomic buffer shim, `int` and `uint` only).
+- Deferred by the author: F5 (no consumer; DiamondDogs uses shader objects), F6 (`docs/phase-f-plan.md` F6 has the resume
+  steps), F3.4d (waits for VeloxRhi's limits), float atomics.
+- Vertex pulling: `docs/vertex-pulling-plan.md`. D1 to D6 decided (D6: `ls_vertex_attribute`, generated IA struct). V2 to V6
+  not started. Open: a vertex input with no semantic (now a mismatch) — record it, or a named error?
+- Upstream report drafts: `docs/slang-issue-*.md`. The author filed the debug-info one; she is checking the others for
+  duplicates.
+- Next: the DiamondDogs rendergraph (`C:/SoftwareDev/DiamondDogs/docs/rendergraph-api-spec.md`, the Lodestone usage
+  section) — guide its agent, Loom, on using Lodestone, and take only a few requests from it.

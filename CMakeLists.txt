@@ -31,6 +31,14 @@ if (LODESTONE_BUILD_TESTS AND NOT LODESTONE_BUILD_COOKER)
     message(FATAL_ERROR "LODESTONE_BUILD_TESTS needs LODESTONE_BUILD_COOKER: every test links the cooker.")
 endif()
 
+# The Debug options of a clang build. clang-cl ignores -fno-omit-frame-pointer and warns, so it gets /Oy-
+set(LODESTONE_CLANG_DEBUG_OPTIONS -fcolor-diagnostics -fansi-escape-codes -fstandalone-debug -fno-limit-debug-info)
+if (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    list(APPEND LODESTONE_CLANG_DEBUG_OPTIONS /Oy-)
+else()
+    list(APPEND LODESTONE_CLANG_DEBUG_OPTIONS -fno-omit-frame-pointer)
+endif()
+
 # Add our various internal libraries first: the client library, and our
 # JSON writer that is used by some of the .exe tools and the cooker lib
 # these are all thin and worth using subdir add with

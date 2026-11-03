@@ -241,7 +241,7 @@ if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     # malloc and free, ucrtbased.dll allocates through _malloc_dbg, and ASan then reports the teardown
     # free as a bad free and aborts before main. To turn the sanitizers on, every target in the
     # process must first use the release CRT, slang included.
-    target_compile_options(lodestone PRIVATE "$<$<CONFIG:Debug>:-fcolor-diagnostics;-fansi-escape-codes;-fstandalone-debug;-fno-limit-debug-info;-fno-omit-frame-pointer>")
+    target_compile_options(lodestone PRIVATE "$<$<CONFIG:Debug>:${LODESTONE_CLANG_DEBUG_OPTIONS}>")
 endif()
 # The module cache folder is named by the Slang build tag and this configuration, so that a Debug build and
 # a RelWithDebInfo build (which can be on different Slang builds) never read each other's module files.

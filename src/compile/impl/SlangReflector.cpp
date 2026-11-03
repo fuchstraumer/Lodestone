@@ -1674,9 +1674,9 @@ void AddVisibleStoredValues(std::span<const RawBinding> bindings,
                             bool reads_push_constants,
                             std::vector<uint32_t>& used)
 {
-    // we test against this span during each iteration, and it should only include the elements that were present before this function call,
-    // ensuring that we do not consider any newly added used indices within the same iteration loop.
-    const std::span<const uint32_t> testSpan{ used };
+    // only the indices present before this call count. The loop appends to `used`, which can reallocate it, so the
+    // span is made from the current buffer for each test
+    const size_t usedCount = used.size();
     for (size_t index = 0u; index < bindings.size(); ++index)
     {
         const StoredValuePlacement* stored = GetStoredValuePlacement(bindings[index].Placement);
@@ -1697,7 +1697,7 @@ void AddVisibleStoredValues(std::span<const RawBinding> bindings,
                 const BoundPlacement* block = GetBoundPlacement(bindings[used_index].Placement);
                 return block != nullptr && *block == stored->Block;
             };
-            visible = std::ranges::any_of(testSpan, placementUsed);
+            visible = std::ranges::any_of(std::span{ used }.first(usedCount), placementUsed);
         }
 
         if (visible)

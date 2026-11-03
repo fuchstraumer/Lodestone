@@ -542,39 +542,57 @@ std::expected<VariantKey, QueryError> ManifestQueryBuilder::singleOver(std::span
                                                .AxisName = std::string(capability),
                                                .Detail = static_cast<uint32_t>(rejection.Reason) });
         }
-        return std::unexpected(QueryError{ .Code = QueryErrorCode::NoVariantForConstraints });
+        return std::unexpected(QueryError{ .Code = QueryErrorCode::NoVariantForConstraints,
+                                           .AxisName = std::string(blockingAxisName()) });
     }
     else if (keys.size() == 1u)
     {
         return keys.front();
     }
 
-    const manifest::ModuleView& module = index->environment.Module();
     constexpr size_t k_WordBits = std::numeric_limits<decltype(relevant_axes)::value_type>::digits;
-    std::string varyingNames;
-    for (const uint32_t axisIndex : index->varyingAxes(keys))
+    std::vector<uint32_t> varying = index->varyingAxes(keys);
+    const auto isIrrelevant = [&](uint32_t axisIndex)
     {
-        const bool relevant = ((relevant_axes[axisIndex / k_WordBits] >> (axisIndex % k_WordBits)) & 1u) != 0u;
-        if (!relevant)
-        {
-            continue;
-        }
-        if (!varyingNames.empty())
-        {
-            varyingNames += ", ";
-        }
-        varyingNames += index->environment.String(module.AxisData(axisIndex).NameString);
-    }
+        return ((relevant_axes[axisIndex / k_WordBits] >> (axisIndex % k_WordBits)) & 1u) == 0u;
+    };
+    std::erase_if(varying, isIrrelevant);
 
-    if (varyingNames.empty())
+    if (varying.empty())
     {
         // the matches give the same instances. The smallest key keeps the answer stable between calls
         return std::ranges::min(keys);
     }
 
     return std::unexpected(QueryError{ .Code = QueryErrorCode::AmbiguousVariant,
-                                       .AxisName = std::move(varyingNames),
-                                       .Detail = static_cast<uint32_t>(keys.size()) });
+                                       .Detail = static_cast<uint32_t>(keys.size()),
+                                       .VaryingAxes = std::move(varying) });
+}
+
+std::string_view ManifestQueryBuilder::blockingAxisName() const
+{
+    if (constraints.empty())
+    {
+        return {};
+    }
+
+    // holds every constraint but the one at `i`. After each test, the removed constraint goes back in at the
+    // position of the next one to remove
+    std::vector<QueryAxisRange> others(constraints.begin() + 1, constraints.end());
+    for (size_t i = 0u; i < constraints.size(); ++i)
+    {
+        if (!index->select(others).empty())
+        {
+            return constraints[i].AxisName;
+        }
+
+        if (i < others.size())
+        {
+            others[i] = constraints[i];
+        }
+    }
+
+    return {};
 }
 
 bool ManifestQueryBuilder::IsValid() const noexcept

@@ -390,8 +390,60 @@ variants but give no runtime gain. Schedule it when a use case appears, as F4.7 
 
 ### F6 — `spirv-modern-heap` (early adopter, D8)
 
-A second Handle form on `VK_EXT_descriptor_heap`. A new profile row, and the Slang capability
-`spvDescriptorHeapEXT`. Plan it in detail when F4 is done.
+**Deferred 2026-10-29, author's decision.** Interesting, not critical, and easy to add later. Nothing is built. To resume:
+
+1. Read this section: the spike answers below are the whole design input. The spike outputs (`f6/` in the session
+   scratchpad) will be gone; each probe is one compute shader with a `ParameterBlock` of five `DescriptorHandle`s
+   (texture, sampler, `WTexture2D<RGBA16F>`, `RWStructuredBuffer`, `StructuredBuffer`), compiled with
+   `-capability spvDescriptorHeapEXT -bindless-space-index 3`.
+2. First measure the one open risk: that `-capability spvDescriptorHeapEXT` reaches the worker sessions through the C++ API
+   (`SlangModuleContext`, the session's compiler options), not only through `slangc`.
+3. Ask the author the three decisions at the end of this section (they are open), then run F6a to F6e in order.
+   F4.6 is the model: `HeapLowering` on `TargetProfile`, the profile row, the validator's lowering table, the client
+   header constants, and the format bump.
+
+A third Handle profile on `VK_EXT_descriptor_heap`. The author's RTX 4080 (driver 617.14) exposes the extension
+(`vulkaninfo`, 2026-10-29).
+
+**Measured** (spike, scratchpad `f6/`, isolated `slangc` 2026.19-87; I checked the capability atom and the heap case):
+
+- **Selection is a capability, not a link module.** `-capability spvDescriptorHeapEXT` (`slang-capabilities.capdef:977`:
+  `SPV_EXT_descriptor_heap + SPV_KHR_untyped_pointers`). `defaultGetDescriptorFromHandle` has a `case spvDescriptorHeapEXT`
+  (`hlsl.meta.slang:29542`): a sampler goes to the sampler heap, every other kind to the resource heap, indexed by
+  `handle.x`. The profile passes the capability as a compile option. The C++ API path is not measured.
+- **The SPIR-V.** Two `OpUntypedVariableKHR` builtins (`ResourceHeapEXT`, `SamplerHeapEXT`), with no `DescriptorSet` and no
+  `Binding`. An image is `OpUntypedAccessChainKHR` on the heap with `handle.x`, then `OpLoad`; a buffer is
+  `OpUntypedAccessChainKHR`, then `OpBufferPointerEXT`. Capabilities `UntypedPointersKHR` and `DescriptorHeapEXT`.
+  `spirv-val` accepts it for Vulkan 1.2, 1.3, and 1.4.
+- **The stride is the driver's.** Each heap array type has `ArrayStrideIdEXT` of an `OpConstantSizeOfEXT`, so the
+  descriptor size comes from the device at pipeline creation. `-spirv-resource-heap-stride N` and
+  `-spirv-sampler-heap-stride N` fix a literal stride instead.
+- **Bound resources and the heap mix.** Plain globals, parameter blocks, and push constants keep their sets and bindings.
+  Slang still reserves the bindless space index, and `-bindless-space-index` moves it.
+- **Pointer buffers work beside it** (H4), and `spirv-val` passes.
+- **Reflection does not change**: a handle is a `uint2`, and only `bindlessSpaceIndex` names the heap.
+- **The sampler pair chain** is `OpLoad` of the `uint2` member, `OpCompositeExtract 0`, `OpUntypedAccessChainKHR` on the
+  heap, `OpLoad`, then `OpSampledImage`. `TraceHeapHandle` follows `OpAccessChain` into a typed heap array today, so it
+  needs the untyped form.
+- WGSL ignores the capability. The profile is SPIR-V only, as the forms table already arranges.
+
+**Proposed steps:**
+
+| Step | Work | Proof |
+|---|---|---|
+| F6a | `HeapLowering::DescriptorHeap` on `TargetProfile`, which passes `-capability spvDescriptorHeapEXT` to the session. A profile row `spirv-modern-heap`: the `spirv-modern-*` forms, heap set 3 kept reserved. | The other three SPIR-V profiles do not change (known-good, `ShimPlacementTest`). |
+| F6b | `SpvModuleReader` reads the two heap builtins and the untyped access chains. `CollectDeclaredBindings` does not list them. Under this lowering, `SpvValidator` requires that no reflected resource and no declared binding use the heap set, and that the heap is reached only through the two builtins. | `SpvValidatorTest` rows: the heap shape passes, a bound variable in the heap set fails. |
+| F6c | `TraceHeapHandle` follows `OpUntypedAccessChainKHR` (images and samplers) and `OpBufferPointerEXT` (buffers) back to the `uint2` member. | `ShimPlacementTest`: the pairs of `ShimMaterial.slang` on `spirv-modern-heap` equal the pairs on the other profiles (the cross-profile pair check). |
+| F6d | The manifest: `DescriptorHeapLowering::DescriptorHeap`, no heap set, and in the client header which heap each descriptor type uses (sampler heap for a sampler, resource heap for the rest). Format 20. | The manifest round trip, a reject row for an unknown lowering. |
+| F6e | The device fit already gets `DescriptorHeapEXT` and `UntypedPointersKHR` from the F3 capability recording. Check that a device without them fails `Fit`. | `ManifestIndexTest` or the F3 fit tests. |
+
+**Decisions for the author:**
+
+1. **The stride.** The driver's descriptor size (`OpConstantSizeOfEXT`, Slang's default), or a fixed stride from the policy?
+   I recommend the driver's: the descriptor size is a device fact, and the phase F rule gives device facts to the runtime,
+   not to the cook. A fixed stride would also need a value for each device.
+2. **The name** `spirv-modern-heap`, beside `spirv-modern-mutable` and `spirv-modern-typed`.
+3. **Format 20** for the new lowering value, by the same rule as format 19.
 
 ### Not in phase F
 

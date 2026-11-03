@@ -65,7 +65,7 @@ enum class ErrorCode : uint32_t
     InvalidVisibilityListOrder = 44,
     MergedLayoutTooManyStages = 45,
     MergedLayoutDuplicateStage = 46,
-    MergedLayoutPlacementUnsupported = 47,
+    // 47 was MergedLayoutPlacementUnsupported. Merge accepts every placement
     MergedLayoutConflict = 48,
     InvalidModuleAxisDefault = 49,
     InvalidAxisRelevance = 50,

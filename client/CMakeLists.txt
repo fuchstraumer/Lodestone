@@ -43,7 +43,7 @@ target_include_directories(lodestone_client_library PRIVATE
     "${PROJECT_SOURCE_DIR}/tools/suggest")
 add_library(lodestone::client_library ALIAS lodestone_client_library)
 if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    target_compile_options(lodestone_client_library PRIVATE "$<$<CONFIG:Debug>:-fcolor-diagnostics;-fansi-escape-codes;-fstandalone-debug;-fno-limit-debug-info;-fno-omit-frame-pointer>")
+    target_compile_options(lodestone_client_library PRIVATE "$<$<CONFIG:Debug>:${LODESTONE_CLANG_DEBUG_OPTIONS}>")
 endif()
 
 add_library(lodestone_client_interface INTERFACE)

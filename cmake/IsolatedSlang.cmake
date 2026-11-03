@@ -93,6 +93,19 @@ if (NOT TARGET SPIRV-Tools-static)
     set(spirvToolsConfigurations Debug RelWithDebInfo Release MinSizeRel)
     string(REPLACE ";" "|" spirvToolsConfigurationList "${spirvToolsConfigurations}")
 
+    # SPIRV-Tools links into this project, so it must use the parent's C runtime. ExternalProject evaluates generator
+    # expressions in a cache argument for each parent configuration, and the inner tree is configured once. So the
+    # expression is escaped here, and the inner project evaluates it for each of its own configurations
+    set(spirvToolsRuntimeArgs "")
+    if (DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
+        string(REPLACE "$<" "@LODESTONE_GENEX_OPEN@" spirvToolsRuntime "${CMAKE_MSVC_RUNTIME_LIBRARY}")
+        string(REPLACE ">" "$<ANGLE-R>" spirvToolsRuntime "${spirvToolsRuntime}")
+        string(REPLACE "@LODESTONE_GENEX_OPEN@" "$<1:$><" spirvToolsRuntime "${spirvToolsRuntime}")
+        set(spirvToolsRuntimeArgs
+            "-DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=${spirvToolsRuntime}"
+            "-DCMAKE_POLICY_DEFAULT_CMP0091:STRING=NEW")
+    endif()
+
     set(spirvToolsByproducts "")
     foreach (configuration IN LISTS spirvToolsConfigurations)
         list(APPEND spirvToolsByproducts "${spirvToolsBinaryDir}/source/${configuration}/SPIRV-Tools.lib")
@@ -117,6 +130,7 @@ if (NOT TARGET SPIRV-Tools-static)
             "-DSPIRV_TOOLS_BUILD_STATIC:BOOL=ON"
             "-DSPIRV_TOOLS_USE_MIMALLOC:BOOL=OFF"
             "-DSKIP_SPIRV_TOOLS_INSTALL:BOOL=ON"
+            ${spirvToolsRuntimeArgs}
         BUILD_COMMAND "${CMAKE_COMMAND}" --build "${spirvToolsBinaryDir}" --config $<CONFIG> --target SPIRV-Tools-static
         BUILD_ALWAYS ON
         BUILD_BYPRODUCTS ${spirvToolsByproducts}
