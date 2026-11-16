@@ -286,7 +286,8 @@ CreationFields DescribeCreation(const ResolvedResource& resource) noexcept
     switch (resource.Kind())
     {
     case BindingKind::UniformBuffer:
-        fields.Size = CreationSource::Shader;
+        // a block always states its byte size, and the footprint axes show whether an axis changes it
+        fields.Size = SourceOfFootprint(resource, true);
         fields.Usage = CreationSource::Shader;
         break;
     case BindingKind::StorageBuffer:

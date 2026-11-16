@@ -107,6 +107,7 @@ enum class CookError : uint16_t
     PolicyDocumentLoadFailed = 133,
     PolicyInertAxisNotInertWhenCooked = 134,
     PolicyUnknownTargetName = 135,
+    PolicyKeyConflict = 136, // two policy files set the same key
 
     AxisDefaultMissing = 140, // the axis declaration has no initializer
     AxisDefaultUnreadable = 141, // the initializer could not be evaluated or resolved to a value
@@ -161,6 +162,7 @@ enum class CookError : uint16_t
     SlangInterfaceHasResourceMember = 230,
     SlangCachedModuleWriteFailed = 231,
     SlangVaryingParameterHoldsResource = 232, // an entry point parameter that is not uniform holds a resource or a pointer
+    SlangGenericInterfaceImpl = 233, // a generic type carries ls_axis_interface_impl, and the link line names no type arguments
 
     TargetValidatorUnavailable = 300,
     TargetValidationEntryPointParseFailed = 301,

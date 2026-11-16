@@ -144,6 +144,15 @@ CookError SlangModuleContext::collectAxesFromDecl(slang::DeclReflection* reflect
             continue;
         }
 
+        if (child->getKind() == slang::DeclReflection::Kind::Generic)
+        {
+            const CookError genericChecked = rejectGenericInterfaceImpl(child);
+            if (!genericChecked)
+            {
+                return genericChecked;
+            }
+        }
+
         if (child->getKind() == slang::DeclReflection::Kind::Variable)
         {
             CookResult<std::optional<RawAxisDeclaration>> axisDeclResult = buildAxisDecl(child, module_name);
@@ -549,6 +558,38 @@ CookError SlangModuleContext::buildInterfaceAxes(AxesBuildContext& axes_build_co
     }
 
     return CookError::Success;
+}
+
+ShaderLocation SlangModuleContext::locationOfDecl(slang::DeclReflection* reflection) const
+{
+    // best effort: Slang gives no location for a declaration inside an __include'd fragment
+    slang::SourceLocation sourceLoc;
+    if (SLANG_SUCCEEDED(session->getDeclSourceLocation(reflection, &sourceLoc)) && sourceLoc.filePath != nullptr)
+    {
+        return ShaderLocation{ .File = sourceLoc.filePath,
+                               .Line = static_cast<uint32_t>(sourceLoc.line),
+                               .Column = static_cast<uint32_t>(sourceLoc.column) };
+    }
+
+    return ShaderLocation{};
+}
+
+CookError SlangModuleContext::rejectGenericInterfaceImpl(slang::DeclReflection* generic_reflection) const
+{
+    // a generic struct reflects as a Generic node, and its attributes sit on the declaration inside it
+    slang::GenericReflection* generic = generic_reflection->asGeneric();
+    slang::DeclReflection* inner = generic != nullptr ? generic->getInnerDecl() : nullptr;
+    slang::TypeReflection* innerType = inner != nullptr ? inner->getType() : nullptr;
+    if (innerType == nullptr || innerType->findUserAttributeByName("ls_axis_interface_impl") == nullptr)
+    {
+        return CookError::Success;
+    }
+
+    const char* genericName = generic->getName();
+    const std::string errStr = std::format("Generic type '{}' cannot be an interface axis value, because the link line "
+                                           "names no type arguments. Tag a non-generic struct that wraps it",
+                                           genericName != nullptr ? genericName : "<unknown>");
+    return ReportError(*diagnosticSink, CookError::SlangGenericInterfaceImpl, locationOfDecl(inner), errStr);
 }
 
 CookError SlangModuleContext::rejectResourceMembers(slang::TypeReflection* type,

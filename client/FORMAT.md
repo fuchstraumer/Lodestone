@@ -95,7 +95,7 @@ kind with the usage of the roles. Copies, readback, and render attachments stay 
 
 Each binding record has a footprint axis mask (format version 13, task L16): `EnvironmentHeader::FootprintAxisTableOffset`,
 one mask for each binding record in the word layout of the axis-active mask. Bit k is set when axis k changes the
-resource's element count or extent. `model/AxisInfluence` measures it by scope and name with the two passes of the
+resource's element count or extent (version 20 adds the byte size). `model/AxisInfluence` measures it by scope and name with the two passes of the
 axis relevance, and a variant that does not declare the resource does not take part. Before the closing pass an
 Undetermined axis counts as Inert: one cooked value changes nothing, and a sparse cook with no one-axis pair is then
 closed by the second pass. The client reads it with `ResolvedResource::FootprintAxes` and `IsFootprintAxis`.
@@ -185,3 +185,11 @@ Format version 18 also records the descriptor heap that the Handle form indexes 
 ## Version 19
 
 Format version 19 (phase F step F4.6) adds a second heap lowering, `DescriptorHeapLowering::PerDescriptorType`, for the profile `spirv-modern-typed`. It is Slang's `BindlessDescriptorOptions.None`: one unbounded array for each descriptor type, with no `VK_EXT_mutable_descriptor_type`. The bindings equal `DefaultVkBindlessBindings` in Slang's `hlsl.meta.slang`: samplers at `k_TypedHeapSamplerBinding` (0), combined image samplers at 1, sampled images at `k_TypedHeapSampledImageBinding` (2), storage images at `k_TypedHeapStorageImageBinding` (3), uniform texel buffers at 4, storage texel buffers at 5, uniform buffers at 6, and storage buffers at `k_TypedHeapStorageBufferBinding` (7). The read and read-write views of a storage buffer share binding 7, because they are one descriptor type. A renderer builds the heap's set layout from these constants. No record changes size. `Open` rejects a lowering above `PerDescriptorType` (`InvalidProfileDescriptorHeap`). The profile `spirv-modern` is now `spirv-modern-mutable`, and its output does not change.
+
+## Version 20
+
+Format version 20 (DiamondDogs request C17) changes what the footprint axis mask holds, and no record. Bit k is now also
+set when axis k changes the byte size of the binding, for example a uniform block whose element type follows an
+interface axis. `DescribeCreation` reads the mask for a uniform buffer too, so its `Size` is `ShaderPerVariant` when
+an axis changes the byte size, and `Shader` otherwise. `VerifyFootprintAxes` still checks the element count and the
+extent only, because no size attribute can name the byte size of a uniform block.

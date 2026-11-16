@@ -28,7 +28,7 @@ namespace
         "Usage: lodestone --output <directory> --target=<name> [--O<level>] [--no-validate] [--quiet]\n"
         "                 [--cache-dir <path>] [--include-dir <path>]... [--single-threaded] [--no-dedupe]\n"
         "                 [--verify-deterministic] [--dump-stage=<name>]\n"
-        "                 [--policy-file <path>] [--depfile] <module.slang>...\n"
+        "                 [--policy-file <path>]... [--depfile] <module.slang>...\n"
         "  --output, -o    output directory (required)\n"
         "  --target=<name> output target profile (required). Repeat it for more than one. Names: wgsl, spirv, spirv-modern-mutable, spirv-modern-typed\n"
         "  --O<level>      slang optimization level: 0-3, defaults to 0\n"
@@ -45,7 +45,8 @@ namespace
         "                  Repeat the flag for more than one stage. Names: space, variants, raw,\n"
         "                  resolved, interned, cooked, all.\n"
         "  --dump-sources  write the shader sources to the dump files\n"
-        "  --policy-file <path> specify the policy file to use\n"
+        "  --policy-file <path> policy file to use. Repeat it to merge more than one file. A key that two files\n"
+        "                  both set is an error\n"
         "  --depfile       write ShaderLibrary.d, a depfile that names every source file the cook read\n";
 
     constexpr std::string_view k_OptimizationPrefix = "--O";
@@ -415,7 +416,7 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
                 return std::unexpected(policyFile.error());
             }
 
-            options.PolicyFile = *policyFile;
+            options.PolicyFiles.push_back(std::move(*policyFile));
         }
         else if (const SwitchFlag* flag = FindSwitchFlag(argument); flag != nullptr)
         {

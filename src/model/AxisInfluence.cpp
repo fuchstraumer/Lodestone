@@ -48,8 +48,11 @@ namespace
         std::vector<std::pair<std::string_view, std::string_view>> Identities;
         /** Strided by the identity count. Null where the variant does not declare the resource. */
         std::vector<const ResourceFootprint*> Footprints;
+        /** Strided like `Footprints`. Zero where the variant does not declare the resource. */
+        std::vector<uint64_t> ByteSizes;
 
         [[nodiscard]] const ResourceFootprint* At(size_t variant_index, size_t identity_index) const noexcept;
+        [[nodiscard]] uint64_t ByteSizeAt(size_t variant_index, size_t identity_index) const noexcept;
     };
 
     /** A boolean capability axis whose off variant needs a capability name that its on variant does not. */
@@ -97,7 +100,10 @@ namespace
 
     FootprintTable BuildFootprintTable(const CookedModule& module);
 
-    bool GroupSharesOneFootprint(const FootprintTable& table, std::span<const uint32_t> group, size_t identity_index);
+    bool GroupSharesOneFootprint(const FootprintTable& table,
+                                 std::span<const uint32_t> group,
+                                 size_t identity_index,
+                                 FootprintBasis basis);
 
     const std::vector<std::string>& CapabilityNamesOf(const CookedModule& module,
                                                       uint32_t variant_index,
@@ -347,7 +353,7 @@ CookResult<std::vector<ContentHashValue>> HashBaseInstances(const CookedModule& 
     return std::move(instances->Hashes);
 }
 
-std::vector<ResourceFootprintInfluence> ComputeFootprintInfluence(const CookedModule& module)
+std::vector<ResourceFootprintInfluence> ComputeFootprintInfluence(const CookedModule& module, FootprintBasis basis)
 {
     const FootprintTable table = BuildFootprintTable(module);
     std::vector<ResourceFootprintInfluence> influence;
@@ -364,9 +370,9 @@ std::vector<ResourceFootprintInfluence> ComputeFootprintInfluence(const CookedMo
         return influence;
     }
 
-    auto sharesOneFootprint = [&table](std::span<const uint32_t> group, size_t identity_index)
+    auto sharesOneFootprint = [&table, basis](std::span<const uint32_t> group, size_t identity_index)
     {
-        return GroupSharesOneFootprint(table, group, identity_index);
+        return GroupSharesOneFootprint(table, group, identity_index, basis);
     };
     std::vector<std::vector<AxisInfluence>> measured = MeasureAxisPairs(module, table.Identities.size(), sharesOneFootprint);
     for (auto&& [identityIndex, resource] : std::views::enumerate(influence))
@@ -389,7 +395,8 @@ std::vector<uint64_t> BuildFootprintAxisMasks(const CookedModule& module, size_t
         return masks;
     }
 
-    const std::vector<ResourceFootprintInfluence> influence = ComputeFootprintInfluence(module);
+    const std::vector<ResourceFootprintInfluence> influence =
+        ComputeFootprintInfluence(module, FootprintBasis::AttributeFootprintAndByteSize);
     for (auto&& [resourceIndex, resource] : std::views::enumerate(module.Resources))
     {
         const auto measured = std::ranges::lower_bound(influence,
@@ -419,7 +426,9 @@ CookError VerifyFootprintAxes(const CookedModule& module, DiagnosticSink& sink)
     }
 
     const std::span<const PermutationAxis> axes = module.Space->Axes();
-    const std::vector<ResourceFootprintInfluence> measured = ComputeFootprintInfluence(module);
+    // only the footprint is checked: no size attribute can name the byte size of a uniform block
+    const std::vector<ResourceFootprintInfluence> measured =
+        ComputeFootprintInfluence(module, FootprintBasis::AttributeFootprint);
     CookError result = CookError::Success;
     for (const ResourceFootprintInfluence& resource : measured)
     {
@@ -710,6 +719,11 @@ namespace
         return Footprints[(variant_index * Identities.size()) + identity_index];
     }
 
+    uint64_t FootprintTable::ByteSizeAt(size_t variant_index, size_t identity_index) const noexcept
+    {
+        return ByteSizes[(variant_index * Identities.size()) + identity_index];
+    }
+
     FootprintTable BuildFootprintTable(const CookedModule& module)
     {
         FootprintTable table;
@@ -733,6 +747,7 @@ namespace
         }
 
         table.Footprints.assign(module.Variants.size() * table.Identities.size(), nullptr);
+        table.ByteSizes.assign(module.Variants.size() * table.Identities.size(), 0u);
         for (auto&& [variantIndex, variant] : std::views::enumerate(module.Variants))
         {
             const ResourceList& resources = module.ResourceLists[variant.ResourceListIndex];
@@ -742,15 +757,21 @@ namespace
                 const size_t slot = (static_cast<size_t>(variantIndex) * table.Identities.size()) +
                                      identityOfResource[resources[position]];
                 table.Footprints[slot] = &footprints[position];
+                table.ByteSizes[slot] = module.Resources[resources[position]].ByteSize;
             }
         }
 
         return table;
     }
 
-    bool GroupSharesOneFootprint(const FootprintTable& table, std::span<const uint32_t> group, size_t identity_index)
+    bool GroupSharesOneFootprint(const FootprintTable& table,
+                                 std::span<const uint32_t> group,
+                                 size_t identity_index,
+                                 FootprintBasis basis)
     {
+        const bool comparesByteSize = basis == FootprintBasis::AttributeFootprintAndByteSize;
         const ResourceFootprint* first = nullptr;
+        uint64_t firstByteSize = 0u;
         for (const uint32_t variantIndex : group)
         {
             const ResourceFootprint* footprint = table.At(variantIndex, identity_index);
@@ -759,11 +780,13 @@ namespace
                 continue;
             }
 
+            const uint64_t byteSize = table.ByteSizeAt(variantIndex, identity_index);
             if (first == nullptr)
             {
                 first = footprint;
+                firstByteSize = byteSize;
             }
-            else if (!(*footprint == *first))
+            else if (!(*footprint == *first) || (comparesByteSize && byteSize != firstByteSize))
             {
                 return false;
             }

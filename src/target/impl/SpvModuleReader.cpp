@@ -80,6 +80,10 @@ namespace
                        std::span<const uint32_t> words,
                        uint32_t result_id);
 
+    /** Adds the capabilities that the declared capabilities imply, directly or through other capabilities. Only names
+     * that the Vulkan capability table knows are added. */
+    void AddImpliedCapabilities(std::vector<std::string>& names);
+
     /** Maps the curated set of `FromSlangImageFormat`. Other formats, `Unknown` included, are Invalid on both sides. */
     TextureFormat TextureFormatFromSpirv(spv::ImageFormat format) noexcept;
 
@@ -120,6 +124,13 @@ namespace
     /** Returns the variable at the end of a chain of loads, access chains, and copies, or 0. One step per id bounds
      * the walk on a malformed module. */
     uint32_t TraceToVariable(const ParseState& parse_state, uint32_t id);
+
+    /** Returns the function parameter at the end of the same chain as `TraceToVariable`, or 0. */
+    uint32_t TraceToParameter(const ParseState& parse_state, uint32_t id);
+
+    /** Gives the uses that `use` stands for in the callers, where its image or sampler is a function parameter. Both
+     * sides go through the same call. A use with no parameter is returned as it is. */
+    std::vector<SampledImageUse> ExpandThroughCalls(const ParseState& parse_state, const SampledImageUse& use);
 
     std::optional<StoredValueLocation> LocateHandle(const ParseState& parse_state,
                                                     const IdRecord& variable,
@@ -214,66 +225,69 @@ CookResult<std::vector<SamplerTexturePlacement>> CollectSamplerTexturePairs(cons
 {
     std::vector<SamplerTexturePlacement> pairs;
     pairs.reserve(parse_state.SampledImages.size());
-    for (const SampledImageUse& use : parse_state.SampledImages)
+    for (const SampledImageUse& sampled : parse_state.SampledImages)
     {
-        const uint32_t imageVariable = TraceToVariable(parse_state, use.ImageId);
-        const uint32_t samplerVariable = TraceToVariable(parse_state, use.SamplerId);
-        const bool imageBound = imageVariable != 0u && parse_state.Ids[imageVariable].Group != ~0u;
-        const bool samplerBound = samplerVariable != 0u && parse_state.Ids[samplerVariable].Group != ~0u;
-
-        auto unresolved = [&sink, &use](std::string_view reason)
+        for (const SampledImageUse& use : ExpandThroughCalls(parse_state, sampled))
         {
-            const std::string errStr = std::format("an OpSampledImage of image %{} and sampler %{} {}, so the pair "
-                                                   "cannot be recorded",
-                                                   use.ImageId,
-                                                   use.SamplerId,
-                                                   reason);
-            return std::unexpected(ReportError(sink, CookError::ReflectionSamplerPairUnresolved, errStr));
-        };
+            const uint32_t imageVariable = TraceToVariable(parse_state, use.ImageId);
+            const uint32_t samplerVariable = TraceToVariable(parse_state, use.SamplerId);
+            const bool imageBound = imageVariable != 0u && parse_state.Ids[imageVariable].Group != ~0u;
+            const bool samplerBound = samplerVariable != 0u && parse_state.Ids[samplerVariable].Group != ~0u;
 
-        if (!imageBound || !samplerBound)
-        {
-            return unresolved("does not trace back to two bound resource variables");
-        }
-
-        const IdRecord& image = parse_state.Ids[imageVariable];
-        const IdRecord& sampler = parse_state.Ids[samplerVariable];
-        SamplerTexturePlacement pair{ .TextureGroup = image.Group,
-                                      .TextureBinding = image.Binding,
-                                      .SamplerGroup = sampler.Group,
-                                      .SamplerBinding = sampler.Binding };
-
-        // a side in the heap names the handle that indexes it, so the pair names two values as reflection does
-        const std::optional<uint32_t> heapSet = parse_state.DescriptorHeapSet;
-        if (heapSet.has_value() && image.Group == *heapSet)
-        {
-            const std::optional<StoredValueLocation> handle = TraceHeapHandle(parse_state, use.ImageId, imageVariable);
-            if (!handle)
+            auto unresolved = [&sink, &use](std::string_view reason)
             {
-                return unresolved("reads an image from the descriptor heap with an index that is not a handle in a block");
+                const std::string errStr = std::format("an OpSampledImage of image %{} and sampler %{} {}, so the pair "
+                                                       "cannot be recorded",
+                                                       use.ImageId,
+                                                       use.SamplerId,
+                                                       reason);
+                return std::unexpected(ReportError(sink, CookError::ReflectionSamplerPairUnresolved, errStr));
+            };
+
+            if (!imageBound || !samplerBound)
+            {
+                return unresolved("does not trace back to two bound resource variables");
             }
 
-            pair.TextureGroup = handle->Group;
-            pair.TextureBinding = handle->Binding;
-            pair.TextureContainer = handle->Container;
-            pair.TextureOffset = handle->ByteOffset;
-        }
+            const IdRecord& image = parse_state.Ids[imageVariable];
+            const IdRecord& sampler = parse_state.Ids[samplerVariable];
+            SamplerTexturePlacement pair{ .TextureGroup = image.Group,
+                                          .TextureBinding = image.Binding,
+                                          .SamplerGroup = sampler.Group,
+                                          .SamplerBinding = sampler.Binding };
 
-        if (heapSet.has_value() && sampler.Group == *heapSet)
-        {
-            const std::optional<StoredValueLocation> handle = TraceHeapHandle(parse_state, use.SamplerId, samplerVariable);
-            if (!handle)
+            // a side in the heap names the handle that indexes it, so the pair names two values as reflection does
+            const std::optional<uint32_t> heapSet = parse_state.DescriptorHeapSet;
+            if (heapSet.has_value() && image.Group == *heapSet)
             {
-                return unresolved("reads a sampler from the descriptor heap with an index that is not a handle in a block");
+                const std::optional<StoredValueLocation> handle = TraceHeapHandle(parse_state, use.ImageId, imageVariable);
+                if (!handle)
+                {
+                    return unresolved("reads an image from the descriptor heap with an index that is not a handle in a block");
+                }
+
+                pair.TextureGroup = handle->Group;
+                pair.TextureBinding = handle->Binding;
+                pair.TextureContainer = handle->Container;
+                pair.TextureOffset = handle->ByteOffset;
             }
 
-            pair.SamplerGroup = handle->Group;
-            pair.SamplerBinding = handle->Binding;
-            pair.SamplerContainer = handle->Container;
-            pair.SamplerOffset = handle->ByteOffset;
-        }
+            if (heapSet.has_value() && sampler.Group == *heapSet)
+            {
+                const std::optional<StoredValueLocation> handle = TraceHeapHandle(parse_state, use.SamplerId, samplerVariable);
+                if (!handle)
+                {
+                    return unresolved("reads a sampler from the descriptor heap with an index that is not a handle in a block");
+                }
 
-        pairs.push_back(pair);
+                pair.SamplerGroup = handle->Group;
+                pair.SamplerBinding = handle->Binding;
+                pair.SamplerContainer = handle->Container;
+                pair.SamplerOffset = handle->ByteOffset;
+            }
+
+            pairs.push_back(pair);
+        }
     }
 
     return pairs;
@@ -593,6 +607,9 @@ CookResult<EmittedCodeFacts> CollectEmittedCodeFacts(const ParseState& parse_sta
     {
         facts.CapabilityNames.emplace_back(name);
     }
+
+    // a module declares only some capabilities, and the rest follow from them
+    AddImpliedCapabilities(facts.CapabilityNames);
 
     std::ranges::sort(facts.CapabilityNames);
     const auto repeated = std::ranges::unique(facts.CapabilityNames);
@@ -1125,6 +1142,21 @@ namespace
             // the function bodies are parsed for this: words[3] is the image, and words[4] the sampler
             parseState->SampledImages.push_back(SampledImageUse{ .ImageId = words[3], .SamplerId = words[4] });
             break;
+        case spv::Op::OpFunction:
+            parseState->CurrentFunction = resultId;
+            parseState->NextParameterIndex = 0u;
+            break;
+        case spv::Op::OpFunctionParameter:
+            parseState->Ids[resultId].OwningFunction = parseState->CurrentFunction;
+            parseState->Ids[resultId].ParameterIndex = parseState->NextParameterIndex++;
+            break;
+        case spv::Op::OpFunctionCall:
+            // words[3] is the callee, and the arguments follow it
+            parseState->Calls.push_back(FunctionCall{ .Callee = words[3],
+                                                      .FirstArgument = static_cast<uint32_t>(parseState->CallArguments.size()),
+                                                      .ArgumentCount = static_cast<uint32_t>(words.size() - 4u) });
+            parseState->CallArguments.append_range(words.subspan(4u));
+            break;
         default:
             return SPV_SUCCESS;
         }
@@ -1398,6 +1430,67 @@ namespace
         }
     }
 
+    uint32_t TraceToParameter(const ParseState& parse_state, uint32_t id)
+    {
+        for (size_t step = 0u; step < parse_state.Ids.size() && id != 0u && id < parse_state.Ids.size(); ++step)
+        {
+            const IdRecord& record = parse_state.Ids[id];
+
+            if (record.OpCode == spv::Op::OpFunctionParameter)
+            {
+                return id;
+            }
+
+            id = record.DerivedFrom;
+        }
+        return 0u;
+    }
+
+    std::vector<SampledImageUse> ExpandThroughCalls(const ParseState& parse_state, const SampledImageUse& use)
+    {
+        // SPIR-V forbids recursion, so each step moves to a caller and the walk ends
+        std::vector<SampledImageUse> expanded;
+        std::vector<SampledImageUse> pending{ use };
+        while (!pending.empty())
+        {
+            const SampledImageUse current = pending.back();
+            pending.pop_back();
+
+            const uint32_t imageParameter = TraceToParameter(parse_state, current.ImageId);
+            const uint32_t samplerParameter = TraceToParameter(parse_state, current.SamplerId);
+            if (imageParameter == 0u && samplerParameter == 0u)
+            {
+                expanded.push_back(current);
+                continue;
+            }
+
+            // both sides are in one function, so either parameter names it
+            const uint32_t function = parse_state.Ids[imageParameter != 0u ? imageParameter : samplerParameter].OwningFunction;
+            for (const FunctionCall& call : parse_state.Calls)
+            {
+                if (call.Callee != function)
+                {
+                    continue;
+                }
+
+                const std::span<const uint32_t> arguments =
+                    std::span{ parse_state.CallArguments }.subspan(call.FirstArgument, call.ArgumentCount);
+                SampledImageUse inCaller = current;
+                if (imageParameter != 0u)
+                {
+                    inCaller.ImageId = arguments[parse_state.Ids[imageParameter].ParameterIndex];
+                }
+                if (samplerParameter != 0u)
+                {
+                    inCaller.SamplerId = arguments[parse_state.Ids[samplerParameter].ParameterIndex];
+                }
+                pending.push_back(inCaller);
+            }
+        }
+
+        return expanded;
+    }
+
     std::optional<StoredValueLocation> TraceHeapHandle(const ParseState& parse_state, uint32_t id, uint32_t heap_variable)
     {
         for (size_t step = 0u; step < parse_state.Ids.size() && id != 0u && id < parse_state.Ids.size(); ++step)
@@ -1536,6 +1629,42 @@ namespace
         }
     }
     // NOLINTEND(misc-no-recursion)
+
+    void AddImpliedCapabilities(std::vector<std::string>& names)
+    {
+        // a copy, because the views below point into it while `names` grows
+        const std::vector<std::string> declared = names;
+
+        std::vector<std::string_view> pending;
+        pending.reserve(declared.size());
+        for (const std::string& name : declared)
+        {
+            pending.push_back(vulkan::PrimaryCapabilityName(name));
+        }
+
+        // implied names in the table are views of static data
+        std::vector<std::string_view> visited;
+        while (!pending.empty())
+        {
+            const std::string_view current = pending.back();
+            pending.pop_back();
+
+            if (std::ranges::contains(visited, current))
+            {
+                continue;
+            }
+            visited.push_back(current);
+
+            for (const vulkan::CapabilityImplication& implication : vulkan::ImpliedBy(current))
+            {
+                pending.push_back(implication.Implied);
+                if (vulkan::FindCapability(implication.Implied))
+                {
+                    names.emplace_back(implication.Implied);
+                }
+            }
+        }
+    }
 
 } // namespace
 

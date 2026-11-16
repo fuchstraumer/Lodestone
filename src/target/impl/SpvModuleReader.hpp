@@ -107,12 +107,23 @@ struct IdRecord
     // the Location decoration, or ~0u without one
     uint32_t Location{ ~0u };
     bool BuiltIn{ false };
+    // an OpFunctionParameter: its function and its position in the parameter list
+    uint32_t OwningFunction{ 0u };
+    uint32_t ParameterIndex{ 0u };
 };
 
 struct SampledImageUse
 {
     uint32_t ImageId{ 0u };
     uint32_t SamplerId{ 0u };
+};
+
+/** One OpFunctionCall. The arguments are in `ParseState::CallArguments`. */
+struct FunctionCall
+{
+    uint32_t Callee{ 0u };
+    uint32_t FirstArgument{ 0u };
+    uint32_t ArgumentCount{ 0u };
 };
 
 /** One access chain with at least one index. The first index of a chain on a binding array picks the element. */
@@ -137,6 +148,11 @@ struct ParseState
     std::vector<SampledImageUse> SampledImages;
     std::vector<ChainAccess> ChainAccesses;
     std::vector<uint32_t> Indices;
+    std::vector<FunctionCall> Calls;
+    std::vector<uint32_t> CallArguments;
+    // the function whose body the parse is in, and the position of its next parameter
+    uint32_t CurrentFunction{ 0u };
+    uint32_t NextParameterIndex{ 0u };
     // the caller sets it after the parse. A sampled image from this set is reached through a handle
     std::optional<uint32_t> DescriptorHeapSet;
 };

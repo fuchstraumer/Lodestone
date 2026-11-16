@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <initializer_list>
 #include <optional>
 #include <string>
@@ -61,7 +62,7 @@ int main()
         runner.CheckEqual(minimal->OptimizationLevel, 0u, "the optimization level defaults to 0");
         runner.Check(minimal->DedupeEnabled && minimal->ValidateAgainstEmittedText && !minimal->VerifyDeterministic,
                      "dedup and validation are on, and the determinism check is off");
-        runner.Check(!minimal->PolicyFile.has_value(), "no policy file unless one is named");
+        runner.Check(minimal->PolicyFiles.empty(), "no policy file unless one is named");
         runner.Check(!minimal->ModuleCacheDirectory.empty(), "the module cache folder has a default");
     }
 
@@ -119,7 +120,21 @@ int main()
     const CookResult<CookerOptions> withPolicy = Parse({ "-o", output, "--target=wgsl", "--policy-file", policy, "a.slang" });
     if (runner.CheckOk(withPolicy, "an existing policy file"))
     {
-        runner.CheckEqual(withPolicy->PolicyFile, std::optional<std::filesystem::path>{ policy }, "the policy path reads back");
+        runner.CheckEqual(withPolicy->PolicyFiles, std::vector<std::filesystem::path>{ policy }, "the policy path reads back");
+    }
+
+    const std::string secondPolicy = (scratch / "second.toml").string();
+    {
+        std::ofstream secondFile{ secondPolicy };
+        secondFile << "[Other]\n";
+    }
+    const CookResult<CookerOptions> twoPolicies =
+        Parse({ "-o", output, "--target=wgsl", "--policy-file", policy, "--policy-file", secondPolicy, "a.slang" });
+    if (runner.CheckOk(twoPolicies, "a repeated policy file"))
+    {
+        runner.CheckEqual(twoPolicies->PolicyFiles,
+                          std::vector<std::filesystem::path>{ policy, secondPolicy },
+                          "a repeated --policy-file gives each path, in the order given");
     }
     runner.CheckError(Parse({ "-o", output, "--target=wgsl", "--policy-file", (scratch / "missing.toml").string(), "a.slang" }),
                       CookError::FileNotFound,

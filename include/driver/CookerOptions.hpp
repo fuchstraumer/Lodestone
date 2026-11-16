@@ -51,7 +51,8 @@ struct CookerOptions
     /** Cooks twice into memory and compares, to catch unordered containers reaching the output. */
     bool VerifyDeterministic{ false };
     uint32_t DumpStageMask{ 0u };
-    std::optional<std::filesystem::path> PolicyFile;
+    /** Merged in the order given. */
+    std::vector<std::filesystem::path> PolicyFiles;
     bool DumpSources{ false };
     bool WriteDepfile{ false };
 };

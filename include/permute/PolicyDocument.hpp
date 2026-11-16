@@ -50,6 +50,9 @@ struct ModulePolicyEntry
 struct PolicyParseError
 {
     std::string Message;
+    /** @brief Empty when the text did not come from a file. */
+    std::string File;
+    CookError Code{ CookError::PolicyDocumentLoadFailed };
     uint32_t Line{ 0u };
     uint32_t Column{ 0u };
 };
@@ -72,6 +75,9 @@ class PolicyDocument
 {
 public:
     [[nodiscard]] static PolicyDocResult<PolicyDocument> Load(std::string_view path);
+    /** @brief Loads each file and merges them. A table merges with a table. Any other key that two files both set fails
+     * with `PolicyKeyConflict`, and an array is never merged. */
+    [[nodiscard]] static PolicyDocResult<PolicyDocument> LoadMerged(std::span<const std::string> paths);
     // from memory, for tests
     [[nodiscard]] static PolicyDocResult<PolicyDocument> Parse(std::string_view text);
     [[nodiscard]] const ModulePolicyEntry* FindModule(std::string_view module_name) const noexcept;

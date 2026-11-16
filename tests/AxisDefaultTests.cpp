@@ -58,7 +58,11 @@ CookResult<CookStatistics> CookIntoMemory(const std::filesystem::path& module_pa
     options.ModulePaths.push_back(module_path);
     options.TargetNames.emplace_back("wgsl");
     options.OutputPath = "AxisDefault";
-    options.PolicyFile = std::move(policy_file);
+    if (policy_file.has_value())
+    {
+        options.PolicyFiles.push_back(std::move(*policy_file));
+    }
+
     return RunCook(options, sink);
 }
 

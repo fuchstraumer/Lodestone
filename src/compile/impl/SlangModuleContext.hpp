@@ -113,6 +113,8 @@ private:
                                                  std::string_view module_name,
                                                  AxesBuildContext& axes_build_context) const;
     [[nodiscard]] CookError buildInterfaceAxes(AxesBuildContext& axes_build_context) const;
+    [[nodiscard]] CookError rejectGenericInterfaceImpl(slang::DeclReflection* generic_reflection) const;
+    [[nodiscard]] ShaderLocation locationOfDecl(slang::DeclReflection* reflection) const;
     [[nodiscard]] CookError rejectResourceMembers(slang::TypeReflection* type,
                                                   std::string_view type_name,
                                                   std::string_view module_name,

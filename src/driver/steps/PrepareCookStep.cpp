@@ -15,6 +15,7 @@
 #include <string_view>
 #include <system_error>
 #include <utility>
+#include <vector>
 
 namespace lodestone
 {
@@ -71,17 +72,21 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input, Diag
         }
     }
     
-    if (result.Options.PolicyFile)
+    if (!result.Options.PolicyFiles.empty())
     {
-        const std::filesystem::path& policyFilePath = *result.Options.PolicyFile;
-        if (!std::filesystem::exists(policyFilePath, filesystemError))
+        std::vector<std::string> policyFilePaths;
+        policyFilePaths.reserve(result.Options.PolicyFiles.size());
+        for (const std::filesystem::path& policyFilePath : result.Options.PolicyFiles)
         {
-            return filesystemError ? std::unexpected(ErrorCodeToCookError(filesystemError)) :
-                                     std::unexpected(CookError::DirectoryDoesNotExist);
+            if (!std::filesystem::exists(policyFilePath, filesystemError))
+            {
+                return filesystemError ? std::unexpected(ErrorCodeToCookError(filesystemError)) :
+                                         std::unexpected(CookError::DirectoryDoesNotExist);
+            }
+            policyFilePaths.push_back(policyFilePath.string());
         }
 
-        std::string policyFilePathStr = policyFilePath.string();
-        PolicyDocResult<PolicyDocument> policyDocResult = PolicyDocument::Load(policyFilePathStr);
+        PolicyDocResult<PolicyDocument> policyDocResult = PolicyDocument::LoadMerged(policyFilePaths);
         if (!policyDocResult)
         {
             // this will have to be cleaned up before too long, what a mess
@@ -89,8 +94,8 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input, Diag
             Diagnostic policyDiag
             {
                 .Severity=DiagnosticSeverity::Fatal,
-                .Code="CookError::PolicyDocumentLoadFailed",
-                .File=policyFilePath.string(),
+                .Code=std::format("CookError::{}", ToString(policyError.Code)),
+                .File=policyError.File,
                 .Range=
                 {
                     .StartLine=static_cast<int32_t>(policyError.Line),
@@ -101,7 +106,7 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input, Diag
                 .Related={}
             };
             result.Diagnostics->Report(std::move(policyDiag));
-            return std::unexpected(CookError::PolicyDocumentLoadFailed);
+            return std::unexpected(policyError.Code);
         }
         result.Policy = std::move(*policyDocResult);
 

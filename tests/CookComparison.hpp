@@ -45,7 +45,11 @@ inline CookedBundle CookForTargets(std::vector<std::filesystem::path> module_pat
     options.ModulePaths = std::move(module_paths);
     options.TargetNames = std::move(target_names);
     options.OutputPath = "CookComparison";
-    options.PolicyFile = std::move(policy_file);
+    if (policy_file.has_value())
+    {
+        options.PolicyFiles.push_back(std::move(*policy_file));
+    }
+
     options.VerifyDeterministic = true;
 
     MemoryOutputSink sink;

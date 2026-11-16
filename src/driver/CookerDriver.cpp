@@ -295,10 +295,11 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
 
     if (cookState.Options.WriteDepfile)
     {
-        if (cookState.Options.PolicyFile.has_value())
+        for (const std::filesystem::path& policyFile : cookState.Options.PolicyFiles)
         {
-            dependencyPaths.push_back(NormalizeDependencyPath(cookState.Options.PolicyFile.value()));
+            dependencyPaths.push_back(NormalizeDependencyPath(policyFile));
         }
+
         std::ranges::sort(dependencyPaths);
         const auto [duplicatesBegin, duplicatesEnd] = std::ranges::unique(dependencyPaths);
         dependencyPaths.erase(duplicatesBegin, duplicatesEnd);

@@ -148,7 +148,7 @@ public:
     [[nodiscard]] bool HasTag(std::string_view tag) const noexcept;
     /** @brief The creation usage of the binding kind and the roles. Copies and maps belong to the graph. */
     [[nodiscard]] BufferUsageFlags RequiredBufferUsage() const noexcept;
-    /** @brief The axes that change the element count or extent, in the word layout of `EnvironmentView::AxisMask`. */
+    /** @brief The axes that change the element count, extent, or byte size, in the word layout of `EnvironmentView::AxisMask`. */
     [[nodiscard]] std::span<const uint64_t> FootprintAxes() const noexcept;
     [[nodiscard]] bool IsFootprintAxis(uint32_t local_axis) const noexcept;
     [[nodiscard]] uint32_t Index() const noexcept;

@@ -39,7 +39,7 @@ struct RejectionCase
     std::string_view Claim;
 };
 
-constexpr std::array<RejectionCase, 25u> k_Cases
+constexpr std::array<RejectionCase, 26u> k_Cases
 {
     RejectionCase{ .ModuleFile = "PointerMember.slang",
                    .TargetName = "wgsl",
@@ -65,6 +65,10 @@ constexpr std::array<RejectionCase, 25u> k_Cases
                    .TargetName = "wgsl",
                    .Expected = CookError::SlangInterfaceHasResourceMember,
                    .Claim = "an implementation of an interface axis that holds a resource fails the cook" },
+    RejectionCase{ .ModuleFile = "InterfaceAxisGenericImpl.slang",
+                   .TargetName = "wgsl",
+                   .Expected = CookError::SlangGenericInterfaceImpl,
+                   .Claim = "a generic type that is tagged as an interface axis value fails the cook" },
     // a storage shim extern links the format of one axis value, so the axis must exist and have a value in every variant
     RejectionCase{ .ModuleFile = "Shims/ShimStorageNoAttribute.slang",
                    .TargetName = "wgsl",

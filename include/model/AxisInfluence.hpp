@@ -57,8 +57,19 @@ struct ResourceFootprintInfluence
     std::vector<AxisInfluence> Axes;
 };
 
+/** @brief What `ComputeFootprintInfluence` compares between variants. */
+enum class FootprintBasis : uint8_t
+{
+    Invalid = 0,
+    /** The element count and the extent. These are the values that `ls_*` size attributes can name. */
+    AttributeFootprint,
+    /** The attribute footprint, and the byte size of the binding. A uniform block has a byte size that follows an
+     * axis, and no attribute can name it. */
+    AttributeFootprintAndByteSize,
+};
+
 /** @brief Sorted by scope and name. Undetermined counts as Inert before the closing pass. */
-std::vector<ResourceFootprintInfluence> ComputeFootprintInfluence(const CookedModule& module);
+std::vector<ResourceFootprintInfluence> ComputeFootprintInfluence(const CookedModule& module, FootprintBasis basis);
 
 /** @brief Fails when a proven footprint axis is not named by the resource's size attributes. */
 CookError VerifyFootprintAxes(const CookedModule& module, DiagnosticSink& sink);
@@ -68,7 +79,8 @@ CookError VerifyFootprintAxes(const CookedModule& module, DiagnosticSink& sink);
  * must be a subset of the on variant's. Gated axes (a wave size) refine another axis and are not checked. */
 CookError VerifyCapabilityAxes(const CookedLibrary& library, DiagnosticSink& sink);
 
-/** @brief One mask per `CookedModule::Resources` record, `word_count` words each. */
+/** @brief One mask per `CookedModule::Resources` record, `word_count` words each. Measured with
+ * `FootprintBasis::AttributeFootprintAndByteSize`. */
 std::vector<uint64_t> BuildFootprintAxisMasks(const CookedModule& module, size_t word_count);
 
 /** @brief Undetermined counts as relevant: with one cooked value, the pin always resolves. */

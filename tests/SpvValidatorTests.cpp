@@ -858,8 +858,36 @@ int main()
                        "each OpCapability and OpExtension reads back as a name, sorted, an alias by its primary name"))
     {
         runner.CheckEqual(workgroupFacts->CapabilityNames,
-                          std::vector<std::string>{ "Float16", "SPV_KHR_16bit_storage", "Shader", "UniformAndStorageBuffer16BitAccess" },
+                          std::vector<std::string>{ "Float16",
+                                                    "Matrix",
+                                                    "SPV_KHR_16bit_storage",
+                                                    "Shader",
+                                                    "StorageBuffer16BitAccess",
+                                                    "UniformAndStorageBuffer16BitAccess" },
                           "each OpCapability and OpExtension reads back as a name, sorted, an alias by its primary name");
+    }
+
+    runner.BeginSection("a capability adds the capabilities that it implies");
+    const std::vector<std::byte> shuffleCs =
+        Assemble(Replace(k_WorkgroupCs, "OpCapability Float16", "OpCapability GroupNonUniformShuffle"));
+    runner.Check(!shuffleCs.empty(), "the shuffle fixture assembles");
+    const CookResult<EmittedCodeFacts> shuffleFacts = validator.ReadEmittedCodeFacts(shuffleCs, sink);
+    if (runner.CheckOk(shuffleFacts, "a capability implies another, directly"))
+    {
+        runner.Check(std::ranges::contains(shuffleFacts->CapabilityNames, "GroupNonUniform"),
+                     "GroupNonUniformShuffle adds GroupNonUniform");
+    }
+
+    // AtomicStorage is not in the Vulkan table, so the closure must pass through a name that it does not add
+    const std::vector<std::byte> atomicCs = Assemble(Replace(k_WorkgroupCs, "OpCapability Shader", "OpCapability AtomicStorageOps"));
+    runner.Check(!atomicCs.empty(), "the atomic counter fixture assembles");
+    const CookResult<EmittedCodeFacts> atomicFacts = validator.ReadEmittedCodeFacts(atomicCs, sink);
+    if (runner.CheckOk(atomicFacts, "a capability implies another through a name that the table lacks"))
+    {
+        runner.Check(std::ranges::contains(atomicFacts->CapabilityNames, "Shader"),
+                     "AtomicStorageOps implies AtomicStorage, which implies Shader");
+        runner.Check(!std::ranges::contains(atomicFacts->CapabilityNames, "AtomicStorage"),
+                     "a name that the table lacks is not added");
     }
     if (runner.CheckOk(workgroupFacts,
                        "each workgroup variable counts RoundUp(16, std430 size): 64 + 32 + 16 + 32 bytes"))

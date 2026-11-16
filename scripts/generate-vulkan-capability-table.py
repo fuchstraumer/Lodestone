@@ -13,6 +13,7 @@ entries, and the device needs any one of them:
 SPIR-V gives some capabilities a second name (`StorageUniform16` is `UniformAndStorageBuffer16BitAccess`), and
 SPIRV-Headers' `CapabilityToString` can return either one. `vk.xml` uses the primary name. So the script also reads
 `spirv.core.grammar.json` and writes each alias with its primary name, and the cook stores the primary name.
+The grammar also lists the capabilities that each capability implies, and the script writes those pairs too.
 
 The output is a client header of strings, sorted by name. It names no Vulkan type, so a client needs
 no Vulkan header to read it. The file is checked in, so a build needs neither Python nor `vk.xml`.
@@ -83,12 +84,25 @@ def ReadAliases(grammar_path):
     return dict(sorted(aliases.items()))
 
 
+def ReadImplications(grammar_path):
+    """Each direct implication as (capability, implied capability), sorted. SPIR-V says that a capability
+    declares the capabilities in its `capabilities` field too, so a module need not list them."""
+    grammar = json.loads(pathlib.Path(grammar_path).read_text(encoding='utf-8'))
+    capability_kind = next(kind for kind in grammar['operand_kinds'] if kind['kind'] == 'Capability')
+    aliases = ReadAliases(grammar_path)
+    implications = set()
+    for enumerant in capability_kind['enumerants']:
+        for implied in enumerant.get('capabilities', []):
+            implications.add((enumerant['enumerant'], aliases.get(implied, implied)))
+    return sorted(implications)
+
+
 def VersionCode(major, minor):
     # the same packing as VK_MAKE_API_VERSION(0, major, minor, 0), so a renderer compares its own api version
     return (major << 22) | (minor << 12)
 
 
-def WriteHeader(entries, aliases, header_version, output_path):
+def WriteHeader(entries, aliases, implications, header_version, output_path):
     lines = []
     lines.append('#pragma once')
     lines.append('#ifndef LODESTONE_VULKAN_CAPABILITY_TABLE_HPP')
@@ -199,6 +213,26 @@ def WriteHeader(entries, aliases, header_version, output_path):
     lines.append('    return position != k_CapabilityAliases.end() && position->Alias == name ? position->Name : name;')
     lines.append('}')
     lines.append('')
+    lines.append('/** @brief One direct implication: a module that declares `Name` also declares `Implied`. */')
+    lines.append('struct CapabilityImplication')
+    lines.append('{')
+    lines.append('    std::string_view Name;')
+    lines.append('    std::string_view Implied;')
+    lines.append('};')
+    lines.append('')
+    lines.append('/** @brief Sorted by `Name`, then by `Implied`. Names are primary names. */')
+    lines.append(f'inline constexpr std::array<CapabilityImplication, {len(implications)}u> k_CapabilityImplications{{ {{')
+    for name, implied in implications:
+        lines.append(f'    {{ "{name}", "{implied}" }},')
+    lines.append('} };')
+    lines.append('')
+    lines.append('/** @brief The capabilities that `name` implies directly. The result is empty for a name that implies none. */')
+    lines.append('[[nodiscard]] constexpr std::span<const CapabilityImplication> ImpliedBy(std::string_view name) noexcept')
+    lines.append('{')
+    lines.append('    const auto range = std::ranges::equal_range(k_CapabilityImplications, name, {}, &CapabilityImplication::Name);')
+    lines.append('    return std::span<const CapabilityImplication>{ range.begin(), range.end() };')
+    lines.append('}')
+    lines.append('')
     lines.append('[[nodiscard]] constexpr std::span<const CapabilityEnable> EnablesOf(const CapabilityEntry& entry) noexcept')
     lines.append('{')
     lines.append('    return std::span<const CapabilityEnable>{ k_CapabilityEnables }.subspan(entry.FirstEnable, entry.EnableCount);')
@@ -222,8 +256,10 @@ def main():
     tree = ElementTree.parse(arguments.vk_xml).getroot()
     entries = ReadEntries(tree)
     aliases = ReadAliases(arguments.spirv_grammar)
-    WriteHeader(entries, aliases, ReadHeaderVersion(tree), arguments.output)
-    print(f'{len(entries)} names, {sum(len(enables) for enables in entries.values())} enables, {len(aliases)} aliases')
+    implications = ReadImplications(arguments.spirv_grammar)
+    WriteHeader(entries, aliases, implications, ReadHeaderVersion(tree), arguments.output)
+    print(f'{len(entries)} names, {sum(len(enables) for enables in entries.values())} enables, '
+          f'{len(aliases)} aliases, {len(implications)} implications')
 
 
 if __name__ == '__main__':

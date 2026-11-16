@@ -119,7 +119,7 @@ public:
     /** @brief Bit k is set when axis k can change the entry point's instance. One cooked value counts as relevant. */
     [[nodiscard]] std::span<const uint64_t> AxisRelevance(uint32_t entry_point_index) const noexcept;
     [[nodiscard]] bool IsAxisRelevant(uint32_t entry_point_index, uint32_t local_axis) const noexcept;
-    /** @brief Bit k is set when axis k changes the resource's element count or extent. */
+    /** @brief Bit k is set when axis k changes the resource's element count, extent, or byte size. */
     [[nodiscard]] std::span<const uint64_t> FootprintAxes(uint32_t binding_index) const noexcept;
     [[nodiscard]] bool IsFootprintAxis(uint32_t binding_index, uint32_t local_axis) const noexcept;
     /** @brief String indices sorted by text: SPIR-V capability and extension names, or WGSL `enable` directives. */

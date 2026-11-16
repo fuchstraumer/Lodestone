@@ -4,6 +4,7 @@
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifest.hpp"
 #include "ShaderManifestLayout.hpp"
+#include "VariantKey.hpp"
 #include "emit/ResourceReport.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 #include "emit/ShaderManifestVerify.hpp"
@@ -70,7 +71,17 @@ struct VariantChoice
     bool Debug;
 };
 
-CookedModule BuildModule(const PermutationSpace& space, std::span<const VariantChoice> variants)
+/** Whether the byte size of the `Params` uniform block follows SIZE: 16 bytes, or 32 bytes when SIZE is on. */
+enum class ParamsByteSize : uint8_t
+{
+    Invalid = 0,
+    Fixed,
+    FollowsSize,
+};
+
+constexpr uint32_t k_BigParams = 5u;
+
+CookedModule BuildModule(const PermutationSpace& space, std::span<const VariantChoice> variants, ParamsByteSize params_size)
 {
     CookedModule module;
     module.Name = "ReportModule";
@@ -90,6 +101,13 @@ CookedModule BuildModule(const PermutationSpace& space, std::span<const VariantC
     ReflectedBinding sampler = MakeBinding("LinearSampler", 4u, BindingKind::Sampler, ResourceShape::Invalid);
     module.Resources = { counts, params, lut, target, sampler };
     module.ResourceLists.push_back(ResourceList{ k_Counts, k_Params, k_Lut, k_Target, k_Sampler });
+    if (params_size == ParamsByteSize::FollowsSize)
+    {
+        ReflectedBinding bigParams = params;
+        bigParams.ByteSize = 32u;
+        module.Resources.push_back(bigParams);
+        module.ResourceLists.push_back(ResourceList{ k_Counts, k_BigParams, k_Lut, k_Target, k_Sampler });
+    }
     module.Delivered.VisibilityLists.push_back(VisibilityList{ 0u, 1u, 2u, 3u, 4u });
 
     for (const uint64_t elementCount : { 64u, 128u })
@@ -113,6 +131,7 @@ CookedModule BuildModule(const PermutationSpace& space, std::span<const VariantC
                 PermutationBinding{ .Axis = &space.Axes()[1], .Value = PermutationValue{ choice.Debug } } },
             instances);
         variant.FootprintListIndex = choice.Size ? 1u : 0u;
+        variant.ResourceListIndex = (params_size == ParamsByteSize::FollowsSize && choice.Size) ? 1u : 0u;
         module.VariantKeys.push_back(space.ComputeVariantKey(variant.Canonical));
         module.Variants.push_back(std::move(variant));
     }
@@ -156,8 +175,8 @@ std::vector<std::byte> EmitBytes(const CookedModule& module)
 void CheckMeasurement(tests::TestRunner& runner, const PermutationSpace& space)
 {
     runner.BeginSection("the footprint axes are measured from the cooked tables");
-    const CookedModule every = BuildModule(space, k_EveryVariant);
-    const std::vector<ResourceFootprintInfluence> influence = ComputeFootprintInfluence(every);
+    const CookedModule every = BuildModule(space, k_EveryVariant, ParamsByteSize::Fixed);
+    const std::vector<ResourceFootprintInfluence> influence = ComputeFootprintInfluence(every, FootprintBasis::AttributeFootprint);
     const ResourceFootprintInfluence* counts = FindInfluence(influence, "Counts");
     runner.Check(counts != nullptr && counts->Axes[0] == AxisInfluence::Active && counts->Axes[1] == AxisInfluence::Inert,
                  "SIZE changes the count, and DEBUG does not");
@@ -168,8 +187,8 @@ void CheckMeasurement(tests::TestRunner& runner, const PermutationSpace& space)
                  "an extent that no axis changes has no axis");
 
     runner.BeginSection("a sparse cook is closed by the second pass");
-    const CookedModule diagonal = BuildModule(space, k_Diagonal);
-    const std::vector<ResourceFootprintInfluence> sparse = ComputeFootprintInfluence(diagonal);
+    const CookedModule diagonal = BuildModule(space, k_Diagonal, ParamsByteSize::Fixed);
+    const std::vector<ResourceFootprintInfluence> sparse = ComputeFootprintInfluence(diagonal, FootprintBasis::AttributeFootprint);
     const ResourceFootprintInfluence* sparseCounts = FindInfluence(sparse, "Counts");
     runner.Check(sparseCounts != nullptr && sparseCounts->PairAxes[0] == AxisInfluence::Undetermined &&
                      sparseCounts->PairAxes[1] == AxisInfluence::Undetermined,
@@ -186,30 +205,129 @@ void CheckValidator(tests::TestRunner& runner, const PermutationSpace& space)
 {
     runner.BeginSection("the validator compares the measured axes with the declared axes");
     RecordingDiagnosticSink sink;
-    CookedModule declared = BuildModule(space, k_EveryVariant);
+    CookedModule declared = BuildModule(space, k_EveryVariant, ParamsByteSize::Fixed);
     declared.FootprintDeclarations.push_back(FootprintAxisDeclaration{ .ScopeName = "", .Name = "Counts", .Axes = { 0u } });
     runner.CheckEqual(VerifyFootprintAxes(declared, sink), CookError::Success, "a count that its attribute names passes");
 
-    const CookedModule undeclared = BuildModule(space, k_EveryVariant);
+    const CookedModule undeclared = BuildModule(space, k_EveryVariant, ParamsByteSize::Fixed);
     runner.CheckEqual(VerifyFootprintAxes(undeclared, sink), CookError::FootprintAxisUndeclared,
                       "a count that changes with an axis that no attribute names fails");
 
-    CookedModule wrongAxis = BuildModule(space, k_EveryVariant);
+    CookedModule wrongAxis = BuildModule(space, k_EveryVariant, ParamsByteSize::Fixed);
     wrongAxis.FootprintDeclarations.push_back(FootprintAxisDeclaration{ .ScopeName = "", .Name = "Counts", .Axes = { 1u } });
     runner.CheckEqual(VerifyFootprintAxes(wrongAxis, sink), CookError::FootprintAxisUndeclared,
                       "a count whose attribute names another axis fails");
 
-    CookedModule sparse = BuildModule(space, k_Diagonal);
+    CookedModule sparse = BuildModule(space, k_Diagonal, ParamsByteSize::Fixed);
     sparse.FootprintDeclarations.push_back(FootprintAxisDeclaration{ .ScopeName = "", .Name = "Counts", .Axes = { 0u } });
     runner.CheckEqual(VerifyFootprintAxes(sparse, sink), CookError::Success,
                       "a sparse cook passes, because only a one-axis pair proves an axis");
+}
+
+/** An independent answer: whether two variants that differ in this axis alone read a different `Params` byte size
+ * through the client views. */
+bool ByteSizeChangesWithAxis(const manifest::EnvironmentView& environment, uint32_t axis)
+{
+    const std::array<uint32_t, 2u> radices{ 2u, 2u };
+    const uint32_t variantCount = static_cast<uint32_t>(environment.VariantKeys().size());
+    for (uint32_t lhs = 0u; lhs < variantCount; ++lhs)
+    {
+        for (uint32_t rhs = lhs + 1u; rhs < variantCount; ++rhs)
+        {
+            std::array<uint32_t, 2u> lhsDigits{};
+            std::array<uint32_t, 2u> rhsDigits{};
+            UnpackVariantKey(environment.VariantAt(lhs).Key(), radices, lhsDigits);
+            UnpackVariantKey(environment.VariantAt(rhs).Key(), radices, rhsDigits);
+
+            const uint32_t otherAxis = 1u - axis;
+            if (lhsDigits[otherAxis] != rhsDigits[otherAxis] || lhsDigits[axis] == rhsDigits[axis])
+            {
+                continue;
+            }
+
+            const manifest::LayoutRange lhsLayout = environment.VariantAt(lhs).EntryPoint(0u).Layout();
+            const manifest::LayoutRange rhsLayout = environment.VariantAt(rhs).EntryPoint(0u).Layout();
+            if (lhsLayout[k_Params].ByteSize() != rhsLayout[k_Params].ByteSize())
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+void CheckUniformByteSize(tests::TestRunner& runner, const PermutationSpace& space)
+{
+    runner.BeginSection("a uniform block whose byte size follows an axis is per-variant");
+
+    // the validator checks the attribute footprint only, and no size attribute can name the size of a block
+    CookedModule validated = BuildModule(space, k_EveryVariant, ParamsByteSize::FollowsSize);
+    validated.FootprintDeclarations.push_back(FootprintAxisDeclaration{ .ScopeName = "", .Name = "Counts", .Axes = { 0u } });
+    RecordingDiagnosticSink sink;
+    runner.CheckEqual(VerifyFootprintAxes(validated, sink), CookError::Success,
+                      "a byte size that follows an axis is not an undeclared footprint axis");
+
+    const std::vector<ResourceFootprintInfluence> attributeOnly =
+        ComputeFootprintInfluence(validated, FootprintBasis::AttributeFootprint);
+    const ResourceFootprintInfluence* attributeParams = FindInfluence(attributeOnly, "Params");
+    runner.Check(attributeParams != nullptr && attributeParams->Axes[0] == AxisInfluence::Inert,
+                 "the attribute footprint of the block does not change");
+    const std::vector<ResourceFootprintInfluence> withByteSize =
+        ComputeFootprintInfluence(validated, FootprintBasis::AttributeFootprintAndByteSize);
+    const ResourceFootprintInfluence* byteSizeParams = FindInfluence(withByteSize, "Params");
+    runner.Check(byteSizeParams != nullptr && byteSizeParams->Axes[0] == AxisInfluence::Active &&
+                     byteSizeParams->Axes[1] == AxisInfluence::Inert,
+                 "the byte size of the block follows SIZE and not DEBUG");
+
+    const std::vector<std::byte> bytes = EmitBytes(validated);
+    runner.Check(!bytes.empty(), "the manifest is written, and its round trip passes");
+    const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(bytes);
+    if (!runner.CheckOk(bundle, "the manifest opens"))
+    {
+        return;
+    }
+    const manifest::ManifestResult<manifest::EnvironmentView> environment = bundle->OpenEnvironment(0u, 0u);
+    if (!runner.CheckOk(environment, "the environment opens"))
+    {
+        return;
+    }
+
+    const manifest::LayoutRange layout = environment->VariantAt(0u).EntryPoint(0u).Layout();
+    runner.CheckEqual(layout.Size(), 5u, "the entry point reads five resources");
+    if (layout.Size() != 5u)
+    {
+        return;
+    }
+    for (uint32_t axis = 0u; axis < 2u; ++axis)
+    {
+        runner.CheckEqual(layout[k_Params].IsFootprintAxis(axis),
+                          ByteSizeChangesWithAxis(*environment, axis),
+                          "the written mask equals a direct comparison of the byte sizes read through the views");
+    }
+    runner.Check(layout[k_Params].IsFootprintAxis(0u) && !layout[k_Params].IsFootprintAxis(1u),
+                 "the mask of the block holds SIZE and not DEBUG");
+
+    const manifest::CreationFields params = manifest::DescribeCreation(layout[k_Params]);
+    runner.CheckEqual(params.Size, CreationSource::ShaderPerVariant, "the block has a size per variant");
+    runner.CheckEqual(params.Usage, CreationSource::Shader, "the block usage stays fixed by the shader");
+    runner.Check(params.IsComplete(), "a block with a size per variant is complete");
+
+    const CookResult<ResourceReport> report = BuildResourceReport(bytes, sink);
+    if (!runner.CheckOk(report, "the report reads the manifest") || report->Environments.empty())
+    {
+        return;
+    }
+    const std::string text = FormatResourceReport(*report);
+    runner.Check(text.contains("Params : UniformBuffer, read by CountCS\n    size: per-variant (SIZE), usage: shader"),
+                 "the text names the axis of a block size that varies");
 }
 
 void CheckManifest(tests::TestRunner& runner, const PermutationSpace& space)
 {
     lodestone::StderrDiagnosticSink manifestDiagnostics;
     runner.BeginSection("the footprint axes and the creation fields read back through the manifest");
-    const std::vector<std::byte> bytes = EmitBytes(BuildModule(space, k_EveryVariant));
+    const std::vector<std::byte> bytes = EmitBytes(BuildModule(space, k_EveryVariant, ParamsByteSize::Fixed));
     const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(bytes);
     if (!runner.CheckOk(bundle, "the manifest opens, and its round trip passes"))
     {
@@ -321,6 +439,7 @@ int main()
     const PermutationSpace space = MakeSpace();
     CheckMeasurement(runner, space);
     CheckValidator(runner, space);
+    CheckUniformByteSize(runner, space);
     CheckManifest(runner, space);
     return runner.Report();
 }

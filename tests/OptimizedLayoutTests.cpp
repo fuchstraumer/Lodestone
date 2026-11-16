@@ -115,12 +115,36 @@ int main(int argc, char** argv)
     const tests::CookedBundle unoptimized = CookAtLevel(module, 0u, 0u);
     const tests::CookedBundle optimized = CookAtLevel(module, 2u, 0u);
     const tests::CookedBundle debug = CookAtLevel(module, 2u, 3u);
+    const tests::CookedBundle helper = CookAtLevel(assetDirectory / "SamplerHelper.slang", 0u, 0u);
 
     {
         const tests::ScopedSection section = runner.Section("both cooks pass the cross-profile checks");
         runner.CheckEqual(unoptimized.Result, CookError::Success, "the O0 cook of both targets succeeds");
         runner.CheckEqual(optimized.Result, CookError::Success, "the O2 cook of both targets succeeds");
         runner.CheckEqual(debug.Result, CookError::Success, "the O2 cook with debug information succeeds");
+    }
+
+    {
+        // the cook compares the SPIR-V pairs with the pairs that Tint reads from the WGSL
+        const tests::ScopedSection section = runner.Section("a sampler that a helper takes as a parameter pairs through each call");
+        runner.CheckEqual(helper.Result, CookError::Success, "the O0 cook of the helper passes the cross-profile pair check");
+        const manifest::ManifestResult<manifest::BundleView> helperBundle = manifest::BundleView::Open(helper.Bytes);
+        if (runner.CheckOk(helperBundle, "the helper bundle opens"))
+        {
+            const manifest::ManifestResult<uint32_t> entry = helperBundle->Module(0u).FindEntryPointIndex("HelperCS");
+            for (const std::string_view target : { "wgsl", "spirv" })
+            {
+                const tests::ScopedContext context = runner.Context(std::string{ target });
+                const manifest::ManifestResult<manifest::EnvironmentView> environment =
+                    helperBundle->OpenEnvironment(static_cast<uint32_t>(helperBundle->FindProfile(target)), 0u);
+                if (runner.CheckOk(environment, "the environment opens") && runner.CheckOk(entry, "the entry point is found"))
+                {
+                    const manifest::EntryPointInstanceView view = environment->VariantAt(0u).EntryPoint(*entry);
+                    runner.CheckEqual(view.SamplerTexturePairs().size(), size_t{ 2u },
+                                      "the two calls give the texture with each sampler");
+                }
+            }
+        }
     }
 
     const manifest::ManifestResult<manifest::BundleView> bundle0 = manifest::BundleView::Open(unoptimized.Bytes);

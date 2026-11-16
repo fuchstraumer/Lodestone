@@ -39,6 +39,13 @@ namespace
     PolicyDocResult<TargetCookPolicy> ReadTargetPolicy(const toml::table& target_table);
     PolicyDocResult<StringMap<TargetCookPolicy>> ReadTargets(const toml::table& module_table);
     PolicyParseError MakeParseError(const toml::parse_result& result);
+    std::string FileOf(const toml::source_region& region);
+    void MoveNodeInto(toml::table& destination, std::string_view key, toml::node& node);
+    PolicyParseError MakeKeyConflict(const toml::node& existing, const toml::node& incoming, std::string_view dotted_key);
+    /** Moves every key of `source` into `destination`. Returns the conflict when two files set one key. */
+    std::optional<PolicyParseError> MergeTables(toml::table& destination,
+                                                toml::table& source,
+                                                std::string_view key_prefix);
     PolicyDocResult<StringMap<ModulePolicyEntry>> BuildModules(const toml::table& root);
     const PermutationAxis* FindDeclaredAxis(std::span<const PermutationAxis> axes, std::string_view name);
     CookError ValidateTargetAndAxisValues(const std::string_view module_name,
@@ -57,6 +64,35 @@ PolicyDocResult<PolicyDocument> PolicyDocument::Load(std::string_view path)
     }
 
     PolicyDocResult<StringMap<ModulePolicyEntry>> modules = BuildModules(result.table());
+    if (!modules)
+    {
+        return std::unexpected(std::move(modules.error()));
+    }
+
+    PolicyDocument document;
+    document.modules = std::move(*modules);
+    return document;
+}
+
+PolicyDocResult<PolicyDocument> PolicyDocument::LoadMerged(std::span<const std::string> paths)
+{
+    toml::table merged;
+    for (const std::string& path : paths)
+    {
+        toml::parse_result result = toml::parse_file(path);
+        if (result.failed())
+        {
+            return std::unexpected(MakeParseError(result));
+        }
+
+        const std::optional<PolicyParseError> conflict = MergeTables(merged, result.table(), "");
+        if (conflict)
+        {
+            return std::unexpected(*conflict);
+        }
+    }
+
+    PolicyDocResult<StringMap<ModulePolicyEntry>> modules = BuildModules(merged);
     if (!modules)
     {
         return std::unexpected(std::move(modules.error()));
@@ -233,6 +269,7 @@ namespace
     {
         const toml::source_region& region = node.source();
         return PolicyParseError{ .Message = std::move(message),
+                                 .File = FileOf(region),
                                  .Line = region.begin.line,
                                  .Column = region.begin.column };
     }
@@ -400,9 +437,72 @@ namespace
         const toml::parse_error& error = result.error();
         const toml::source_region& region = error.source();
         return PolicyParseError{ .Message = std::string{ error.description() },
+                                 .File = FileOf(region),
                                  .Line = region.begin.line,
                                  .Column = region.begin.column };
     }
+
+    std::string FileOf(const toml::source_region& region)
+    {
+        return region.path != nullptr ? *region.path : std::string{};
+    }
+
+    void MoveNodeInto(toml::table& destination, std::string_view key, toml::node& node)
+    {
+        // moving keeps the source region of each node, which a later conflict message reads
+        node.visit([&destination, key](auto& element) { static_cast<void>(destination.insert(key, std::move(element))); });
+    }
+
+    PolicyParseError MakeKeyConflict(const toml::node& existing, const toml::node& incoming, std::string_view dotted_key)
+    {
+        const toml::source_region& existingRegion = existing.source();
+        const toml::source_region& incomingRegion = incoming.source();
+        return PolicyParseError{ .Message = std::format("key '{}' is set in '{}' at line {} and in '{}' at line {}",
+                                                        dotted_key,
+                                                        FileOf(existingRegion),
+                                                        existingRegion.begin.line,
+                                                        FileOf(incomingRegion),
+                                                        incomingRegion.begin.line),
+                                 .File = FileOf(incomingRegion),
+                                 .Code = CookError::PolicyKeyConflict,
+                                 .Line = incomingRegion.begin.line,
+                                 .Column = incomingRegion.begin.column };
+    }
+
+    // NOLINTBEGIN(misc-no-recursion)
+    std::optional<PolicyParseError> MergeTables(toml::table& destination,
+                                                toml::table& source,
+                                                std::string_view key_prefix)
+    {
+        for (auto&& [key, node] : source)
+        {
+            const std::string dottedKey = key_prefix.empty() ? std::string{ key.str() }
+                                                             : std::format("{}.{}", key_prefix, key.str());
+
+            toml::node* existing = destination.get(key.str());
+            if (existing == nullptr)
+            {
+                MoveNodeInto(destination, key.str(), node);
+                continue;
+            }
+
+            toml::table* existingTable = existing->as_table();
+            toml::table* incomingTable = node.as_table();
+            if (existingTable == nullptr || incomingTable == nullptr)
+            {
+                return MakeKeyConflict(*existing, node, dottedKey);
+            }
+
+            std::optional<PolicyParseError> nested = MergeTables(*existingTable, *incomingTable, dottedKey);
+            if (nested)
+            {
+                return nested;
+            }
+        }
+
+        return std::nullopt;
+    }
+    // NOLINTEND(misc-no-recursion)
 
     PolicyDocResult<StringMap<ModulePolicyEntry>> BuildModules(const toml::table& root)
     {

@@ -6,8 +6,13 @@
 #include "Diagnostics.hpp"
 #include "TestHarness.hpp"
 #include <array>
+#include <chrono>
 #include <cstddef>
+#include <filesystem>
 #include <format>
+#include <fstream>
+#include <initializer_list>
+#include <system_error>
 #include <string>
 #include <utility>
 #include <vector>
@@ -311,9 +316,118 @@ void TestTargetNames(TestRunner& runner)
     }
 }
 
+/** Writes each text into a file of its own in a folder of its own, and removes the folder when it goes out of scope. */
+class TemporaryPolicyFiles
+{
+public:
+    explicit TemporaryPolicyFiles(std::initializer_list<std::string_view> texts)
+    {
+        const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+        directory = std::filesystem::temp_directory_path() / std::format("LodestonePolicyDocumentTest_{}", stamp);
+        std::filesystem::create_directories(directory);
+
+        for (const std::string_view text : texts)
+        {
+            const std::string path = (directory / std::format("policy{}.toml", paths.size())).string();
+            std::ofstream file{ path, std::ios::binary };
+            file << text;
+            paths.push_back(path);
+        }
+    }
+
+    ~TemporaryPolicyFiles()
+    {
+        std::error_code ignored;
+        std::filesystem::remove_all(directory, ignored);
+    }
+
+    TemporaryPolicyFiles(const TemporaryPolicyFiles&) = delete;
+    TemporaryPolicyFiles& operator=(const TemporaryPolicyFiles&) = delete;
+
+    [[nodiscard]] const std::vector<std::string>& Paths() const noexcept
+    {
+        return paths;
+    }
+
+private:
+    std::filesystem::path directory;
+    std::vector<std::string> paths;
+};
+
+void TestMergedFiles(TestRunner& runner)
+{
+    runner.BeginSection("several files merge into one document");
+
+    const TemporaryPolicyFiles disjoint{ "[OceanFft.targets.wgsl]\nMaxVariants = 64\n",
+                                         "[Terrain.targets.spirv]\nMaxVariants = 8\n" };
+    const auto merged = PolicyDocument::LoadMerged(disjoint.Paths());
+    if (runner.CheckOk(merged, "two files with different modules merge"))
+    {
+        runner.CheckEqual(merged->ModuleCount(), 2u, "each module of each file is in the document");
+        runner.CheckEqual(merged->FindTargetPolicy("OceanFft", "wgsl").MaxVariants, 64u, "the first file's value reads back");
+        runner.CheckEqual(merged->FindTargetPolicy("Terrain", "spirv").MaxVariants, 8u, "the second file's value reads back");
+    }
+
+    const TemporaryPolicyFiles sameModule{ "[OceanFft.targets.wgsl]\nMaxVariants = 64\n",
+                                           "[OceanFft.targets.spirv]\nMaxVariants = 8\n" };
+    const auto sameModuleMerged = PolicyDocument::LoadMerged(sameModule.Paths());
+    if (runner.CheckOk(sameModuleMerged, "two files with different targets of one module merge"))
+    {
+        runner.CheckEqual(sameModuleMerged->FindTargetPolicy("OceanFft", "wgsl").MaxVariants, 64u,
+                          "tables merge down to the keys");
+        runner.CheckEqual(sameModuleMerged->FindTargetPolicy("OceanFft", "spirv").MaxVariants, 8u,
+                          "tables merge down to the keys");
+    }
+
+    const TemporaryPolicyFiles differentAxes{ "[OceanFft.targets.wgsl.CookValues]\nIFFT_SIZE = [256]\n",
+                                              "[OceanFft.targets.wgsl.CookValues]\nIFFT_USE_WAVE_OPS = [true]\n" };
+    const auto axesMerged = PolicyDocument::LoadMerged(differentAxes.Paths());
+    if (runner.CheckOk(axesMerged, "two files with different CookValues axes of one module merge"))
+    {
+        runner.CheckEqual(axesMerged->FindTargetPolicy("OceanFft", "wgsl").CookValues.size(), 2u,
+                          "the CookValues of both files are in the policy");
+    }
+
+    runner.BeginSection("a key that two files set is a conflict");
+
+    const TemporaryPolicyFiles sameValue{ "[OceanFft.targets.wgsl]\nMaxVariants = 64\n",
+                                          "# a comment line\n[OceanFft.targets.wgsl]\nMaxVariants = 8\n" };
+    const auto valueConflict = PolicyDocument::LoadMerged(sameValue.Paths());
+    if (runner.Check(!valueConflict.has_value(), "two files that set MaxVariants for one module and target fail"))
+    {
+        const lodestone::PolicyParseError& error = valueConflict.error();
+        runner.CheckEqual(error.Code, CookError::PolicyKeyConflict, "the error is PolicyKeyConflict");
+        runner.Check(error.Message.contains(sameValue.Paths()[0]) && error.Message.contains(sameValue.Paths()[1]),
+                     std::format("the message names both files: '{}'", error.Message));
+        runner.Check(error.Message.contains("OceanFft.targets.wgsl.MaxVariants"),
+                     std::format("the message names the dotted key: '{}'", error.Message));
+        runner.Check(error.Message.contains("line 2") && error.Message.contains("line 3"),
+                     std::format("the message names both line numbers: '{}'", error.Message));
+    }
+
+    const TemporaryPolicyFiles sameAxis{ "[OceanFft.targets.wgsl.CookValues]\nIFFT_SIZE = [256]\n",
+                                         "[OceanFft.targets.wgsl.CookValues]\nIFFT_SIZE = [512]\n" };
+    const auto axisConflict = PolicyDocument::LoadMerged(sameAxis.Paths());
+    if (runner.Check(!axisConflict.has_value(), "two files that set one CookValues axis fail, and arrays do not union"))
+    {
+        runner.CheckEqual(axisConflict.error().Code, CookError::PolicyKeyConflict, "the error is PolicyKeyConflict");
+        runner.Check(axisConflict.error().Message.contains("OceanFft.targets.wgsl.CookValues.IFFT_SIZE"),
+                     std::format("the message names the dotted key: '{}'", axisConflict.error().Message));
+    }
+
+    const TemporaryPolicyFiles malformed{ "[OceanFft.targets.wgsl]\nMaxVariants = 64\n", "[OceanFft" };
+    const auto parseFailure = PolicyDocument::LoadMerged(malformed.Paths());
+    if (runner.Check(!parseFailure.has_value(), "a file that does not parse fails the merge"))
+    {
+        runner.CheckEqual(parseFailure.error().Code, CookError::PolicyDocumentLoadFailed, "a parse failure keeps its own error");
+        runner.Check(parseFailure.error().File == malformed.Paths()[1], "a parse failure names its file");
+    }
+}
+
 int main()
 {
     TestRunner runner{ "PolicyDocumentTests" };
+    TestMergedFiles(runner);
     TestParseAndQuery(runner);
     TestParseRejections(runner);
     TestValidationAgainstSpace(runner);

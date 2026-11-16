@@ -77,6 +77,7 @@
             "contentHash": 17771999990063547495,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -86,6 +87,7 @@
             "contentHash": 15939814897232257434,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -95,6 +97,7 @@
             "contentHash": 12323541287565596156,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -104,6 +107,7 @@
             "contentHash": 460656828092853655,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -113,6 +117,7 @@
             "contentHash": 15211363841204055201,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -122,6 +127,7 @@
             "contentHash": 18163240081606218549,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -131,6 +137,7 @@
             "contentHash": 5665272027613512831,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -140,6 +147,7 @@
             "contentHash": 8818630594198687562,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -149,6 +157,7 @@
             "contentHash": 4703307383788513774,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -158,6 +167,7 @@
             "contentHash": 12240279818241701988,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -167,6 +177,7 @@
             "contentHash": 11461762360596883431,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -176,6 +187,7 @@
             "contentHash": 16171726498879931705,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -185,6 +197,7 @@
             "contentHash": 16907630188233564088,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -194,6 +207,7 @@
             "contentHash": 1124532432474034706,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -203,6 +217,7 @@
             "contentHash": 18290291392347783068,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -212,6 +227,7 @@
             "contentHash": 6545507745699726238,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -221,6 +237,7 @@
             "contentHash": 4806818109887291186,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -230,6 +247,7 @@
             "contentHash": 11753393881416301644,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -288,6 +306,7 @@
             "contentHash": 6171441629272945423,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -297,6 +316,7 @@
             "contentHash": 13512021620642640606,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -306,6 +326,7 @@
             "contentHash": 18255839431681836780,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -315,6 +336,7 @@
             "contentHash": 5423228246132792065,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -324,6 +346,7 @@
             "contentHash": 6336887951648161724,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -333,6 +356,7 @@
             "contentHash": 7102839797892239230,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -342,6 +366,7 @@
             "contentHash": 13988924990386822475,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -351,6 +376,7 @@
             "contentHash": 4900251884688447863,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -360,6 +386,7 @@
             "contentHash": 5782587645275630137,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -369,6 +396,7 @@
             "contentHash": 2609446928893703417,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -378,6 +406,7 @@
             "contentHash": 6242309830044360882,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -387,6 +416,7 @@
             "contentHash": 11820778556019122786,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -396,6 +426,7 @@
             "contentHash": 1535379087840314939,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -405,6 +436,7 @@
             "contentHash": 17590647634738161993,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -414,6 +446,7 @@
             "contentHash": 15554291003650923893,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -423,6 +456,7 @@
             "contentHash": 8368313943340103362,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -432,6 +466,7 @@
             "contentHash": 4851471649139213800,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -441,6 +476,7 @@
             "contentHash": 532004929685248253,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -499,6 +535,7 @@
             "contentHash": 3631528010521971591,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -508,6 +545,7 @@
             "contentHash": 11184573665890528583,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -517,6 +555,7 @@
             "contentHash": 6785650305314118004,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -526,6 +565,7 @@
             "contentHash": 1720705016176425791,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -535,6 +575,7 @@
             "contentHash": 5992623842037451416,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -544,6 +585,7 @@
             "contentHash": 11121236522621922656,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -553,6 +595,7 @@
             "contentHash": 7183604615888830756,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -562,6 +605,7 @@
             "contentHash": 10440801686983840376,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -571,6 +615,7 @@
             "contentHash": 11620732525367236082,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -580,6 +625,7 @@
             "contentHash": 8821870818000590088,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -589,6 +635,7 @@
             "contentHash": 13080693247306358333,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -598,6 +645,7 @@
             "contentHash": 8802597866211591403,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -607,6 +655,7 @@
             "contentHash": 13027948429623399953,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -616,6 +665,7 @@
             "contentHash": 12228883582327773993,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -625,6 +675,7 @@
             "contentHash": 10287558679446528830,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -634,6 +685,7 @@
             "contentHash": 13981914477057665184,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -643,6 +695,7 @@
             "contentHash": 320472939612857779,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -652,6 +705,7 @@
             "contentHash": 10862871252490353953,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -703,6 +757,7 @@
             "contentHash": 17560626835469160327,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -712,6 +767,7 @@
             "contentHash": 16976773459875403268,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -721,6 +777,7 @@
             "contentHash": 6605009333815921966,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -730,6 +787,7 @@
             "contentHash": 7792927951122518469,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -739,6 +797,7 @@
             "contentHash": 567112861538102767,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -748,6 +807,7 @@
             "contentHash": 2374648816218592239,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -757,6 +817,7 @@
             "contentHash": 13117947157795919527,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -766,6 +827,7 @@
             "contentHash": 5041201725328273252,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -775,6 +837,7 @@
             "contentHash": 15579762659941213153,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -784,6 +847,7 @@
             "contentHash": 7278312897222969130,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -793,6 +857,7 @@
             "contentHash": 7385668794189932001,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -802,6 +867,7 @@
             "contentHash": 12687326493400986544,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -811,6 +877,7 @@
             "contentHash": 9828578216373182140,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -820,6 +887,7 @@
             "contentHash": 12748293914485107342,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -829,6 +897,7 @@
             "contentHash": 12918159747320712627,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -838,6 +907,7 @@
             "contentHash": 17662108703499150650,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -847,6 +917,7 @@
             "contentHash": 3636589687317493994,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -856,6 +927,7 @@
             "contentHash": 6879663466557116969,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -907,6 +979,7 @@
             "contentHash": 11532603397924190666,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -916,6 +989,7 @@
             "contentHash": 15070554534418347417,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -925,6 +999,7 @@
             "contentHash": 7977517622400880816,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -934,6 +1009,7 @@
             "contentHash": 11100421735524236280,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -943,6 +1019,7 @@
             "contentHash": 7690043076910733783,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -952,6 +1029,7 @@
             "contentHash": 15780174545993061946,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -961,6 +1039,7 @@
             "contentHash": 12912654981965505821,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -970,6 +1049,7 @@
             "contentHash": 11208343220189956559,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -979,6 +1059,7 @@
             "contentHash": 18237011063921414992,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -988,6 +1069,7 @@
             "contentHash": 8512391242517565848,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -997,6 +1079,7 @@
             "contentHash": 12694516613401185488,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1006,6 +1089,7 @@
             "contentHash": 10399303006875457232,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1015,6 +1099,7 @@
             "contentHash": 4738207421545848468,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1024,6 +1109,7 @@
             "contentHash": 9984785858169404333,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1033,6 +1119,7 @@
             "contentHash": 15010056491485242888,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1042,6 +1129,7 @@
             "contentHash": 11874225207079446995,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1051,6 +1139,7 @@
             "contentHash": 7514671305533951276,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1060,6 +1149,7 @@
             "contentHash": 2711242296752292202,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1111,6 +1201,7 @@
             "contentHash": 11522937115677976923,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1120,6 +1211,7 @@
             "contentHash": 12648481343380666023,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1129,6 +1221,7 @@
             "contentHash": 3980516424744465322,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1138,6 +1231,7 @@
             "contentHash": 9880733537241956086,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1147,6 +1241,7 @@
             "contentHash": 266044109456476087,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1156,6 +1251,7 @@
             "contentHash": 5978569768932000475,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1165,6 +1261,7 @@
             "contentHash": 10974439727425314217,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1174,6 +1271,7 @@
             "contentHash": 141929627211559136,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1183,6 +1281,7 @@
             "contentHash": 12731154745628021506,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1192,6 +1291,7 @@
             "contentHash": 10554809598597211922,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1201,6 +1301,7 @@
             "contentHash": 4983774796061372676,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1210,6 +1311,7 @@
             "contentHash": 5764698574274835937,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1219,6 +1321,7 @@
             "contentHash": 17077313979243810125,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1228,6 +1331,7 @@
             "contentHash": 17470581284256476595,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1237,6 +1341,7 @@
             "contentHash": 10273882547852413515,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1246,6 +1351,7 @@
             "contentHash": 14862798558967443129,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1255,6 +1361,7 @@
             "contentHash": 4114233513385673164,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         },
@@ -1264,6 +1371,7 @@
             "contentHash": 3954503787860971440,
             "workgroupMemoryBytes": 256,
             "capabilities": [
+                "GroupNonUniform",
                 "GroupNonUniformArithmetic"
             ]
         }
