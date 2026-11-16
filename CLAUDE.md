@@ -132,7 +132,7 @@ contents. `Check` returns its condition, so the check can guard the checks that 
 check fails, so a guard that fails cannot hide the checks behind it. To read the diagnostics of a cook, pass a
 `RecordingDiagnosticSink` to the three-argument `RunCook`.
 
-Fifty-three test targets exist: forty-six unit tests and seven cook tests. `tests/README.md` lists what each one proves. Read it before you add or change a test, and add a row there for each new target.
+Fifty-four test targets exist: forty-seven unit tests and seven cook tests. `tests/README.md` lists what each one proves. Read it before you add or change a test, and add a row there for each new target.
 
 Each cook test writes into its own output directory. The bundle and the dedup report hold every module
 of one cook, so a module added to a cook changes those files.
@@ -677,7 +677,8 @@ No module data is compiled in. Phase E step E6 deleted the old registry
 An axis is declared in the shader, on its `extern static const` (or `extern struct`, for an interface
 axis) declaration, as an `ls_axis_*` attribute. `builtins/LodestoneAttributes.slang` defines the
 attributes: `ls_axis_values`, `ls_axis_boolean`, `ls_axis_active_when`, `ls_axis_kind`, `ls_axis_enum`,
-`ls_axis_interface`, and `ls_axis_interface_impl`. `SlangCompiler::PrepareRawModule` reads them at the
+`ls_axis_interface`, `ls_axis_interface_active_when` (the struct form of `ls_axis_active_when`, because an attribute
+has one target), and `ls_axis_interface_impl`. `SlangCompiler::PrepareRawModule` reads them at the
 bootstrap compile through `SlangModuleContext::ReadDeclaredAxes`, and `BuildPermutationSpace` (in
 `src/driver/CookerDriver.cpp`) turns them into a `PermutationSpace`.
 

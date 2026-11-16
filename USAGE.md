@@ -109,6 +109,14 @@ extern static const uint WAVE_SIZE = 32u;
 When `USE_WAVE_OPS` is false, `WAVE_SIZE` has no effect, and the cooker makes no extra variants for it. Use a
 gate whenever one axis has no meaning without another axis. A gate removes variants that are identical.
 
+An attribute has one target, so an interface axis (a struct) uses `ls_axis_interface_active_when` instead:
+
+```slang
+[ls_axis_interface]
+[ls_axis_interface_active_when("USE_TINT")]
+public extern struct TINT : ITint = NoTint;
+```
+
 #### Constants that are not axes
 
 An `extern static const` with no `ls_axis_*` attribute is not an axis. The cooker reads its default value, and

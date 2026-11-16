@@ -106,6 +106,14 @@ public struct ls_axis_interfaceAttribute
 {
 };
 
+/** The interface axis is active when this expression over earlier axes is true. This is the struct form of
+  * `ls_axis_active_when`, because an attribute can have only one target. Place it beside `ls_axis_interface`. */
+[__AttributeUsage(_AttributeTargets.Struct)]
+public struct ls_axis_interface_active_whenAttribute
+{
+    public string condition;
+};
+
 [__AttributeUsage(_AttributeTargets.Struct)]
 public struct ls_axis_interface_implAttribute
 {
