@@ -205,8 +205,18 @@ CookError PolicyDocument::ValidateAgainstSpace(std::string_view module_name,
         return CookError::Success;
     }
 
+    size_t inertAxesCount = 0;
+    for (const auto& [entryPoint, axes] : entry->InertAxesForEntryPoints)
+    {
+        inertAxesCount += axes.size();
+    }
+
+    std::vector<std::string_view> inertAxesNames;
+    inertAxesNames.reserve(inertAxesCount);
+
     auto inertAxesStrs = entry->InertAxesForEntryPoints | std::views::values | std::views::join;
-    std::vector<std::string_view> inertAxesNames(inertAxesStrs.begin(), inertAxesStrs.end());
+    inertAxesNames.append_range(inertAxesStrs);
+
     std::ranges::sort(inertAxesNames);
     auto [firstToErase, lastToErase] = std::ranges::unique(inertAxesNames);
     inertAxesNames.erase(firstToErase, lastToErase);
@@ -488,7 +498,11 @@ namespace
             else if (element.is_integer())
             {
                 const int64_t val = *element.value<int64_t>();
-                // todo-ship: TOML has no unsigned integers, so this assumes unsigned. Drop signed values or handle them
+                if (val < 0)
+                {
+                    return std::unexpected(ErrorAt(
+                        element, std::format("CookValues.{} entries must be non-negative integers", axis_name)));
+                }
                 cookValues.Values.emplace_back(static_cast<uint32_t>(val));
             }
             else if (element.is_string())
@@ -756,11 +770,12 @@ namespace
                     const std::optional<PermutationValue> named = axis->FindNamedValue(valueName);
                     if (!named.has_value() || !AxisDeclaresValue(*axis, *named))
                     {
-                        std::vector<std::string_view> declaredNames;
-                        for (const PermutationValue& value : axis->GetValues())
+                        std::vector<std::string_view> declaredNames(axis->NumValues());
+                        for (const auto&&[idx, value] : axis->GetValues() | std::views::enumerate)
                         {
-                            declaredNames.push_back(axis->NamedValueName(value));
+                            declaredNames[idx] = axis->NamedValueName(value);
                         }
+                        
                         const std::string_view nearest = NearestName(RemoveWhitespace(valueName), declaredNames);
                         return ReportError(sink,
                                            CookError::PolicyValueNotInAxis,

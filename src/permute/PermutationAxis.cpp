@@ -214,7 +214,18 @@ std::optional<PermutationValue> PermutationAxis::FindNamedValue(std::string_view
 
 std::string_view PermutationAxis::NamedValueName(const PermutationValue& value) const noexcept
 {
-    return ValueDomain == AxisValueDomain::Enum ? EnumCaseName(value.AsUInt()) : InterfaceImplTypeName(value.AsUInt());
+    if (ValueDomain == AxisValueDomain::Enum)
+    {
+        return EnumCaseName(value.AsUInt());
+    }
+    else if (ValueDomain == AxisValueDomain::Type)
+    {
+        return InterfaceImplTypeName(value.AsUInt());
+    }
+    else
+    {
+        return {};
+    }
 }
 
 } // namespace lodestone

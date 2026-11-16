@@ -54,7 +54,7 @@ private:
 int64_t PermutationValueToInt64(const PermutationValue& value) noexcept;
 std::string ValueToPrintableString(const PermutationValue& value) noexcept;
 std::string ValueToSlangLiteral(const PermutationAxis& axis, const PermutationValue& value);
-std::string ValueToSlangTypeName(const PermutationValue& value);
+std::string_view ValueToSlangTypeName(const PermutationValue& value);
 std::string MakeExportedConstantSource(const PermutationAxis& axis, const PermutationValue& value);
 std::string MakeVariantModuleName(const PermutationAxis& axis, const PermutationValue& value);
 std::string MakeVariantModulePath(const PermutationAxis& axis, const PermutationValue& value);

@@ -1,5 +1,7 @@
 #include "permute/PermutationValue.hpp"
 #include "permute/PermutationAxis.hpp"
+#include "permute/PermutationTypes.hpp"
+#include <cassert>
 #include <cstdint>
 #include <format>
 #include <string>
@@ -107,7 +109,7 @@ std::string ValueToSlangLiteral(const PermutationAxis& axis, const PermutationVa
     case PermutationValue::Type::UInt:
         return std::to_string(value.AsUInt());
     case PermutationValue::Type::Enum:
-        return std::string{ value.AsQualifiedEnum(axis) };
+        return value.AsQualifiedEnum(axis);
     case PermutationValue::Type::Type:
         return std::string{ value.AsType(axis) };
     case PermutationValue::Type::Invalid:
@@ -134,7 +136,7 @@ std::string ValueToPrintableString(const PermutationValue& value) noexcept
     return "invalid";
 }
 
-std::string ValueToSlangTypeName(const PermutationValue& value)
+std::string_view ValueToSlangTypeName(const PermutationValue& value)
 {
     switch (value.GetType())
     {

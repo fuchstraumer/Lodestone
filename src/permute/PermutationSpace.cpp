@@ -98,10 +98,19 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetCookPolic
     for (const std::string& expr : requireExpressions)
     {
         const auto exprEval = CollectExpressionIdentifiers(expr, sink);
+        if (!exprEval)
+        {
+            return std::unexpected(exprEval.error());
+        }
 
         std::ptrdiff_t deepest = 0;
         for (const std::string& identifier : *exprEval)
         {
+            const auto found = axisIndexMap.find(identifier);
+            if (found == axisIndexMap.end())
+            {
+                return std::unexpected(CookError::PermutationConstraintUnknownSymbol);
+            }
             deepest = std::max(deepest, axisIndexMap.at(identifier));
         }
 
@@ -126,8 +135,10 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetCookPolic
     }
 
     PermutationAssignment partial;
+    std::vector<AttrExprSymbol> symbols = SymbolsFromCanonicalAssignment(CanonicalizeAssignment(partial));
     std::vector<VariantDescriptor> descriptors;
-    const CookError walkResult = expandFrom(0, partial, requireReadyAt, policy, axisValueOverrides, descriptors, sink);
+    const CookError walkResult =
+        expandFrom(0, partial, symbols, requireReadyAt, policy, axisValueOverrides, descriptors, sink);
     if (!walkResult)
     {
         return std::unexpected(walkResult);
@@ -148,7 +159,7 @@ CookResult<VariantSet> PermutationSpace::EnumerateVariants(const TargetCookPolic
     {
         return std::unexpected(verifyUnique);
     }
-    for (uint64_t i = 0; std::cmp_less(i, variantSet.Variants.size()); ++i)
+    for (int32_t i = 0; std::cmp_less(i, variantSet.Variants.size()); ++i)
     {
         variantSet.Variants[i].Index = i;
     }
@@ -175,7 +186,7 @@ VariantKey PermutationSpace::ComputeVariantKey(const CanonicalAssignment& canoni
     std::vector<uint32_t> valueIndices(axes.size());
     std::vector<uint32_t> radices(axes.size());
 
-    for (size_t i = 0; i < axes.size(); ++i)
+    for (int32_t i = 0; std::cmp_less(i, axes.size()); ++i)
     {
         const PermutationValue& actualValue = canonical[i].Value;
         const auto& values = axes[i].GetValues();
@@ -393,19 +404,18 @@ CookError PermutationSpace::validateRequires(const std::vector<std::string_view>
 //NOLINTBEGIN(misc-no-recursion)
 CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
                                        PermutationAssignment& partial,
+                                       std::vector<AttrExprSymbol>& symbols,
                                        const RequireReadyMap& require_ready_at,
                                        const TargetCookPolicy& policy,
                                        const AxisValueOverrideMap& axis_value_overrides,
                                        std::vector<VariantDescriptor>& expanded,
                                        DiagnosticSink& sink) const
 {
-    CanonicalAssignment canonical = CanonicalizeAssignment(partial);
-
     if (std::cmp_equal(depth, axes.size()))
     {
+        CanonicalAssignment canonical = CanonicalizeAssignment(partial);
         if (!policy.CookIf.empty())
         {
-            const std::vector<AttrExprSymbol> symbols = SymbolsFromCanonicalAssignment(canonical);
             const CookResult<int64_t> cookIfResult = EvaluateExpression(policy.CookIf, symbols, sink);
             if (!cookIfResult) [[unlikely]]
             {
@@ -434,7 +444,6 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
     const PermutationAxis& axis = axes[static_cast<size_t>(depth)];
 
     bool active = true;
-    const std::vector<AttrExprSymbol> symbols = SymbolsFromCanonicalAssignment(canonical);
 
     // ActiveWhen only references earlier axes, so it can be evaluated here
     if (!axis.ActiveWhen.empty())
@@ -463,6 +472,7 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
 
         return expandFrom(depth + 1,
                           partial,
+                          symbols,
                           require_ready_at,
                           policy,
                           axis_value_overrides,
@@ -480,9 +490,8 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
     for (const PermutationValue& value : axisValues)
     {
         partial.emplace_back(&axis, value);
-        const CanonicalAssignment innerCanonical = CanonicalizeAssignment(partial);
-        const std::vector<AttrExprSymbol> innerSymbols = SymbolsFromCanonicalAssignment(innerCanonical);
-        const CookResult<bool> keepAxis = CheckRequires(depth, innerSymbols, require_ready_at, sink);
+        symbols[static_cast<size_t>(depth)].Value = PermutationValueToInt64(value);
+        const CookResult<bool> keepAxis = CheckRequires(depth, symbols, require_ready_at, sink);
         if (!keepAxis) [[unlikely]]
         {
             partial.pop_back();
@@ -493,6 +502,7 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
         {
             const CookError subtree = expandFrom(depth + 1,
                                                  partial,
+                                                 symbols,
                                                  require_ready_at,
                                                  policy,
                                                  axis_value_overrides,
@@ -508,6 +518,7 @@ CookError PermutationSpace::expandFrom(std::ptrdiff_t depth,
         partial.pop_back();
     }
 
+    symbols[static_cast<size_t>(depth)].Value = PermutationValueToInt64(axis.GetCanonicalValue());
     return CookError::Success;
 }
 //NOLINTEND(misc-no-recursion)

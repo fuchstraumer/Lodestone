@@ -85,6 +85,7 @@ private:
 
     CookError expandFrom(std::ptrdiff_t depth,
                          PermutationAssignment& partial,
+                         std::vector<AttrExprSymbol>& symbols,
                          const RequireReadyMap& require_ready_at,
                          const TargetCookPolicy& policy,
                          const AxisValueOverrideMap& axis_value_overrides,

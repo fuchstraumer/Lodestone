@@ -84,7 +84,7 @@ namespace
         std::span<const AttrExprSymbol> symbolTable;
         DiagnosticSink& sink; // clang will complain we're using a ref member, but whatever dude. its fine.
         ParserMode parserMode;
-        size_t cursor{};
+        int64_t cursor{};
         std::vector<std::string> identifiers;
     };
 
@@ -179,7 +179,8 @@ namespace
 
     void ExpressionParser::skipWhitespace() noexcept
     {
-        while (cursor < text.size() && std::isspace(static_cast<unsigned char>(text[cursor])) != 0)
+        while (std::cmp_less(cursor, text.size()) &&
+               std::isspace(static_cast<unsigned char>(text[cursor])) != 0)
         {
             ++cursor;
         }
@@ -194,7 +195,7 @@ namespace
             return false;
         }
 
-        cursor += oper.size();
+        cursor += std::ssize(oper);
         return true;
     }
 
@@ -294,6 +295,10 @@ namespace
             return left;
         }
 
+        // convert to unsigned, even though the values are parsed as signed:
+        // shifts get hairy with signed ints, so we'll convert before returning after shifting
+        uint64_t leftU = static_cast<uint64_t>(left.value());
+
         while (peekIsShift())
         {
             const bool shiftLeft = consumeOperator("<<");
@@ -307,6 +312,8 @@ namespace
             {
                 return right;
             }
+
+            const uint64_t rightU = static_cast<uint64_t>(right.value());
 
             if (parserMode == ParserMode::CollectOnly)
             {
@@ -322,7 +329,8 @@ namespace
                 return std::unexpected(error);
             }
 
-            left = shiftLeft ? (left.value() << right.value()) : (left.value() >> right.value());
+            leftU = shiftLeft ? (leftU << rightU) : (leftU >> rightU);
+            left = static_cast<int64_t>(leftU);
         }
 
         return left;
@@ -449,7 +457,7 @@ namespace
     CookResult<int64_t> ExpressionParser::parsePrimary()
     {
         skipWhitespace();
-        if (cursor >= text.size())
+        if (cursor >= std::ssize(text))
         {
             const CookError error = ReportError(
                 sink, CookError::AttributeExpressionParseFailed, "Attribute expression ends early");
@@ -496,7 +504,7 @@ namespace
     CookResult<int64_t> ExpressionParser::parseInteger()
     {
         int base = 10;
-        size_t digitsBegin = cursor;
+        int64_t digitsBegin = cursor;
 
         if (text.compare(cursor, 2u, "0x") == 0 || text.compare(cursor, 2u, "0X") == 0)
         {
@@ -504,14 +512,15 @@ namespace
             digitsBegin = cursor + 2u;
         }
 
-        size_t digitsEnd = digitsBegin;
-        while (digitsEnd < text.size() && std::isalnum(static_cast<unsigned char>(text[digitsEnd])) != 0)
+        int64_t digitsEnd = digitsBegin;
+        while (digitsEnd < std::ssize(text) && std::isalnum(static_cast<unsigned char>(text[digitsEnd])) != 0)
         {
             ++digitsEnd;
         }
 
-        size_t valueEnd = digitsEnd;
-        if (valueEnd > digitsBegin && base == 10 &&
+        int64_t valueEnd = digitsEnd;
+        if (valueEnd > digitsBegin &&
+            (base == 10 || base == 16) && // fix: strip trailing u for base10 and base16, not just base 10
             (text[valueEnd - 1u] == 'u' || text[valueEnd - 1u] == 'U'))
         {
             --valueEnd;
@@ -537,8 +546,8 @@ namespace
 
     CookResult<int64_t> ExpressionParser::parseIdentifier()
     {
-        const size_t nameBegin = cursor;
-        while (cursor < text.size() && IsIdentifierCharacter(text[cursor]))
+        const int64_t nameBegin = cursor;
+        while (cursor < std::ssize(text) && IsIdentifierCharacter(text[cursor]))
         {
             ++cursor;
         }
