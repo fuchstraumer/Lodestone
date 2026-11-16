@@ -345,6 +345,49 @@
             "axes": []
         }
     ],
+    "hostTypes": [
+        {
+            "index": 0,
+            "name": "SceneUniforms",
+            "rule": "Std140",
+            "byteSize": 96,
+            "fields": [
+                {
+                    "name": "ViewProjection",
+                    "offset": 0,
+                    "size": 64,
+                    "kind": "Matrix",
+                    "scalarType": "Float32",
+                    "rows": 4,
+                    "columns": 4,
+                    "matrixLayout": "RowMajor",
+                    "arrayDimensions": []
+                },
+                {
+                    "name": "CameraPosition",
+                    "offset": 64,
+                    "size": 16,
+                    "kind": "Vector",
+                    "scalarType": "Float32",
+                    "rows": 1,
+                    "columns": 4,
+                    "matrixLayout": "Invalid",
+                    "arrayDimensions": []
+                },
+                {
+                    "name": "ToneMapParams",
+                    "offset": 80,
+                    "size": 16,
+                    "kind": "Vector",
+                    "scalarType": "Float32",
+                    "rows": 1,
+                    "columns": 4,
+                    "matrixLayout": "Invalid",
+                    "arrayDimensions": []
+                }
+            ]
+        }
+    ],
     "variants": [
         {
             "index": 0,
@@ -396,6 +439,13 @@
                     "x": 1,
                     "y": 1,
                     "z": 1
+                }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
                 }
             ]
         },
@@ -450,6 +500,13 @@
                     "y": 1,
                     "z": 1
                 }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
+                }
             ]
         },
         {
@@ -502,6 +559,13 @@
                     "x": 1,
                     "y": 1,
                     "z": 1
+                }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
                 }
             ]
         },
@@ -556,6 +620,13 @@
                     "y": 1,
                     "z": 1
                 }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
+                }
             ]
         },
         {
@@ -608,6 +679,13 @@
                     "x": 1,
                     "y": 1,
                     "z": 1
+                }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
                 }
             ]
         },
@@ -662,6 +740,13 @@
                     "y": 1,
                     "z": 1
                 }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
+                }
             ]
         },
         {
@@ -714,6 +799,13 @@
                     "x": 1,
                     "y": 1,
                     "z": 1
+                }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
                 }
             ]
         },
@@ -768,6 +860,13 @@
                     "y": 1,
                     "z": 1
                 }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
+                }
             ]
         },
         {
@@ -820,6 +919,13 @@
                     "x": 1,
                     "y": 1,
                     "z": 1
+                }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
                 }
             ]
         },
@@ -874,6 +980,13 @@
                     "y": 1,
                     "z": 1
                 }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
+                }
             ]
         },
         {
@@ -926,6 +1039,13 @@
                     "x": 1,
                     "y": 1,
                     "z": 1
+                }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
                 }
             ]
         },
@@ -980,6 +1100,13 @@
                     "y": 1,
                     "z": 1
                 }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
+                }
             ]
         },
         {
@@ -1032,6 +1159,13 @@
                     "x": 1,
                     "y": 1,
                     "z": 1
+                }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
                 }
             ]
         },
@@ -1086,6 +1220,13 @@
                     "y": 1,
                     "z": 1
                 }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
+                }
             ]
         },
         {
@@ -1139,6 +1280,13 @@
                     "y": 1,
                     "z": 1
                 }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
+                }
             ]
         },
         {
@@ -1191,6 +1339,13 @@
                     "x": 1,
                     "y": 1,
                     "z": 1
+                }
+            ],
+            "hostRoots": [
+                {
+                    "kind": "Binding",
+                    "owner": 0,
+                    "struct": 0
                 }
             ]
         }

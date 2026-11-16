@@ -8,7 +8,9 @@
             "suffix": "",
             "description": "",
             "bindings": [],
-            "entryPoints": []
+            "entryPoints": [],
+            "hostTypes": [],
+            "hostRoots": []
         }
     ]
 }

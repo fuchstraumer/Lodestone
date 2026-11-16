@@ -4,6 +4,7 @@
     "spaceSize": 1,
     "variantCount": 1,
     "entryPoints": [],
+    "hostTypes": [],
     "variants": [
         {
             "index": 0,
@@ -17,7 +18,8 @@
             "rasterIndices": [],
             "samplerPairIndices": [],
             "constantsIndices": [],
-            "workgroups": []
+            "workgroups": [],
+            "hostRoots": []
         }
     ],
     "interners": {

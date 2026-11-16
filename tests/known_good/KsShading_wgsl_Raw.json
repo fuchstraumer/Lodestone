@@ -12,7 +12,8 @@
             "description": "",
             "bindings": [],
             "sizeAttributes": [],
-            "entryPoints": []
+            "entryPoints": [],
+            "hostTypes": []
         }
     ]
 }

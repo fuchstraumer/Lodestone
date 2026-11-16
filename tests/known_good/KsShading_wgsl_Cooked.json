@@ -33,6 +33,7 @@
     "samplerPairLists": [],
     "entryPointConstants": [],
     "footprintDeclarations": [],
+    "hostTypes": [],
     "variants": [
         {
             "index": 0,
@@ -46,7 +47,8 @@
             "rasterIndices": [],
             "samplerPairIndices": [],
             "constantsIndices": [],
-            "workgroups": []
+            "workgroups": [],
+            "hostRoots": []
         }
     ],
     "interners": {
