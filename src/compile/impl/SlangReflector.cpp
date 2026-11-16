@@ -603,10 +603,12 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
             {
                 value.Scope = JoinScopeName(value.Scope, field->getName());
             }
+
             value.Name = variable->getName() != nullptr ? variable->getName() : std::string{};
             value.ByteOffset = leaf.Offset;
             value.Member = leaf.Type;
             value.Implementation = leaf.Path[leaf.Path.size() - 2u]->getTypeLayout()->getType();
+            
             out_values->push_back(std::move(value));
         }
         
@@ -616,6 +618,7 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
         {
             return;
         }
+
         const bool isArray = leaf.Type->getKind() == slang::TypeReflection::Kind::Array;
         uint32_t arrayCount = 1u;
         uint16_t stride = 0u;
@@ -636,6 +639,7 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
             arrayCount = *resolvedCount;
             stride =static_cast<uint16_t>(leaf.Type->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM));
         }
+
         const bool isPointerType = leaf.Type->getKind() == slang::TypeReflection::Kind::Pointer;
         const bool isPermittedShimPointer = hasShimValueAttr && (language == TargetLanguage::Spirv);
         if (isPointerType && (bufferForm != AccessModel::Pointer) && !isPermittedShimPointer)
@@ -645,6 +649,7 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
                 CookError::PointerTypeNotSupported,
                 std::format("member {} is a pointer, and the buffers of this profile use the {} form", name, ToString(bufferForm)));
         }
+
         const bool isMatrix = leaf.Type->getKind() == slang::TypeReflection::Kind::Matrix;
         MatrixLayout layout{ MatrixLayout::Invalid };
         if (isMatrix)

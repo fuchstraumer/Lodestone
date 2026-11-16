@@ -16,6 +16,14 @@ enum class MatrixLayout : uint8_t
     ColumnMajor,
 };
 
+/** @brief The memory layout rule of a block or buffer element. `Std140` is a uniform buffer, and `Std430` is a storage
+ * buffer or a push constant block. */
+enum class LayoutRule : uint8_t
+{
+    Std140,
+    Std430,
+};
+
 /** @brief How a shader reaches a resource: a binding, a descriptor handle, or a buffer device address. */
 enum class PlacementKind : uint8_t
 {

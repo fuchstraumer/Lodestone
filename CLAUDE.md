@@ -60,10 +60,13 @@ when the option is ON. Every test links the cooker, so `LODESTONE_BUILD_TESTS` f
 tests ON with the cooker OFF fail the configure.
 
 `lodestone_add_shader_cook(<name> OUTPUT_DIR <dir> TARGETS <profile>... MODULES <file>... [POLICY_FILE <file>]
-[OPTIONS <arg>...])` (in `cmake/LodestoneShaderCook.cmake`) runs one cook as a build step, with `--depfile`, so
+[HOST_TYPES <include>] [OPTIONS <arg>...])` (in `cmake/LodestoneShaderCook.cmake`) runs one cook as a build step, with `--depfile`, so
 an edit to any file a module reads re-cooks. It runs the `lodestone_cooker_console` target, or the host cooker
 that `LODESTONE_COOKER_EXECUTABLE` names. A build with no cooker (Emscripten) must set that variable. The
-target property `LODESTONE_MANIFEST` gives the manifest path. The console builds whenever the cooker does. The preset `ninja-msvc-client` turns the cooker off:
+target property `LODESTONE_MANIFEST` gives the manifest path. `HOST_TYPES <include>` turns on the host header
+(`--host-types`, with `--host-namespace` set to the cook name, which must be a C++ identifier). The header is a byproduct of the
+cook step, and the target property `LODESTONE_HOST_HEADER` gives its path. A consumer target depends on the cook with
+`add_dependencies`. The console builds whenever the cooker does. The preset `ninja-msvc-client` turns the cooker off:
 `scripts\configure.bat ninja-msvc-client`, then `scripts\build.bat RelWithDebInfo ninja-msvc-client`.
 
 `LODESTONE_ISOLATE_SLANG` (default ON) builds Slang and SPIRV-Tools in their own build trees under
@@ -129,7 +132,7 @@ contents. `Check` returns its condition, so the check can guard the checks that 
 check fails, so a guard that fails cannot hide the checks behind it. To read the diagnostics of a cook, pass a
 `RecordingDiagnosticSink` to the three-argument `RunCook`.
 
-Fifty-one test targets exist: forty-four unit tests and seven cook tests. `tests/README.md` lists what each one proves. Read it before you add or change a test, and add a row there for each new target.
+Fifty-three test targets exist: forty-six unit tests and seven cook tests. `tests/README.md` lists what each one proves. Read it before you add or change a test, and add a row there for each new target.
 
 Each cook test writes into its own output directory. The bundle and the dedup report hold every module
 of one cook, so a module added to a cook changes those files.
@@ -158,7 +161,9 @@ itself. A function in the cooker library that can report takes a `DiagnosticSink
 `--output/-o`, `--cache-dir`, `--include-dir/-I <path>` (repeatable),
 `--O0` to `--O3`, `--g0` to `--g3` (Slang's debug information level), `--target=<name>`, `--no-validate`, `--quiet`,
 `--single-threaded`, `--no-dedupe`, `--verify-deterministic`, `--dump-stage=<name>`, `--dump-sources`,
-and `--depfile`. `--depfile` writes `ShaderLibrary.d`, a Makefile-form depfile that names every file Slang
+`--host-types=<include>`, `--host-namespace=<name>`, and `--depfile`. `--host-types` and `--host-namespace` take their value
+after `=`, and each needs the other (`HostNamespaceMissing`; a namespace that is not a C++ identifier or a `::` path of
+identifiers is `HostNamespaceInvalid`). `--depfile` writes `ShaderLibrary.d`, a Makefile-form depfile that names every file Slang
 read, `import` and `__include` included. `--dump-sources` writes every unique compiled source to a subfolder
 `<module>_<target>_sources`, beside a `SourceTable.json` that names each variant by its axis description
 and its source hashes. Each file holds the target code only (`.wgsl` or `.spv`), so Tint, `spirv-dis`,
@@ -238,9 +243,9 @@ is therefore a visible word in a diff: the day a file in `emit/` writes
 |---|---|---|
 | `permute/` | `PermutationValue`, `PermutationAxis`, `PermutationAssignment`, `PermutationSpace`, `PolicyDocument`, `AttributeExpression` | The authoring parameter domain. Stages 1 and 2. Phase E filled this folder. |
 | `compile/` | `SlangCompiler`, `SlangDiagnosticParser`, `RawLibrary`, `ShimLinkSource`, `Diagnostics`, and `src/compile/impl/` | **The Slang wall. No file outside this folder names a Slang type.** |
-| `model/` | `ResolveStage`, `ShaderDataSchema`, `BufferLayout`, `ContentHash`, `ContentInterner`, `CookedLibrary`, `AxisInfluence` | The data that flows, interns, and freezes. Stages 4, 6, and 7. |
+| `model/` | `ResolveStage`, `ShaderDataSchema`, `BufferLayout`, `ContentHash`, `ContentInterner`, `CookedLibrary`, `AxisInfluence`, `HostTypeTable` | The data that flows, interns, and freezes. Stages 4, 6, and 7. |
 | `target/` | `TargetProfile`, `ShimTable`, `StorageFormatTable`, `TargetUtils`, `WgslValidator`, `SpvValidator` | A target, its access model, and its validator. Phase F fills this folder. |
-| `emit/` | `ShaderLibraryEmitter`, `ShaderManifestEmitter`, `OutputSink`, `StageDump`, `DedupeReport` | Everything that writes through a sink. Stage 8, plus the two reports. |
+| `emit/` | `ShaderLibraryEmitter`, `ShaderManifestEmitter`, `HostHeaderEmitter`, `OutputSink`, `StageDump`, `DedupeReport` | Everything that writes through a sink. Stage 8, plus the two reports. |
 | `driver/` | `CookerDriver`, `CookerOptions` | The loop and its command line. |
 
 `CookerErrors.hpp` sits at the top of `include/`, because every folder uses it.
@@ -492,6 +497,13 @@ number would state that every target must supply one. A target supplies a valida
    - `ShaderLibrary.dedupe.txt`, from `GenerateDedupeReport`
    - `ShaderLibrary.resources.txt`, from `BuildResourceReport` and `FormatResourceReport`, read from the written
      manifest bytes through the client views
+   - `ShaderLibrary.host.hpp`, from `EmitHostHeader`, only with `--host-types`. It reads the host type tables, the
+     resource lists, and the visibility lists of the `CookedLibrary`: one C++ struct for each distinct layout
+     (`detail::<Name>_<k>`, with explicit padding and `static_assert` of every size and offset), `<Name><CookProfile,
+     LayoutRule>` to select one by profile and layout rule, binding name constants for each entry point (a
+     binding that some variants lack is in `SomeVariants`, with the axes that change it), and `Params<CookProfile>`.
+     The cook does not remove an earlier header, and `FileOutputSink` writes no file whose bytes are unchanged, so a
+     header with unchanged text keeps its timestamp.
 
    A cooked module points into its `PermutationSpace`, so the driver moves each space to the heap and
    keeps it until the emit is done.
@@ -555,6 +567,7 @@ unordered container reached the output.
 | `CanonicalAssignment` | `permute/PermutationAssignment.hpp` | An assignment that holds every axis of one space. Only `PermutationSpace::CanonicalizeAssignment` builds one, so `ComputeVariantKey` cannot be given a partial assignment. |
 | `VariantKey` | `client/include/VariantKey.hpp` | A variant's identity: a strong `enum class : uint64_t`, a mixed-radix packing of the canonical assignment. `PackVariantKey`/`UnpackVariantKey` are the shared codec the cooker and the client both use. |
 | `PolicyDocument`, `TargetCookPolicy` | `permute/PolicyDocument.hpp` | The cook policy read from a TOML file: per target a variant budget, a `CookValues` allow-list, and a `CookIf` predicate. `ModulePolicyEntry` carries the per-module expectations to `EnforceModulePolicy`. |
+| `HostTypeTable`, `HostStruct`, `HostField`, `HostRoot` | `model/HostTypeTable.hpp` | The layout of each struct that a host program mirrors, for one layout rule (`LayoutRule`: `Std140` or `Std430`, in the client header). Stage 3 reads a type tree for each block element, structured buffer element (and Pointer pointee), and entry point constants (`SlangReflector::recordHostStruct`; Slang reports no layout rule, so the rule comes from the container: constant buffer and parameter block std140, structured buffer and pointee std430, push constants std430, uniform buffer constants std140). The root of the entry point constants is named `<EntryPoint>Params`, and a struct parameter is a nested field of it. `RawBinding::HostStruct` and `RawEntryPointConstants::HostStruct` carry the root to stage 4, which lists them as `HostRoot` values in `CompiledVariant::HostRoots`. They are not part of `ReflectedBinding`, so interning ignores them. Stage 6 merges each variant's table by (name, rule) (`MergeHostTypes`, through a `HostTypeIndex` that `InternedModule::HostTypeKeys` keeps beside the table), remaps the roots in `LibraryVariant::HostRoots`, and fails with `HostTypeLayoutConflict` when one name and rule has two layouts, such as an array that an axis sizes. The key of a host type is (name, profile, rule). `VerifyHostTypesAcrossProfiles` checks that one (name, rule) has one layout across the modules of one profile, and across profiles, with one exception: a struct that holds a stored value (`HostField::StoredValue`, the `uint2` handle or `UInt64` address that a Handle or Pointer shim becomes) at any depth in any profile is compared within each profile only, because its layout follows the access model. The exemption is decided from all profiles together, by name and rule. A field has the dimensions of its array, outermost first (`HostField::ArrayDimensions`, each with a count and a stride). |
 | `CompiledVariant`, `CompiledEntryPoint` | `model/ShaderDataSchema.hpp` | Compiler output: WGSL text plus reflection. Owns its strings. |
 | `ReflectedBinding` | `model/ShaderDataSchema.hpp` | What the shader states about one resource. The CPU side never writes any of it. `Name` and `ScopeName` together are the identity: two entry points can each declare `albedoMap`. |
 | `RawVariant`, `RawModule` | `compile/RawLibrary.hpp` | Stage 3 output. Everything Slang says, with no opinion about any of it. A `[ls_*]` argument is still the string the author wrote. |
@@ -675,8 +688,12 @@ the value stays a cook-time fact for a size expression to use later.
 The cook policy is data, not code. A `PolicyDocument` reads a TOML file through toml++, behind a facade
 in `src/permute/PolicyDocument.cpp` (no toml++ type leaves that file). A module can name an
 `InertAxesForEntryPoints` table and a section for each target profile, and a target section carries
-`MaxVariants`, a `CookValues` allow-list, and a `CookIf` predicate. A `CookValues` list holds booleans, integers, or, for an
-enum axis, case names (`["Rgba16Float", "R32Float"]`), which `PermutationAxis::FindEnumCase` resolves. The `--policy-file` option names the
+`MaxVariants`, a `CookValues` allow-list, and a `CookIf` predicate. A `CookValues` list holds booleans, integers, or names. For an
+enum axis a name is a case name (`["Rgba16Float", "R32Float"]`), which `PermutationAxis::FindEnumCase` resolves. For an interface axis
+a name is a type name, which `PermutationAxis::FindInterfaceImpl` resolves with the whitespace removed. An interface axis also takes
+types that no tag names, from `[Module.axes.AXIS] Types = [{ Type = "Composed<A,B>", Imports = ["Mod"] }]`. `LinkVariant` resolves
+each such string in its link module and compares it, without whitespace, with Slang's full name for the type. A `typealias`
+spelling fails with `PolicyInterfaceTypeNameMismatch`, so the manifest has one name for each type. The `--policy-file` option names the
 file. `tests/assets/KitchenSink/KitchenSink.toml` is the reference.
 
 The policy is opt-in (phase F decision O4). A module with no entry, or with no `targets` table, cooks every

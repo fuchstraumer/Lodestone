@@ -41,6 +41,8 @@ set(LODESTONE_COMMON_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/CookerErrors.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/Diagnostics.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/TransparentHash.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/containers/DenseHashMap.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/containers/SmallVector.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/CookerErrors.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Diagnostics.cpp")
 
@@ -94,6 +96,7 @@ set(LODESTONE_DRIVER_SOURCES
 set(LODESTONE_EMIT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/DedupeReport.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/DepFile.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/HostHeaderEmitter.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/OutputSink.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/ResourceReport.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/ShaderManifestEmitter.hpp"
@@ -101,6 +104,7 @@ set(LODESTONE_EMIT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/StageDump.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/DedupeReport.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/DepFile.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/HostHeaderEmitter.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/OutputSink.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/ResourceReport.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/ShaderManifestEmitter.cpp"
@@ -114,6 +118,7 @@ set(LODESTONE_MODEL_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/model/ContentHash.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/model/ContentInterner.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/model/CookedLibrary.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/model/HostTypeTable.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/model/ResolveStage.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/model/ShaderDataSchema.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/AxisInfluence.cpp"
@@ -121,6 +126,7 @@ set(LODESTONE_MODEL_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/DeliveredForm.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/ContentHash.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/CookedLibrary.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/model/HostTypeTable.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/ResolveStage.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/ShaderDataSchema.cpp")
 
