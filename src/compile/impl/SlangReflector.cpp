@@ -7,6 +7,7 @@
 #include "compile/RawLibrary.hpp"
 #include "magic_enum/magic_enum.hpp"
 #include "model/BufferLayout.hpp"
+#include "model/HostTypeTable.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
@@ -145,11 +146,33 @@ std::string_view TypeArgumentOf(std::string_view full_name) noexcept;
 
 std::string FullNameOf(slang::TypeReflection* type);
 
+/** Returns `Invalid` for a scalar type that no host struct member can have. */
+HostScalarType ToHostScalarType(slang::TypeReflection::ScalarType scalar_type) noexcept;
+
+MatrixLayout ToMatrixLayout(SlangMatrixLayoutMode mode) noexcept;
+
+/** Returns the full name of the struct type, or `fallback_name` for a struct with no name (a `cbuffer` body). */
+std::string HostRootName(slang::TypeLayoutReflection* struct_layout, std::string_view fallback_name);
+
+/** Clears the table pointer of the reflector when `Reflect` ends, whichever way it ends. */
+struct HostTypeScope
+{
+    explicit HostTypeScope(HostTypeTable*& slot, HostTypeTable* table) noexcept;
+    ~HostTypeScope() noexcept;
+    HostTypeScope(const HostTypeScope&) = delete;
+    HostTypeScope& operator=(const HostTypeScope&) = delete;
+    HostTypeTable*& Slot;
+};
+
 /** Reads the access from the second type argument of a `Ptr` full name. The pointee, the address space, and the data layout
  * that follow it are ignored. */
 ResourceAccess PointerAccessOf(std::string_view full_name) noexcept;
 
 ResourceAccess FromSlangAccessType(SlangResourceAccess access);
+
+/** Returns the element count of one array dimension. A link-time constant gives `SLANG_UNKNOWN_SIZE`, so the count
+ * is then the size divided by the stride. Returns no value when that division is not exact. */
+std::optional<uint32_t> ResolvedArrayCount(slang::TypeLayoutReflection* array_layout);
 
 /** Returns no value for `SLANG_UNKNOWN_SIZE` (an unresolved generic or link-time constant). Every placement read
  * goes through this, so that no binding is placed where no shader uses it. */
@@ -188,6 +211,7 @@ CookResult<RawVariant> SlangReflector::Reflect(LinkedVariant& linked_variant,
     rawVariant.VariantSuffix = MakeAssignmentSuffix(descriptor.Canonical);
     rawVariant.VariantDescription = DescribeAssignment(descriptor.Canonical);
     rawVariant.VariantIndex = descriptor.Index;
+    const HostTypeScope hostTypeScope{ hostTypes, &rawVariant.HostTypes };
 
     const CookError bindingExtrResult =
         extractRawBindings(linked_variant.ProgramLayout, rawVariant.Bindings, rawVariant.SizeAttributes);
@@ -337,7 +361,10 @@ CookError SlangReflector::applyLeafTypeUniformBufferLayout(slang::TypeLayoutRefl
         return uniformWalkResult;
     }
 
-    return CookError::Success;
+    return recordHostStruct(elementLayout,
+                            LayoutRule::Std140,
+                            HostRootName(elementLayout, binding.Name),
+                            binding.HostStruct);
 }
 
 CookError SlangReflector::applyLeafTypeStorageBufferLayout(slang::TypeLayoutReflection* leaf_layout,
@@ -357,7 +384,10 @@ CookError SlangReflector::applyLeafTypeStorageBufferLayout(slang::TypeLayoutRefl
                 return structWalkResult;
             }
 
-            return CookError::Success;
+            return recordHostStruct(elementLayout,
+                                    LayoutRule::Std430,
+                                    HostRootName(elementLayout, binding.Name),
+                                    binding.HostStruct);
         }
         else
         {
@@ -591,8 +621,20 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
         uint16_t stride = 0u;
         if (isArray)
         {
-            arrayCount = static_cast<uint32_t>(leaf.Type->getElementCount());
-            stride = static_cast<uint16_t>(leaf.Type->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM));
+            const std::optional<uint32_t> resolvedCount = ResolvedArrayCount(leaf.Type);
+            if (!resolvedCount)
+            {
+                result = ReportError(*sink,
+                                     CookError::ReflectionUnavailable,
+                                     std::format("member {} is an array of unknown length, and its size {} is not a "
+                                                 "multiple of its stride",
+                                                 name,
+                                                 memberSize));
+                return;
+            }
+
+            arrayCount = *resolvedCount;
+            stride =static_cast<uint16_t>(leaf.Type->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM));
         }
         const bool isPointerType = leaf.Type->getKind() == slang::TypeReflection::Kind::Pointer;
         const bool isPermittedShimPointer = hasShimValueAttr && (language == TargetLanguage::Spirv);
@@ -639,6 +681,292 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
 
     return result;
 }
+
+// NOLINTBEGIN(misc-no-recursion)
+
+CookError SlangReflector::recordHostStruct(slang::TypeLayoutReflection* struct_layout,
+                                           LayoutRule rule,
+                                           std::string_view name,
+                                           uint32_t& out_struct) const
+{
+    if (hostTypes == nullptr || struct_layout == nullptr ||
+        struct_layout->getKind() != slang::TypeReflection::Kind::Struct)
+    {
+        return CookError::Success;
+    }
+
+    const CookResult<uint32_t> root = addHostStruct(struct_layout, rule, name);
+    if (!root)
+    {
+        return root.error();
+    }
+
+    if (*root != k_NoHostStruct)
+    {
+        out_struct = *root;
+    }
+
+    return CookError::Success;
+}
+
+/** The fields come first, so a nested struct has a smaller index than its parent. A struct with no uniform data
+ * (only resources) is not a host type, and gives `k_NoHostStruct`. */
+CookResult<uint32_t> SlangReflector::addHostStruct(slang::TypeLayoutReflection* struct_layout,
+                                                   LayoutRule rule,
+                                                   std::string_view name) const
+{
+    HostStruct hostStruct;
+    hostStruct.Name = std::string{ name };
+    hostStruct.Rule = rule;
+    hostStruct.ByteSize = static_cast<uint32_t>(struct_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
+
+    const unsigned int fieldCount = struct_layout->getFieldCount();
+    for (unsigned int i = 0u; i < fieldCount; ++i)
+    {
+        slang::VariableLayoutReflection* field = struct_layout->getFieldByIndex(i);
+        const char* fieldName = field->getName();
+        if (fieldName == nullptr)
+        {
+            continue;
+        }
+
+        const uint32_t offset = static_cast<uint32_t>(field->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM));
+        const CookError fieldError =
+            appendHostField(fieldName, offset, field->getTypeLayout(), rule, hostStruct.Fields);
+        if (!fieldError)
+        {
+            return std::unexpected(fieldError);
+        }
+    }
+
+    if (hostStruct.Fields.empty())
+    {
+        return k_NoHostStruct;
+    }
+
+    const std::optional<uint32_t> existing = FindHostStruct(*hostTypes, hostStruct.Name, rule);
+    if (!existing)
+    {
+        hostTypes->Structs.push_back(std::move(hostStruct));
+
+        return static_cast<uint32_t>(hostTypes->Structs.size() - 1u);
+    }
+
+    if (hostTypes->Structs[*existing] == hostStruct)
+    {
+        return *existing;
+    }
+
+    // one name has two layouts inside one variant, such as two modules that declare a struct with one name
+    hostTypes->Structs.push_back(std::move(hostStruct));
+    const uint32_t incoming = static_cast<uint32_t>(hostTypes->Structs.size() - 1u);
+    std::string difference = DescribeHostStructDifference(*hostTypes, *existing, *hostTypes, incoming);
+    hostTypes->Structs.pop_back();
+
+    return std::unexpected(ReportError(*sink,
+                                       CookError::HostTypeLayoutConflict,
+                                       std::format("host struct '{}' ({}) has two layouts in one variant: {}",
+                                                   name,
+                                                   ToString(rule),
+                                                   difference)));
+}
+
+CookError SlangReflector::appendHostField(std::string_view name,
+                                          uint32_t offset,
+                                          slang::TypeLayoutReflection* type_layout,
+                                          LayoutRule rule,
+                                          std::vector<HostField>& out_fields) const
+{
+    if (type_layout == nullptr)
+    {
+        return CookError::Success;
+    }
+
+    const uint32_t size = static_cast<uint32_t>(type_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
+    // resources and varyings take no uniform bytes
+    if (size == 0u)
+    {
+        return CookError::Success;
+    }
+
+    HostField field;
+    field.Name = std::string{ name };
+    field.Offset = offset;
+    field.Size = size;
+
+    slang::TypeLayoutReflection* element = type_layout;
+    while (element->getKind() == slang::TypeReflection::Kind::Array)
+    {
+        const size_t elementCount = element->getElementCount();
+        if (elementCount == 0u || elementCount == SLANG_UNBOUNDED_SIZE)
+        {
+            return ReportError(*sink,
+                               CookError::ReflectionUnavailable,
+                               std::format("host struct member '{}' is an array with no fixed length", name));
+        }
+
+        const std::optional<uint32_t> resolvedCount = ResolvedArrayCount(element);
+        if (!resolvedCount)
+        {
+            return ReportError(*sink,
+                               CookError::ReflectionUnavailable,
+                               std::format("host struct member '{}' is an array of unknown length, and its size {} is "
+                                           "not a multiple of its stride",
+                                           name,
+                                           element->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM)));
+        }
+
+        const size_t elementStride = element->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM);
+        field.ArrayDimensions.push_back(
+            HostArrayDimension{ .Count = *resolvedCount, .Stride = static_cast<uint32_t>(elementStride) });
+        element = element->getElementTypeLayout();
+    }
+
+    const CookError leafError = appendHostLeaf(field, element, rule);
+    if (!leafError)
+    {
+        return leafError;
+    }
+
+    if (field.Kind != HostFieldKind::Invalid)
+    {
+        out_fields.push_back(std::move(field));
+    }
+
+    return CookError::Success;
+}
+
+/** Sets the kind and type of one member, after the arrays are removed. A shim implementation is a struct around one
+ * marked value, and the host sees that value: a `uint2` handle, or a `UInt64` address. */
+CookError SlangReflector::appendHostLeaf(HostField& field,
+                                         slang::TypeLayoutReflection* element_layout,
+                                         LayoutRule rule) const
+{
+    slang::TypeReflection* type = element_layout->getType();
+
+    switch (element_layout->getKind())
+    {
+    case slang::TypeReflection::Kind::Scalar:
+        field.Kind = HostFieldKind::Scalar;
+        field.ScalarType = ToHostScalarType(type->getScalarType());
+        break;
+    case slang::TypeReflection::Kind::Vector:
+        field.Kind = HostFieldKind::Vector;
+        field.ScalarType = ToHostScalarType(type->getScalarType());
+        field.Columns = static_cast<uint32_t>(type->getElementCount());
+        break;
+    case slang::TypeReflection::Kind::Matrix:
+        field.Kind = HostFieldKind::Matrix;
+        field.ScalarType = ToHostScalarType(type->getScalarType());
+        field.Rows = type->getRowCount();
+        field.Columns = type->getColumnCount();
+        field.MatrixLayout = ToMatrixLayout(element_layout->getMatrixLayoutMode());
+        break;
+    case slang::TypeReflection::Kind::Pointer:
+        field.Kind = HostFieldKind::Scalar;
+        field.ScalarType = HostScalarType::UInt64;
+        break;
+    case slang::TypeReflection::Kind::Struct:
+        return appendHostStructField(field, element_layout, rule);
+    default:
+        return ReportError(*sink,
+                           CookError::ReflectionUnavailable,
+                           std::format("host struct member '{}' is not a scalar, vector, matrix, or struct",
+                                       field.Name));
+    }
+
+    if (field.ScalarType == HostScalarType::Invalid)
+    {
+        return ReportError(*sink,
+                           CookError::ReflectionUnavailable,
+                           std::format("host struct member '{}' has a scalar type that a host struct cannot mirror",
+                                       field.Name));
+    }
+
+    return CookError::Success;
+}
+
+CookError SlangReflector::appendHostStructField(HostField& field,
+                                                slang::TypeLayoutReflection* struct_layout,
+                                                LayoutRule rule) const
+{
+    slang::TypeReflection* type = struct_layout->getType();
+    AccessModel form{ AccessModel::Invalid };
+    const char* typeName = type != nullptr ? type->getName() : nullptr;
+    if (typeName != nullptr && FindShimInterfaceByImplementation(typeName, form) != nullptr)
+    {
+        return appendHostShimValue(field, struct_layout, rule);
+    }
+
+    std::string nestedName = FullNameOf(type);
+    if (nestedName.empty())
+    {
+        nestedName = field.Name;
+    }
+
+    const CookResult<uint32_t> nested = addHostStruct(struct_layout, rule, nestedName);
+    if (!nested)
+    {
+        return nested.error();
+    }
+
+    if (*nested == k_NoHostStruct)
+    {
+        return CookError::Success;
+    }
+
+    field.Kind = HostFieldKind::Struct;
+    field.StructIndex = *nested;
+
+    return CookError::Success;
+}
+
+/** The marked value takes the name, the array, and the size of the member that holds the implementation. */
+CookError SlangReflector::appendHostShimValue(HostField& field,
+                                              slang::TypeLayoutReflection* shim_layout,
+                                              LayoutRule rule) const
+{
+    const unsigned int fieldCount = shim_layout->getFieldCount();
+    for (unsigned int i = 0u; i < fieldCount; ++i)
+    {
+        slang::VariableLayoutReflection* inner = shim_layout->getFieldByIndex(i);
+        slang::VariableReflection* variable = inner->getVariable();
+        const bool isMarked =
+            variable != nullptr && variable->findAttributeByName(globalSession, k_ShimValueAttributeName) != nullptr;
+        if (!isMarked)
+        {
+            continue;
+        }
+
+        const size_t innerBytes = inner->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
+        const uint32_t innerOffset = field.Offset + static_cast<uint32_t>(innerBytes);
+        std::vector<HostField> innerFields;
+        const CookError innerError =
+            appendHostField(field.Name, innerOffset, inner->getTypeLayout(), rule, innerFields);
+        if (!innerError)
+        {
+            return innerError;
+        }
+
+        if (innerFields.empty())
+        {
+            return CookError::Success;
+        }
+
+        std::vector<HostArrayDimension> dimensions = std::move(field.ArrayDimensions);
+        const uint32_t size = field.Size;
+        field = std::move(innerFields.front());
+        field.ArrayDimensions = std::move(dimensions);
+        field.Size = size;
+        field.StoredValue = true;
+
+        return CookError::Success;
+    }
+
+    return CookError::Success;
+}
+
+// NOLINTEND(misc-no-recursion)
 
 // I am an anti-recursion zealot, but Slang damn near requires it here
 // todo-ship: add a depth counter, so we can break out past our max depth
@@ -741,6 +1069,19 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
             {
                 return membersError;
             }
+
+            if (draft.Binding.HostStruct == k_NoHostStruct)
+            {
+                const CookError hostError =
+                    recordHostStruct(globals,
+                                     LayoutRule::Std140,
+                                     HostRootName(globals, draft.Binding.Name),
+                                     draft.Binding.HostStruct);
+                if (!hostError)
+                {
+                    return hostError;
+                }
+            }
         }
 
         const CookError collectAttributesError =
@@ -811,6 +1152,16 @@ CookError SlangReflector::readBlockContainer(const ParameterBlockInfo& block,
     if (!uniformMembersError)
     {
         return uniformMembersError;
+    }
+
+    const CookError hostError =
+        recordHostStruct(block.ElementLayout,
+                         LayoutRule::Std140,
+                         HostRootName(block.ElementLayout, draft.Binding.Name),
+                         draft.Binding.HostStruct);
+    if (!hostError)
+    {
+        return hostError;
     }
 
     const BoundPlacement container = *GetBoundPlacement(draft.Binding.Placement);
@@ -913,6 +1264,16 @@ CookError SlangReflector::appendStoredValueDrafts(std::span<const StoredValueLea
                 if (!pointeeError)
                 {
                     return pointeeError;
+                }
+
+                const CookError pointeeHostError =
+                    recordHostStruct(pointee,
+                                     LayoutRule::Std430,
+                                     HostRootName(pointee, draft.Binding.Name),
+                                     draft.Binding.HostStruct);
+                if (!pointeeHostError)
+                {
+                    return pointeeHostError;
                 }
             }
         }
@@ -1177,6 +1538,18 @@ CookResult<slang::TypeLayoutReflection*> SlangReflector::readEntryPointConstants
     }
 
     const slang::BindingType containerType = parametersLayout->getBindingRangeType(0);
+
+    // Slang does not report the layout rule of a layout, so we derive it from the container: a push constant block
+    // is std430, and a constant buffer is std140. The root is always the struct that wraps the loose `uniform`
+    // parameters, and we name it after the entry point, so a single struct parameter is a nested field of it.
+    const LayoutRule rule =
+        containerType == slang::BindingType::PushConstant ? LayoutRule::Std430 : LayoutRule::Std140;
+    const std::string rootName = std::format("{}Params", out_entry_point.Name);
+    const CookError hostError = recordHostStruct(elementLayout, rule, rootName, constants.HostStruct);
+    if (!hostError)
+    {
+        return std::unexpected(hostError);
+    }
     if (containerType == slang::BindingType::PushConstant)
     {
         // the metadata does not track push constants, so the emitted code settles this block later
@@ -1714,6 +2087,89 @@ std::string_view TypeArgumentOf(std::string_view full_name) noexcept
     return (open == std::string_view::npos || close == std::string_view::npos || close <= open)
                ? std::string_view{}
                : full_name.substr(open + 1u, close - open - 1u);
+}
+
+HostScalarType ToHostScalarType(slang::TypeReflection::ScalarType scalar_type) noexcept
+{
+    switch (scalar_type)
+    {
+    case slang::TypeReflection::ScalarType::Bool:
+        return HostScalarType::Bool;
+    case slang::TypeReflection::ScalarType::Int8:
+        return HostScalarType::Int8;
+    case slang::TypeReflection::ScalarType::UInt8:
+        return HostScalarType::UInt8;
+    case slang::TypeReflection::ScalarType::Int16:
+        return HostScalarType::Int16;
+    case slang::TypeReflection::ScalarType::UInt16:
+        return HostScalarType::UInt16;
+    case slang::TypeReflection::ScalarType::Int32:
+        return HostScalarType::Int32;
+    case slang::TypeReflection::ScalarType::UInt32:
+        return HostScalarType::UInt32;
+    case slang::TypeReflection::ScalarType::Int64:
+    case slang::TypeReflection::ScalarType::IntPtr:
+        return HostScalarType::Int64;
+    case slang::TypeReflection::ScalarType::UInt64:
+    case slang::TypeReflection::ScalarType::UIntPtr:
+        return HostScalarType::UInt64;
+    case slang::TypeReflection::ScalarType::Float16:
+        return HostScalarType::Float16;
+    case slang::TypeReflection::ScalarType::Float32:
+        return HostScalarType::Float32;
+    case slang::TypeReflection::ScalarType::Float64:
+        return HostScalarType::Float64;
+    default:
+        return HostScalarType::Invalid;
+    }
+}
+
+MatrixLayout ToMatrixLayout(SlangMatrixLayoutMode mode) noexcept
+{
+    switch (mode)
+    {
+    case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
+        return MatrixLayout::RowMajor;
+    case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
+        return MatrixLayout::ColumnMajor;
+    default:
+        return MatrixLayout::Invalid;
+    }
+}
+
+std::string HostRootName(slang::TypeLayoutReflection* struct_layout, std::string_view fallback_name)
+{
+    std::string name = struct_layout != nullptr ? FullNameOf(struct_layout->getType()) : std::string{};
+
+    return name.empty() ? std::string{ fallback_name } : name;
+}
+
+HostTypeScope::HostTypeScope(HostTypeTable*& slot, HostTypeTable* table) noexcept : Slot(slot)
+{
+    Slot = table;
+}
+
+HostTypeScope::~HostTypeScope() noexcept
+{
+    Slot = nullptr;
+}
+
+std::optional<uint32_t> ResolvedArrayCount(slang::TypeLayoutReflection* array_layout)
+{
+    const size_t elementCount = array_layout->getElementCount();
+    if (elementCount != SLANG_UNKNOWN_SIZE)
+    {
+        return static_cast<uint32_t>(elementCount);
+    }
+
+    const size_t stride = array_layout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM);
+    const size_t size = array_layout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+    if (stride == 0u || size % stride != 0u)
+    {
+        return std::nullopt;
+    }
+
+    return static_cast<uint32_t>(size / stride);
 }
 
 std::string FullNameOf(slang::TypeReflection* type)

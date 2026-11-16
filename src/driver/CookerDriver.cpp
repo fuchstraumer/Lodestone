@@ -13,6 +13,7 @@
 #include "driver/steps/FinalizeModuleStep.hpp"
 #include "emit/DedupeReport.hpp"
 #include "emit/DepFile.hpp"
+#include "emit/HostHeaderEmitter.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ResourceReport.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
@@ -54,7 +55,10 @@ namespace
     }
 
     CookedLibrary MakeEmptyLibrary(const SharedCookState& cook_state);
-    CookError EmitLibraryArtifacts(const CookedLibrary& library, OutputSink& sink, DiagnosticSink& diagnostics);
+    CookError EmitLibraryArtifacts(const CookedLibrary& library,
+                                   const CookerOptions& options,
+                                   OutputSink& sink,
+                                   DiagnosticSink& diagnostics);
 
     std::string NormalizeDependencyPath(const std::filesystem::path& path)
     {
@@ -95,6 +99,8 @@ namespace
         const static FinalizeModuleStep FinalizeModule;
         //NOLINTEND(readability-identifier-naming)
 
+        const std::chrono::steady_clock::time_point stage1Start = std::chrono::steady_clock::now();
+
         const std::filesystem::path& modulePath = cook_state.Options.ModulePaths[module_index];
         CookResult<PreparedCompiler> preparedModuleResult = PrepareModule(cook_state, modulePath, target_name);
         if (!preparedModuleResult)
@@ -117,6 +123,11 @@ namespace
             return std::unexpected(rawAxesResult.error());
         }
 
+        const std::chrono::steady_clock::time_point stage1End = std::chrono::steady_clock::now();
+        const std::chrono::duration<double, std::milli> stage1Elapsed = stage1End - stage1Start;
+
+        const std::chrono::steady_clock::time_point stage2Start = std::chrono::steady_clock::now();
+
         const std::string_view moduleName = cook_state.AllModuleNames[module_index];
         const SymbolTable& symbolTable = preparedModule.Compiler->GetSymbolTable();
         CookResult<PreparedPermutationSpace> spaceResult = PreparePermutationSpace(cook_state,
@@ -128,6 +139,14 @@ namespace
         {
             return std::unexpected(spaceResult.error());
         }
+
+        const std::chrono::steady_clock::time_point stage2End = std::chrono::steady_clock::now();
+        const std::chrono::duration<double, std::milli> stage2Elapsed = stage2End - stage2Start;
+
+        AddPhaseTimings(PhaseTimings{
+            .Stage1_DeclareMs = stage1Elapsed.count(),
+            .Stage2_EnumerateMs = stage2Elapsed.count()
+        });
 
         PreparedPermutationSpace& preparedSpace = *spaceResult;
         const CookError spaceDumpError =
@@ -222,11 +241,14 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
     //NOLINTNEXTLINE(readability-identifier-naming)
     const static PrepareCookStep PrepareCook;
 
+    const std::chrono::steady_clock::time_point prepStart = std::chrono::steady_clock::now();
     CookResult<PreparedCook> preparedCookResult = PrepareCook(std::move(options), diagnostics);
+    const std::chrono::steady_clock::time_point prepEnd = std::chrono::steady_clock::now();
     if (!preparedCookResult)
     {
         return std::unexpected(preparedCookResult.error());
     }
+    const std::chrono::duration<double, std::milli> prepElapsed = prepEnd - prepStart;
 
     const PreparedCook& preparedCook = *preparedCookResult;
     const SharedCookState& cookState = preparedCook.SharedState;
@@ -268,11 +290,19 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
         return std::unexpected(ReportError(diagnostics, CookError::ReflectionMismatch, errStr));
     }
 
+    const std::chrono::steady_clock::time_point crossStart = std::chrono::steady_clock::now();
+
     // each validator reports its own record
     const CookError pairsError = VerifySamplerPairsAcrossProfiles(library, diagnostics);
     if (!pairsError)
     {
         return std::unexpected(pairsError);
+    }
+
+    const CookError hostTypesError = VerifyHostTypesAcrossProfiles(library, diagnostics);
+    if (!hostTypesError)
+    {
+        return std::unexpected(hostTypesError);
     }
 
     const CookError factsError = VerifySourceFactsAcrossProfiles(library, diagnostics);
@@ -287,7 +317,12 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
         return std::unexpected(capabilityAxisError);
     }
 
-    const CookError emitError = EmitLibraryArtifacts(library, sink, diagnostics);
+    const std::chrono::steady_clock::time_point crossEnd = std::chrono::steady_clock::now();
+    const std::chrono::duration<double, std::milli> crossElapsed = crossEnd - crossStart;
+
+    const std::chrono::steady_clock::time_point emitStart = std::chrono::steady_clock::now();
+
+    const CookError emitError = EmitLibraryArtifacts(library, cookState.Options, sink, diagnostics);
     if (!emitError)
     {
         return std::unexpected(emitError);
@@ -311,6 +346,16 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
             return std::unexpected(depfileError);
         }
     }
+
+    const std::chrono::steady_clock::time_point emitEnd = std::chrono::steady_clock::now();
+    const std::chrono::duration<double, std::milli> emitElapsed = emitEnd - emitStart;
+
+    AddPhaseTimings(PhaseTimings{
+        .PrepareCookMs = prepElapsed.count(),
+        .Validate_CrossProfileMs = crossElapsed.count(),
+        .Stage8_EmitMs = emitElapsed.count(),
+        .CooksRun = 1u
+    });
 
     const std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
     const std::chrono::duration<double, std::milli> elapsed = endTime - startTime;
@@ -417,7 +462,10 @@ namespace
         return library;
     }
 
-    CookError EmitLibraryArtifacts(const CookedLibrary& library, OutputSink& sink, DiagnosticSink& diagnostics)
+    CookError EmitLibraryArtifacts(const CookedLibrary& library,
+                                   const CookerOptions& options,
+                                   OutputSink& sink,
+                                   DiagnosticSink& diagnostics)
     {
         CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library, diagnostics);
         if (!manifest)
@@ -450,7 +498,27 @@ namespace
             return reportWriteError;
         }
 
-        return sink.WriteArtifact(k_DedupeReportFileName, GenerateDedupeReport(library));
+        const CookError dedupeWriteError = sink.WriteArtifact(k_DedupeReportFileName, GenerateDedupeReport(library));
+        if (!dedupeWriteError)
+        {
+            return dedupeWriteError;
+        }
+
+        if (options.HostTypesInclude.empty())
+        {
+            return CookError::Success;
+        }
+
+        // the cook does not remove an earlier host header, and the sink keeps the timestamp of one whose text is
+        // unchanged. A failed cook leaves the old header beside no manifest, so a consumer fails on the manifest.
+        const CookResult<std::string> hostHeader =
+            EmitHostHeader(library, options.HostTypesInclude, options.HostNamespace, diagnostics);
+        if (!hostHeader)
+        {
+            return hostHeader.error();
+        }
+
+        return sink.WriteArtifact(k_HostHeaderFileName, *hostHeader);
     }
 } // namespace
 

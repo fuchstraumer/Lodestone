@@ -1,5 +1,7 @@
 #include "TestHarness.hpp"
 #include "ShaderManifestFormat.hpp"
+#include "driver/CookerSteps.hpp"
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <format>
@@ -75,7 +77,8 @@ TestRunner::TestRunner(std::string_view suite_name) noexcept :
     suiteName{ suite_name },
     checksRun{ 0 },
     failures{ 0 },
-    emptySections{ 0 }
+    emptySections{ 0 },
+    startTime{ std::chrono::steady_clock::now() }
 {
 }
 
@@ -132,10 +135,16 @@ int TestRunner::Report()
     if (Failures() == 0)
     {
         std::println("{} : {} checks passed", suiteName, checksRun);
+        const std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
+        const std::chrono::duration<double, std::milli> elapsed = endTime - startTime;
+        lodestone::WriteTestTimingCsvRow(suiteName, elapsed.count());
         return 0;
     }
 
     std::println("{} : {} of {} checks FAILED, {} sections ran no checks", suiteName, failures, checksRun, emptySections);
+    const std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
+    const std::chrono::duration<double, std::milli> elapsed = endTime - startTime;
+    lodestone::WriteTestTimingCsvRow(suiteName, elapsed.count());
     return 1;
 }
 

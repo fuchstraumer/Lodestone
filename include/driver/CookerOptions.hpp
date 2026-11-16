@@ -55,6 +55,10 @@ struct CookerOptions
     std::vector<std::filesystem::path> PolicyFiles;
     bool DumpSources{ false };
     bool WriteDepfile{ false };
+    /** The file that defines the host vector and matrix types. Empty turns the host header off. */
+    std::string HostTypesInclude;
+    /** The C++ namespace of the host header. Required with `HostTypesInclude`, and empty without it. */
+    std::string HostNamespace;
 };
 
 bool IsStageDumpRequested(const CookerOptions& options, StageDumpKind kind) noexcept;

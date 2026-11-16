@@ -5,6 +5,7 @@
 #include "ShaderLibraryTypes.hpp"
 #include "SlangCompilerTypes.hpp"
 #include "compile/RawLibrary.hpp"
+#include "model/HostTypeTable.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "target/TargetProfile.hpp"
@@ -79,6 +80,29 @@ private:
     [[nodiscard]] CookError collectStructMembers(slang::TypeLayoutReflection* struct_layout,
                                                   std::vector<ReflectedUniformMember>& members,
                                                   std::vector<StoredValueLeaf>* out_values) const;
+    /** Adds the struct tree of `struct_layout` to the host type table of the variant, and stores the index of the root in
+     * `out_struct`. A layout that is not a struct, or that has no uniform data, leaves `out_struct` unchanged. */
+    [[nodiscard]] CookError recordHostStruct(slang::TypeLayoutReflection* struct_layout,
+                                             LayoutRule rule,
+                                             std::string_view name,
+                                             uint32_t& out_struct) const;
+    [[nodiscard]] CookResult<uint32_t> addHostStruct(slang::TypeLayoutReflection* struct_layout,
+                                                     LayoutRule rule,
+                                                     std::string_view name) const;
+    [[nodiscard]] CookError appendHostField(std::string_view name,
+                                            uint32_t offset,
+                                            slang::TypeLayoutReflection* type_layout,
+                                            LayoutRule rule,
+                                            std::vector<HostField>& out_fields) const;
+    [[nodiscard]] CookError appendHostLeaf(HostField& field,
+                                           slang::TypeLayoutReflection* element_layout,
+                                           LayoutRule rule) const;
+    [[nodiscard]] CookError appendHostStructField(HostField& field,
+                                                  slang::TypeLayoutReflection* struct_layout,
+                                                  LayoutRule rule) const;
+    [[nodiscard]] CookError appendHostShimValue(HostField& field,
+                                                slang::TypeLayoutReflection* shim_layout,
+                                                LayoutRule rule) const;
     [[nodiscard]] CookError applyLeafTypeSamplerLayout(slang::TypeReflection* leaf_type,
                                                        RawBinding& binding) const;
     [[nodiscard]] CookError applyLeafTypeTextureLayout(slang::TypeReflection* leaf_type,
@@ -106,6 +130,8 @@ private:
     slang::IGlobalSession* globalSession;
     AccessModel bufferForm;
     TargetLanguage language{ TargetLanguage::Invalid };
+    /** Points to the table of the variant that `Reflect` fills, and is null outside that call. */
+    HostTypeTable* hostTypes{ nullptr };
 };
 
 } // namespace lodestone

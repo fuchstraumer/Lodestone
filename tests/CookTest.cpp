@@ -1,8 +1,10 @@
 #include "driver/CookerDriver.hpp"
 #include "CookerErrors.hpp"
 #include "driver/CookerOptions.hpp"
+#include "driver/CookerSteps.hpp"
 #include "emit/OutputSink.hpp"
 
+#include <chrono>
 #include <cstddef>
 #include <cstdio>
 #include <filesystem>
@@ -12,6 +14,8 @@
 
 int main(int argc, char** argv)
 {
+    const std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+
     std::vector<std::string_view> arguments;
     arguments.reserve(static_cast<size_t>(argc));
     for (int i = 1; i < argc; ++i)
@@ -49,6 +53,10 @@ int main(int argc, char** argv)
                  statistics.value().TotalSourceBytes / 1024u,
                  statistics.value().ElapsedMilliseconds,
                  sink.Describe());
+
+    const std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
+    const std::chrono::duration<double, std::milli> elapsed = endTime - startTime;
+    lodestone::WriteTestTimingCsvRow("CookTest", elapsed.count());
 
     return 0;
 }

@@ -2,6 +2,7 @@
 #ifndef LODESTONE_RAW_LIBRARY_HPP
 #define LODESTONE_RAW_LIBRARY_HPP
 #include "permute/PermutationTypes.hpp"
+#include "model/HostTypeTable.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
@@ -82,6 +83,8 @@ struct RawBinding
     bool IsComparisonSampler{ false };
 
     std::vector<ReflectedUniformMember> UniformMembers;
+    /** Index into `RawVariant::HostTypes` of the element struct, or `k_NoHostStruct`. */
+    uint32_t HostStruct{ k_NoHostStruct };
 
     /** As written. Stage 4 splits and checks them. */
     std::string RawRoles;
@@ -95,6 +98,8 @@ struct RawEntryPointConstants
     uint32_t ByteSize{ 0u };
     std::optional<uint32_t> ContainerBinding;
     std::vector<ReflectedUniformMember> Members;
+    /** Index into `RawVariant::HostTypes`, or `k_NoHostStruct` when the entry point has no constants. */
+    uint32_t HostStruct{ k_NoHostStruct };
 };
 
 struct RawEntryPoint
@@ -119,6 +124,7 @@ struct RawVariant
     std::vector<RawBinding> Bindings;
     std::vector<RawSizeAttribute> SizeAttributes;
     std::vector<RawEntryPoint> EntryPoints;
+    HostTypeTable HostTypes;
 };
 
 /** @brief A non-`extern` module-scope `static const` as written. Stage 4 evaluates it per variant.

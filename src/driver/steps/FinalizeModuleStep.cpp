@@ -9,6 +9,7 @@
 #include "model/CookedLibrary.hpp"
 #include "model/ShaderDataSchema.hpp"
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -40,7 +41,16 @@ CookResult<FinalizedModule> FinalizeModuleStep::operator()(const SharedCookState
                                                            InternedModule&& interned_module,
                                                            std::span<const CompiledVariant> module_variants) const
 {
+    PhaseTimings localTimings{};
+
+    const std::chrono::steady_clock::time_point freezeStart = std::chrono::steady_clock::now();
     CookedModule cookedModule = FreezeModuleTables(std::move(interned_module));
+    const std::chrono::steady_clock::time_point freezeEnd = std::chrono::steady_clock::now();
+    const std::chrono::duration<double, std::milli> freezeElapsed = freezeEnd - freezeStart;
+    localTimings.Stage7_FreezeMs = freezeElapsed.count();
+
+    const std::chrono::steady_clock::time_point validateStart = std::chrono::steady_clock::now();
+
     const CookError roundTripResult = VerifyLibraryRoundTrip(cookedModule, module_variants, *shared_state.Diagnostics);
     if (!roundTripResult)
     {
@@ -75,6 +85,12 @@ CookResult<FinalizedModule> FinalizeModuleStep::operator()(const SharedCookState
             return std::unexpected(policyError);
         }
     }
+
+    const std::chrono::steady_clock::time_point validateEnd = std::chrono::steady_clock::now();
+    const std::chrono::duration<double, std::milli> validateElapsed = validateEnd - validateStart;
+    localTimings.Validate_ModuleRoundTripsMs = validateElapsed.count();
+
+    AddPhaseTimings(localTimings);
 
     std::optional<std::string> dump = std::nullopt;
     if (IsStageDumpRequested(shared_state.Options, StageDumpKind::Cooked))

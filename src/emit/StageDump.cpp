@@ -5,6 +5,7 @@
 #include "model/ContentHash.hpp"
 #include "model/ContentInterner.hpp"
 #include "model/CookedLibrary.hpp"
+#include "model/HostTypeTable.hpp"
 #include "driver/CookerOptions.hpp"
 #include "JsonWriter.hpp"
 #include "permute/PermutationAssignment.hpp"
@@ -438,6 +439,73 @@ namespace
         writer.EndArray();
     }
 
+    void WriteHostTypes(JsonWriter& writer, const HostTypeTable& table)
+    {
+        writer.Key("hostTypes");
+        writer.BeginArray();
+        for (size_t structIndex = 0u; structIndex < table.Structs.size(); ++structIndex)
+        {
+            const HostStruct& hostStruct = table.Structs[structIndex];
+            writer.BeginObject();
+            writer.KeyUInt("index", structIndex);
+            writer.KeyString("name", hostStruct.Name);
+            writer.KeyString("rule", magic_enum::enum_name(hostStruct.Rule));
+            writer.KeyUInt("byteSize", hostStruct.ByteSize);
+
+            writer.Key("fields");
+            writer.BeginArray();
+            for (const HostField& field : hostStruct.Fields)
+            {
+                writer.BeginObject();
+                writer.KeyString("name", field.Name);
+                writer.KeyUInt("offset", field.Offset);
+                writer.KeyUInt("size", field.Size);
+                writer.KeyString("kind", magic_enum::enum_name(field.Kind));
+                writer.KeyString("scalarType", magic_enum::enum_name(field.ScalarType));
+                writer.KeyUInt("rows", field.Rows);
+                writer.KeyUInt("columns", field.Columns);
+                writer.KeyString("matrixLayout", magic_enum::enum_name(field.MatrixLayout));
+                writer.Key("arrayDimensions");
+                writer.BeginArray();
+                for (const HostArrayDimension& dimension : field.ArrayDimensions)
+                {
+                    writer.BeginObject();
+                    writer.KeyUInt("count", dimension.Count);
+                    writer.KeyUInt("stride", dimension.Stride);
+                    writer.EndObject();
+                }
+                writer.EndArray();
+                if (field.StructIndex != k_NoHostStruct)
+                {
+                    writer.KeyUInt("structIndex", field.StructIndex);
+                }
+                if (field.StoredValue)
+                {
+                    writer.KeyBool("storedValue", true);
+                }
+                writer.EndObject();
+            }
+            writer.EndArray();
+            writer.EndObject();
+        }
+        writer.EndArray();
+    }
+
+    void WriteHostRoots(JsonWriter& writer, std::span<const HostRoot> roots)
+    {
+        writer.Key("hostRoots");
+        writer.BeginArray();
+        for (const HostRoot& root : roots)
+        {
+            writer.BeginObject();
+            writer.KeyString("kind", magic_enum::enum_name(root.Kind));
+            writer.KeyUInt("owner", root.Owner);
+            writer.KeyUInt("struct", root.Struct);
+            writer.EndObject();
+        }
+        writer.EndArray();
+    }
+
     void WriteVariantTable(JsonWriter& writer, std::span<const LibraryVariant> variants)
     {
         writer.Key("variants");
@@ -458,6 +526,7 @@ namespace
             WriteIndexArray(writer, "samplerPairIndices", variant.Delivered.SamplerPairIndices);
             WriteIndexArray(writer, "constantsIndices", variant.Delivered.ConstantsIndices);
             WriteWorkgroups(writer, variant);
+            WriteHostRoots(writer, variant.HostRoots);
             writer.EndObject();
         }
         writer.EndArray();
@@ -577,6 +646,10 @@ namespace
             writer.KeyString("storageFormat", magic_enum::enum_name(binding.StorageFormat));
             writer.KeyString("storageAccess", magic_enum::enum_name(binding.Access));
             writer.KeyBool("isComparisonSampler", binding.IsComparisonSampler);
+            if (binding.HostStruct != k_NoHostStruct)
+            {
+                writer.KeyUInt("hostStruct", binding.HostStruct);
+            }
 
             writer.Key("uniformMembers");
             writer.BeginArray();
@@ -644,6 +717,10 @@ namespace
             if (entryPoint.Constants.ContainerBinding)
             {
                 writer.KeyUInt("containerBinding", *entryPoint.Constants.ContainerBinding);
+            }
+            if (entryPoint.Constants.HostStruct != k_NoHostStruct)
+            {
+                writer.KeyUInt("hostStruct", entryPoint.Constants.HostStruct);
             }
             WriteUniformMembers(writer, "members", entryPoint.Constants.Members);
             writer.EndObject();
@@ -791,6 +868,7 @@ std::string DumpRawModule(const RawModule& module)
         WriteRawBindings(writer, variant);
         WriteRawSizeAttributes(writer, variant);
         WriteRawEntryPoints(writer, variant);
+        WriteHostTypes(writer, variant.HostTypes);
         writer.EndObject();
     }
     writer.EndArray();
@@ -852,6 +930,9 @@ std::string DumpResolvedModule(std::string_view module_name, std::span<const Com
         }
         writer.EndArray();
 
+        WriteHostTypes(writer, variant.HostTypes);
+        WriteHostRoots(writer, variant.HostRoots);
+
         writer.EndObject();
     }
     writer.EndArray();
@@ -903,6 +984,7 @@ std::string DumpInternedModule(const InternedModule& module)
     writer.KeyUInt("variantCount", module.Variants.size());
 
     WriteEntryPointTable(writer, module.EntryPoints);
+    WriteHostTypes(writer, module.HostTypes);
     WriteVariantTable(writer, module.Variants);
 
     writer.Key("interners");
@@ -992,6 +1074,7 @@ std::string DumpCookedModule(const CookedModule& module)
     WriteSamplerPairTable(writer, module);
     WriteEntryPointConstantsTable(writer, module);
     WriteFootprintDeclarations(writer, module);
+    WriteHostTypes(writer, module.HostTypes);
     WriteVariantTable(writer, module.Variants);
     WriteInternerTable(writer, module);
 

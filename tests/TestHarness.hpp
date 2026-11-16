@@ -5,6 +5,7 @@
 #include "ShaderManifestIndex.hpp"
 #include "TestFormat.hpp"
 
+#include <chrono>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -134,6 +135,7 @@ private:
     int32_t checksRun;
     int32_t failures;
     int32_t emptySections;
+    std::chrono::steady_clock::time_point startTime;
 };
 
 template<typename ActualType, typename ExpectedType>

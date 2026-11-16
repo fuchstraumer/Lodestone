@@ -397,13 +397,30 @@ CookResult<CompiledVariant> ResolveVariant(const RawVariant& raw, const ResolveC
 
         variant.Bindings.push_back(std::move(binding));
         variant.Footprints.push_back(std::move(footprint.value()));
+
+        if (rawBinding.HostStruct != k_NoHostStruct)
+        {
+            variant.HostRoots.push_back(HostRoot{ .Kind = HostRootKind::Binding,
+                                                  .Owner = static_cast<uint32_t>(i),
+                                                  .Struct = rawBinding.HostStruct });
+        }
     }
 
     variant.EntryPoints.reserve(raw.EntryPoints.size());
-    for (const RawEntryPoint& rawEntryPoint : raw.EntryPoints)
+    for (size_t entryPointIndex = 0u; entryPointIndex < raw.EntryPoints.size(); ++entryPointIndex)
     {
+        const RawEntryPoint& rawEntryPoint = raw.EntryPoints[entryPointIndex];
         variant.EntryPoints.push_back(ResolveEntryPoint(rawEntryPoint));
+
+        if (rawEntryPoint.Constants.HostStruct != k_NoHostStruct)
+        {
+            variant.HostRoots.push_back(HostRoot{ .Kind = HostRootKind::EntryPointConstants,
+                                                  .Owner = static_cast<uint32_t>(entryPointIndex),
+                                                  .Struct = rawEntryPoint.Constants.HostStruct });
+        }
     }
+
+    variant.HostTypes = raw.HostTypes;
 
     return variant;
 }

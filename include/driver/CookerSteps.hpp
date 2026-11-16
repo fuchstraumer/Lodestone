@@ -79,6 +79,28 @@ struct FinalizedModule
     std::optional<std::string> Dump;
 };
 
+struct PhaseTimings
+{
+    double PrepareCookMs{ 0.0 };
+    double Stage1_DeclareMs{ 0.0 };
+    double Stage2_EnumerateMs{ 0.0 };
+    double Stage3_CompileMs{ 0.0 };
+    double Stage4_ResolveMs{ 0.0 };
+    double Validate_EmittedCodeMs{ 0.0 };
+    double Stage6_InternMs{ 0.0 };
+    double Stage7_FreezeMs{ 0.0 };
+    double Validate_ModuleRoundTripsMs{ 0.0 };
+    double Validate_CrossProfileMs{ 0.0 };
+    double Stage8_EmitMs{ 0.0 };
+    uint32_t CooksRun{ 0u };
+
+    PhaseTimings& operator+=(const PhaseTimings& other) noexcept;
+};
+
+void AddPhaseTimings(const PhaseTimings& timings) noexcept;
+PhaseTimings GetProcessPhaseTimings() noexcept;
+void WriteTestTimingCsvRow(std::string_view test_name, double total_test_ms);
+
 };
 
 #endif // LODESTONE_COOKER_STEPS_HPP

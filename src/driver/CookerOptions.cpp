@@ -1,5 +1,6 @@
 #include "driver/CookerOptions.hpp"
 #include "CookerErrors.hpp"
+#include "emit/HostHeaderEmitter.hpp"
 #include "target/TargetProfile.hpp"
 
 #include <algorithm>
@@ -47,12 +48,18 @@ namespace
         "  --dump-sources  write the shader sources to the dump files\n"
         "  --policy-file <path> policy file to use. Repeat it to merge more than one file. A key that two files\n"
         "                  both set is an error\n"
-        "  --depfile       write ShaderLibrary.d, a depfile that names every source file the cook read\n";
+        "  --depfile       write ShaderLibrary.d, a depfile that names every source file the cook read\n"
+        "  --host-types=<include> write ShaderLibrary.host.hpp, the C++ mirrors of the shader structs. The header\n"
+        "                  includes <include>, which must define float2 to float4x4, int2 to int4, uint2 to uint4,\n"
+        "                  and half to half4. The cooker does not read that file\n"
+        "  --host-namespace=<name> the C++ namespace of the host header. Required with --host-types\n";
 
     constexpr std::string_view k_OptimizationPrefix = "--O";
     constexpr std::string_view k_DebugPrefix = "--g";
     constexpr std::string_view k_TargetPrefix = "--target=";
     constexpr std::string_view k_StageDumpPrefix = "--dump-stage=";
+    constexpr std::string_view k_HostTypesPrefix = "--host-types=";
+    constexpr std::string_view k_HostNamespacePrefix = "--host-namespace=";
     constexpr std::string_view k_AllStageDumpsName = "all";
 
     /** One table for both the flag spelling and the artifact name, so the two cannot drift. */
@@ -244,13 +251,39 @@ namespace
         return CookError::Success;
     }
 
-    const std::array<ValueFlag, 4u> k_ValueFlags
+    CookError ApplyHostTypesOption(CookerOptions& options, std::string_view value)
+    {
+        // the include text goes inside quotes in the header, so a quote or a line break would end it early
+        const bool valid = !value.empty() && value.find_first_of("\"\r\n") == std::string_view::npos;
+        if (!valid)
+        {
+            return CookError::MalformedArgument;
+        }
+
+        options.HostTypesInclude = std::string{ value };
+        return CookError::Success;
+    }
+
+    CookError ApplyHostNamespaceOption(CookerOptions& options, std::string_view value)
+    {
+        if (!IsValidHostNamespace(value))
+        {
+            return CookError::HostNamespaceInvalid;
+        }
+
+        options.HostNamespace = std::string{ value };
+        return CookError::Success;
+    }
+
+    const std::array<ValueFlag, 6u> k_ValueFlags
     {
         ValueFlag{ .Prefix = k_StageDumpPrefix, .Apply = &ApplyDumpStageArgument },
         // rejected here, so every name in CookerOptions is one FindTargetProfile accepts
         ValueFlag{ .Prefix = k_TargetPrefix, .Apply = &ApplyTargetOption },
         ValueFlag{ .Prefix = k_OptimizationPrefix, .Apply = &ApplyDesiredOptimizationLevel },
-        ValueFlag{ .Prefix = k_DebugPrefix, .Apply = &ApplyDebugLevel }
+        ValueFlag{ .Prefix = k_DebugPrefix, .Apply = &ApplyDebugLevel },
+        ValueFlag{ .Prefix = k_HostTypesPrefix, .Apply = &ApplyHostTypesOption },
+        ValueFlag{ .Prefix = k_HostNamespacePrefix, .Apply = &ApplyHostNamespaceOption }
     };
 
     const ValueFlag* FindValueFlag(std::string_view argument) noexcept
@@ -453,6 +486,12 @@ CookResult<CookerOptions> ParseCommandLine(std::span<const std::string_view> arg
     if (options.TargetNames.empty())
     {
         return std::unexpected(CookError::NoTargetSpecified);
+    }
+
+    // each flag is useless without the other: the header needs a namespace, and a namespace needs a header
+    if (options.HostTypesInclude.empty() != options.HostNamespace.empty())
+    {
+        return std::unexpected(CookError::HostNamespaceMissing);
     }
 
     return options;

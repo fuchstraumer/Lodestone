@@ -55,6 +55,8 @@ enum class CookError : uint16_t
     MalformedArgument = 63,
     UnknownTargetProfile = 64,
     NoTargetSpecified = 65,
+    HostNamespaceMissing = 66, // `--host-types` has no `--host-namespace`, or `--host-namespace` has no `--host-types`
+    HostNamespaceInvalid = 67, // `--host-namespace` is not a C++ identifier or a `::` path of identifiers
 
     PermutationSpaceNotFound = 80,
     PermutationValueNotInAxis = 81,
@@ -142,6 +144,9 @@ enum class CookError : uint16_t
     DeliveredFormExceedsBase = 186, // the delivered code needs a binding, pair, capability, or size that the base code does not
     ShimElementImplicitPadding = 187, // the scalar layout and the std430 layout of a shim buffer element type differ
     ShimElementTypeUnsupported = 188, // the element type of a shim buffer has no buffer layout: a resource, pointer, or unsized array
+    HostTypeLayoutConflict = 189, // one host struct name and layout rule has two layouts, across variants, modules, or profiles
+    HostTypeNameCollision = 190, // two names of a host header map to one C++ identifier
+    HostTypeNotEmittable = 191, // a host struct has a member that no host type can mirror
 
     SystemError = 200,
     DirectoryDoesNotExist = 201,

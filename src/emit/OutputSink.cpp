@@ -16,6 +16,13 @@
 namespace lodestone
 {
 
+namespace
+{
+
+    bool FileHasContent(const std::filesystem::path& file_path, std::string_view content);
+
+} // namespace
+
 OutputSink::OutputSink(std::string _name) noexcept : name{ std::move(_name) } {}
 OutputSink::~OutputSink() noexcept = default;
 
@@ -44,6 +51,12 @@ CookError FileOutputSink::WriteArtifact(std::string_view artifact_name, std::str
     if (std::wcslen(artifactPath.c_str()) > 255)
     {
         return CookError::OutputPathTooLong;
+    }
+
+    // a file with the same bytes keeps its timestamp, so a build that depends on it does not run again
+    if (FileHasContent(artifactPath, content))
+    {
+        return CookError::Success;
     }
 
     std::error_code directoryError;
@@ -144,5 +157,30 @@ CookError MemoryOutputSink::RemoveArtifact(std::string_view artifact_name)
     }
     return CookError::Success;
 }
+
+namespace
+{
+
+    bool FileHasContent(const std::filesystem::path& file_path, std::string_view content)
+    {
+        std::error_code sizeError;
+        const std::uintmax_t existingSize = std::filesystem::file_size(file_path, sizeError);
+        if (sizeError || existingSize != content.size())
+        {
+            return false;
+        }
+
+        std::ifstream stream{ file_path, std::ios::binary };
+        std::string existing(content.size(), ' ');
+        stream.read(existing.data(), static_cast<std::streamsize>(existing.size()));
+        if (stream.gcount() != static_cast<std::streamsize>(existing.size()))
+        {
+            return false;
+        }
+
+        return existing == content;
+    }
+
+} // namespace
 
 } // namespace lodestone

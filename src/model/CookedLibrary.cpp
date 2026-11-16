@@ -7,6 +7,7 @@
 #include "Diagnostics.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
+#include "model/HostTypeTable.hpp"
 #include "model/ShaderDataSchema.hpp"
 
 #include <algorithm>
@@ -15,12 +16,15 @@
 #include <cstdint>
 #include <format>
 #include <expected>
+#include <map>
 #include <memory>
 #include <optional>
 #include <ranges>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -76,7 +80,17 @@ namespace
                                                  bool& has_unread_pairs);
     /** @brief Constructs the frozen codeform tables by consuming the interners */
     CodeFormTables FreezeCodeForm(CodeFormInterners& interners);
-    
+
+    /** Merges the host structs of one variant into the module table by name and rule, and stores the roots of the
+     * variant with the merged indices. The same name and rule with another layout is a conflict. */
+    CookError MergeVariantHostTypes(InternedModule& module,
+                                    const CompiledVariant& variant,
+                                    LibraryVariant& record,
+                                    DiagnosticSink& sink);
+
+    /** Returns the name and rule of each struct that holds a stored value at any depth, in any profile. */
+    std::set<std::pair<std::string_view, LayoutRule>> FindStoredValueTypes(const CookedLibrary& library);
+
     /** Calls `visit` for each variant that the first recording profile of a module and a later one both cooked. Each
      * profile applies its own policy, so only the shared keys are compared. */
     template <typename Visitor>
@@ -289,6 +303,12 @@ CookError AppendVariantToModule(InternedModule& module,
     record.RasterIndices.reserve(variant.EntryPoints.size());
     record.Workgroups.reserve(variant.EntryPoints.size());
 
+    const CookError hostTypesError = MergeVariantHostTypes(module, variant, record, sink);
+    if (!hostTypesError)
+    {
+        return hostTypesError;
+    }
+
     const bool hasBase = !variant.EntryPoints.empty() && variant.EntryPoints.front().Base.has_value();
     if (hasBase)
     {
@@ -346,6 +366,7 @@ CookedModule FreezeModuleTables(InternedModule&& interned)
     module.RasterStates = interned.RasterInterner.ConsumeTable();
     module.ObservedCapabilities = std::move(interned.ObservedCapabilities);
     module.FootprintDeclarations = std::move(interned.FootprintDeclarations);
+    module.HostTypes = std::move(interned.HostTypes);
 
     module.ResourceTable = DescribeTable(interned.ResourceInterner);
     module.ResourceListTable = DescribeTable(interned.ResourceListInterner);
@@ -536,6 +557,70 @@ CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library, Diagnos
     });
 }
 
+CookError VerifyHostTypesAcrossProfiles(const CookedLibrary& library, DiagnosticSink& sink)
+{
+    struct StructRef
+    {
+        size_t Environment;
+        uint32_t Struct;
+    };
+
+    // an exempt struct is compared within one profile only, so its key holds the profile
+    constexpr size_t k_AllProfiles = SIZE_MAX;
+    const size_t moduleCount = library.ModuleNames.size();
+    const std::set<std::pair<std::string_view, LayoutRule>> storedValueTypes = FindStoredValueTypes(library);
+    std::map<std::tuple<std::string_view, LayoutRule, size_t>, StructRef> seen;
+
+    for (size_t environmentIndex = 0u; environmentIndex < library.Environments.size(); ++environmentIndex)
+    {
+        const std::optional<CookedModule>& environment = library.Environments[environmentIndex];
+        if (!environment.has_value())
+        {
+            continue;
+        }
+
+        const size_t profileIndex = environmentIndex / moduleCount;
+        for (uint32_t structIndex = 0u; structIndex < environment->HostTypes.Structs.size(); ++structIndex)
+        {
+            const HostStruct& hostStruct = environment->HostTypes.Structs[structIndex];
+            const std::string_view name{ hostStruct.Name };
+            const bool exempt = storedValueTypes.contains(std::pair{ name, hostStruct.Rule });
+            const auto [position, inserted] =
+                seen.try_emplace(std::tuple{ name, hostStruct.Rule, exempt ? profileIndex : k_AllProfiles },
+                                 StructRef{ .Environment = environmentIndex, .Struct = structIndex });
+            if (inserted)
+            {
+                continue;
+            }
+
+            const StructRef first = position->second;
+            const CookedModule& firstEnvironment = *library.Environments[first.Environment];
+            std::string difference = DescribeHostStructDifference(firstEnvironment.HostTypes,
+                                                                  first.Struct,
+                                                                  environment->HostTypes,
+                                                                  structIndex);
+            if (difference.empty())
+            {
+                continue;
+            }
+
+            return ReportError(sink,
+                               CookError::HostTypeLayoutConflict,
+                               std::format("host struct '{}' ({}) has two layouts: in module '{}' for profile '{}' and in "
+                                           "module '{}' for profile '{}', because {}",
+                                           hostStruct.Name,
+                                           ToString(hostStruct.Rule),
+                                           library.ModuleNames[first.Environment % moduleCount],
+                                           library.Profiles[first.Environment / moduleCount].TargetName,
+                                           library.ModuleNames[environmentIndex % moduleCount],
+                                           library.Profiles[profileIndex].TargetName,
+                                           difference));
+        }
+    }
+
+    return CookError::Success;
+}
+
 CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library, DiagnosticSink& sink)
 {
     return VisitSharedVariants(
@@ -658,6 +743,76 @@ namespace
         std::ranges::sort(named);
 
         return named;
+    }
+
+    std::set<std::pair<std::string_view, LayoutRule>> FindStoredValueTypes(const CookedLibrary& library)
+    {
+        std::set<std::pair<std::string_view, LayoutRule>> types;
+        for (const std::optional<CookedModule>& environment : library.Environments)
+        {
+            if (!environment.has_value())
+            {
+                continue;
+            }
+
+            // a nested struct has a smaller index than its parent, so its flag is known when the parent reads it
+            const std::vector<HostStruct>& structs = environment->HostTypes.Structs;
+            std::vector<bool> holdsStoredValue(structs.size(), false);
+            for (size_t structIndex = 0u; structIndex < structs.size(); ++structIndex)
+            {
+                const HostStruct& hostStruct = structs[structIndex];
+                const bool holds = std::ranges::any_of(hostStruct.Fields,
+                                                       [&holdsStoredValue](const HostField& field)
+                                                       {
+                                                           return field.StoredValue ||
+                                                                  (field.Kind == HostFieldKind::Struct &&
+                                                                   holdsStoredValue[field.StructIndex]);
+                                                       });
+                holdsStoredValue[structIndex] = holds;
+                if (holds)
+                {
+                    types.emplace(std::string_view{ hostStruct.Name }, hostStruct.Rule);
+                }
+            }
+        }
+
+        return types;
+    }
+
+    CookError MergeVariantHostTypes(InternedModule& module,
+                                    const CompiledVariant& variant,
+                                    LibraryVariant& record,
+                                    DiagnosticSink& sink)
+    {
+        std::vector<uint32_t> remap;
+        const std::optional<HostTypeConflict> conflict =
+            MergeHostTypes(module.HostTypes, module.HostTypeKeys, variant.HostTypes, remap);
+        if (conflict)
+        {
+            const HostStruct& existing = module.HostTypes.Structs[conflict->Existing];
+
+            return ReportError(sink,
+                               CookError::HostTypeLayoutConflict,
+                               std::format("host struct '{}' ({}) of module '{}' has two layouts: variant [{}] and "
+                                           "variant [{}] differ, because {}",
+                                           existing.Name,
+                                           ToString(existing.Rule),
+                                           module.Name,
+                                           module.HostStructOrigins[conflict->Existing],
+                                           variant.VariantDescription,
+                                           conflict->Difference));
+        }
+
+        module.HostStructOrigins.resize(module.HostTypes.Structs.size(), variant.VariantDescription);
+
+        record.HostRoots.reserve(variant.HostRoots.size());
+        for (const HostRoot& root : variant.HostRoots)
+        {
+            record.HostRoots.push_back(
+                HostRoot{ .Kind = root.Kind, .Owner = root.Owner, .Struct = remap[root.Struct] });
+        }
+
+        return CookError::Success;
     }
 
     CodeFormTables FreezeCodeForm(CodeFormInterners& interners)

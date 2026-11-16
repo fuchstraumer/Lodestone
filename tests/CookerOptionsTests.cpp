@@ -181,6 +181,37 @@ int main()
                       CookError::MalformedArgument,
                       "an unknown stage name");
 
+    runner.BeginSection("the host header needs its include and its namespace together");
+    const CookResult<CookerOptions> hostHeader = Parse(
+        { "-o", output, "--target=wgsl", "--host-types=Host.hpp", "--host-namespace=game::shaders", "a.slang" });
+    if (runner.CheckOk(hostHeader, "both flags"))
+    {
+        runner.CheckEqual(hostHeader->HostTypesInclude, "Host.hpp", "the include reads back");
+        runner.CheckEqual(hostHeader->HostNamespace, "game::shaders", "a namespace path reads back");
+    }
+    const CookResult<CookerOptions> noHostHeader = Parse({ "-o", output, "--target=wgsl", "a.slang" });
+    if (runner.CheckOk(noHostHeader, "neither flag"))
+    {
+        runner.Check(noHostHeader->HostTypesInclude.empty() && noHostHeader->HostNamespace.empty(),
+                     "the host header is off by default");
+    }
+    runner.CheckError(Parse({ "-o", output, "--target=wgsl", "--host-types=Host.hpp", "a.slang" }),
+                      CookError::HostNamespaceMissing,
+                      "--host-types with no namespace");
+    runner.CheckError(Parse({ "-o", output, "--target=wgsl", "--host-namespace=shaders", "a.slang" }),
+                      CookError::HostNamespaceMissing,
+                      "--host-namespace with no header");
+    for (const std::string_view invalid : { "", "1shaders", "a-b", "a:b", "::a", "a::", "a::::b", "class", "a::int" })
+    {
+        const std::string flag = std::format("--host-namespace={}", invalid);
+        runner.CheckError(Parse({ "-o", output, "--target=wgsl", "--host-types=Host.hpp", flag, "a.slang" }),
+                          CookError::HostNamespaceInvalid,
+                          std::format("'{}' is not a C++ namespace", invalid));
+    }
+    runner.CheckError(Parse({ "-o", output, "--target=wgsl", "--host-types=", "--host-namespace=a", "a.slang" }),
+                      CookError::MalformedArgument,
+                      "an empty include");
+
     std::filesystem::remove_all(scratch);
     return runner.Report();
 }

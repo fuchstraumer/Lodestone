@@ -17,6 +17,7 @@
 #include "target/TargetProfile.hpp"
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -140,7 +141,8 @@ namespace
                                                                    InternedModule& interned_module,
                                                                    RawModule& raw_module,
                                                                    const DerivedConstantTable& derived_constants,
-                                                                   std::vector<CompiledVariant>& out_module_variants);
+                                                                   std::vector<CompiledVariant>& out_module_variants,
+                                                                   PhaseTimings& phase_timings);
     // names the module file, the target, and the variant, as the record that caused the failure can name none
     [[nodiscard]] CookError ReportVariantFailure(const SharedCookState& shared_state,
                                                  const TargetProfile& target,
@@ -157,6 +159,7 @@ CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& share
                                                     const PermutationSpace& space,
                                                     const VariantSet& variants) const
 {
+    PhaseTimings localTimings{};
     InternedModule internedModule;
 
     if (!shared_state.Options.DedupeEnabled)
@@ -174,12 +177,15 @@ CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& share
     std::vector<CompiledVariant> compiledVariants;
     compiledVariants.reserve(variants.Variants.size());
 
+    const std::chrono::steady_clock::time_point rawStart = std::chrono::steady_clock::now();
     CookResult<RawModule> rawModuleResult = compiler->PrepareRawModule(space);
+    const std::chrono::steady_clock::time_point rawEnd = std::chrono::steady_clock::now();
     if (!rawModuleResult)
     {
         return std::unexpected(rawModuleResult.error());
     }
-
+    const std::chrono::duration<double, std::milli> rawElapsed = rawEnd - rawStart;
+    localTimings.Stage3_CompileMs += rawElapsed.count();
 
     RawModule rawModule{ std::move(*rawModuleResult) };
     CookResult<TargetProfile> targetProfileResult = FindTargetProfile(target_name);
@@ -189,13 +195,17 @@ CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& share
         return std::unexpected(targetProfileResult.error());
     }
 
+    const std::chrono::steady_clock::time_point dConstStart = std::chrono::steady_clock::now();
     const CookResult<DerivedConstantTable> derivedConstants =
         MakeDerivedConstantTable(rawModule.DerivedConstants, space.Axes(), rawModule.ExternDefaults, *shared_state.Diagnostics);
+    const std::chrono::steady_clock::time_point dConstEnd = std::chrono::steady_clock::now();
     if (!derivedConstants)
     {
         const std::string errStr = std::format("module '{}' failed: {}", module_name, ToString(derivedConstants.error()));
         return std::unexpected(ReportError(*shared_state.Diagnostics, derivedConstants.error(), errStr));
     }
+    const std::chrono::duration<double, std::milli> dConstElapsed = dConstEnd - dConstStart;
+    localTimings.Stage4_ResolveMs += dConstElapsed.count();
 
     CookResult<CookStatistics> compileVariantsResult = CompileModuleVariants(shared_state,
                                                                              *targetProfileResult,
@@ -204,7 +214,8 @@ CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& share
                                                                              internedModule,
                                                                              rawModule,
                                                                              derivedConstants.value(),
-                                                                             compiledVariants);
+                                                                             compiledVariants,
+                                                                             localTimings);
 
     if (!compileVariantsResult)
     {
@@ -229,6 +240,8 @@ CookResult<BuiltModule> BuildModuleStep::operator()(const SharedCookState& share
     {
         internedModuleDump = DumpInternedModule(internedModule);
     }
+
+    AddPhaseTimings(localTimings);
 
     return BuiltModule{
         .Module = std::move(internedModule),
@@ -741,11 +754,17 @@ namespace
                                                                    InternedModule& interned_module,
                                                                    RawModule& raw_module,
                                                                    const DerivedConstantTable& derived_constants,
-                                                                   std::vector<CompiledVariant>& out_module_variants)
+                                                                   std::vector<CompiledVariant>& out_module_variants,
+                                                                   PhaseTimings& phase_timings)
     {
         const bool keepRawVariants = IsStageDumpRequested(shared_state.Options, StageDumpKind::Raw);
         CookStatistics localStats{};
+
+        const std::chrono::steady_clock::time_point compileStart = std::chrono::steady_clock::now();
         auto compileResultsList = compiler.Compile(variant_set.Variants, *shared_state.Diagnostics);
+        const std::chrono::steady_clock::time_point compileEnd = std::chrono::steady_clock::now();
+        const std::chrono::duration<double, std::milli> compileElapsed = compileEnd - compileStart;
+        phase_timings.Stage3_CompileMs += compileElapsed.count();
 
         for (auto&& [idx, result] : std::views::enumerate(compileResultsList))
         {
@@ -758,6 +777,8 @@ namespace
                                                                 currVariant,
                                                                 result.error()));
             }
+
+            const std::chrono::steady_clock::time_point resolveStart = std::chrono::steady_clock::now();
 
             const RawVariant& currRawVariant = result.value();
             CookResult<ResolveContext> contextResult = MakeResolveContext(currVariant.Canonical,
@@ -793,6 +814,10 @@ namespace
                 return std::unexpected(declarationError);
             }
 
+            const std::chrono::steady_clock::time_point resolveEnd = std::chrono::steady_clock::now();
+            const std::chrono::duration<double, std::milli> resolveElapsed = resolveEnd - resolveStart;
+            phase_timings.Stage4_ResolveMs += resolveElapsed.count();
+
             if (keepRawVariants)
             {
                 raw_module.Variants.emplace_back(std::move(*result));
@@ -801,6 +826,8 @@ namespace
             CompiledVariant& variant = variantResult.value();
             RecordVariantStatistics(variant, localStats);
             ReportVariantIfRequested(shared_state.Options, variant, *shared_state.Diagnostics);
+
+            const std::chrono::steady_clock::time_point validateStart = std::chrono::steady_clock::now();
 
             const CookResult<uint32_t> mismatches = ReadEmittedCode(target,
                                                                     shared_state.Options.ValidateAgainstEmittedText,
@@ -823,10 +850,16 @@ namespace
                 }
             }
 
+            const std::chrono::steady_clock::time_point validateEnd = std::chrono::steady_clock::now();
+            const std::chrono::duration<double, std::milli> validateElapsed = validateEnd - validateStart;
+            phase_timings.Validate_EmittedCodeMs += validateElapsed.count();
+
             if (shared_state.Options.ReportReflection)
             {
                 ReportUnreferencedBindings(variant, *shared_state.Diagnostics);
             }
+
+            const std::chrono::steady_clock::time_point internStart = std::chrono::steady_clock::now();
 
             if (interned_module.EntryPoints.empty())
             {
@@ -843,6 +876,10 @@ namespace
             {
                 return std::unexpected(appendResult);
             }
+
+            const std::chrono::steady_clock::time_point internEnd = std::chrono::steady_clock::now();
+            const std::chrono::duration<double, std::milli> internElapsed = internEnd - internStart;
+            phase_timings.Stage6_InternMs += internElapsed.count();
 
             out_module_variants.emplace_back(std::move(*variantResult));
         }

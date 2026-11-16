@@ -2,6 +2,7 @@
 #ifndef LODESTONE_DATA_SCHEMA_HPP
 #define LODESTONE_DATA_SCHEMA_HPP
 #include "ResourceFlags.hpp"
+#include "model/HostTypeTable.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include <cstddef>
 #include <cstdint>
@@ -278,6 +279,10 @@ struct CompiledVariant
     /** Parallel to `Bindings`. Size expressions read axis values, so footprints belong to the variant. */
     std::vector<ResourceFootprint> Footprints;
     std::vector<CompiledEntryPoint> EntryPoints;
+    /** The struct layouts of this variant. The roots are kept apart from the bindings, so the interned content does not
+     * depend on a table index. */
+    HostTypeTable HostTypes;
+    std::vector<HostRoot> HostRoots;
 };
 
 /** Returns the bindings one entry point reads, joined with this variant's footprints. */

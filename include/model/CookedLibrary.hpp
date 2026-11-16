@@ -4,6 +4,7 @@
 #include "ContentHash.hpp"
 #include "ContentInterner.hpp"
 #include "CookerErrors.hpp"
+#include "HostTypeTable.hpp"
 #include "ShaderDataSchema.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifestFormat.hpp"
@@ -62,6 +63,8 @@ struct LibraryVariant
     CodeFormIndices Delivered;
     /** @brief Empty when the cook compiled once, and `Delivered` is the base. */
     std::optional<CodeFormIndices> Base;
+    /** @brief Indices into the host type table of the module. A binding root names a position in the resource list. */
+    std::vector<HostRoot> HostRoots;
 };
 
 /** @brief The axes that a resource's size attributes name, directly or through derived constants. */
@@ -124,6 +127,12 @@ struct InternedModule
     /** Sorted by scope and name. The first declaring variant adds an entry: the attribute text never varies.
      */
     std::vector<FootprintAxisDeclaration> FootprintDeclarations;
+    /** The merged host structs of every variant. Keyed by name and rule, so `DisableDedupe` does not change it. */
+    HostTypeTable HostTypes;
+    /** Indexes `HostTypes` during the build. The frozen module does not keep it. */
+    HostTypeIndex HostTypeKeys;
+    /** Parallel to `HostTypes`: the description of the variant that added each struct. */
+    std::vector<std::string> HostStructOrigins;
     void DisableDedupe() noexcept;
 };
 
@@ -164,6 +173,8 @@ struct CookedModule
     /** The manifest's capability name table: sorted and unique. */
     std::vector<std::string> ObservedCapabilities;
     std::vector<FootprintAxisDeclaration> FootprintDeclarations;
+    /** The host structs of every variant, one for each name and layout rule. */
+    HostTypeTable HostTypes;
 
     TableStatistics ResourceTable;
     TableStatistics ResourceListTable;
@@ -212,6 +223,13 @@ CookError AppendVariantToModule(InternedModule& module,
 /** @brief Compares the pairs of each variant that two profiles cooked. Skips profiles that did not record
  * pairs, and entry points with combined texture samplers. */
 CookError VerifySamplerPairsAcrossProfiles(const CookedLibrary& library, DiagnosticSink& sink);
+
+/** @brief Compares the layout of each host struct. The key of a host type is its name, its profile, and its layout
+ * rule. Within one profile, a name and rule must have one layout in every module. Across profiles, a name and rule
+ * must have one layout too, except where a struct holds a stored value (a Handle or Pointer shim member) at any
+ * depth in any profile: that layout follows the access model, so the exempt struct is compared within each profile
+ * only. */
+CookError VerifyHostTypesAcrossProfiles(const CookedLibrary& library, DiagnosticSink& sink);
 
 /** @brief Compares the workgroup memory and the portable capabilities (16-bit floats, subgroups) of each
  * entry point that two profiles cooked for one variant. Skips profiles that did not read their facts. */
