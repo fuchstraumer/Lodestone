@@ -43,6 +43,9 @@ namespace
             QueryAxisValue{ .Type = AxisValueDomain::Boolean, .IntegralValue = 1u, .Name = axis_name }
         };
     }
+
+    /** Both spans have the same length. */
+    bool IsCapabilitySubset(std::span<const uint64_t> subset, std::span<const uint64_t> superset) noexcept;
 }
 
 std::string_view NearestName(std::string_view input, std::span<const std::string_view> candidates) noexcept
@@ -313,6 +316,11 @@ QueryResult<std::vector<VariantKey>> ManifestQueryBuilder::Keys() const noexcept
         return std::unexpected(errors.front().Code);
     }
 
+    if (preferCapable && !device.has_value())
+    {
+        return std::unexpected(QueryErrorCode::PreferCapableNeedsDevice);
+    }
+
     manifest::DeviceFit rejection;
     return selectFitting(allEntryPoints(), rejection);
 }
@@ -332,6 +340,13 @@ ManifestQueryBuilder ManifestQueryBuilder::ForDevice(manifest::CapabilitySupport
     std::vector<uint64_t> supported(environment.MakeDeviceCapabilities(supports, user, {}));
     environment.MakeDeviceCapabilities(supports, user, supported);
     result.device = DeviceState{ .Supported = std::move(supported), .Limits = limits };
+    return result;
+}
+
+ManifestQueryBuilder ManifestQueryBuilder::PreferCapable() const noexcept
+{
+    ManifestQueryBuilder result = *this;
+    result.preferCapable = true;
     return result;
 }
 
@@ -373,8 +388,112 @@ std::vector<VariantKey> ManifestQueryBuilder::selectFitting(std::span<const uint
     };
 
     std::erase_if(keys, doesNotFit);
-    
+
+    if (preferCapable)
+    {
+        removeDominatedByCapability(keys, entry_points);
+    }
+
     return keys;
+}
+
+void ManifestQueryBuilder::removeDominatedByCapability(std::vector<VariantKey>& keys,
+                                                       std::span<const uint32_t> entry_points) const noexcept
+{
+    const manifest::EnvironmentView& environment = index->environment;
+    const manifest::ModuleView& module = environment.Module();
+
+    std::vector<uint32_t> capabilityAxes;
+    for (uint32_t axisIndex = 0u; std::cmp_less(axisIndex, index->radices.size()); ++axisIndex)
+    {
+        const manifest::Axis& axis = module.AxisData(axisIndex);
+        if (axis.Kind == AxisKind::Capability)
+        {
+            capabilityAxes.push_back(axisIndex);
+        }
+    }
+
+    if (capabilityAxes.empty())
+    {
+        return;
+    }
+
+    // the key with every capability digit zeroed is equal for two keys exactly when they differ only in capability axes
+    const auto withoutCapabilityDigits = [&](VariantKey key) -> uint64_t
+    {
+        uint64_t remaining = std::to_underlying(key);
+        for (const uint32_t axisIndex : capabilityAxes)
+        {
+            remaining -= static_cast<uint64_t>(index->digitOf(key, axisIndex)) * index->placeValues[axisIndex];
+        }
+        return remaining;
+    };
+
+    std::vector<std::pair<uint64_t, VariantKey>> classes;
+    classes.reserve(keys.size());
+    for (const VariantKey key : keys)
+    {
+        classes.emplace_back(withoutCapabilityDigits(key), key);
+    }
+    std::ranges::sort(classes);
+
+    const auto capabilitiesOf = [&](VariantKey key, uint32_t entry_point) -> std::span<const uint64_t>
+    {
+        const manifest::VariantView variant = environment.VariantAt(*environment.FindVariant(key));
+        return variant.EntryPoint(entry_point).RequiredCapabilities();
+    };
+
+    const auto dominates = [&](VariantKey dominant, VariantKey dominated) -> bool
+    {
+        bool strict = false;
+        for (const uint32_t entryPoint : entry_points)
+        {
+            const std::span<const uint64_t> dominantNames = capabilitiesOf(dominant, entryPoint);
+            const std::span<const uint64_t> dominatedNames = capabilitiesOf(dominated, entryPoint);
+            if (!IsCapabilitySubset(dominatedNames, dominantNames))
+            {
+                return false;
+            }
+
+            strict = strict || !std::ranges::equal(dominatedNames, dominantNames);
+        }
+
+        return strict;
+    };
+
+    std::vector<VariantKey> removed;
+    size_t begin = 0u;
+    while (begin < classes.size())
+    {
+        size_t end = begin + 1u;
+        while (end < classes.size() && classes[end].first == classes[begin].first)
+        {
+            ++end;
+        }
+
+        for (size_t candidate = begin; candidate < end; ++candidate)
+        {
+            const auto dominatesCandidate = [&](size_t other)
+            {
+                return other != candidate && dominates(classes[other].second, classes[candidate].second);
+            };
+
+            const auto others = std::views::iota(begin, end);
+            if (std::ranges::any_of(others, dominatesCandidate))
+            {
+                removed.push_back(classes[candidate].second);
+            }
+        }
+
+        begin = end;
+    }
+
+    std::ranges::sort(removed);
+    const auto isRemoved = [&removed](VariantKey key)
+    {
+        return std::ranges::binary_search(removed, key);
+    };
+    std::erase_if(keys, isRemoved);
 }
 
 QueryResult<std::vector<DecodedVariant>> ManifestQueryBuilder::Variants() const noexcept
@@ -526,6 +645,11 @@ std::expected<VariantKey, QueryError> ManifestQueryBuilder::singleOver(std::span
     {
         // the whole error, so the suggestion reaches the caller
         return std::unexpected(errors.front());
+    }
+
+    if (preferCapable && !device.has_value())
+    {
+        return std::unexpected(QueryError{ .Code = QueryErrorCode::PreferCapableNeedsDevice });
     }
 
     manifest::DeviceFit rejection;
@@ -722,6 +846,19 @@ ManifestQueryBuilder ManifestQueryBuilder::whereAnyOf(std::string_view axis_name
     result.noteDuplicateValues(axis_name, axisIndex, values);
     result.insertConstraint(axis_name, axisIndex, std::move(values), mode);
     return result;
+}
+
+namespace
+{
+    bool IsCapabilitySubset(std::span<const uint64_t> subset, std::span<const uint64_t> superset) noexcept
+    {
+        const auto isWordSubset = [](uint64_t subset_word, uint64_t superset_word) -> bool
+        {
+            return (subset_word & ~superset_word) == 0u;
+        };
+
+        return std::ranges::equal(subset, superset, isWordSubset);
+    }
 }
 
 } // namespace lodestone

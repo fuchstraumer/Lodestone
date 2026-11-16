@@ -5,11 +5,14 @@
 #include "Diagnostics.hpp"
 #include "compile/SlangDiagnosticParser.hpp"
 #include "permute/PermutationAssignment.hpp"
+#include "permute/PermutationAxis.hpp"
+#include "permute/PermutationTypes.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "permute/PermutationValue.hpp"
 #include "slang-com-ptr.h"
 #include "slang.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -44,6 +47,12 @@ struct GeneratedEntryPoint
 GeneratedEntryPoint GenerateOneEntryPoint(slang::IComponentType* linked_program, size_t index, SlangInt target_index);
 CookResult<std::vector<LinkedVariant::EpCode>> GenerateEntryPointCode(SlangModuleContext& context, Slang::ComPtr<slang::IComponentType> linked_program, SlangInt target_index, DiagnosticSink& sink);
 CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext& context, const VariantDescriptor& descriptor, DiagnosticSink& sink);
+const RawInterfaceImpl* FindPolicyImpl(const PermutationBinding& binding) noexcept;
+std::string DescribePolicyType(const PermutationBinding& binding, const RawInterfaceImpl& impl);
+CookError ReportPolicyTypeInvalid(DiagnosticSink& sink, const PermutationBinding& binding, std::string_view stage);
+/** Reports every policy type of the variant. A link failure does not say which value caused it. */
+CookError ReportPolicyTypesInvalid(DiagnosticSink& sink, const VariantDescriptor& descriptor, std::string_view stage);
+bool HasPolicyType(const VariantDescriptor& descriptor) noexcept;
 
 } // namespace
 
@@ -252,6 +261,78 @@ CookResult<std::vector<LinkedVariant::EpCode>> GenerateEntryPointCode(SlangModul
     return generated;
 }
 
+const RawInterfaceImpl* FindPolicyImpl(const PermutationBinding& binding) noexcept
+{
+    if (binding.Value.GetType() != PermutationValue::Type::Type)
+    {
+        return nullptr;
+    }
+
+    const RawInterfaceImpl& impl = binding.Axis->InterfaceImpl(binding.Value.AsUInt());
+    return impl.FromPolicy ? &impl : nullptr;
+}
+
+std::string DescribePolicyType(const PermutationBinding& binding, const RawInterfaceImpl& impl)
+{
+    return std::format("type '{}' of axis '{}' (policy file '{}', line {})",
+                       impl.TypeName,
+                       binding.Axis->Name,
+                       impl.PolicyFile,
+                       impl.PolicyLine);
+}
+
+CookError ReportPolicyTypeInvalid(DiagnosticSink& sink, const PermutationBinding& binding, std::string_view stage)
+{
+    const RawInterfaceImpl& impl = *FindPolicyImpl(binding);
+    const std::string message =
+        std::format("The {} does not conform to interface '{}' or does not resolve, so Slang failed while {}. Check "
+                    "the type and its Imports",
+                    DescribePolicyType(binding, impl),
+                    binding.Axis->InterfaceName(),
+                    stage);
+    return ReportError(sink,
+                       CookError::PolicyInterfaceTypeInvalid,
+                       ShaderLocation{ .File = impl.PolicyFile, .Line = impl.PolicyLine },
+                       message);
+}
+
+CookError ReportPolicyTypesInvalid(DiagnosticSink& sink, const VariantDescriptor& descriptor, std::string_view stage)
+{
+    std::string candidates;
+    ShaderLocation where;
+    for (const PermutationBinding& binding : descriptor.Active)
+    {
+        const RawInterfaceImpl* impl = FindPolicyImpl(binding);
+        if (impl == nullptr)
+        {
+            continue;
+        }
+
+        if (candidates.empty())
+        {
+            where = ShaderLocation{ .File = impl->PolicyFile, .Line = impl->PolicyLine };
+        }
+        else
+        {
+            candidates += "; ";
+        }
+        candidates += DescribePolicyType(binding, *impl);
+    }
+
+    const std::string message =
+        std::format("Slang failed while {} a variant that uses a type from the policy file. The failure does not "
+                    "say which value caused it. Check each of these: {}",
+                    stage,
+                    candidates);
+    return ReportError(sink, CookError::PolicyInterfaceTypeInvalid, where, message);
+}
+
+bool HasPolicyType(const VariantDescriptor& descriptor) noexcept
+{
+    return std::ranges::any_of(descriptor.Active,
+                               [](const PermutationBinding& binding) { return FindPolicyImpl(binding) != nullptr; });
+}
+
 CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext& context,
                                                              const VariantDescriptor& descriptor,
                                                              DiagnosticSink& sink)
@@ -284,6 +365,10 @@ CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext&
 
         if (variantModule == nullptr)
         {
+            if (FindPolicyImpl(binding) != nullptr)
+            {
+                return std::unexpected(ReportPolicyTypeInvalid(sink, binding, "loading its link module"));
+            }
             return std::unexpected(CookError::VariantModuleCreationFailed);
         }
 
@@ -305,6 +390,10 @@ CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext&
 
     if (composite == nullptr)
     {
+        if (HasPolicyType(descriptor))
+        {
+            return std::unexpected(ReportPolicyTypesInvalid(sink, descriptor, "creating the composite"));
+        }
         return std::unexpected(CookError::CompositeCreationFailed);
     }
 
@@ -312,6 +401,10 @@ CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext&
     if (SLANG_FAILED(composite->link(linked.writeRef(), diagnostics.writeRef())))
     {
         ReportDiagnostics(sink, "link", diagnostics.get());
+        if (HasPolicyType(descriptor))
+        {
+            return std::unexpected(ReportPolicyTypesInvalid(sink, descriptor, "linking"));
+        }
         return std::unexpected(CookError::LinkFailed);
     }
 

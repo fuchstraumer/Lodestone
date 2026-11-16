@@ -1,0 +1,2 @@
+[PolicyGraph.axes.NO_SUCH_AXIS]
+Types = [ { Type = "Composed<LeafA, LeafB>", Imports = ["PolicyLeaves"] } ]

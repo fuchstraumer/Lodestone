@@ -450,6 +450,7 @@ CookError SlangModuleContext::stageInterfaceStruct(slang::DeclReflection* reflec
     stub.InterfaceName.assign(interfaceName, interfaceNameLength);
     stub.Type = type;
     stub.Impl.Module = std::string(module_name);
+    stub.Impl.Imports.emplace_back(module_name);
     stub.Impl.TypeName = std::move(typeName);
     axes_build_context.InterfaceAxisImplStubs.emplace_back(std::move(stub));
     return CookError::Success;
@@ -587,7 +588,8 @@ CookError SlangModuleContext::rejectGenericInterfaceImpl(slang::DeclReflection* 
 
     const char* genericName = generic->getName();
     const std::string errStr = std::format("Generic type '{}' cannot be an interface axis value, because the link line "
-                                           "names no type arguments. Tag a non-generic struct that wraps it",
+                                           "names no type arguments. Tag a non-generic struct that wraps it, or list an instantiation in the policy "
+                                           "file under axes.<AXIS>.Types",
                                            genericName != nullptr ? genericName : "<unknown>");
     return ReportError(*diagnosticSink, CookError::SlangGenericInterfaceImpl, locationOfDecl(inner), errStr);
 }

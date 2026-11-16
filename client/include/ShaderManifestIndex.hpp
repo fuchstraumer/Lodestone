@@ -75,6 +75,7 @@ enum class QueryErrorCode : uint8_t
     DeviceFactsUnavailable, // ForDevice() on a profile whose cook did not read the capabilities and workgroup  memory
     NoVariantFitsDevice,    // The constraints match variants, and the device runs none of them. Detail is a
                          // DeviceMismatch and AxisName is the capability name for MissingCapability
+    PreferCapableNeedsDevice, // A terminal ran on a builder that called PreferCapable() and has no ForDevice()
     Count
 };
 
@@ -176,6 +177,13 @@ struct ManifestQueryBuilder
                                                  void* user,
                                                  const manifest::DeviceLimits& limits) const;
 
+    /** @brief Requires `ForDevice`. After the device filter, removes each match that another match dominates.
+     * The other match differs from it only in axes of kind `Capability`, needs a superset of its capabilities in
+     * every entry point that the terminal counts, and needs a strict superset in at least one. Matches with
+     * incomparable capability sets both stay. A terminal fails with `PreferCapableNeedsDevice` when no device
+     * was given. */
+    [[nodiscard]] ManifestQueryBuilder PreferCapable() const noexcept;
+
     [[nodiscard]] ManifestQueryBuilder WhereAnyOfBoolean(std::string_view axis_name) const;
     [[nodiscard]] ManifestQueryBuilder WhereAnyOf(std::string_view axis_name,
                                                   std::span<const uint32_t> values) const;
@@ -233,6 +241,9 @@ private:
      * `first_rejection` is the reason for the first variant removed. */
     [[nodiscard]] std::vector<VariantKey> selectFitting(std::span<const uint32_t> entry_points,
                                                         manifest::DeviceFit& first_rejection) const noexcept;
+    /** @brief Removes each key that another key of `keys` dominates in capabilities. See `PreferCapable`. */
+    void removeDominatedByCapability(std::vector<VariantKey>& keys,
+                                     std::span<const uint32_t> entry_points) const noexcept;
     // WhereNoneOf builds a complement, so it does not call this
     void noteDuplicateValues(std::string_view axis_name,
                              uint32_t axis_index,
@@ -253,6 +264,7 @@ private:
         manifest::DeviceLimits Limits;
     };
     std::optional<DeviceState> device;
+    bool preferCapable{ false };
 };
 
 /** @brief Returns the candidate closest to a mistyped name, or an empty view. The edit budget is one edit per

@@ -13,7 +13,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 19u;
+inline constexpr uint32_t k_ShaderManifestVersion = 20u;
 
 // NOLINTBEGIN(readability-enum-initial-value, performance-enum-size)
 enum class ErrorCode : uint32_t

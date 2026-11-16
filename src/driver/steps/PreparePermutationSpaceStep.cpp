@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <expected>
 #include <format>
+#include <iterator>
 #include <optional>
 #include <ranges>
 #include <span>
@@ -45,7 +46,17 @@ namespace
                                                        std::span<const std::string> module_names,
                                                        std::string_view module_name,
                                                        std::vector<RawAxisDeclaration> raw_axes,
+                                                       const PolicyDocument& policy,
                                                        DiagnosticSink& sink);
+    std::string WithoutWhitespace(std::string_view text);
+    CookError CheckPolicyAxesAreInterfaceAxes(const PolicyDocument& policy,
+                                              std::string_view module_name,
+                                              std::span<const RawAxisDeclaration> raw_axes,
+                                              DiagnosticSink& sink);
+    CookError AppendPolicyTypes(RawAxisDeclaration& raw_axis,
+                                const PolicyDocument& policy,
+                                std::string_view module_name,
+                                DiagnosticSink& sink);
     CookResult<uint32_t> ResolveDeclaredDefaultIndex(const RawAxisDeclaration& raw_axis,
                                                      const PermutationAxis& axis,
                                                      const SymbolTable& symbol_table,
@@ -68,6 +79,7 @@ CookResult<PreparedPermutationSpace> PreparePermutationSpaceStep::operator()(con
                                                                 shared_state.AllModuleNames,
                                                                 module_name,
                                                                 std::move(raw_axes),
+                                                                shared_state.Policy,
                                                                 *shared_state.Diagnostics);
     if (!result)
     {
@@ -542,8 +554,15 @@ namespace
                                                        std::span<const std::string> module_names,
                                                        std::string_view module_name,
                                                        std::vector<RawAxisDeclaration> raw_axes,
+                                                       const PolicyDocument& policy,
                                                        DiagnosticSink& sink)
     {
+        const CookError policyAxesChecked = CheckPolicyAxesAreInterfaceAxes(policy, module_name, raw_axes, sink);
+        if (!policyAxesChecked)
+        {
+            return std::unexpected(policyAxesChecked);
+        }
+
         // prune the axes no source uses
         auto extractNameStrView = [](const RawAxisDeclaration& raw_axis)
         {
@@ -605,6 +624,12 @@ namespace
             }
             else if (rawAxis.IsInterfaceAxis)
             {
+                const CookError typesAppended = AppendPolicyTypes(rawAxis, policy, module_name, sink);
+                if (!typesAppended)
+                {
+                    return std::unexpected(typesAppended);
+                }
+
                 // each value is the index of the implementation
                 for (uint32_t i = 0; std::cmp_less(i, rawAxis.InterfaceImpls.size()); ++i)
                 {
@@ -661,6 +686,94 @@ namespace
         }
 
         return PermutationSpace{ axes };
+    }
+
+    std::string WithoutWhitespace(std::string_view text)
+    {
+        std::string stripped;
+        stripped.reserve(text.size());
+        std::ranges::copy_if(text,
+                             std::back_inserter(stripped),
+                             [](const unsigned char character) { return std::isspace(character) == 0; });
+
+        return stripped;
+    }
+
+    CookError CheckPolicyAxesAreInterfaceAxes(const PolicyDocument& policy,
+                                              std::string_view module_name,
+                                              std::span<const RawAxisDeclaration> raw_axes,
+                                              DiagnosticSink& sink)
+    {
+        const ModulePolicyEntry* entry = policy.FindModule(module_name);
+        if (entry == nullptr)
+        {
+            return CookError::Success;
+        }
+
+        // the map has no order, and the first error must not depend on the hash
+        std::vector<std::string_view> policyAxisNames = entry->InterfaceAxes | std::views::keys |
+                                                        std::ranges::to<std::vector<std::string_view>>();
+        std::ranges::sort(policyAxisNames);
+
+        for (const std::string_view axisName : policyAxisNames)
+        {
+            const auto declared = std::ranges::find(raw_axes, axisName, &RawAxisDeclaration::Name);
+            if (declared != raw_axes.end() && declared->IsInterfaceAxis)
+            {
+                continue;
+            }
+
+            const std::span<const PolicyInterfaceType> types = policy.InterfaceTypesForAxis(module_name, axisName);
+            const ShaderLocation where{ .File = types.empty() ? std::string_view{} : std::string_view{ types.front().File },
+                                        .Line = types.empty() ? 0u : types.front().Line };
+            const std::string reason = declared == raw_axes.end() ? "the module does not declare it"
+                                                                  : "it is not an interface axis";
+            const std::string message =
+                std::format("the policy lists types for axis '{}' in module '{}', but {}. Only an interface axis "
+                            "(`[ls_axis_interface] extern struct`) takes axes.<AXIS>.Types",
+                            axisName,
+                            module_name,
+                            reason);
+            return ReportError(sink, CookError::PolicyAxisNotInterface, where, message);
+        }
+
+        return CookError::Success;
+    }
+
+    CookError AppendPolicyTypes(RawAxisDeclaration& raw_axis,
+                                const PolicyDocument& policy,
+                                std::string_view module_name,
+                                DiagnosticSink& sink)
+    {
+        for (const PolicyInterfaceType& policyType : policy.InterfaceTypesForAxis(module_name, raw_axis.Name))
+        {
+            RawInterfaceImpl impl;
+            impl.TypeName = WithoutWhitespace(policyType.Type);
+            impl.Imports = policyType.Imports;
+            impl.FromPolicy = true;
+            impl.PolicyFile = policyType.File;
+            impl.PolicyLine = policyType.Line;
+
+            const auto duplicate = std::ranges::find(raw_axis.InterfaceImpls, impl.TypeName, &RawInterfaceImpl::TypeName);
+            if (duplicate != raw_axis.InterfaceImpls.end())
+            {
+                const std::string message =
+                    std::format("axis '{}' in module '{}' already has the value '{}', so the policy type '{}' repeats "
+                                "it",
+                                raw_axis.Name,
+                                module_name,
+                                duplicate->TypeName,
+                                policyType.Type);
+                return ReportError(sink,
+                                   CookError::PolicyInterfaceTypeInvalid,
+                                   ShaderLocation{ .File = policyType.File, .Line = policyType.Line },
+                                   message);
+            }
+
+            raw_axis.InterfaceImpls.push_back(std::move(impl));
+        }
+
+        return CookError::Success;
     }
 }
 

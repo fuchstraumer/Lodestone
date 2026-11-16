@@ -1,0 +1,2 @@
+[PolicyGraph.axes.GRAPH]
+Types = [ { Type = "Constant", Imports = ["PolicyGraph"] } ]

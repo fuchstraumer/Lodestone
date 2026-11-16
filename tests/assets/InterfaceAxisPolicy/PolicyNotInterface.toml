@@ -1,0 +1,2 @@
+[PolicyGraph.axes.USE_BIAS]
+Types = [ { Type = "Composed<LeafA, LeafB>", Imports = ["PolicyLeaves"] } ]

@@ -34,6 +34,10 @@ namespace
     // toml++ records a source region per node, so errors give the line and column
     PolicyParseError ErrorAt(const toml::node& node, std::string message);
     PolicyDocResult<StringMap<std::vector<std::string>>> ReadInertAxes(const toml::table& module_table);
+    PolicyDocResult<StringMap<std::vector<PolicyInterfaceType>>> ReadInterfaceAxes(const toml::table& module_table);
+    PolicyDocResult<std::vector<PolicyInterfaceType>> ReadInterfaceTypes(std::string_view axis_name,
+                                                                         const toml::table& axis_table);
+    PolicyDocResult<PolicyInterfaceType> ReadInterfaceType(std::string_view axis_name, const toml::node& type_node);
     PolicyDocResult<AxisCookValues> ReadAxisCookValues(std::string_view axis_name,
                                                        const toml::node& values_node);
     PolicyDocResult<TargetCookPolicy> ReadTargetPolicy(const toml::table& target_table);
@@ -149,6 +153,25 @@ const TargetCookPolicy& PolicyDocument::FindTargetPolicy(std::string_view module
         return empty;
     }
     return found->second;
+}
+
+std::span<const PolicyInterfaceType> PolicyDocument::InterfaceTypesForAxis(std::string_view module_name,
+                                                                           std::string_view axis_name) const noexcept
+{
+    const ModulePolicyEntry* entry = FindModule(module_name);
+    if (entry == nullptr)
+    {
+        return {};
+    }
+
+    const auto found = entry->InterfaceAxes.find(axis_name);
+    if (found == entry->InterfaceAxes.end())
+    {
+        return {};
+    }
+
+    const std::vector<PolicyInterfaceType>& types = found->second;
+    return types;
 }
 
 std::span<const std::string> PolicyDocument::InertAxesForEntryPoint(std::string_view module_name,
@@ -309,6 +332,139 @@ namespace
             }
         }
         return inertAxes;
+    }
+
+    PolicyDocResult<StringMap<std::vector<PolicyInterfaceType>>> ReadInterfaceAxes(const toml::table& module_table)
+    {
+        StringMap<std::vector<PolicyInterfaceType>> interfaceAxes;
+
+        const auto node = module_table["axes"];
+        if (!node)
+        {
+            return interfaceAxes;
+        }
+
+        const toml::table* table = node.as_table();
+        if (table == nullptr)
+        {
+            return std::unexpected(ErrorAt(*node.node(), "axes must be a table"));
+        }
+
+        for (auto&& [axisKey, axisNode] : *table)
+        {
+            const toml::table* axisTable = axisNode.as_table();
+            if (axisTable == nullptr)
+            {
+                return std::unexpected(ErrorAt(axisNode, std::format("axes.{} must be a table", axisKey.str())));
+            }
+
+            PolicyDocResult<std::vector<PolicyInterfaceType>> types = ReadInterfaceTypes(axisKey.str(), *axisTable);
+            if (!types)
+            {
+                return std::unexpected(std::move(types.error()));
+            }
+            interfaceAxes.emplace(std::string{ axisKey.str() }, std::move(*types));
+        }
+
+        return interfaceAxes;
+    }
+
+    PolicyDocResult<std::vector<PolicyInterfaceType>> ReadInterfaceTypes(std::string_view axis_name,
+                                                                         const toml::table& axis_table)
+    {
+        for (auto&& [key, node] : axis_table)
+        {
+            if (key.str() != "Types")
+            {
+                return std::unexpected(ErrorAt(node,
+                                               std::format("axes.{} has the unknown key '{}'. The only key is Types",
+                                                           axis_name,
+                                                           key.str())));
+            }
+        }
+
+        const auto typesNode = axis_table["Types"];
+        const toml::array* typesArray = typesNode.as_array();
+        if (typesArray == nullptr)
+        {
+            return std::unexpected(ErrorAt(axis_table,
+                                           std::format("axes.{}.Types must be an array of tables", axis_name)));
+        }
+
+        std::vector<PolicyInterfaceType> types;
+        types.reserve(typesArray->size());
+        for (const toml::node& element : *typesArray)
+        {
+            PolicyDocResult<PolicyInterfaceType> type = ReadInterfaceType(axis_name, element);
+            if (!type)
+            {
+                return std::unexpected(std::move(type.error()));
+            }
+            types.push_back(std::move(*type));
+        }
+
+        return types;
+    }
+
+    PolicyDocResult<PolicyInterfaceType> ReadInterfaceType(std::string_view axis_name, const toml::node& type_node)
+    {
+        const toml::table* typeTable = type_node.as_table();
+        if (typeTable == nullptr)
+        {
+            return std::unexpected(
+                ErrorAt(type_node, std::format("axes.{}.Types entries must be tables with Type and Imports", axis_name)));
+        }
+
+        for (auto&& [key, node] : *typeTable)
+        {
+            if (key.str() != "Type" && key.str() != "Imports")
+            {
+                return std::unexpected(ErrorAt(node,
+                                               std::format("axes.{}.Types has the unknown key '{}'. The keys are Type "
+                                                           "and Imports",
+                                                           axis_name,
+                                                           key.str())));
+            }
+        }
+
+        PolicyInterfaceType type;
+        const toml::source_region& region = type_node.source();
+        type.File = FileOf(region);
+        type.Line = region.begin.line;
+
+        const std::optional<std::string> typeText = (*typeTable)["Type"].value<std::string>();
+        if (!typeText || typeText->find_first_not_of(" \t\r\n") == std::string::npos)
+        {
+            return std::unexpected(
+                ErrorAt(type_node, std::format("axes.{}.Types entries need a non-empty string Type", axis_name)));
+        }
+        type.Type = *typeText;
+
+        const auto importsNode = (*typeTable)["Imports"];
+        if (!importsNode)
+        {
+            return type;
+        }
+
+        const toml::array* importsArray = importsNode.as_array();
+        if (importsArray == nullptr)
+        {
+            return std::unexpected(
+                ErrorAt(*importsNode.node(), std::format("axes.{}.Types Imports must be an array of strings", axis_name)));
+        }
+
+        for (const toml::node& element : *importsArray)
+        {
+            const std::optional<std::string> moduleName = element.value<std::string>();
+            if (!moduleName)
+            {
+                return std::unexpected(ErrorAt(
+                    element, std::format("axes.{}.Types Imports must be an array of strings", axis_name)));
+            }
+            type.Imports.push_back(*moduleName);
+        }
+
+        return type;
     }
 
     PolicyDocResult<AxisCookValues> ReadAxisCookValues(std::string_view axis_name,
@@ -524,6 +680,13 @@ namespace
             }
 
             entry.InertAxesForEntryPoints = std::move(*inertAxes);
+
+            PolicyDocResult<StringMap<std::vector<PolicyInterfaceType>>> interfaceAxes = ReadInterfaceAxes(*moduleTable);
+            if (!interfaceAxes)
+            {
+                return std::unexpected(std::move(interfaceAxes.error()));
+            }
+            entry.InterfaceAxes = std::move(*interfaceAxes);
 
             PolicyDocResult<StringMap<TargetCookPolicy>> targets = ReadTargets(*moduleTable);
             if (!targets)

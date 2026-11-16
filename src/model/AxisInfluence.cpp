@@ -63,6 +63,14 @@ namespace
         size_t EntryPoint{ 0u };
     };
 
+    /** An integer or enum capability axis whose lower value needs a capability name that the next value does not. */
+    struct NonNestedCapabilityPair
+    {
+        uint32_t LowerVariant{ 0u };
+        uint32_t UpperVariant{ 0u };
+        size_t EntryPoint{ 0u };
+    };
+
     /** What the capability names of one module show about one axis. `FoundPair` is false when no two cooked variants
      * differ in that axis alone, and then the axis cannot be judged. */
     struct CapabilityAxisOutcome
@@ -70,6 +78,7 @@ namespace
         bool FoundPair{ false };
         bool Changed{ false };
         std::optional<InvertedCapabilityPair> Inverted;
+        std::optional<NonNestedCapabilityPair> NotNested;
     };
 
     ContentHashValue HashInstance(const CookedModule& module,
@@ -114,6 +123,12 @@ namespace
                                                            std::span<const uint32_t> group,
                                                            size_t axis_index,
                                                            size_t entry_point_index);
+
+    /** The group holds two or more values of a non-boolean axis. Adjacent values in the declared order must nest. */
+    std::optional<NonNestedCapabilityPair> FindNonNestedPair(const CookedModule& module,
+                                                             std::span<const uint32_t> group,
+                                                             size_t axis_index,
+                                                             size_t entry_point_index);
 
     CapabilityAxisOutcome MeasureCapabilityAxis(const CookedModule& module, size_t axis_index);
 
@@ -507,6 +522,23 @@ CookError VerifyCapabilityAxes(const CookedLibrary& library, DiagnosticSink& sin
                                                  module.EntryPoints[inverted.EntryPoint].Name,
                                                  module.Variants[inverted.OnVariant].Description));
             }
+            else if (outcome.NotNested.has_value())
+            {
+                const NonNestedCapabilityPair& notNested = *outcome.NotNested;
+                result = ReportError(sink,
+                                     CookError::CapabilityAxisNotNested,
+                                     std::format("capability axis: module '{}' profile '{}' axis '{}' is {} in variant [{}] "
+                                                 "and {} in variant [{}], and entry point '{}' needs a capability at the "
+                                                 "lower value that the higher value does not",
+                                                 moduleName,
+                                                 profile.TargetName,
+                                                 axis.Name,
+                                                 ValueToPrintableString(module.Variants[notNested.LowerVariant].Canonical[k].Value),
+                                                 module.Variants[notNested.LowerVariant].Description,
+                                                 ValueToPrintableString(module.Variants[notNested.UpperVariant].Canonical[k].Value),
+                                                 module.Variants[notNested.UpperVariant].Description,
+                                                 module.EntryPoints[notNested.EntryPoint].Name));
+            }
             else if (outcome.FoundPair && !outcome.Changed && result == CookError::Success)
             {
                 result = ReportError(sink,
@@ -836,6 +868,40 @@ namespace
         };
     }
 
+    std::optional<NonNestedCapabilityPair> FindNonNestedPair(const CookedModule& module,
+                                                             std::span<const uint32_t> group,
+                                                             size_t axis_index,
+                                                             size_t entry_point_index)
+    {
+        const std::span<const PermutationValue> declaredValues = module.Space->Axes()[axis_index].GetValues();
+        const auto declaredOrdinal = [&module, axis_index, declaredValues](uint32_t variant_index)
+        {
+            const PermutationValue& value = module.Variants[variant_index].Canonical[axis_index].Value;
+            return std::ranges::find(declaredValues, value) - declaredValues.begin();
+        };
+
+        std::vector<uint32_t> ordered{ group.begin(), group.end() };
+        std::ranges::stable_sort(ordered, std::ranges::less{}, declaredOrdinal);
+
+        for (size_t position = 1u; position < ordered.size(); ++position)
+        {
+            const uint32_t lower = ordered[position - 1u];
+            const uint32_t upper = ordered[position];
+            if (!std::ranges::includes(CapabilityNamesOf(module, upper, entry_point_index),
+                                       CapabilityNamesOf(module, lower, entry_point_index)))
+            {
+                return NonNestedCapabilityPair
+                {
+                    .LowerVariant = lower,
+                    .UpperVariant = upper,
+                    .EntryPoint = entry_point_index
+                };
+            }
+        }
+
+        return std::nullopt;
+    }
+
     CapabilityAxisOutcome MeasureCapabilityAxis(const CookedModule& module, size_t axis_index)
     {
         const bool isBoolean = module.Space->Axes()[axis_index].ValueDomain == AxisValueDomain::Boolean;
@@ -855,6 +921,10 @@ namespace
                 if (isBoolean && !outcome.Inverted.has_value())
                 {
                     outcome.Inverted = FindInvertedPair(module, group, axis_index, entryPointIndex);
+                }
+                else if (!isBoolean && !outcome.NotNested.has_value())
+                {
+                    outcome.NotNested = FindNonNestedPair(module, group, axis_index, entryPointIndex);
                 }
             }
         };

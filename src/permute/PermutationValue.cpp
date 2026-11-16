@@ -11,7 +11,7 @@ namespace lodestone
 
 namespace
 {
-    // `::` is not legal in module names, so enum values join with `_`
+    // `::` is not legal in module names, so enum values join with `_`. policy types use their ordinal
     std::string ValueNameToken(const PermutationAxis& axis, const PermutationValue& value);
 }
 
@@ -155,13 +155,16 @@ std::string MakeExportedConstantSource(const PermutationAxis& axis, const Permut
 {
     if (value.GetType() == PermutationValue::Type::Type)
     {
-        // the synthetic module is its own TU, so it imports the declaring module
+        // the synthetic module is its own TU, so it imports every module that the type needs
         const RawInterfaceImpl& impl = axis.InterfaceImpl(value.AsUInt());
-        return std::format("import {};\nexport struct {} : {} = {};\n",
-                           impl.Module,
-                           axis.Name,
-                           axis.InterfaceName(),
-                           impl.TypeName);
+        std::string source;
+        for (const std::string& importedModule : impl.Imports)
+        {
+            source += std::format("import {};\n", importedModule);
+        }
+
+        source += std::format("export struct {} : {} = {};\n", axis.Name, axis.InterfaceName(), impl.TypeName);
+        return source;
     }
     else if (value.GetType() == PermutationValue::Type::Enum)
     {
@@ -197,6 +200,12 @@ namespace
         if (value.GetType() == PermutationValue::Type::Enum)
         {
             return std::format("{}_{}", axis.EnumTypeName(), value.AsEnumCase(axis));
+        }
+
+        // a type expression such as `Composed<A,B>` is not a legal module name or file name
+        if (value.GetType() == PermutationValue::Type::Type && axis.InterfaceImpl(value.AsUInt()).FromPolicy)
+        {
+            return std::format("Policy{}", value.AsUInt());
         }
         return ValueToSlangLiteral(axis, value);
     }

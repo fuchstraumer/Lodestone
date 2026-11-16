@@ -124,6 +124,12 @@ add_lodestone_unit_test(AccessModelRejectTest AccessModelRejectTests.cpp)
 target_compile_definitions(AccessModelRejectTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets")
 add_lodestone_unit_test(AttributeExpressionTest AttributeExpressionTests.cpp)
+# Interface axis values from the policy file. It cooks a module with one tagged type and one instantiation of a generic
+# type that the policy lists, on both targets, and compares the block layout of the policy type with a typealias of the
+# same expression. It also proves the three policy errors. It cooks through Slang, so it takes about three seconds.
+add_lodestone_unit_test(InterfaceAxisPolicyTest InterfaceAxisPolicyTests.cpp)
+target_compile_definitions(InterfaceAxisPolicyTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/InterfaceAxisPolicy")
 # The declared default of each axis, from the shader initializer to the client query layer. It cooks through
 # Slang, so it takes about one second.
 add_lodestone_unit_test(AxisDefaultTest AxisDefaultTests.cpp)

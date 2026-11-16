@@ -3,6 +3,7 @@
 #define LODESTONE_PERMUTATION_TYPES_HPP
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace lodestone
 {
@@ -17,6 +18,12 @@ struct RawInterfaceImpl
 {
     std::string Module;
     std::string TypeName; // namespace-qualified, not module-qualified
+    // the modules that the link line imports. a tagged type lists its declaring module, a policy type lists its own
+    std::vector<std::string> Imports;
+    bool FromPolicy{ false };
+    // where the policy entry is written, for errors. empty and 0 when the type is tagged
+    std::string PolicyFile;
+    uint32_t PolicyLine{ 0u };
     constexpr bool operator==(const RawInterfaceImpl& other) const noexcept
     {
         return Module == other.Module && TypeName == other.TypeName;

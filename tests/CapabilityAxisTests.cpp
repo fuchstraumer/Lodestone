@@ -39,7 +39,7 @@ struct CookCase
     std::string_view Claim;
 };
 
-constexpr std::array<CookCase, 4u> k_CookCases
+constexpr std::array<CookCase, 6u> k_CookCases
 {
     CookCase{ .ModuleFile = "WaveGuarded.slang",
               .Expected = CookError::Success,
@@ -53,6 +53,12 @@ constexpr std::array<CookCase, 4u> k_CookCases
     CookCase{ .ModuleFile = "OffPathNeedsMore.slang",
               .Expected = CookError::CapabilityAxisInverted,
               .Claim = "an off path that needs a capability the on path does not fails the cook" },
+    CookCase{ .ModuleFile = "NestedLevels.slang",
+              .Expected = CookError::Success,
+              .Claim = "an integer capability axis whose values nest cooks" },
+    CookCase{ .ModuleFile = "NonNestedLevels.slang",
+              .Expected = CookError::CapabilityAxisNotNested,
+              .Claim = "an integer capability axis whose values do not nest fails the cook" },
 };
 
 CookError CookOneModule(const std::filesystem::path& module_path, std::string_view target_name)

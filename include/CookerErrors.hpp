@@ -47,6 +47,7 @@ enum class CookError : uint16_t
     ShimExternNotReflected = 56, // the source declares an extern struct of a shim interface that reflection does not find
     ShimFormUnavailable = 57, // the shim table has no implementation for the profile of the cook
     ShimExternInvalid = 58, // the type arguments of a shim extern are not plain type names, or do not match the interface
+    CapabilityAxisNotNested = 59, // the capability names of an integer or enum capability axis do not grow with its declared values
 
     NoModulesSpecified = 60,
     NoOutputSpecified = 61,
@@ -108,6 +109,9 @@ enum class CookError : uint16_t
     PolicyInertAxisNotInertWhenCooked = 134,
     PolicyUnknownTargetName = 135,
     PolicyKeyConflict = 136, // two policy files set the same key
+    PolicyAxisNotInterface = 137, // axes.<AXIS> names an axis the module does not declare, or an axis that is not an interface axis
+    PolicyInterfaceTypeInvalid = 138, // a type from axes.<AXIS>.Types does not link or does not conform to the interface
+    PolicyInterfaceTypeNameMismatch = 139, // Slang's name for a policy type differs from the policy string
 
     AxisDefaultMissing = 140, // the axis declaration has no initializer
     AxisDefaultUnreadable = 141, // the initializer could not be evaluated or resolved to a value

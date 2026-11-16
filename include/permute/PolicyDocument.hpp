@@ -40,9 +40,22 @@ struct TargetCookPolicy
     std::string CookIf;
 };
 
+/** @brief One type expression that the policy file adds to an interface axis, such as `Composed<LeafA, LeafB>`. */
+struct PolicyInterfaceType
+{
+    std::string Type;
+    /** @brief The modules that the link line imports so that `Type` resolves. */
+    std::vector<std::string> Imports;
+    /** @brief Where the entry is written. `File` is empty when the text did not come from a file. */
+    std::string File;
+    uint32_t Line{ 0u };
+};
+
 struct ModulePolicyEntry
 {
     StringMap<std::vector<std::string>> InertAxesForEntryPoints;
+    /** @brief The types of each interface axis, from `[<Module>.axes.<AXIS>]`. */
+    StringMap<std::vector<PolicyInterfaceType>> InterfaceAxes;
     StringMap<TargetCookPolicy> Targets;
 };
 
@@ -84,6 +97,9 @@ public:
     /** @brief Returns an empty policy when none is found. */
     [[nodiscard]] const TargetCookPolicy& FindTargetPolicy(std::string_view module_name,
                                                        std::string_view target_name) const noexcept;
+    /** @brief Returns the types that the policy adds to an axis, or an empty span. */
+    [[nodiscard]] std::span<const PolicyInterfaceType> InterfaceTypesForAxis(std::string_view module_name,
+                                                                             std::string_view axis_name) const noexcept;
     [[nodiscard]] std::span<const std::string> InertAxesForEntryPoint(std::string_view module_name,
                                                                 std::string_view entry_point_name) const noexcept;
     /** @brief Checks every axis name and value in the policy against the space. */

@@ -12,6 +12,7 @@
 #include <format>
 #include <fstream>
 #include <initializer_list>
+#include <span>
 #include <system_error>
 #include <string>
 #include <utility>
@@ -424,12 +425,93 @@ void TestMergedFiles(TestRunner& runner)
     }
 }
 
+void TestInterfaceAxisTypes(TestRunner& runner)
+{
+    runner.BeginSection("axes.<AXIS>.Types adds the types of an interface axis");
+
+    constexpr std::string_view goodText = R"toml(
+[Graphs.axes.GRAPH]
+Types = [
+    { Type = "Composed<LeafA, LeafB>", Imports = ["NoiseLeaves"] },
+    { Type = "Plain" },
+]
+)toml";
+    const auto good = PolicyDocument::Parse(goodText);
+    if (runner.CheckOk(good, "a file with two types parses"))
+    {
+        const std::span<const lodestone::PolicyInterfaceType> types = good->InterfaceTypesForAxis("Graphs", "GRAPH");
+        if (runner.CheckEqual(types.size(), 2u, "the axis has two types, in file order"))
+        {
+            runner.CheckEqual(types[0].Type, "Composed<LeafA, LeafB>", "the type string keeps its spelling");
+            runner.CheckEqual(types[0].Imports.size(), 1u, "the first type has one import");
+            runner.CheckEqual(types[0].Imports.front(), "NoiseLeaves", "the import is the module name");
+            runner.CheckEqual(types[0].Line, 4u, "the first type keeps the line of its entry");
+            runner.CheckEqual(types[1].Line, 5u, "the second type keeps the line of its entry");
+            runner.Check(types[1].Imports.empty(), "a type with no Imports has an empty list");
+            runner.Check(types[0].File.empty(), "a file that was parsed from text has no file name");
+        }
+        runner.Check(good->InterfaceTypesForAxis("Graphs", "OTHER").empty(), "an axis with no entry has no types");
+        runner.Check(good->InterfaceTypesForAxis("Nope", "GRAPH").empty(), "a module with no entry has no types");
+    }
+
+    const TemporaryPolicyFiles fromFile{ "[Graphs.axes.GRAPH]\nTypes = [ { Type = \"Plain\" } ]\n" };
+    const auto loaded = PolicyDocument::LoadMerged(fromFile.Paths());
+    if (runner.CheckOk(loaded, "a file on disk parses"))
+    {
+        const std::span<const lodestone::PolicyInterfaceType> types = loaded->InterfaceTypesForAxis("Graphs", "GRAPH");
+        if (runner.CheckEqual(types.size(), 1u, "the type is read"))
+        {
+            runner.CheckEqual(types[0].File, fromFile.Paths()[0], "the entry keeps its file name");
+        }
+    }
+
+    runner.BeginSection("axes.<AXIS>.Types rejects what it does not know");
+
+    constexpr std::array<std::string_view, 6u> rejectedTexts
+    {
+        "[Graphs.axes.GRAPH]\nTypez = []\n",
+        "[Graphs.axes.GRAPH]\nTypes = [ { Type = \"Plain\", Import = [\"M\"] } ]\n",
+        "[Graphs.axes.GRAPH]\nTypes = [ { Imports = [\"M\"] } ]\n",
+        "[Graphs.axes.GRAPH]\nTypes = [ { Type = \"Plain\", Imports = [3] } ]\n",
+        "[Graphs.axes.GRAPH]\nTypes = \"Plain\"\n",
+        "[Graphs.axes]\nGRAPH = 3\n",
+    };
+    for (const std::string_view text : rejectedTexts)
+    {
+        const auto rejected = PolicyDocument::Parse(text);
+        runner.Check(!rejected.has_value() && rejected.error().Line > 0u,
+                     std::format("the file is rejected with a line: {}", text));
+    }
+
+    const auto unknownKey = PolicyDocument::Parse("[Graphs.axes.GRAPH]\nTypez = []\n");
+    runner.Check(!unknownKey.has_value() && unknownKey.error().Message.contains("Typez"),
+                 "the error names the unknown key");
+
+    runner.BeginSection("an interface axis that two files list is a conflict");
+
+    const TemporaryPolicyFiles twoFiles{ "[Graphs.axes.GRAPH]\nTypes = [ { Type = \"Plain\" } ]\n",
+                                         "[Graphs.axes.GRAPH]\nTypes = [ { Type = \"Other\" } ]\n" };
+    const auto conflict = PolicyDocument::LoadMerged(twoFiles.Paths());
+    if (runner.Check(!conflict.has_value(), "two files that list Types for one axis fail, and arrays do not union"))
+    {
+        runner.CheckEqual(conflict.error().Code, CookError::PolicyKeyConflict, "the error is PolicyKeyConflict");
+        runner.Check(conflict.error().Message.contains("Graphs.axes.GRAPH.Types"),
+                     std::format("the message names the dotted key: '{}'", conflict.error().Message));
+    }
+
+    const TemporaryPolicyFiles twoAxes{ "[Graphs.axes.GRAPH]\nTypes = [ { Type = \"Plain\" } ]\n",
+                                        "[Graphs.axes.SHAPE]\nTypes = [ { Type = \"Other\" } ]\n" };
+    const auto mergedAxes = PolicyDocument::LoadMerged(twoAxes.Paths());
+    runner.CheckOk(mergedAxes, "two files that list different axes merge");
+}
+
 int main()
 {
     TestRunner runner{ "PolicyDocumentTests" };
     TestMergedFiles(runner);
     TestParseAndQuery(runner);
     TestParseRejections(runner);
+    TestInterfaceAxisTypes(runner);
     TestValidationAgainstSpace(runner);
     TestEnumCaseNames(runner);
     TestTargetCoverage(runner);

@@ -804,6 +804,166 @@ void CheckDeviceFilter(lodestone::tests::TestRunner& runner)
     }
 }
 
+// One boolean capability axis and one entry point. The off source needs `Float16` and the on source needs
+// `GroupNonUniform`, so neither set contains the other.
+PermutationSpace MakeIncomparableSpace()
+{
+    std::vector<PermutationAxis> axes;
+    axes.emplace_back("MODE", BoolValues(), AxisKind::Capability, EarliestBindingTime::Cook, AxisValueDomain::Boolean);
+    return PermutationSpace{ std::move(axes) };
+}
+
+lodestone::CookedModule BuildIncomparableModule(const PermutationSpace& space)
+{
+    lodestone::CookedModule module;
+    module.Name = "IncomparableModule";
+    module.Space = &space;
+    module.EntryPoints.push_back(
+        lodestone::LibraryEntryPoint{ .Name = "MainCS", .Stage = lodestone::ShaderStageKind::Compute });
+    lodestone::tests::AddFixtureSource(
+        module, lodestone::tests::BytesOf("// half"), lodestone::SourceCodeFacts{ .CapabilityNames = { "Float16" } });
+    lodestone::tests::AddFixtureSource(
+        module,
+        lodestone::tests::BytesOf("// wave"),
+        lodestone::SourceCodeFacts{ .CapabilityNames = { "GroupNonUniform" } });
+    module.ObservedCapabilities = { "Float16", "GroupNonUniform" };
+    module.ResourceLists.emplace_back();
+    module.FootprintLists.emplace_back();
+    module.Delivered.VisibilityLists.emplace_back();
+    lodestone::tests::AddDefaultInstanceTables(module);
+
+    for (uint32_t source = 0u; source < 2u; ++source)
+    {
+        const std::array instances{ lodestone::tests::ComputeInstance(source, 0u) };
+        lodestone::LibraryVariant variant = lodestone::tests::MakeFixtureVariant(
+            space,
+            source,
+            lodestone::PermutationAssignment{
+                lodestone::PermutationBinding{ .Axis = &space.Axes()[0], .Value = PermutationValue{ source == 1u } } },
+            instances);
+        module.VariantKeys.push_back(space.ComputeVariantKey(variant.Canonical));
+        module.Variants.push_back(std::move(variant));
+    }
+
+    module.SpaceSize = 2u;
+    return module;
+}
+
+bool SupportsEverything(void*, std::string_view)
+{
+    return true;
+}
+
+void CheckPreferCapable(lodestone::tests::TestRunner& runner)
+{
+    runner.BeginSection("PreferCapable removes the matches that another match dominates in capabilities");
+    using lodestone::manifest::DeviceLimits;
+
+    const DeviceLimits roomy{ .MaxWorkgroupMemoryBytes = 65536u,
+                              .MaxInvocationsPerWorkgroup = 1024u,
+                              .MaxWorkgroupSizeX = 1024u,
+                              .MaxWorkgroupSizeY = 1024u,
+                              .MaxWorkgroupSizeZ = 64u,
+                              .MaxPushConstantBytes = 256u };
+    TestDevice waves{ .Subgroups = true };
+
+    const PermutationSpace space = MakeDeviceSpace();
+    lodestone::CookedLibrary library;
+    library.ModuleNames = { "DeviceModule" };
+    lodestone::CookedProfile profile = MakeProfile("wgsl");
+    profile.CodeFactsRead = true;
+    library.Profiles = { profile };
+    library.Environments.emplace_back(BuildDeviceModule(space));
+    const std::vector<std::byte> bytes = EmitBytes(library);
+    const ManifestResult<EnvironmentView> opened = OpenEnvironment(bytes, 0u, 0u);
+    if (!runner.Check(opened.has_value(), "the device module opens"))
+    {
+        return;
+    }
+
+    const ManifestIndex index{ opened.value() };
+    const std::array<std::string_view, 1u> generate{ "GenerateCS" };
+    const std::array<std::string_view, 1u> blur{ "BlurCS" };
+    const ManifestQueryBuilder smallOnly = index.Query().Where("BIG", false).ForDevice(&TestDeviceSupports, &waves, roomy);
+
+    runner.CheckError(smallOnly.Single(), lodestone::QueryErrorCode::AmbiguousVariant,
+                      "without PreferCapable, a device that runs both values of WAVE leaves two matches");
+    const std::expected<VariantKey, lodestone::QueryError> preferred = smallOnly.PreferCapable().Single();
+    if (runner.CheckOk(preferred, "with PreferCapable, the wave variant dominates the scalar variant"))
+    {
+        runner.CheckEqual(index.Decode(*preferred)[0].IntegralValue, 1u,
+                          "with PreferCapable, the key is the one with the superset of capabilities");
+    }
+
+    const std::expected<VariantKey, lodestone::QueryError> preferredFor = smallOnly.PreferCapable().SingleFor(generate);
+    if (runner.CheckOk(preferredFor, "SingleFor counts GenerateCS, which the capability axis changes"))
+    {
+        runner.CheckEqual(index.Decode(*preferredFor)[0].IntegralValue, 1u,
+                          "SingleFor chooses the superset for the entry point that the axis changes");
+    }
+
+    const std::expected<VariantKey, lodestone::QueryError> preferredBlur = smallOnly.PreferCapable().SingleFor(blur);
+    if (runner.CheckOk(preferredBlur, "SingleFor on BlurCS keeps both matches, and the relevance rule joins them"))
+    {
+        runner.CheckEqual(index.Decode(*preferredBlur)[0].IntegralValue, 0u,
+                          "equal capability sets are not collapsed, so the smallest key answers");
+    }
+
+    const ManifestQueryBuilder everything = index.Query().ForDevice(&TestDeviceSupports, &waves, roomy);
+    const std::expected<VariantKey, lodestone::QueryError> varying = everything.PreferCapable().Single();
+    if (runner.CheckError(varying, lodestone::QueryErrorCode::AmbiguousVariant,
+                          "an axis that is not a capability axis is never collapsed"))
+    {
+        runner.CheckEqual(varying.error().VaryingAxes, std::vector<uint32_t>{ 1u },
+                          "only BIG still varies after the capability axis is resolved");
+    }
+
+    const lodestone::QueryResult<std::vector<VariantKey>> kept = everything.PreferCapable().Keys();
+    if (runner.CheckOk(kept, "Keys with PreferCapable succeeds"))
+    {
+        runner.CheckEqual(kept->size(), 2u, "Keys with PreferCapable drops the two scalar keys");
+        runner.Check(std::ranges::all_of(*kept, [&](VariantKey key) { return index.Decode(key)[0].IntegralValue == 1u; }),
+                     "Keys with PreferCapable keeps only the wave keys");
+    }
+
+    const lodestone::QueryResult<std::vector<DecodedVariant>> keptVariants = everything.PreferCapable().Variants();
+    if (runner.CheckOk(keptVariants, "Variants with PreferCapable succeeds"))
+    {
+        runner.CheckEqual(keptVariants->size(), 2u, "Variants with PreferCapable drops the two scalar variants");
+    }
+
+    const ManifestQueryBuilder noDevice = index.Query().PreferCapable();
+    runner.CheckError(noDevice.Keys(), lodestone::QueryErrorCode::PreferCapableNeedsDevice,
+                      "Keys with PreferCapable and no device fails by name");
+    runner.CheckError(noDevice.Variants(), lodestone::QueryErrorCode::PreferCapableNeedsDevice,
+                      "Variants with PreferCapable and no device fails by name");
+    runner.CheckError(noDevice.Single(), lodestone::QueryErrorCode::PreferCapableNeedsDevice,
+                      "Single with PreferCapable and no device fails by name");
+    runner.CheckError(noDevice.SingleFor(generate), lodestone::QueryErrorCode::PreferCapableNeedsDevice,
+                      "SingleFor with PreferCapable and no device fails by name");
+
+    const PermutationSpace incomparableSpace = MakeIncomparableSpace();
+    lodestone::CookedLibrary incomparableLibrary;
+    incomparableLibrary.ModuleNames = { "IncomparableModule" };
+    incomparableLibrary.Profiles = { profile };
+    incomparableLibrary.Environments.emplace_back(BuildIncomparableModule(incomparableSpace));
+    const std::vector<std::byte> incomparableBytes = EmitBytes(incomparableLibrary);
+    const ManifestResult<EnvironmentView> incomparableOpened = OpenEnvironment(incomparableBytes, 0u, 0u);
+    if (runner.Check(incomparableOpened.has_value(), "the incomparable module opens"))
+    {
+        const ManifestIndex incomparableIndex{ incomparableOpened.value() };
+        const std::expected<VariantKey, lodestone::QueryError> ambiguous =
+            incomparableIndex.Query().ForDevice(&SupportsEverything, nullptr, roomy).PreferCapable().Single();
+        if (runner.CheckError(ambiguous, lodestone::QueryErrorCode::AmbiguousVariant,
+                              "matches with incomparable capability sets both stay"))
+        {
+            runner.CheckEqual(ambiguous.error().Detail, 2u, "both incomparable matches stay");
+            runner.CheckEqual(ambiguous.error().VaryingAxes, std::vector<uint32_t>{ 0u },
+                              "the capability axis still varies");
+        }
+    }
+}
+
 void CheckAxisRelevanceValidator(lodestone::tests::TestRunner& runner)
 {
     lodestone::StderrDiagnosticSink manifestDiagnostics;
@@ -1425,6 +1585,7 @@ int main()
 
     CheckAxisRelevanceValidator(runner);
     CheckDeviceFilter(runner);
+    CheckPreferCapable(runner);
 
     return runner.Report();
 }
