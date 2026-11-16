@@ -106,6 +106,14 @@ private:
                                                 AxesBuildContext& axes_build_context) const;
     [[nodiscard]] CookResult<std::optional<RawAxisDeclaration>> buildAxisDecl(slang::DeclReflection* reflection,
                                                                               std::string_view module_name) const;
+    [[nodiscard]] CookError readEnumAxis(slang::DeclReflection* reflection,
+                                         slang::VariableReflection* variable,
+                                         std::string_view module_name,
+                                         RawAxisDeclaration& out_axis) const;
+    [[nodiscard]] CookError readStringAttribute(slang::DeclReflection* reflection,
+                                                slang::VariableReflection* variable,
+                                                const char* attr_name,
+                                                std::string& out_value) const;
     [[nodiscard]] CookResult<std::string> extractSingleAttribute(slang::DeclReflection* decl_reflection,
                                                                  slang::Attribute* attribute,
                                                                  std::string_view attr_name) const;

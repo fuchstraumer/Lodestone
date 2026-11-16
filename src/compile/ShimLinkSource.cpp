@@ -286,13 +286,7 @@ namespace
 
     std::string Join(const std::vector<std::string_view>& parts)
     {
-        std::string joined;
-        for (const std::string_view part : parts)
-        {
-            joined += joined.empty() ? "" : ", ";
-            joined += part;
-        }
-        return joined;
+        return parts | std::views::join_with(std::string_view{ ", " }) | std::ranges::to<std::string>();
     }
 }
 

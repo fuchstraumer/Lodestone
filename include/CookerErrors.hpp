@@ -172,6 +172,7 @@ enum class CookError : uint16_t
     SlangCachedModuleWriteFailed = 231,
     SlangVaryingParameterHoldsResource = 232, // an entry point parameter that is not uniform holds a resource or a pointer
     SlangGenericInterfaceImpl = 233, // a generic type carries ls_axis_interface_impl, and the link line names no type arguments
+    SlangEnumTagUnsupported = 234, // an enum axis case value has a scalar type or byte width that the decoder cannot read
 
     TargetValidatorUnavailable = 300,
     TargetValidationEntryPointParseFailed = 301,

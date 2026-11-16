@@ -135,6 +135,10 @@ target_compile_definitions(InterfaceAxisPolicyTest PRIVATE
 add_lodestone_unit_test(AxisDefaultTest AxisDefaultTests.cpp)
 target_compile_definitions(AxisDefaultTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/AxisDefaults")
+# An interface axis gated with `ls_axis_interface_active_when`. It cooks through Slang, so it takes about one second.
+add_lodestone_unit_test(InterfaceAxisActiveWhenTest InterfaceAxisActiveWhenTests.cpp)
+target_compile_definitions(InterfaceAxisActiveWhenTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/InterfaceAxisActiveWhen")
 # Derived constants in size expressions, from the shader source to the element count in the manifest. It cooks
 # through Slang, so it takes about one second.
 add_lodestone_unit_test(DerivedConstantTest DerivedConstantTests.cpp)

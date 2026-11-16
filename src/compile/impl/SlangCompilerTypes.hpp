@@ -293,6 +293,7 @@ struct SerializedModule
 struct InterfaceAxisStub
 {
     std::string Name;
+    std::string ActiveWhen;
     slang::TypeReflection* Type{ nullptr };
     std::string SourceFile;
     int32_t SourceLine{ 0 };

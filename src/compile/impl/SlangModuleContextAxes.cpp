@@ -21,6 +21,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -30,10 +31,10 @@ namespace lodestone
 
 namespace
 {
-    EnumTagKind ScalarTypeToEnumTagKind(slang::TypeReflection::ScalarType scalar);
+    std::optional<EnumTagKind> ScalarTypeToEnumTagKind(slang::TypeReflection::ScalarType scalar);
 
     // an imported enum reflects with ScalarType::None, but its blob has the real width. Slang enums default to int
-    EnumTagKind EnumTagKindFromByteWidth(size_t byte_width);
+    std::optional<EnumTagKind> EnumTagKindFromByteWidth(size_t byte_width);
 
     /** Returns the initializer as reflection reads it: literals only, so no value means "unreadable", not "no default".
      * The source text is the primary reader. */
@@ -227,52 +228,10 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
 
     if (enumAxisAttr != nullptr)
     {
-        result.IsEnumAxis = true;
-        slang::TypeReflection* typeReflection = variableReflection->getType();
-        if (typeReflection == nullptr || typeReflection->getKind() != slang::TypeReflection::Kind::Enum)
+        const CookError enumError = readEnumAxis(reflection, variableReflection, module_name, result);
+        if (!enumError)
         {
-            const std::string errStr =
-                std::format("Variable '{}' has an enum axis attribute but is not of enum type", variableName);
-            return std::unexpected(ReportError(*diagnosticSink,
-                                                CookError::AttributeExpressionParseFailed,
-                                                errStr));
-        }
-
-        const char* enumTypeName = typeReflection->getName();
-        result.RootName = enumTypeName != nullptr ? enumTypeName : "<TypeNameResolutionFailed>";
-        // the synthetic module imports the enum's declaring module, or the axis's own when the search finds none
-        const std::string_view enumDeclaringModule = FindDeclaringModule(Session(), typeReflection);
-        result.RootModule =
-            enumDeclaringModule.empty() ? std::string(module_name) : std::string(enumDeclaringModule);
-        // the field accessors return enum cases. Values are read, since cases need not count up from zero
-        const uint32_t enumCaseCount = typeReflection->getFieldCount();
-        result.EnumCases.reserve(enumCaseCount);
-        for (int32_t i = 0; std::cmp_less(i, enumCaseCount); ++i)
-        {
-            slang::VariableReflection* caseVar = typeReflection->getFieldByIndex(i);
-            if (caseVar == nullptr)
-            {
-                const std::string errStr = 
-                    std::format("Failed to retrieve enum case at index {} for variable '{}'", i, variableName);
-                return std::unexpected(ReportError(*diagnosticSink,
-                                                    CookError::AttributeExpressionParseFailed,
-                                                    errStr));
-            }
-
-            const char* caseName = caseVar->getName();
-            Slang::ComPtr<slang::IBlob> caseValueBlob;
-            int64_t caseValue = 0;
-            if (SLANG_SUCCEEDED(caseVar->getDefaultValueBlob(caseValueBlob.writeRef())))
-            {
-                const void* caseValueData = caseValueBlob->getBufferPointer();
-                const slang::TypeReflection::ScalarType scalarType = typeReflection->getScalarType();
-                const EnumTagKind enumTagKind =
-                    scalarType != slang::TypeReflection::ScalarType::None
-                        ? ScalarTypeToEnumTagKind(scalarType)
-                        : EnumTagKindFromByteWidth(caseValueBlob->getBufferSize());
-                caseValue = DecodeEnumTag(enumTagKind, caseValueData);
-            }
-            result.EnumCases.emplace_back(caseName != nullptr ? caseName : "<CaseNameResolutionFailed>", caseValue);
+            return std::unexpected(enumError);
         }
     }
 
@@ -288,40 +247,24 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
                                                     errStr));
         }
 
-        CookResult<std::string> valuesResult =
-            extractSingleAttribute(reflection, valuesAttr, "ls_axis_values");
-        if (!valuesResult.has_value())
+        const CookError valuesError = readStringAttribute(reflection, variableReflection, "ls_axis_values", result.AxisValues);
+        if (!valuesError)
         {
-            return std::unexpected(valuesResult.error());
+            return std::unexpected(valuesError);
         }
-
-        result.AxisValues = std::move(*valuesResult);
     }
 
-    slang::Attribute* activeWhenAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_axis_active_when");
-    if (activeWhenAttr != nullptr)
+    const CookError activeWhenError =
+        readStringAttribute(reflection, variableReflection, "ls_axis_active_when", result.ActiveWhen);
+    if (!activeWhenError)
     {
-        CookResult<std::string> activeWhenResult =
-            extractSingleAttribute(reflection, activeWhenAttr, "ls_axis_active_when");
-        if (!activeWhenResult.has_value())
-        {
-            return std::unexpected(activeWhenResult.error());
-        }
-
-        result.ActiveWhen = std::move(*activeWhenResult);
+        return std::unexpected(activeWhenError);
     }
 
-    slang::Attribute* kindAttr = variableReflection->findAttributeByName(globalSession.get(), "ls_axis_kind");
-    if (kindAttr != nullptr)
+    const CookError kindError = readStringAttribute(reflection, variableReflection, "ls_axis_kind", result.Kind);
+    if (!kindError)
     {
-        CookResult<std::string> kindResult =
-            extractSingleAttribute(reflection, kindAttr, "ls_axis_kind");
-        if (!kindResult.has_value())
-        {
-            return std::unexpected(kindResult.error());
-        }
-
-        result.Kind = std::move(*kindResult);
+        return std::unexpected(kindError);
     }
 
     // best effort: declarations in an `__include` fragment have no usable location, and that is still a valid axis
@@ -338,6 +281,92 @@ CookResult<std::optional<RawAxisDeclaration>> SlangModuleContext::buildAxisDecl(
     }
 
     return result;
+}
+
+CookError SlangModuleContext::readEnumAxis(slang::DeclReflection* reflection,
+                                           slang::VariableReflection* variable,
+                                           std::string_view module_name,
+                                           RawAxisDeclaration& out_axis) const
+{
+    const std::string_view variableName = variable->getName();
+    out_axis.IsEnumAxis = true;
+    slang::TypeReflection* typeReflection = variable->getType();
+    if (typeReflection == nullptr || typeReflection->getKind() != slang::TypeReflection::Kind::Enum)
+    {
+        const std::string errStr =
+            std::format("Variable '{}' has an enum axis attribute but is not of enum type", variableName);
+        return ReportError(*diagnosticSink, CookError::AttributeExpressionParseFailed, errStr);
+    }
+
+    const char* enumTypeName = typeReflection->getName();
+    out_axis.RootName = enumTypeName != nullptr ? enumTypeName : "<TypeNameResolutionFailed>";
+    // the synthetic module imports the enum's declaring module, or the axis's own when the search finds none
+    const std::string_view enumDeclaringModule = FindDeclaringModule(Session(), typeReflection);
+    out_axis.RootModule = enumDeclaringModule.empty() ? std::string(module_name) : std::string(enumDeclaringModule);
+
+    // the field accessors return enum cases. Values are read, since cases need not count up from zero
+    const uint32_t enumCaseCount = typeReflection->getFieldCount();
+    out_axis.EnumCases.reserve(enumCaseCount);
+    for (int32_t i = 0; std::cmp_less(i, enumCaseCount); ++i)
+    {
+        slang::VariableReflection* caseVar = typeReflection->getFieldByIndex(i);
+        if (caseVar == nullptr)
+        {
+            const std::string errStr =
+                std::format("Failed to retrieve enum case at index {} for variable '{}'", i, variableName);
+            return ReportError(*diagnosticSink, CookError::AttributeExpressionParseFailed, errStr);
+        }
+
+        const char* caseName = caseVar->getName();
+        Slang::ComPtr<slang::IBlob> caseValueBlob;
+        int64_t caseValue = 0;
+        if (SLANG_SUCCEEDED(caseVar->getDefaultValueBlob(caseValueBlob.writeRef())))
+        {
+            const void* caseValueData = caseValueBlob->getBufferPointer();
+            const slang::TypeReflection::ScalarType scalarType = typeReflection->getScalarType();
+            const std::optional<EnumTagKind> enumTagKind =
+                scalarType != slang::TypeReflection::ScalarType::None
+                    ? ScalarTypeToEnumTagKind(scalarType)
+                    : EnumTagKindFromByteWidth(caseValueBlob->getBufferSize());
+            if (!enumTagKind)
+            {
+                const std::string errStr = std::format("Enum '{}' of axis '{}' has a case value of an unsupported "
+                                                       "scalar type or byte width ({} bytes)",
+                                                       out_axis.RootName,
+                                                       variableName,
+                                                       caseValueBlob->getBufferSize());
+                return ReportError(*diagnosticSink,
+                                   CookError::SlangEnumTagUnsupported,
+                                   locationOfDecl(reflection),
+                                   errStr);
+            }
+            caseValue = DecodeEnumTag(*enumTagKind, caseValueData);
+        }
+        out_axis.EnumCases.emplace_back(caseName != nullptr ? caseName : "<CaseNameResolutionFailed>", caseValue);
+    }
+
+    return CookError::Success;
+}
+
+CookError SlangModuleContext::readStringAttribute(slang::DeclReflection* reflection,
+                                                  slang::VariableReflection* variable,
+                                                  const char* attr_name,
+                                                  std::string& out_value) const
+{
+    slang::Attribute* attribute = variable->findAttributeByName(globalSession.get(), attr_name);
+    if (attribute == nullptr)
+    {
+        return CookError::Success;
+    }
+
+    CookResult<std::string> value = extractSingleAttribute(reflection, attribute, attr_name);
+    if (!value.has_value())
+    {
+        return value.error();
+    }
+
+    out_value = std::move(*value);
+    return CookError::Success;
 }
 
 CookResult<std::string> SlangModuleContext::extractSingleAttribute(slang::DeclReflection* reflection,
@@ -400,6 +429,24 @@ CookError SlangModuleContext::stageInterfaceStruct(slang::DeclReflection* reflec
         InterfaceAxisStub stub;
         stub.Name = declName;
         stub.Type = type;
+
+        // interface active_when attributes need special handling, and require their own dedicated attribute to work
+        slang::UserAttribute* activeWhenAttr = type->findUserAttributeByName("ls_axis_interface_active_when");
+        if (activeWhenAttr != nullptr)
+        {
+            size_t activeWhenLength = 0u;
+            const char* activeWhenText = activeWhenAttr->getArgumentValueString(0u, &activeWhenLength);
+            if (activeWhenText == nullptr)
+            {
+                return ReportError(*diagnosticSink,
+                                   CookError::SlangGetAttributeValueStrFailed,
+                                   locationOfDecl(reflection),
+                                   std::format("Failed to read value for attribute ls_axis_interface_active_when on '{}'",
+                                               declName));
+            }
+            stub.ActiveWhen.assign(activeWhenText, activeWhenLength);
+        }
+
         slang::SourceLocation sourceLoc;
         if (SLANG_SUCCEEDED(session->getDeclSourceLocation(reflection, &sourceLoc)) &&
             (sourceLoc.filePath != nullptr))
@@ -483,13 +530,22 @@ CookError SlangModuleContext::buildInterfaceAxes(AxesBuildContext& axes_build_co
     }
     
 
+    std::unordered_map<std::string_view, slang::TypeReflection*> interfaceTypes;
+    for (const InterfaceAxisImplStub& implStub : axes_build_context.InterfaceAxisImplStubs)
+    {
+        if (!interfaceTypes.contains(implStub.InterfaceName))
+        {
+            interfaceTypes.emplace(implStub.InterfaceName, programLayout->findTypeByName(implStub.InterfaceName.c_str()));
+        }
+    }
+
     for (const InterfaceAxisStub& stub : axes_build_context.InterfaceAxisStubs)
     {
         std::string matchedInterfaceName;
 
         for (const InterfaceAxisImplStub& implStub : axes_build_context.InterfaceAxisImplStubs)
         {
-            slang::TypeReflection* interfaceType = programLayout->findTypeByName(implStub.InterfaceName.c_str());
+            slang::TypeReflection* interfaceType = interfaceTypes.at(implStub.InterfaceName);
             if (interfaceType != nullptr && programLayout->isSubType(stub.Type, interfaceType))
             {
                 if (matchedInterfaceName.empty())
@@ -523,7 +579,7 @@ CookError SlangModuleContext::buildInterfaceAxes(AxesBuildContext& axes_build_co
             .IsBooleanAxis = false,
             .IsInterfaceAxis = true,
             .AxisValues = {},
-            .ActiveWhen = {}, // todo: fill this in if present
+            .ActiveWhen = stub.ActiveWhen,
             .Kind = "technique", // an interface axis selects behaviour; ls_axis_kind cannot sit on a struct, so default it here
 
             .SourceFile = stub.SourceFile.empty() ? "<unknown>" : stub.SourceFile,
@@ -533,7 +589,7 @@ CookError SlangModuleContext::buildInterfaceAxes(AxesBuildContext& axes_build_co
             .InterfaceImpls = {}
         };
 
-        slang::TypeReflection* interfaceType = programLayout->findTypeByName(matchedInterfaceName.c_str());
+        slang::TypeReflection* interfaceType = interfaceTypes.at(matchedInterfaceName);
         for (const InterfaceAxisImplStub& implStub : axes_build_context.InterfaceAxisImplStubs)
         {
             if (implStub.InterfaceName != matchedInterfaceName)
@@ -636,7 +692,7 @@ CookError SlangModuleContext::rejectResourceMembers(slang::TypeReflection* type,
 
 namespace
 {
-    EnumTagKind ScalarTypeToEnumTagKind(slang::TypeReflection::ScalarType scalar)
+    std::optional<EnumTagKind> ScalarTypeToEnumTagKind(slang::TypeReflection::ScalarType scalar)
     {
         using slang::TypeReflection;
         switch (scalar)
@@ -658,12 +714,11 @@ namespace
         case TypeReflection::ScalarType::UInt64:
             return EnumTagKind::UInt64;
         default:
-            assert(false && "Unsupported scalar type for enum case blob");
-            return EnumTagKind::Int32;
+            return std::nullopt;
         }
     }
 
-    EnumTagKind EnumTagKindFromByteWidth(size_t byte_width)
+    std::optional<EnumTagKind> EnumTagKindFromByteWidth(size_t byte_width)
     {
         switch (byte_width)
         {
@@ -676,8 +731,7 @@ namespace
         case 8u:
             return EnumTagKind::Int64;
         default:
-            assert(false && "Unexpected enum tag byte width");
-            return EnumTagKind::Int32;
+            return std::nullopt;
         }
     }
 
@@ -709,17 +763,23 @@ namespace
         case slang::TypeReflection::ScalarType::UInt32:
         case slang::TypeReflection::ScalarType::Int64:
         case slang::TypeReflection::ScalarType::UInt64:
-            if (byteWidth < EnumTagByteWidth(ScalarTypeToEnumTagKind(scalarType)))
+        {
+            const std::optional<EnumTagKind> tagKind = ScalarTypeToEnumTagKind(scalarType);
+            if (!tagKind || byteWidth < EnumTagByteWidth(*tagKind))
             {
                 return std::nullopt;
             }
-            return DecodeEnumTag(ScalarTypeToEnumTagKind(scalarType), bytes);
+            return DecodeEnumTag(*tagKind, bytes);
+        }
         case slang::TypeReflection::ScalarType::None:
-            if (byteWidth == 1u || byteWidth == 2u || byteWidth == 4u || byteWidth == 8u)
+        {
+            const std::optional<EnumTagKind> tagKind = EnumTagKindFromByteWidth(byteWidth);
+            if (!tagKind)
             {
-                return DecodeEnumTag(EnumTagKindFromByteWidth(byteWidth), bytes);
+                return std::nullopt;
             }
-            return std::nullopt;
+            return DecodeEnumTag(*tagKind, bytes);
+        }
         default:
             return std::nullopt;
         }

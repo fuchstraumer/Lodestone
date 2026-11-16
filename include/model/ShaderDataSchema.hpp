@@ -29,6 +29,7 @@ struct BoundPlacement
     uint32_t Binding{ 0u };
 
     friend bool operator==(const BoundPlacement&, const BoundPlacement&) = default;
+    friend auto operator<=>(const BoundPlacement&, const BoundPlacement&) = default;
 };
 
 /** @brief A resource that a shader reaches through a value stored in a block: a descriptor handle (`Handle`) or a buffer

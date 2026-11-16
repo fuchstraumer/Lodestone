@@ -107,9 +107,9 @@ namespace lodestone
                 return {};
             }
 
-            size_t idStartIdx = line.find_last_not_of(k_ValidIdChars, idEndIdx);
-            assert(idStartIdx != std::string_view::npos);
-            ++idStartIdx;
+            // npos means the identifier starts at column zero
+            const size_t separatorIdx = line.find_last_not_of(k_ValidIdChars, idEndIdx);
+            const size_t idStartIdx = separatorIdx == std::string_view::npos ? 0u : separatorIdx + 1u;
             return line.substr(idStartIdx, idEndIdx - idStartIdx + 1);
         }
 

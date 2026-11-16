@@ -25,6 +25,7 @@
 #include <expected>
 #include <format>
 #include <functional>
+#include <iterator>
 #include <optional>
 #include <ranges>
 #include <span>
@@ -73,17 +74,18 @@ void ReadVaryingShape(slang::TypeLayoutReflection* type_layout,
                       VertexScalarType& out_scalar_type,
                       uint32_t& out_component_count) noexcept;
 
-/** Calls `visit` for each leaf of one tree. Slang offsets are relative to the parent, so the walker sums them. */
+/** Calls `visit` for each leaf of one tree. Slang offsets are relative to the parent, so the walker sums them. A template,
+ * so that the visitor is a direct call and not a `std::function`. The definition is at the end of the file. */
+template<typename Visitor>
 void VisitLeaves(slang::VariableLayoutReflection* var_layout,
                  SlangParameterCategory category,
                  uint32_t base_offset,
                  std::vector<slang::VariableLayoutReflection*>& path,
-                 const std::function<void(const LeafVisit&)>& visit);
+                 Visitor& visit);
 
 /** Walks the tree under one var layout, including that var layout's offset. */
-void WalkVaryingTree(slang::VariableLayoutReflection* var_layout,
-                     SlangParameterCategory category,
-                     const std::function<void(const LeafVisit&)>& visit);
+template<typename Visitor>
+void WalkVaryingTree(slang::VariableLayoutReflection* var_layout, SlangParameterCategory category, Visitor& visit);
 
 /** Joins the field names of a path with dots. Returns an empty string when any field has no name. */
 std::string JoinFieldNames(std::span<slang::VariableLayoutReflection* const> path);
@@ -1714,11 +1716,12 @@ void ReadVaryingShape(slang::TypeLayoutReflection* type_layout,
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
+template<typename Visitor>
 void VisitLeaves(slang::VariableLayoutReflection* var_layout,
                  SlangParameterCategory category,
                  uint32_t base_offset,
                  std::vector<slang::VariableLayoutReflection*>& path,
-                 const std::function<void(const LeafVisit&)>& visit)
+                 Visitor& visit)
 {
     if (var_layout == nullptr)
     {
@@ -1753,9 +1756,8 @@ void VisitLeaves(slang::VariableLayoutReflection* var_layout,
     path.pop_back();
 }
 
-void WalkVaryingTree(slang::VariableLayoutReflection* var_layout,
-                     SlangParameterCategory category,
-                     const std::function<void(const LeafVisit&)>& visit)
+template<typename Visitor>
+void WalkVaryingTree(slang::VariableLayoutReflection* var_layout, SlangParameterCategory category, Visitor& visit)
 {
     std::vector<slang::VariableLayoutReflection*> path;
     VisitLeaves(var_layout, category, 0u, path, visit);
@@ -1980,27 +1982,23 @@ void AppendBindingDrafts(std::vector<RawBindingDraft>& drafts,
                          std::vector<RawSizeAttribute>& out_attributes)
 {
     const auto baseIndex = static_cast<uint32_t>(out_bindings.size());
+    size_t attributesCount = 0u;
     for (auto&& [offset, draft] : std::views::enumerate(drafts))
     {
         for (RawSizeAttribute& attribute : draft.Attributes)
         {
             attribute.BindingIndex = baseIndex + static_cast<uint32_t>(offset);
         }
+        attributesCount += draft.Attributes.size();
     }
 
-    out_bindings.insert_range(out_bindings.end(), drafts | std::views::transform(&RawBindingDraft::Binding));
-    // todo-ship: either find a way to get cache_latest in here or just stop doing this
-    // its sad but ranges just don't produce the best assembly used like this
-    const size_t attributesCount = std::ranges::fold_left(drafts | std::views::transform(
-                                                                       [](const RawBindingDraft& draft)
-                                                                       {
-                                                                           return draft.Attributes.size();
-                                                                       }),
-                                                          size_t{ 0u },
-                                                          std::plus<size_t>{});
+    out_bindings.reserve(out_bindings.size() + drafts.size());
     out_attributes.reserve(out_attributes.size() + attributesCount);
-    out_attributes.append_range(drafts | std::views::transform(&RawBindingDraft::Attributes) |
-                                std::views::join | std::views::as_rvalue);
+    for (RawBindingDraft& draft : drafts)
+    {
+        out_bindings.push_back(std::move(draft.Binding));
+        std::ranges::move(draft.Attributes, std::back_inserter(out_attributes));
+    }
 }
 
 std::vector<uint32_t> CollectUsedBindingIndices(const LinkedVariant& linked_variant,
@@ -2053,8 +2051,19 @@ void AddVisibleStoredValues(std::span<const RawBinding> bindings,
                             std::vector<uint32_t>& used)
 {
     // only the indices present before this call count. The loop appends to `used`, which can reallocate it, so the
-    // span is made from the current buffer for each test
-    const size_t usedCount = used.size();
+    // placements of the used bindings are copied out once, and sorted so that each stored value does a binary search
+    std::vector<BoundPlacement> usedPlacements;
+    usedPlacements.reserve(used.size());
+    for (const uint32_t usedIndex : used)
+    {
+        const BoundPlacement* usedPlacement = GetBoundPlacement(bindings[usedIndex].Placement);
+        if (usedPlacement != nullptr)
+        {
+            usedPlacements.push_back(*usedPlacement);
+        }
+    }
+    std::ranges::sort(usedPlacements);
+
     for (size_t index = 0u; index < bindings.size(); ++index)
     {
         const StoredValuePlacement* stored = GetStoredValuePlacement(bindings[index].Placement);
@@ -2070,12 +2079,7 @@ void AddVisibleStoredValues(std::span<const RawBinding> bindings,
         }
         else
         {
-            auto placementUsed = [&](uint32_t used_index)
-            {
-                const BoundPlacement* block = GetBoundPlacement(bindings[used_index].Placement);
-                return block != nullptr && *block == stored->Block;
-            };
-            visible = std::ranges::any_of(std::span{ used }.first(usedCount), placementUsed);
+            visible = std::ranges::binary_search(usedPlacements, stored->Block);
         }
 
         if (visible)
@@ -2192,43 +2196,54 @@ ResourceAccess PointerAccessOf(std::string_view full_name) noexcept
 {
     const std::string_view arguments = TypeArgumentOf(full_name);
 
-    // the commas inside the pointee type (`Vertex<float, 2>`) do not separate arguments of the `Ptr`
+    auto accessOfArgument = [](std::string_view access) noexcept
+    {
+        if (access.contains("ReadWrite"))
+        {
+            return ResourceAccess::ReadWrite;
+        }
+
+        return access.contains("Read") ? ResourceAccess::ReadOnly : ResourceAccess::Invalid;
+    };
+
+    // the commas inside the pointee type (`Vertex<float, 2>`) do not separate arguments of the `Ptr`, so only a
+    // comma at depth zero ends an argument
     int32_t depth = 0;
     size_t argumentStart = 0u;
     size_t argumentIndex = 0u;
-    for (size_t position = 0u; position <= arguments.size(); ++position)
+    size_t position = 0u;
+    while (true)
     {
-        const bool atEnd = position == arguments.size();
-        if (!atEnd && arguments[position] == '<')
+        const size_t special = arguments.find_first_of("<>,", position);
+        const bool atEnd = special == std::string_view::npos;
+        if (!atEnd && arguments[special] != ',')
         {
-            ++depth;
-        }
-        else if (!atEnd && arguments[position] == '>')
-        {
-            --depth;
-        }
-
-        if (!atEnd && (arguments[position] != ',' || depth != 0))
-        {
+            depth += arguments[special] == '<' ? 1 : -1;
+            position = special + 1u;
             continue;
         }
 
+        if (!atEnd && depth != 0)
+        {
+            position = special + 1u;
+            continue;
+        }
+
+        const size_t argumentEnd = atEnd ? arguments.size() : special;
         if (argumentIndex == 1u)
         {
-            const std::string_view access = arguments.substr(argumentStart, position - argumentStart);
-            if (access.contains("ReadWrite"))
-            {
-                return ResourceAccess::ReadWrite;
-            }
+            return accessOfArgument(arguments.substr(argumentStart, argumentEnd - argumentStart));
+        }
 
-            return access.contains("Read") ? ResourceAccess::ReadOnly : ResourceAccess::Invalid;
+        if (atEnd)
+        {
+            return ResourceAccess::Invalid;
         }
 
         ++argumentIndex;
-        argumentStart = position + 1u;
+        argumentStart = special + 1u;
+        position = special + 1u;
     }
-
-    return ResourceAccess::Invalid;
 }
 
 ResourceAccess FromSlangAccessType(SlangResourceAccess access)
