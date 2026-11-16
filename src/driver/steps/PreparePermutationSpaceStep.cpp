@@ -48,7 +48,6 @@ namespace
                                                        std::vector<RawAxisDeclaration> raw_axes,
                                                        const PolicyDocument& policy,
                                                        DiagnosticSink& sink);
-    std::string WithoutWhitespace(std::string_view text);
     CookError CheckPolicyAxesAreInterfaceAxes(const PolicyDocument& policy,
                                               std::string_view module_name,
                                               std::span<const RawAxisDeclaration> raw_axes,
@@ -688,17 +687,6 @@ namespace
         return PermutationSpace{ axes };
     }
 
-    std::string WithoutWhitespace(std::string_view text)
-    {
-        std::string stripped;
-        stripped.reserve(text.size());
-        std::ranges::copy_if(text,
-                             std::back_inserter(stripped),
-                             [](const unsigned char character) { return std::isspace(character) == 0; });
-
-        return stripped;
-    }
-
     CookError CheckPolicyAxesAreInterfaceAxes(const PolicyDocument& policy,
                                               std::string_view module_name,
                                               std::span<const RawAxisDeclaration> raw_axes,
@@ -748,7 +736,7 @@ namespace
         for (const PolicyInterfaceType& policyType : policy.InterfaceTypesForAxis(module_name, raw_axis.Name))
         {
             RawInterfaceImpl impl;
-            impl.TypeName = WithoutWhitespace(policyType.Type);
+            impl.TypeName = RemoveWhitespace(policyType.Type);
             impl.Imports = policyType.Imports;
             impl.FromPolicy = true;
             impl.PolicyFile = policyType.File;

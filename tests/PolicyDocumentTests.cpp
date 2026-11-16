@@ -248,6 +248,58 @@ void TestEnumCaseNames(TestRunner& runner)
                       "a name on an axis that is not an enum fails");
 }
 
+void TestInterfaceTypeNames(TestRunner& runner)
+{
+    runner.BeginSection("CookValues of an interface axis are type names, resolved against the axis");
+
+    // the axis takes Constant and the composed type, and not Other
+    std::vector<lodestone::RawInterfaceImpl> impls(3u);
+    impls[0].TypeName = "Constant";
+    impls[1].TypeName = "Composed<LeafA,LeafB>";
+    impls[2].TypeName = "Other";
+    std::vector<PermutationAxis> axes;
+    axes.emplace_back("GRAPH",
+                      std::vector<PermutationValue>{ PermutationValue::MakeType(0u), PermutationValue::MakeType(1u) },
+                      AxisKind::Technique,
+                      EarliestBindingTime::Cook,
+                      AxisValueDomain::Type,
+                      "",
+                      "IGraph",
+                      std::move(impls));
+    const PermutationSpace space{ std::move(axes) };
+
+    auto validate = [&space](std::string_view toml) -> CookError
+    {
+        RecordingDiagnosticSink sink;
+        const auto document = PolicyDocument::Parse(toml);
+        return document ? document->ValidateAgainstSpace("Probe", space, sink) : CookError::Invalid;
+    };
+
+    const auto document = PolicyDocument::Parse(
+        "[Probe.targets.spirv.CookValues]\nGRAPH = [\"Composed < LeafA , LeafB >\", \"Constant\"]\n");
+    RecordingDiagnosticSink sink;
+    if (runner.CheckOk(document, "a file with two type names parses") &&
+        runner.CheckEqual(document->ValidateAgainstSpace("Probe", space, sink), CookError::Success,
+                          "type names that the axis takes validate, whatever their spacing"))
+    {
+        const lodestone::CookResult<lodestone::VariantSet> variants =
+            space.EnumerateVariants(document->FindTargetPolicy("Probe", "spirv"), sink);
+        if (runner.CheckOk(variants, "the variants enumerate") && runner.CheckEqual(variants->Variants.size(), 2u,
+                                                                                    "the cook takes both types"))
+        {
+            runner.CheckEqual(variants->Variants[0].Active[0].Value, PermutationValue::MakeType(0u),
+                              "the first variant has the first type");
+            runner.CheckEqual(variants->Variants[1].Active[0].Value, PermutationValue::MakeType(1u),
+                              "the second variant has the second type");
+        }
+    }
+
+    runner.CheckEqual(validate("[Probe.targets.spirv.CookValues]\nGRAPH = [\"Constnat\"]\n"),
+                      CookError::PolicyValueNotInAxis, "a misspelled type name fails");
+    runner.CheckEqual(validate("[Probe.targets.spirv.CookValues]\nGRAPH = [\"Other\"]\n"),
+                      CookError::PolicyValueNotInAxis, "a type of the interface that the axis does not take fails");
+}
+
 void TestTargetCoverage(TestRunner& runner)
 {
     runner.BeginSection("target coverage");
@@ -514,6 +566,7 @@ int main()
     TestInterfaceAxisTypes(runner);
     TestValidationAgainstSpace(runner);
     TestEnumCaseNames(runner);
+    TestInterfaceTypeNames(runner);
     TestTargetCoverage(runner);
     TestTargetNames(runner);
     return runner.Report();

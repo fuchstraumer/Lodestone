@@ -19,10 +19,12 @@
 #include <expected>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <map>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 // The interface axis GRAPH of PolicyGraph.slang has one tagged type (Constant). The policy file adds an instantiation
@@ -219,7 +221,7 @@ struct RejectionCase
     std::string_view Claim;
 };
 
-constexpr std::array<RejectionCase, 4u> k_RejectionCases
+constexpr std::array<RejectionCase, 5u> k_RejectionCases
 {
     RejectionCase{ .PolicyFile = "PolicyNonConforming.toml",
                    .Expected = CookError::PolicyInterfaceTypeInvalid,
@@ -233,6 +235,10 @@ constexpr std::array<RejectionCase, 4u> k_RejectionCases
                    .Expected = CookError::PolicyAxisNotInterface,
                    .MessagePart = "USE_BIAS",
                    .Claim = "a policy entry for an axis that is not an interface axis fails the cook" },
+    RejectionCase{ .PolicyFile = "PolicyAlias.toml",
+                   .Expected = CookError::PolicyInterfaceTypeNameMismatch,
+                   .MessagePart = "write 'Composed<LeafA,LeafB>'",
+                   .Claim = "a policy type spelled through a typealias fails the name check" },
     RejectionCase{ .PolicyFile = "PolicyDuplicate.toml",
                    .Expected = CookError::PolicyInterfaceTypeInvalid,
                    .MessagePart = "repeats",
@@ -260,6 +266,69 @@ void CheckRejection(tests::TestRunner& runner,
     runner.CheckEqual(record->Range.StartLine, 2, std::format("{}: the record names the line of the entry", rejection.Claim));
 }
 
+void CheckSpacing(tests::TestRunner& runner, const std::filesystem::path& asset_directory, std::string_view target)
+{
+    const tests::ScopedContext context = runner.Context(std::string{ target });
+    const PolicyCook cook =
+        CookPolicy(asset_directory / "PolicyGraph.slang", asset_directory / "PolicySpacing.toml", target);
+    if (!runner.CheckEqual(cook.Result, CookError::Success, "a policy type with extra and missing spaces cooks"))
+    {
+        return;
+    }
+
+    runner.Check(cook.SpaceDump.contains("\"Composed<LeafA,LeafB>\""),
+                 std::format("the space stores the type without whitespace: {}", cook.SpaceDump));
+}
+
+constexpr std::string_view k_CookValuesPolicy = R"toml(
+[PolicyGraph.axes.GRAPH]
+Types = [ { Type = "Composed<LeafA, LeafB>", Imports = ["PolicyLeaves"] } ]
+
+[PolicyGraph.targets.wgsl.CookValues]
+GRAPH = ["Composed < LeafA,LeafB >"]
+)toml";
+
+void CheckCookValuesByTypeName(tests::TestRunner& runner, const std::filesystem::path& asset_directory)
+{
+    const tests::ScopedSection section = runner.Section("CookValues lists interface values by type name");
+    const std::filesystem::path scratch = std::filesystem::temp_directory_path() / "LodestoneCookValuesTypeNames";
+    std::filesystem::create_directories(scratch);
+
+    const std::filesystem::path knownPath = scratch / "Known.toml";
+    {
+        std::ofstream file{ knownPath };
+        file << k_CookValuesPolicy;
+    }
+
+    const std::filesystem::path unknownPath = scratch / "Unknown.toml";
+    {
+        std::ofstream file{ unknownPath };
+        file << "[PolicyGraph.targets.wgsl.CookValues]\nGRAPH = [\"Constnat\"]\n";
+    }
+
+    const PolicyCook known = CookPolicy(asset_directory / "PolicyGraph.slang", knownPath, "wgsl");
+    runner.CheckEqual(known.Result, CookError::Success, "a policy type name in CookValues cooks");
+    const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(known.Bytes);
+    if (runner.CheckOk(bundle, "the manifest opens"))
+    {
+        const manifest::ManifestResult<manifest::EnvironmentView> environment = bundle->OpenEnvironment(0u, 0u);
+        if (runner.CheckOk(environment, "the environment opens"))
+        {
+            const ManifestIndex index{ *environment };
+            runner.CheckEqual(index.Query().Keys()->size(), 2u, "only the listed type is cooked, for each USE_BIAS");
+            runner.Check(index.Query().Where("GRAPH", AxisValueDomain::Type, k_ComposedName).Keys()->size() == 2u,
+                         "the cooked type is the listed one");
+        }
+    }
+
+    const PolicyCook unknown = CookPolicy(asset_directory / "PolicyGraph.slang", unknownPath, "wgsl");
+    runner.CheckEqual(unknown.Result, CookError::PolicyValueNotInAxis, "an unknown type name in CookValues fails");
+    runner.Check(FindRecord(unknown, "Constnat") != nullptr, "the error names the value");
+
+    std::error_code ignored;
+    std::filesystem::remove_all(scratch, ignored);
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -271,6 +340,14 @@ int main(int argc, char** argv)
     {
         CheckPolicyTarget(runner, assetDirectory, target);
     }
+
+    for (const std::string_view target : { "wgsl", "spirv" })
+    {
+        const tests::ScopedSection section = runner.Section("a policy type with unusual spacing");
+        CheckSpacing(runner, assetDirectory, target);
+    }
+
+    CheckCookValuesByTypeName(runner, assetDirectory);
 
     for (const RejectionCase& rejection : k_RejectionCases)
     {

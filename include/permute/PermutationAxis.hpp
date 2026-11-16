@@ -15,6 +15,9 @@
 namespace lodestone
 {
 
+/** @brief Returns the text without any whitespace character. */
+[[nodiscard]] std::string RemoveWhitespace(std::string_view text);
+
 struct PermutationAxis
 {
 
@@ -68,7 +71,14 @@ struct PermutationAxis
     [[nodiscard]] std::string_view EnumCaseName(uint32_t idx) const noexcept;
     /** @brief The ordinal of the case, for `PermutationValue::MakeEnum`. */
     [[nodiscard]] std::optional<uint32_t> FindEnumCase(std::string_view case_name) const noexcept;
+    /** @brief The ordinal of the type, for `PermutationValue::MakeType`. Whitespace in the name is ignored. */
+    [[nodiscard]] std::optional<uint32_t> FindInterfaceImpl(std::string_view type_name) const noexcept;
     [[nodiscard]] std::string_view InterfaceImplTypeName(uint32_t idx) const noexcept;
+    /** @brief Returns the value of an enum axis that has this case name, or of an interface axis that has this type
+     * name. Returns nothing for any other axis. The value is not necessarily one that the axis declares. */
+    [[nodiscard]] std::optional<PermutationValue> FindNamedValue(std::string_view name) const noexcept;
+    /** @brief Returns the case name of an enum value, or the type name of an interface value. */
+    [[nodiscard]] std::string_view NamedValueName(const PermutationValue& value) const noexcept;
     
     /** @brief The module that declares this axis's type, for the synthetic module's import. */
     [[nodiscard]] std::string_view Module() const noexcept;

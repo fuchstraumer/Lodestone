@@ -493,12 +493,12 @@ namespace
             }
             else if (element.is_string())
             {
-                cookValues.CaseNames.emplace_back(*element.value<std::string>());
+                cookValues.ValueNames.emplace_back(*element.value<std::string>());
             }
             else
             {
                 return std::unexpected(ErrorAt(
-                    element, std::format("CookValues.{} entries must be integers, booleans, or enum case names", axis_name)));
+                    element, std::format("CookValues.{} entries must be integers, booleans, enum case names, or interface type names", axis_name)));
             }
         }
 
@@ -739,35 +739,36 @@ namespace
                                        module_name));
                 }
 
-                for (const std::string& caseName : cookValues.CaseNames)
+                for (const std::string& valueName : cookValues.ValueNames)
                 {
-                    if (axis->ValueDomain != AxisValueDomain::Enum)
+                    if (axis->ValueDomain != AxisValueDomain::Enum && axis->ValueDomain != AxisValueDomain::Type)
                     {
                         return ReportError(sink,
                                            CookError::PolicyValueNotInAxis,
                                            std::format("target '{}' CookValues for axis '{}' lists '{}', and only an enum "
-                                                       "axis takes case names",
+                                                       "axis takes case names and only an interface axis takes type "
+                                                       "names",
                                                        targetName,
                                                        cookValues.Axis,
-                                                       caseName));
+                                                       valueName));
                     }
 
-                    const std::optional<uint32_t> ordinal = axis->FindEnumCase(caseName);
-                    if (!ordinal.has_value() || !AxisDeclaresValue(*axis, PermutationValue::MakeEnum(*ordinal)))
+                    const std::optional<PermutationValue> named = axis->FindNamedValue(valueName);
+                    if (!named.has_value() || !AxisDeclaresValue(*axis, *named))
                     {
-                        std::vector<std::string_view> caseNames;
+                        std::vector<std::string_view> declaredNames;
                         for (const PermutationValue& value : axis->GetValues())
                         {
-                            caseNames.push_back(axis->EnumCaseName(value.AsUInt()));
+                            declaredNames.push_back(axis->NamedValueName(value));
                         }
-                        const std::string_view nearest = NearestName(caseName, caseNames);
+                        const std::string_view nearest = NearestName(RemoveWhitespace(valueName), declaredNames);
                         return ReportError(sink,
                                            CookError::PolicyValueNotInAxis,
                                            std::format("target '{}' CookValues for axis '{}' lists '{}', which the axis "
                                                        "does not declare{}",
                                                        targetName,
                                                        cookValues.Axis,
-                                                       caseName,
+                                                       valueName,
                                                        nearest.empty() ? std::string{}
                                                                        : std::format(". Did you mean '{}'?", nearest)));
                     }

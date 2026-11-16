@@ -49,6 +49,11 @@ CookResult<std::vector<LinkedVariant::EpCode>> GenerateEntryPointCode(SlangModul
 CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext& context, const VariantDescriptor& descriptor, DiagnosticSink& sink);
 const RawInterfaceImpl* FindPolicyImpl(const PermutationBinding& binding) noexcept;
 std::string DescribePolicyType(const PermutationBinding& binding, const RawInterfaceImpl& impl);
+std::string DescribePolicyTypeAt(const PermutationBinding& binding, const RawInterfaceImpl& impl);
+/** Returns the full name that Slang gives to the type, without whitespace. Returns an empty string for a null type. */
+std::string SlangTypeNameWithoutWhitespace(slang::TypeReflection* type);
+/** Checks that the policy string is Slang's own name for the type, so that the manifest has one spelling per type. */
+CookError CheckPolicyTypeName(DiagnosticSink& sink, const PermutationBinding& binding, slang::IModule* variant_module);
 CookError ReportPolicyTypeInvalid(DiagnosticSink& sink, const PermutationBinding& binding, std::string_view stage);
 /** Reports every policy type of the variant. A link failure does not say which value caused it. */
 CookError ReportPolicyTypesInvalid(DiagnosticSink& sink, const VariantDescriptor& descriptor, std::string_view stage);
@@ -274,11 +279,52 @@ const RawInterfaceImpl* FindPolicyImpl(const PermutationBinding& binding) noexce
 
 std::string DescribePolicyType(const PermutationBinding& binding, const RawInterfaceImpl& impl)
 {
-    return std::format("type '{}' of axis '{}' (policy file '{}', line {})",
-                       impl.TypeName,
-                       binding.Axis->Name,
-                       impl.PolicyFile,
-                       impl.PolicyLine);
+    return std::format("type '{}' of axis '{}'", impl.TypeName, binding.Axis->Name);
+}
+
+std::string DescribePolicyTypeAt(const PermutationBinding& binding, const RawInterfaceImpl& impl)
+{
+    return std::format("{} (policy file '{}', line {})", DescribePolicyType(binding, impl), impl.PolicyFile, impl.PolicyLine);
+}
+
+std::string SlangTypeNameWithoutWhitespace(slang::TypeReflection* type)
+{
+    Slang::ComPtr<slang::IBlob> fullName;
+    if (type == nullptr || SLANG_FAILED(type->getFullName(fullName.writeRef())) || fullName == nullptr)
+    {
+        return {};
+    }
+
+    return RemoveWhitespace(std::string_view{ static_cast<const char*>(fullName->getBufferPointer()),
+                                              fullName->getBufferSize() });
+}
+
+CookError CheckPolicyTypeName(DiagnosticSink& sink, const PermutationBinding& binding, slang::IModule* variant_module)
+{
+    const RawInterfaceImpl& impl = *FindPolicyImpl(binding);
+    slang::ProgramLayout* layout = variant_module->getLayout();
+    slang::TypeReflection* type = layout != nullptr ? layout->findTypeByName(impl.TypeName.c_str()) : nullptr;
+    const std::string slangName = SlangTypeNameWithoutWhitespace(type);
+    if (slangName.empty())
+    {
+        return ReportPolicyTypeInvalid(sink, binding, "resolving its name");
+    }
+
+    if (slangName == impl.TypeName)
+    {
+        return CookError::Success;
+    }
+
+    const std::string message =
+        std::format("The {} is not the name that Slang uses for the type, which is '{}'. The manifest stores one "
+                    "name for each type, so write '{}' in the policy file",
+                    DescribePolicyType(binding, impl),
+                    slangName,
+                    slangName);
+    return ReportError(sink,
+                       CookError::PolicyInterfaceTypeNameMismatch,
+                       ShaderLocation{ .File = impl.PolicyFile, .Line = impl.PolicyLine },
+                       message);
 }
 
 CookError ReportPolicyTypeInvalid(DiagnosticSink& sink, const PermutationBinding& binding, std::string_view stage)
@@ -316,7 +362,7 @@ CookError ReportPolicyTypesInvalid(DiagnosticSink& sink, const VariantDescriptor
         {
             candidates += "; ";
         }
-        candidates += DescribePolicyType(binding, *impl);
+        candidates += DescribePolicyTypeAt(binding, *impl);
     }
 
     const std::string message =
@@ -370,6 +416,15 @@ CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext&
                 return std::unexpected(ReportPolicyTypeInvalid(sink, binding, "loading its link module"));
             }
             return std::unexpected(CookError::VariantModuleCreationFailed);
+        }
+
+        if (FindPolicyImpl(binding) != nullptr)
+        {
+            const CookError nameError = CheckPolicyTypeName(sink, binding, variantModule);
+            if (nameError != CookError::Success)
+            {
+                return std::unexpected(nameError);
+            }
         }
 
         components.push_back(variantModule);

@@ -3,6 +3,7 @@
 #include "permute/PermutationTypes.hpp"
 #include "permute/PermutationValue.hpp"
 #include <cassert>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <algorithm>
@@ -21,6 +22,17 @@
 
 namespace lodestone
 {
+
+std::string RemoveWhitespace(std::string_view text)
+{
+    std::string stripped;
+    stripped.reserve(text.size());
+    std::ranges::copy_if(text,
+                         std::back_inserter(stripped),
+                         [](const unsigned char character) { return std::isspace(character) == 0; });
+
+    return stripped;
+}
 
 PermutationAxis::PermutationAxis(std::string name,
                                  std::vector<PermutationValue> _values,
@@ -168,6 +180,41 @@ std::optional<uint32_t> PermutationAxis::FindEnumCase(std::string_view case_name
         return std::nullopt;
     }
     return static_cast<uint32_t>(std::distance(enumCases.begin(), found));
+}
+
+std::optional<uint32_t> PermutationAxis::FindInterfaceImpl(std::string_view type_name) const noexcept
+{
+    const std::string stripped = RemoveWhitespace(type_name);
+    const auto found = std::ranges::find(interfaceImpls, stripped, &RawInterfaceImpl::TypeName);
+    if (found == interfaceImpls.end())
+    {
+        return std::nullopt;
+    }
+    return static_cast<uint32_t>(std::distance(interfaceImpls.begin(), found));
+}
+
+std::optional<PermutationValue> PermutationAxis::FindNamedValue(std::string_view name) const noexcept
+{
+    if (ValueDomain == AxisValueDomain::Enum)
+    {
+        const std::optional<uint32_t> ordinal = FindEnumCase(name);
+        return ordinal.has_value() ? std::optional<PermutationValue>{ PermutationValue::MakeEnum(*ordinal) }
+                                   : std::nullopt;
+    }
+
+    if (ValueDomain == AxisValueDomain::Type)
+    {
+        const std::optional<uint32_t> ordinal = FindInterfaceImpl(name);
+        return ordinal.has_value() ? std::optional<PermutationValue>{ PermutationValue::MakeType(*ordinal) }
+                                   : std::nullopt;
+    }
+
+    return std::nullopt;
+}
+
+std::string_view PermutationAxis::NamedValueName(const PermutationValue& value) const noexcept
+{
+    return ValueDomain == AxisValueDomain::Enum ? EnumCaseName(value.AsUInt()) : InterfaceImplTypeName(value.AsUInt());
 }
 
 } // namespace lodestone

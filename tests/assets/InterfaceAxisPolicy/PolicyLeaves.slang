@@ -33,4 +33,12 @@ public struct Composed<A : ILeaf, B : ILeaf> : IGraph
     public float Eval(float3 position) { return First.Eval(position) * Second.Eval(position); }
 }
 
+public struct Plain : IGraph
+{
+    public float Value;
+    public float Eval(float3 position) { return Value; }
+}
+
+public typealias AliasOfPlain = Plain;
+
 public typealias AliasOfComposed = Composed<LeafA, LeafB>;
