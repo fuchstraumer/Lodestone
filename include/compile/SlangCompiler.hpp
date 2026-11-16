@@ -68,7 +68,7 @@ public:
     [[nodiscard]] size_t EntryPointCount() const noexcept;
     [[nodiscard]] const std::vector<std::string>& EntryPointNames() const noexcept;
     [[nodiscard]] const std::vector<std::string>& ModuleSourceStrings() const noexcept;
-    [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
+    [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const;
     /** @brief The file paths for the depfile, excluding embedded builtins. */
     [[nodiscard]] const std::vector<std::string>& DependencyFilePaths() const noexcept;
     /** @brief Fails when a declaration is invalid. The error is also reported, and the cook must not go on without the axes. */

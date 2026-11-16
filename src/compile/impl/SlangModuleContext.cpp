@@ -1,14 +1,11 @@
 #include "SlangModuleContext.hpp"
-#include "ShaderLibraryTypes.hpp"
 #include "SlangCompilerTypes.hpp"
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
 #include "EmbeddedFileSystem.hpp"
 #include "compile/EmbeddedBuiltinModules.hpp"
-#include "compile/EnumTagDecode.hpp"
-#include "compile/RawLibrary.hpp"
+#include "compile/ShimLinkSource.hpp"
 #include "compile/SlangCompiler.hpp"
-#include "permute/PermutationValue.hpp"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "target/TargetProfile.hpp"
@@ -19,7 +16,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <expected>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -33,7 +29,6 @@
 #include <string>
 #include <string_view>
 #include <system_error>
-#include <utility>
 #include <vector>
 
 namespace lodestone
@@ -358,7 +353,7 @@ slang::ISession* SlangModuleContext::Session() const noexcept
     return session;
 }
 
-std::vector<slang::IComponentType*> SlangModuleContext::BaseComponents() const noexcept
+const std::vector<slang::IComponentType*>& SlangModuleContext::BaseComponents() const noexcept
 {
     return baseComponents;
 }
@@ -393,7 +388,7 @@ const std::vector<std::string>& SlangModuleContext::DependencyFilePaths() const 
     return dependencyFilePaths;
 }
 
-std::vector<std::string_view> SlangModuleContext::ModuleSourceStringViews() const noexcept
+std::vector<std::string_view> SlangModuleContext::ModuleSourceStringViews() const
 {
     return moduleSourceStrings |
            std::views::transform(
@@ -511,9 +506,9 @@ CookError SlangModuleContext::primeSessionFromCache(std::span<const SerializedMo
                                                                      serializedModule.Blob,
                                                                      diagnosticsBlob.writeRef());
 
+        ReportDiagnostics(*diagnosticSink, "SlangModuleContext::loadSerializedModules", diagnosticsBlob);
         if (module == nullptr)
         {
-            ReportDiagnostics(*diagnosticSink, "SlangModuleContext::loadSerializedModules", diagnosticsBlob);
             static_cast<void>(ReportError(*diagnosticSink,
                                           CookError::ModuleLoadFailed,
                         std::format("a worker cannot load the module '{}'. Slang gives no reason. If the module was found "
@@ -530,9 +525,9 @@ CookError SlangModuleContext::loadRootModule()
 {
     Slang::ComPtr<slang::IBlob> diagnosticsBlob;
     rootModule = session->loadModule(moduleName.c_str(), diagnosticsBlob.writeRef());
+    ReportDiagnostics(*diagnosticSink, "SlangModuleContext::loadRootModule", diagnosticsBlob);
     if (rootModule == nullptr)
     {
-        ReportDiagnostics(*diagnosticSink, "SlangModuleContext::loadRootModule", diagnosticsBlob);
         return CookError::ModuleLoadFailed;
     }
     return CookError::Success;
@@ -584,6 +579,8 @@ CookError SlangModuleContext::readDependencySourceStrings()
 CookError SlangModuleContext::enumerateEntryPoints()
 {
     const SlangInt32 entryPointCount = rootModule->getDefinedEntryPointCount();
+    entryPointNames.clear();
+    entryPoints.clear();
     entryPointNames.reserve(static_cast<size_t>(entryPointCount));
 
     for (SlangInt32 i = 0; i < entryPointCount; ++i)
@@ -603,6 +600,7 @@ CookError SlangModuleContext::enumerateEntryPoints()
 
 CookError SlangModuleContext::buildSlangComponents()
 {
+    baseComponents.clear();
     baseComponents.reserve(8u + static_cast<size_t>(rootModule->getDefinedEntryPointCount()));
     baseComponents.push_back(rootModule);
     for (const auto& entryPoint : entryPoints)

@@ -127,7 +127,7 @@ namespace
         // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): from_chars takes the end pointer
         const char* const end = text.data() + text.size();
         const std::from_chars_result result = std::from_chars(text.data(), end, value);
-        // C++26 will finally let us boolean convert from_chars_result directly.... please....
+        // from_chars_result has no boolean conversion before C++26
         return result.ec == std::errc{} && result.ptr == end ? value : 0;
     }
 

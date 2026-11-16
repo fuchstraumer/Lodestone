@@ -50,6 +50,7 @@ std::optional<std::string> SlangModuleContext::FindTypeDeclaringModule(std::stri
 {
     Slang::ComPtr<slang::IBlob> diagBlob;
     slang::ProgramLayout* programLayout = rootModule->getLayout(0, diagBlob.writeRef());
+    ReportDiagnostics(*diagnosticSink, "SlangModuleContext::FindTypeDeclaringModule", diagBlob);
     if (programLayout == nullptr)
     {
         return std::nullopt;
@@ -69,11 +70,17 @@ CookResult<LayoutNode> SlangModuleContext::ReadTypeLayoutNode(std::string_view t
 {
     Slang::ComPtr<slang::IBlob> diagBlob;
     slang::ProgramLayout* programLayout = rootModule->getLayout(0, diagBlob.writeRef());
+    ReportDiagnostics(*diagnosticSink, "SlangModuleContext::ReadTypeLayoutNode", diagBlob);
     const std::string name{ type_name };
     slang::TypeReflection* type = programLayout != nullptr ? programLayout->findTypeByName(name.c_str()) : nullptr;
+    Slang::ComPtr<slang::IBlob> typeLayoutDiagnostics;
     slang::TypeLayoutReflection* layout =
-        type != nullptr ? session->getTypeLayout(type, k_BaseTargetIndex, slang::LayoutRules::Default, diagBlob.writeRef())
+        type != nullptr ? session->getTypeLayout(type,
+                                                 k_BaseTargetIndex,
+                                                 slang::LayoutRules::Default,
+                                                 typeLayoutDiagnostics.writeRef())
                         : nullptr;
+    ReportDiagnostics(*diagnosticSink, "SlangModuleContext::ReadTypeLayoutNode", typeLayoutDiagnostics);
     if (layout == nullptr)
     {
         return std::unexpected(ReportError(*diagnosticSink,
@@ -465,6 +472,7 @@ CookError SlangModuleContext::buildInterfaceAxes(AxesBuildContext& axes_build_co
 
     Slang::ComPtr<slang::IBlob> diagBlob;
     slang::ProgramLayout* programLayout = rootModule->getLayout(0, diagBlob.writeRef());
+    ReportDiagnostics(*diagnosticSink, "SlangModuleContext::buildInterfaceAxes", diagBlob);
     if (programLayout == nullptr)
     {
         const std::string errStr =

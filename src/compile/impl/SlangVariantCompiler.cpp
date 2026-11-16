@@ -45,7 +45,7 @@ struct GeneratedEntryPoint
 };
 
 GeneratedEntryPoint GenerateOneEntryPoint(slang::IComponentType* linked_program, size_t index, SlangInt target_index);
-CookResult<std::vector<LinkedVariant::EpCode>> GenerateEntryPointCode(SlangModuleContext& context, Slang::ComPtr<slang::IComponentType> linked_program, SlangInt target_index, DiagnosticSink& sink);
+CookResult<std::vector<LinkedVariant::EpCode>> GenerateEntryPointCode(SlangModuleContext& context, const Slang::ComPtr<slang::IComponentType>& linked_program, SlangInt target_index, DiagnosticSink& sink);
 CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext& context, const VariantDescriptor& descriptor, DiagnosticSink& sink);
 const RawInterfaceImpl* FindPolicyImpl(const PermutationBinding& binding) noexcept;
 std::string DescribePolicyType(const PermutationBinding& binding, const RawInterfaceImpl& impl);
@@ -235,7 +235,7 @@ GeneratedEntryPoint GenerateOneEntryPoint(slang::IComponentType* linked_program,
 }
 
 CookResult<std::vector<LinkedVariant::EpCode>> GenerateEntryPointCode(SlangModuleContext& context,
-                                                                      Slang::ComPtr<slang::IComponentType> linked_program,
+                                                                      const Slang::ComPtr<slang::IComponentType>& linked_program,
                                                                       SlangInt target_index,
                                                                       DiagnosticSink& sink)
 {
@@ -383,8 +383,10 @@ CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext&
                                                              const VariantDescriptor& descriptor,
                                                              DiagnosticSink& sink)
 {
-    std::vector<slang::IComponentType*> components = context.BaseComponents();
-    components.reserve(context.BaseComponents().size() + (descriptor.Active.size() * 2u) + 1u);
+    const std::vector<slang::IComponentType*>& baseComponents = context.BaseComponents();
+    std::vector<slang::IComponentType*> components;
+    components.reserve(baseComponents.size() + (descriptor.Active.size() * 2u) + 3u);
+    components.assign(baseComponents.begin(), baseComponents.end());
     if (context.ShimLinkModule() != nullptr)
     {
         components.push_back(context.ShimLinkModule());
@@ -453,9 +455,11 @@ CookResult<Slang::ComPtr<slang::IComponentType>> LinkVariant(SlangModuleContext&
     }
 
     Slang::ComPtr<slang::IComponentType> linked;
-    if (SLANG_FAILED(composite->link(linked.writeRef(), diagnostics.writeRef())))
+    Slang::ComPtr<slang::IBlob> linkDiagnostics;
+    const SlangResult linkResult = composite->link(linked.writeRef(), linkDiagnostics.writeRef());
+    ReportDiagnostics(sink, "link", linkDiagnostics.get());
+    if (SLANG_FAILED(linkResult))
     {
-        ReportDiagnostics(sink, "link", diagnostics.get());
         if (HasPolicyType(descriptor))
         {
             return std::unexpected(ReportPolicyTypesInvalid(sink, descriptor, "linking"));

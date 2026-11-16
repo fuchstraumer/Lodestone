@@ -61,14 +61,14 @@ public:
     [[nodiscard]] slang::IModule* ShimFormatLinkModule(std::string_view axis_name, uint32_t case_ordinal) const noexcept;
     [[nodiscard]] slang::IGlobalSession* GlobalSession() const noexcept;
     [[nodiscard]] slang::ISession* Session() const noexcept;
-    [[nodiscard]] std::vector<slang::IComponentType*> BaseComponents() const noexcept;
+    [[nodiscard]] const std::vector<slang::IComponentType*>& BaseComponents() const noexcept;
     [[nodiscard]] size_t EntryPointCount() const noexcept;
     [[nodiscard]] const std::vector<std::string>& EntryPointNames() const noexcept;
     [[nodiscard]] std::string_view ModuleName() const noexcept;
     [[nodiscard]] const std::vector<std::string>& ModuleSourceStrings() const noexcept;
     /** @brief Parallel to `ModuleSourceStrings()`. Builtins appear by search path. */
     [[nodiscard]] const std::vector<std::string>& ModuleSourcePaths() const noexcept;
-    [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const noexcept;
+    [[nodiscard]] std::vector<std::string_view> ModuleSourceStringViews() const;
     /** @brief The file paths for the depfile, excluding embedded builtins. */
     [[nodiscard]] const std::vector<std::string>& DependencyFilePaths() const noexcept;
     /** @brief The form of the profile's buffers. Only the Pointer form permits a pointer member. */

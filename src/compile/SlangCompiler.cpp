@@ -268,7 +268,7 @@ const std::vector<std::string>& SlangCompiler::DependencyFilePaths() const noexc
     return bootstrapContext->DependencyFilePaths();
 }
 
-std::vector<std::string_view> SlangCompiler::ModuleSourceStringViews() const noexcept
+std::vector<std::string_view> SlangCompiler::ModuleSourceStringViews() const
 {
     return bootstrapContext->ModuleSourceStringViews();
 }

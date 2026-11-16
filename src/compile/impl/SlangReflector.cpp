@@ -2184,7 +2184,8 @@ std::string FullNameOf(slang::TypeReflection* type)
     {
         return {};
     }
-    return std::string{ static_cast<const char*>(fullName->getBufferPointer()) };
+    const size_t nameLength = fullName->getBufferSize();
+    return std::string{ static_cast<const char*>(fullName->getBufferPointer()), nameLength };
 }
 
 ResourceAccess PointerAccessOf(std::string_view full_name) noexcept
