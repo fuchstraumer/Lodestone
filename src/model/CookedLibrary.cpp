@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -436,9 +437,8 @@ CookResult<ShaderLayout> ResolveLayout(const CookedModule& module,
 {
     const CodeFormTables& tables = FormTables(module, form);
     const CodeFormIndices& indices = FormIndices(variant, form);
-    if (entry_point_index >= indices.VisibilityIndices.size() ||
-        variant.ResourceListIndex >= module.ResourceLists.size() ||
-        variant.FootprintListIndex >= module.FootprintLists.size())
+
+    if (entry_point_index >= indices.VisibilityIndices.size())
     {
         return std::unexpected(CookError::ManifestShaderLayoutVariantIndicesInvalid);
     }
@@ -461,8 +461,8 @@ CookResult<ShaderLayout> ResolveLayout(const CookedModule& module,
             return std::unexpected(CookError::ManifestShaderLayoutResourceListIndexInvalid);
         }
 
-        layout.emplace_back(module.Resources[resources[localRsrcIndex]],
-                            localRsrcIndex < footprints.size() ? footprints[localRsrcIndex] : ResourceFootprint{});
+        assert(localRsrcIndex < footprints.size());
+        layout.emplace_back(module.Resources[resources[localRsrcIndex]], footprints[localRsrcIndex]);
     }
 
     return layout;
@@ -501,9 +501,8 @@ CookResult<ShaderLayoutView> ResolveLayoutView(const CookedModule& module,
             return std::unexpected(CookError::ManifestShaderLayoutResourceListIndexInvalid);
         }
 
-
-        layoutView.emplace_back(&module.Resources[resources[localRsrcIndex]],
-                                localRsrcIndex < footprints.size() ? &footprints[localRsrcIndex] : nullptr);
+        assert(localRsrcIndex < footprints.size());
+        layoutView.emplace_back(&module.Resources[resources[localRsrcIndex]], &footprints[localRsrcIndex]);
     }
 
     return layoutView;

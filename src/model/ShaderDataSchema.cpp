@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -347,10 +348,7 @@ std::vector<ResolvedBinding> BuildEntryPointLayout(const CompiledVariant& varian
 
     for (const uint32_t index : variant.EntryPoints[entry_point_index].Delivered.UsedBindingIndices)
     {
-        if (index >= variant.Bindings.size())
-        {
-            continue;
-        }
+        assert(index < variant.Bindings.size());
 
         ResourceFootprint footprint{};
         if (index < variant.Footprints.size())
@@ -376,14 +374,9 @@ std::vector<ResolvedBindingView> BuildEntryPointLayoutView(const CompiledVariant
 
     for (const uint32_t index : variant.EntryPoints[entry_point_index].Delivered.UsedBindingIndices)
     {
-        if (index >= variant.Bindings.size())
-        {
-            continue;
-        }
-
+        assert(index < variant.Bindings.size());
         const ReflectedBinding* resource = &variant.Bindings[index];
         const ResourceFootprint* footprint = index < variant.Footprints.size() ? &variant.Footprints[index] : nullptr;
-
         layout.emplace_back(resource, footprint);
     }
 

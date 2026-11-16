@@ -21,3 +21,4 @@ out/
 *.png
 __pycache__/
 kitchen_sink_output/
+docs/audit/

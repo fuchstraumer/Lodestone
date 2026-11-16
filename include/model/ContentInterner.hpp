@@ -2,11 +2,13 @@
 #ifndef LODESTONE_CONTENT_INTERNER_HPP
 #define LODESTONE_CONTENT_INTERNER_HPP
 #include "ContentHash.hpp"
+#include "containers/DenseHashMap.hpp"
+#include <concepts>
 #include <cstdint>
 #include <span>
 #include <string>
 #include <string_view>
-#include <unordered_map>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -52,7 +54,8 @@ public:
     {
         uniqueEntries.reserve(1024);
         origins.reserve(1024);
-        buckets.reserve(256);
+        firstEntryByHash.reserve(256);
+        nextEntryWithSameHash.reserve(1024);
     }
 
     void Disable() noexcept
@@ -65,34 +68,35 @@ public:
         return dedupeEnabled;
     }
 
-    /** @brief take that payload and shove it somewhere else (intern. get it) */
-    InternResult Intern(PayloadType payload, ProvenanceRecord origin)
+    template<typename T> requires std::same_as<std::remove_cvref_t<T>, PayloadType>
+    InternResult Intern(T&& payload, ProvenanceRecord origin)
     {
         ++statistics.ArtifactsSeen;
 
         if (!dedupeEnabled)
         {
-            return append(std::move(payload), std::move(origin));
+            return append(std::forward<T>(payload), std::move(origin), k_NoEntry);
         }
 
         const ContentHashValue hash = hashFunction(payload);
-        std::vector<uint32_t>& bucket = buckets[hash];
+        const auto head = firstEntryByHash.find(hash);
+        int32_t firstCandidate = (head != firstEntryByHash.end()) ? head->second : k_NoEntry;
 
-        for (uint32_t candidate : bucket)
+        for (int32_t candidate = firstCandidate; candidate != k_NoEntry; candidate = nextEntryWithSameHash[candidate])
         {
             ++statistics.ByteComparisons;
             if (uniqueEntries[candidate] == payload)
             {
                 origins[candidate].emplace_back(std::move(origin));
-                return InternResult{ candidate, false };
+                return InternResult{ static_cast<uint32_t>(candidate), false };
             }
 
             // same bucket, different bytes: both entries stay
             ++statistics.HashCollisions;
         }
 
-        const InternResult appended = append(std::move(payload), std::move(origin));
-        bucket.push_back(appended.Index);
+        const InternResult appended = append(std::forward<T>(payload), std::move(origin), firstCandidate);
+        firstEntryByHash.insert_or_assign(hash, static_cast<int32_t>(appended.Index));
         return appended;
     }
 
@@ -109,11 +113,7 @@ public:
 
     [[nodiscard]] std::span<const ProvenanceRecord> OriginsOf(uint32_t index) const noexcept
     {
-        if (index >= origins.size())
-        {
-            return {};
-        }
-
+        assert(index < origins.size());
         return origins[index];
     }
 
@@ -130,11 +130,13 @@ public:
 
 private:
 
-    InternResult append(PayloadType&& payload, ProvenanceRecord&& origin)
+    template<typename T, typename P> requires std::same_as<std::remove_cvref_t<T>, PayloadType>
+    InternResult append(T&& payload, P&& origin, int32_t next_entry)
     {
         const uint32_t index = static_cast<uint32_t>(uniqueEntries.size());
-        uniqueEntries.emplace_back(std::move(payload));
-        origins.emplace_back(std::vector<ProvenanceRecord>{ std::move(origin) });
+        uniqueEntries.emplace_back(std::forward<T>(payload));
+        origins.emplace_back(std::vector<ProvenanceRecord>{ std::forward<P>(origin) });
+        nextEntryWithSameHash.emplace_back(next_entry);
         statistics.UniqueEntries = static_cast<uint32_t>(uniqueEntries.size());
         return InternResult{ index, true };
     }
@@ -142,7 +144,9 @@ private:
     HashFunction hashFunction;
     std::string_view hashName;
     bool dedupeEnabled{ true };
-    std::unordered_map<ContentHashValue, std::vector<uint32_t>> buckets;
+    constexpr static int32_t k_NoEntry{ -1 };
+    foundation::DenseHashMap<ContentHashValue, int32_t> firstEntryByHash;
+    std::vector<int32_t> nextEntryWithSameHash;
     std::vector<PayloadType> uniqueEntries;
     std::vector<std::vector<ProvenanceRecord>> origins;
     InternerStatistics statistics;
