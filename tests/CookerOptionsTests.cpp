@@ -146,7 +146,7 @@ int main()
     runner.BeginSection("each switch sets its option");
     const CookResult<CookerOptions> switches = Parse({ "-o", output, "--target=wgsl", "--no-dedupe", "--verify-deterministic",
                                                        "--no-validate", "--quiet", "--single-threaded", "--dump-sources",
-                                                       "--depfile", "a.slang" });
+                                                       "--depfile", "--root-from-source", "a.slang" });
     if (runner.CheckOk(switches, "every switch at once"))
     {
         runner.CheckEqual(switches->DedupeEnabled, false, "--no-dedupe");
@@ -156,6 +156,7 @@ int main()
         runner.CheckEqual(switches->MultithreadEntryPointCodegen, false, "--single-threaded");
         runner.CheckEqual(switches->DumpSources, true, "--dump-sources");
         runner.CheckEqual(switches->WriteDepfile, true, "--depfile");
+        runner.CheckEqual(switches->RootFromSource, true, "--root-from-source");
     }
 
     runner.BeginSection("--dump-stage adds to the mask, and rejects an unknown stage");

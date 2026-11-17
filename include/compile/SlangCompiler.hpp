@@ -45,6 +45,8 @@ struct SlangCompilerCreateInfo
     /** @brief `PerDescriptorType` makes each worker load the link module that overrides Slang's default heap lowering. */
     manifest::DescriptorHeapLowering HeapLowering{ manifest::DescriptorHeapLowering::None };
     std::string_view TargetName;
+    /** @brief The control arm: each worker parses the root module from source, instead of loading its IR. */
+    bool WorkersLoadRootFromSource{ false };
 };
 
 class CompilePool;

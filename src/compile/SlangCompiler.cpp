@@ -90,6 +90,7 @@ CookError SlangCompiler::Initialize(CompilePool& compile_pool, SlangCompilerCrea
     setupTimings.SerializeModulesMs = MillisecondsSince(serializeStart);
     environment->CreateInfo = std::move(create_info);
     environment->SerializedModules = std::move(serializedModules);
+    environment->RootModule = bootstrapContext->SerializeRootModule();
 
     // one writer, so that the workers never write the cache all at once while other sessions read it
     const std::chrono::steady_clock::time_point cacheStart = std::chrono::steady_clock::now();
@@ -306,6 +307,7 @@ CompileTimings& CompileTimings::operator+=(const CompileTimings& other) noexcept
     WorkerGlobalSessionMs += other.WorkerGlobalSessionMs;
     WorkerGlobalSessionCount += other.WorkerGlobalSessionCount;
     WorkerSetupMs += other.WorkerSetupMs;
+    WorkerRootLoadMs += other.WorkerRootLoadMs;
     WorkerSetupCount += other.WorkerSetupCount;
     WorkerPrepareMs += other.WorkerPrepareMs;
     WorkerPrepareCriticalPathMs += other.WorkerPrepareCriticalPathMs;

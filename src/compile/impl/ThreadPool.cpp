@@ -88,6 +88,7 @@ void ThreadPool::recordBatchTimings(std::span<const ContextTimings> thread_timin
         }
 
         batch_timings.WorkerSetupMs += contextTimings.SetupMs;
+        batch_timings.WorkerRootLoadMs += contextTimings.RootLoadMs;
         batch_timings.WorkerSetupCount += 1u;
         batch_timings.WorkerPrepareMs += contextTimings.PrepareMs;
         batch_timings.IdleWorkerCount += contextTimings.JobsRun == 0u ? 1u : 0u;
@@ -132,7 +133,8 @@ CookError ThreadPool::prepareContext(SlangModuleContext& module_context,
     if (error == CookError::Success)
     {
         setupStart = std::chrono::steady_clock::now();
-        error = module_context.RunWorkerSetup(environment.SerializedModules);
+        error = module_context.RunWorkerSetup(environment.SerializedModules, environment.RootModule);
+        context_timings.RootLoadMs = module_context.RootLoadMilliseconds();
     }
 
     if (error == CookError::Success)

@@ -301,7 +301,10 @@ of two entry points that share a variant needs both to fit, and `SingleFor` is t
 Files: [ThreadPool.cpp](../src/compile/impl/ThreadPool.cpp), [SlangModuleContext.cpp](../src/compile/impl/SlangModuleContext.cpp),
 [SlangCompiler.cpp](../src/compile/SlangCompiler.cpp), [EmbeddedFileSystem.hpp](../src/compile/impl/EmbeddedFileSystem.hpp).
 
-**Thread pool.** Each worker primes its own session from the bootstrap's serialized modules. A worker whose setup fails
+**Thread pool.** Each worker primes its own session from the bootstrap's serialized modules, and then loads the root
+module from its own serialized IR (`CompileEnvironment::RootModule`, with the file path of the source). The root module
+is not in the list that `WriteModuleCache` writes, so a cached root can never satisfy a later cook. A null blob, or
+`--root-from-source`, loads the root from source instead. `CompileTimings::WorkerRootLoadMs` measures the root load. A worker whose setup fails
 reports to its thread sink and keeps its thread, because the latch of each later batch counts it. A job is left over only
 when every thread failed its setup, and it gets `WorkerSetupFailed`. The calling thread helps after dispatch. Setup
 errors print before the job errors, so the cause shows before its effects.

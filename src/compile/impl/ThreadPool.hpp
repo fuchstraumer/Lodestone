@@ -38,6 +38,8 @@ struct CompileEnvironment
     /** The modules of the bootstrap. Read the blobs only: copying a `ComPtr` changes the reference count while
      * workers use it. */
     std::vector<SerializedModule> SerializedModules;
+    /** The root module, apart from the other modules: the module cache never receives it. */
+    SerializedModule RootModule;
     /** Every context loads it once. Empty without shim externs. */
     std::string ShimLinkSource;
     std::vector<ShimFormatLinkSource> ShimFormatSources;
@@ -86,6 +88,7 @@ private:
     {
         double GlobalSessionMs{ 0.0 };
         double SetupMs{ 0.0 };
+        double RootLoadMs{ 0.0 };
         double PrepareMs{ 0.0 };
         uint32_t JobsRun{ 0u };
         bool GlobalSessionCreated{ false };

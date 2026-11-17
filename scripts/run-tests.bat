@@ -20,7 +20,7 @@ setlocal enabledelayedexpansion
 set "CONFIG=%~1"
 if "%CONFIG%"=="" set "CONFIG=RelWithDebInfo"
 set "PRESET=%~2"
-if "%PRESET%"=="" set "PRESET=ninja-msvc"
+if "%PRESET%"=="" set "PRESET=ninja-clang-cl"
 
 set "REPO=%~dp0.."
 set "BIN=%REPO%\build\%PRESET%\tests\%CONFIG%"

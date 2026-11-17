@@ -210,6 +210,7 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
     }
 
     moduleName = canonicalModulePath.stem().string();
+    loadRootFromSource = create_info.WorkersLoadRootFromSource;
 
     return CookError::Success;
 }
@@ -426,6 +427,11 @@ bool SlangModuleContext::CompilesDeliveredForm() const noexcept
     return compilesDeliveredForm;
 }
 
+double SlangModuleContext::RootLoadMilliseconds() const noexcept
+{
+    return rootLoadMs;
+}
+
 std::vector<SerializedModule> SlangModuleContext::SerializeModules() const
 {
     const auto moduleCount = static_cast<int64_t>(session->getLoadedModuleCount());
@@ -447,6 +453,15 @@ std::vector<SerializedModule> SlangModuleContext::SerializeModules() const
         serializedModules.emplace_back(moduleNameStr, modulePath, result < 0 ? nullptr : blob);
     }
     return serializedModules;
+}
+
+SerializedModule SlangModuleContext::SerializeRootModule() const
+{
+    Slang::ComPtr<slang::IBlob> blob;
+    const SlangResult result = rootModule->serialize(blob.writeRef());
+
+    // the path of the source, so that diagnostics and dependency paths of a worker stay meaningful
+    return SerializedModule{ moduleName, rootModule->getFilePath(), result < 0 ? nullptr : blob };
 }
 
 CookError WriteModuleCache(std::span<const SerializedModule> serialized_modules, DiagnosticSink& sink)
@@ -473,7 +488,8 @@ CookError WriteModuleCache(std::span<const SerializedModule> serialized_modules,
     return result;
 }
 
-CookError SlangModuleContext::RunWorkerSetup(std::span<const SerializedModule> serialized_modules)
+CookError SlangModuleContext::RunWorkerSetup(std::span<const SerializedModule> serialized_modules,
+                                             const SerializedModule& root_module)
 {
     CookError error = primeSessionFromCache(serialized_modules);
     if (error != CookError::Success)
@@ -481,7 +497,10 @@ CookError SlangModuleContext::RunWorkerSetup(std::span<const SerializedModule> s
         return error;
     }
 
-    error = loadRootModule();
+    const std::chrono::steady_clock::time_point rootStart = std::chrono::steady_clock::now();
+    const bool rootFromIr = !loadRootFromSource && root_module.Blob != nullptr;
+    error = rootFromIr ? loadRootModuleFromIr(root_module) : loadRootModule();
+    rootLoadMs = std::chrono::duration<double, std::milli>{ std::chrono::steady_clock::now() - rootStart }.count();
     if (error != CookError::Success)
     {
         return error;
@@ -530,6 +549,21 @@ CookError SlangModuleContext::primeSessionFromCache(std::span<const SerializedMo
         }
     }
 
+    return CookError::Success;
+}
+
+CookError SlangModuleContext::loadRootModuleFromIr(const SerializedModule& root_module)
+{
+    Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+    rootModule = session->loadModuleFromIRBlob(root_module.Name.c_str(),
+                                               root_module.Path.c_str(),
+                                               root_module.Blob,
+                                               diagnosticsBlob.writeRef());
+    ReportDiagnostics(*diagnosticSink, "SlangModuleContext::loadRootModuleFromIr", diagnosticsBlob);
+    if (rootModule == nullptr)
+    {
+        return CookError::ModuleLoadFailed;
+    }
     return CookError::Success;
 }
 

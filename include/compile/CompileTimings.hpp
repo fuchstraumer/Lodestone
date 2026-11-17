@@ -17,6 +17,8 @@ struct CompileTimings
     /** Worker session priming and the shim, format, and heap link modules. Excludes the global session. */
     double WorkerSetupMs{ 0.0 };
     uint32_t WorkerSetupCount{ 0u };
+    /** The part of `WorkerSetupMs` that loads the root module. */
+    double WorkerRootLoadMs{ 0.0 };
     /** The whole `Initialize` and setup of each worker context, including the global session. */
     double WorkerPrepareMs{ 0.0 };
     /** For each batch, the largest prepare time of one context. The batch waits for the slowest context. */

@@ -7,7 +7,7 @@ REM that names a different toolset, and every SPIRV-Tools target then fails.
 setlocal
 
 set "PRESET=%~1"
-if "%PRESET%"=="" set "PRESET=ninja-msvc"
+if "%PRESET%"=="" set "PRESET=ninja-clang-cl"
 
 set "REPO=%~dp0.."
 set "VCVARS=C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"

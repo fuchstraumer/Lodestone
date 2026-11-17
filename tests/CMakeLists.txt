@@ -288,6 +288,11 @@ add_lodestone_unit_test(EnumTagDecodeTest EnumTagDecodeTests.cpp)
 add_lodestone_unit_test(ManifestIndexTest ManifestIndexTests.cpp)
 add_lodestone_unit_test(MergedLayoutTest MergedLayoutTests.cpp)
 add_lodestone_unit_test(ResourceReportTest ResourceReportTests.cpp)
+# Worker sessions load the root module from IR, and --root-from-source parses it from source. Each case cooks both ways and compares
+# every artifact, the stage dumps included, byte for byte.
+add_lodestone_unit_test(RootModuleIrTest RootModuleIrTests.cpp)
+target_compile_definitions(RootModuleIrTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets")
 
 # Standalone Slang-only probe (not a unit test). It reproduces the Debug-only Slang assert
 # "duplicate global instruction" on the modules in tests/assets/SlangPrelinkRepro. Run it after a

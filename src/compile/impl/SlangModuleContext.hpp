@@ -85,13 +85,23 @@ public:
     /** @brief Returns every loaded module, serialized in dependency order. */
     [[nodiscard]] std::vector<SerializedModule> SerializeModules() const;
 
-    /** @brief Primes a worker's session from the bootstrap's serialized modules. */
-    [[nodiscard]] CookError RunWorkerSetup(std::span<const SerializedModule> serialized_modules);
+    /** @brief Serializes the root module. It is kept apart from `SerializeModules` on purpose: the module cache must
+      * never receive it, because the source of the root module is the truth for every cook. */
+    [[nodiscard]] SerializedModule SerializeRootModule() const;
+
+    /** @brief Primes a worker's session from the bootstrap's serialized modules, and loads the root module from its
+      * IR. The root module loads from source instead when its blob is null or the create info asks for it. */
+    [[nodiscard]] CookError RunWorkerSetup(std::span<const SerializedModule> serialized_modules,
+                                           const SerializedModule& root_module);
+
+    /** @brief Milliseconds that `RunWorkerSetup` spent on the root module. */
+    [[nodiscard]] double RootLoadMilliseconds() const noexcept;
 
 private:
 
     [[nodiscard]] CookError primeSessionFromCache(std::span<const SerializedModule> serialized_modules);
     [[nodiscard]] CookError loadRootModule();
+    [[nodiscard]] CookError loadRootModuleFromIr(const SerializedModule& root_module);
     [[nodiscard]] CookError readDependencySourceStrings();
     [[nodiscard]] CookError enumerateEntryPoints();
     // fixed: base components are added in this one place only
@@ -157,6 +167,8 @@ private:
     AccessModel bufferForm{ AccessModel::Invalid };
     TargetLanguage language{ TargetLanguage::Invalid };
     bool compilesDeliveredForm{ false };
+    bool loadRootFromSource{ false };
+    double rootLoadMs{ 0.0 };
     DiagnosticSink* diagnosticSink{ nullptr };
 };
 

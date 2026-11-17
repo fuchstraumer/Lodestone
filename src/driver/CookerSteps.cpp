@@ -18,11 +18,12 @@ namespace
 {
     PhaseTimings g_ProcessPhaseTimings{};
 
-    constexpr std::array<double CompileTimings::*, 9> k_CompileMsFields
+    constexpr std::array<double CompileTimings::*, 10> k_CompileMsFields
     {
         &CompileTimings::BootstrapGlobalSessionMs,
         &CompileTimings::WorkerGlobalSessionMs,
         &CompileTimings::WorkerSetupMs,
+        &CompileTimings::WorkerRootLoadMs,
         &CompileTimings::WorkerPrepareMs,
         &CompileTimings::WorkerPrepareCriticalPathMs,
         &CompileTimings::BootstrapCompileMs,
@@ -219,12 +220,12 @@ void WriteTestTimingCsvRow(std::string_view test_name, double total_test_ms)
                 "worker_global_session_ms,worker_global_session_count,"
                 "worker_setup_ms,worker_setup_count,worker_prepare_ms,worker_prepare_critical_path_ms,"
                 "idle_worker_count,bootstrap_compile_ms,serialize_modules_ms,write_module_cache_ms,"
-                "symbol_table_ms,code_read_ms,code_read_forms,code_read_repeats,code_read_unique\n";
+                "symbol_table_ms,code_read_ms,code_read_forms,code_read_repeats,code_read_unique,worker_root_load_ms\n";
     }
 
     const CompileTimings& compile = timings.Compile;
     file << std::format("{},{},{},{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},"
-                        "{:.4f},{},{:.4f},{},{:.4f},{},{:.4f},{:.4f},{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{},{},{}\n",
+                        "{:.4f},{},{:.4f},{},{:.4f},{},{:.4f},{:.4f},{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{},{},{},{:.4f}\n",
                         compiler,
                         buildConfig,
                         testName,
@@ -258,7 +259,8 @@ void WriteTestTimingCsvRow(std::string_view test_name, double total_test_ms)
                         timings.CodeReadMs,
                         timings.CodeReadForms,
                         timings.CodeReadRepeats,
-                        timings.CodeReadUnique);
+                        timings.CodeReadUnique,
+                        compile.WorkerRootLoadMs);
 }
 
 namespace

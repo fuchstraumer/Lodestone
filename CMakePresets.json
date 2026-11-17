@@ -46,6 +46,15 @@
                 "CMAKE_C_COMPILER": "clang.exe",
                 "CMAKE_CXX_COMPILER": "clang++.exe"
             }
+        },
+        {
+            "name": "ninja-clang-cl-client",
+            "displayName": "Win64 Clang-CL, client only",
+            "description": "The client library and manifest_dump. No Vulkan SDK, no Slang, and no Tint.",
+            "inherits": "ninja-clang-cl",
+            "cacheVariables": {
+                "LODESTONE_BUILD_COOKER": "OFF"
+            }
         }
     ],
     "buildPresets": [

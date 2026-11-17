@@ -28,6 +28,7 @@ namespace
     constexpr std::string_view k_UsageText =
         "Usage: lodestone --output <directory> --target=<name> [--O<level>] [--no-validate] [--quiet]\n"
         "                 [--cache-dir <path>] [--include-dir <path>]... [--single-threaded] [--no-dedupe]\n"
+        "                 [--root-from-source]\n"
         "                 [--verify-deterministic] [--dump-stage=<name>]\n"
         "                 [--policy-file <path>]... [--depfile] <module.slang>...\n"
         "  --output, -o    output directory (required)\n"
@@ -41,6 +42,7 @@ namespace
         "                  and its parent. Repeat it for more than one\n"
         "  --single-threaded disable multi-threaded entry point codegen\n"
         "  --no-dedupe     disable content deduplication\n"
+        "  --root-from-source worker sessions parse the root module from source, and do not load its serialized IR\n"
         "  --verify-deterministic cook twice and compare all artifacts\n"
         "  --dump-stage=<name> write one stage of the pipeline as JSON, beside the other artifacts.\n"
         "                  Repeat the flag for more than one stage. Names: space, variants, raw,\n"
@@ -134,6 +136,11 @@ namespace
         options.DedupeEnabled = false;
     }
 
+    void EnableRootFromSource(CookerOptions& options) noexcept
+    {
+        options.RootFromSource = true;
+    }
+
     void EnableVerifyDeterminism(CookerOptions& options) noexcept
     {
         options.VerifyDeterministic = true;
@@ -164,9 +171,10 @@ namespace
         options.WriteDepfile = true;
     }
 
-    constexpr std::array<SwitchFlag, 7u> k_SwitchFlags
+    constexpr std::array<SwitchFlag, 8u> k_SwitchFlags
     {
         SwitchFlag{ .Name = "--no-dedupe", .Apply = &DisableDedupe },
+        SwitchFlag{ .Name = "--root-from-source", .Apply = &EnableRootFromSource },
         SwitchFlag{ .Name = "--verify-deterministic", .Apply = &EnableVerifyDeterminism },
         SwitchFlag{ .Name = "--no-validate", .Apply = &DisableValidateAgainstEmittedText },
         SwitchFlag{ .Name = "--quiet", .Apply = &DisableReflectionReports },

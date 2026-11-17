@@ -19,7 +19,7 @@ Usage:
     python scripts/check-known-good.py
     python scripts/check-known-good.py --accept
     python scripts/check-known-good.py --module tests/assets/EntryPointParams.slang
-    python scripts/check-known-good.py --config Debug --preset ninja-msvc
+    python scripts/check-known-good.py --config Debug --preset ninja-clang-cl
 
 Exit code 0 means every stage matched. Exit code 1 means at least one differed, or the cook failed.
 
@@ -189,7 +189,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--module", default=None,
                         help="cook only this module, instead of the default set")
-    parser.add_argument("--preset", default="ninja-msvc", help="build preset directory")
+    parser.add_argument("--preset", default="ninja-clang-cl", help="build preset directory")
     parser.add_argument("--config", default="RelWithDebInfo", help="Debug or RelWithDebInfo")
     parser.add_argument(
         "--accept",

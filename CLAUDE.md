@@ -29,7 +29,7 @@ them: `DAWN_FETCH_DEPENDENCIES` fetches the list in Dawn's `tools/fetch_dawn_dep
 `git submodule deinit -f <path>` for each of them inside `third_party/dawn`.
 
 ```bash
-cmake --preset ninja-msvc
+cmake --preset ninja-clang-cl
 ```
 
 ```bash
@@ -50,7 +50,8 @@ keeps it. Do not change which one the cache holds without a reconfigure.
 `CMakeLists.txt` that adds or removes a target. A bare `cmake --preset` writes a cache that names a
 different toolset, and it leaves a build tree that no longer builds.
 
-Presets: `ninja-msvc` and `ninja-clang-cl`. Configurations: `Debug` and `RelWithDebInfo`.
+Presets: `ninja-clang-cl` (the default of every script) and `ninja-msvc`. Configurations: `Debug` and `RelWithDebInfo`.
+Clang is faster than MSVC in every configuration, so the scripts default to it (2026-11-16).
 Clang-CL with the MSVC frontend variant is a hard configure error.
 
 `LODESTONE_BUILD_COOKER` (default `NOT EMSCRIPTEN`) selects the cooker half. With it OFF, the build adds
@@ -66,8 +67,8 @@ that `LODESTONE_COOKER_EXECUTABLE` names. A build with no cooker (Emscripten) mu
 target property `LODESTONE_MANIFEST` gives the manifest path. `HOST_TYPES <include>` turns on the host header
 (`--host-types`, with `--host-namespace` set to the cook name, which must be a C++ identifier). The header is a byproduct of the
 cook step, and the target property `LODESTONE_HOST_HEADER` gives its path. A consumer target depends on the cook with
-`add_dependencies`. The console builds whenever the cooker does. The preset `ninja-msvc-client` turns the cooker off:
-`scripts\configure.bat ninja-msvc-client`, then `scripts\build.bat RelWithDebInfo ninja-msvc-client`.
+`add_dependencies`. The console builds whenever the cooker does. The presets `ninja-clang-cl-client` and `ninja-msvc-client` turn the cooker off:
+`scripts\configure.bat ninja-clang-cl-client`, then `scripts\build.bat RelWithDebInfo ninja-clang-cl-client`.
 
 `LODESTONE_ISOLATE_SLANG` (default ON) builds Slang and SPIRV-Tools in their own build trees under
 `build/<preset>/_isolated/`, through `ExternalProject` (`cmake/IsolatedSlang.cmake`). No flag or target of this project
@@ -114,14 +115,14 @@ It runs each executable directly and prints one line for each. A failing target 
 with its output shown. The script compares each exit code with 0. A crash exits with a negative code
 (0xC0000409 from `std::terminate`), and the old check `if errorlevel 1` reported such a crash as a pass.
 
-`ctest --test-dir build/ninja-msvc -C Debug -R AttributeExpressionTest --output-on-failure` runs one test.
+`ctest --test-dir build/ninja-clang-cl -C Debug -R AttributeExpressionTest --output-on-failure` runs one test.
 
 **Do not pipe a long run into a pager or into PowerShell `Select-Object`.** The whole stream is held
 until the command ends. The run then prints nothing for minutes, and it looks like a deadlock. A test
 that stops with an assertion also loses its buffered output.
 
 Each test target is also a standalone executable. Run it directly to debug it:
-`build/ninja-msvc/tests/Debug/ManifestIndexTest.exe`. A cook test needs a command line. With no argument
+`build/ninja-clang-cl/tests/Debug/ManifestIndexTest.exe`. A cook test needs a command line. With no argument
 it exits 1 on `NoOutputSpecified`, which reads like a failure rather than a usage error.
 
 There is no test framework. `tests/TestHarness.hpp` gives a counter, `Check(condition, claim)`, `CheckEqual`,
@@ -160,7 +161,7 @@ itself. A function in the cooker library that can report takes a `DiagnosticSink
 `ParseCommandLine` in `src/driver/CookerOptions.cpp` parses the flags, and `GetUsageText` prints them:
 `--output/-o`, `--cache-dir`, `--include-dir/-I <path>` (repeatable),
 `--O0` to `--O3`, `--g0` to `--g3` (Slang's debug information level), `--target=<name>`, `--no-validate`, `--quiet`,
-`--single-threaded`, `--no-dedupe`, `--verify-deterministic`, `--dump-stage=<name>`, `--dump-sources`,
+`--single-threaded`, `--no-dedupe`, `--root-from-source`, `--verify-deterministic`, `--dump-stage=<name>`, `--dump-sources`,
 `--host-types=<include>`, `--host-namespace=<name>`, and `--depfile`. `--host-types` and `--host-namespace` take their value
 after `=`, and each needs the other (`HostNamespaceMissing`; a namespace that is not a C++ identifier or a `::` path of
 identifiers is `HostNamespaceInvalid`). `--depfile` writes `ShaderLibrary.d`, a Makefile-form depfile that names every file Slang
@@ -474,7 +475,10 @@ number would state that every target must supply one. A target supplies a valida
    `SlangCompiler::Compile` then runs once for the whole variant set, and returns one
    `CookResult<RawVariant>` for each variant. A `ThreadPool` spreads the variants across workers.
    Each worker thread keeps one global session for the whole cook, and makes one `SlangModuleContext` for each
-   batch that gives it a job. Each job runs a `SlangVariantCompiler` and then a `SlangReflector`. Output is
+   batch that gives it a job. The context loads the dependencies and the root module from the serialized IR of the
+   bootstrap, and the root module is not parsed again. The module cache never receives the root module, because its
+   source is the truth. `--root-from-source` is the control arm: each worker then parses the root module from source,
+   and `RootModuleIrTest` compares every artifact of the two arms. Each job runs a `SlangVariantCompiler` and then a `SlangReflector`. Output is
    `RawVariant`. Every `[ls_*]` argument comes back as the string the author wrote, because evaluating one is stage 4's job.
 4. **Resolve.** `ResolveVariant` in `model/ResolveStage.cpp` reads the `[ls_*]` attributes and evaluates each
    size expression against a `ResolveContext`. Output is `CompiledVariant`.

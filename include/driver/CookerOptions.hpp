@@ -48,6 +48,8 @@ struct CookerOptions
     bool MultithreadEntryPointCodegen{ true };
     /** The control arm: every artifact takes its own index. */
     bool DedupeEnabled{ true };
+    /** The control arm: worker sessions parse the root module from source, and do not load its IR. */
+    bool RootFromSource{ false };
     /** Cooks twice into memory and compares, to catch unordered containers reaching the output. */
     bool VerifyDeterministic{ false };
     uint32_t DumpStageMask{ 0u };
