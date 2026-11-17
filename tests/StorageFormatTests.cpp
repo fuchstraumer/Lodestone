@@ -8,6 +8,7 @@
 #include "ShaderManifestIndex.hpp"
 #include "VariantKey.hpp"
 #include "compile/RawLibrary.hpp"
+#include "compile/CompilePool.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "driver/CookerDriver.hpp"
 #include "driver/CookerOptions.hpp"
@@ -37,11 +38,11 @@ using namespace lodestone;
 std::vector<std::string> ReadEnumCases(const std::filesystem::path& module_path, const std::filesystem::path& cache_directory)
 {
     RecordingDiagnosticSink sink;
+    CompilePool pool{ false };
     SlangCompiler compiler;
     SlangCompilerCreateInfo createInfo;
     createInfo.ModulePath = module_path;
     createInfo.ModuleCacheDirectory = cache_directory;
-    createInfo.MultithreadVariantBuild = false;
     createInfo.ExpectedBatchSize = 1u;
     createInfo.Language = TargetLanguage::Spirv;
     createInfo.SlangProfileName = "spirv_1_5";
@@ -49,7 +50,7 @@ std::vector<std::string> ReadEnumCases(const std::filesystem::path& module_path,
                                   .Texture = AccessModel::Bound,
                                   .Sampler = AccessModel::Bound,
                                   .StorageTexture = AccessModel::Bound };
-    if (compiler.Initialize(createInfo, sink) != CookError::Success)
+    if (compiler.Initialize(pool, createInfo, sink) != CookError::Success)
     {
         return {};
     }

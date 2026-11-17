@@ -5,6 +5,7 @@
 #include "ShaderLibraryTypes.hpp"
 #include "ShaderManifestFormat.hpp"
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <utility>
 #include <span>
@@ -152,8 +153,24 @@ struct BindingComparison
     [[nodiscard]] bool Matches() const noexcept { return Mismatches.empty(); }
 };
 
+/** @brief Everything that one read of emitted code gives, before any comparison with reflection. It depends on the code
+ * bytes, the profile, and the `validate` flag of the read, and on nothing else, so a read can be shared by every form with
+ * the same code. A validator derives from this class to keep what its comparison needs. */
+class ParsedEmittedCode
+{
+public:
+    ParsedEmittedCode() = default;
+    virtual ~ParsedEmittedCode();
+    ParsedEmittedCode(const ParsedEmittedCode&) = delete;
+    ParsedEmittedCode& operator=(const ParsedEmittedCode&) = delete;
+    ParsedEmittedCode(ParsedEmittedCode&&) = delete;
+    ParsedEmittedCode& operator=(ParsedEmittedCode&&) = delete;
+
+    EmittedCodeFacts Facts;
+};
+
 /** @brief A second opinion on what an entry point declared. The emitted code decides placements, and reflection
- * decides sizes and types. */
+ * decides sizes and types. Every function is safe to call from several threads at once, for different code. */
 class ResolvedLibraryValidator
 {
 public:
@@ -164,7 +181,17 @@ public:
     ResolvedLibraryValidator(ResolvedLibraryValidator&&) = delete;
     ResolvedLibraryValidator& operator=(ResolvedLibraryValidator&&) = delete;
 
-    /** @brief Splits `used` into the bound bindings, sorted, and the stored values, then calls `validateEntryPoint`. */
+    /** @brief Reads the code alone. With `validate`, a target that has a validity check runs it first, and the result
+     * can be compared with `CompareEmittedCode`. Without it, the result has the facts only, for `--no-validate`. */
+    [[nodiscard]] CookResult<std::unique_ptr<const ParsedEmittedCode>> ParseEmittedCode(std::span<const std::byte> target_code,
+                                                                                         bool validate,
+                                                                                         DiagnosticSink& sink) const;
+    /** @brief Splits `used` into the bound bindings, sorted, and the stored values, then compares them with a read that
+     * was made with `validate`. */
+    [[nodiscard]] BindingComparison CompareEmittedCode(const ParsedEmittedCode& parsed,
+                                                       std::span<const ReflectedBinding*> used,
+                                                       DiagnosticSink& sink) const;
+    /** @brief `ParseEmittedCode` with `validate`, then `CompareEmittedCode`. */
     [[nodiscard]] CookResult<BindingComparison> ValidateEntryPoint(std::span<const std::byte> target_code,
                                                                    std::span<const ReflectedBinding*> used,
                                                                    DiagnosticSink& sink) const;
@@ -173,12 +200,14 @@ public:
                                                                     DiagnosticSink& sink) const;
 
 protected:
-    [[nodiscard]] virtual CookResult<BindingComparison> validateEntryPoint(std::span<const std::byte> target_code,
-                                                                           std::span<const ReflectedBinding*> bound,
-                                                                           std::span<const ReflectedBinding*> stored,
-                                                                           DiagnosticSink& sink) const = 0;
-    [[nodiscard]] virtual CookResult<EmittedCodeFacts> readEmittedCodeFacts(std::span<const std::byte> target_code,
-                                                                            DiagnosticSink& sink) const = 0;
+    [[nodiscard]] virtual CookResult<std::unique_ptr<const ParsedEmittedCode>> parseEmittedCode(
+        std::span<const std::byte> target_code,
+        bool validate,
+        DiagnosticSink& sink) const = 0;
+    [[nodiscard]] virtual BindingComparison compareEmittedCode(const ParsedEmittedCode& parsed,
+                                                               std::span<const ReflectedBinding*> bound,
+                                                               std::span<const ReflectedBinding*> stored,
+                                                               DiagnosticSink& sink) const = 0;
 };
 
 struct TargetProfile

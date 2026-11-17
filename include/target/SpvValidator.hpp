@@ -6,6 +6,7 @@
 #include "ShaderManifestFormat.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
 
@@ -26,12 +27,13 @@ public:
     SpvValidator(const SpvValidator&) = delete;
     SpvValidator& operator=(const SpvValidator&) = delete;
 protected:
-    [[nodiscard]] CookResult<BindingComparison> validateEntryPoint(std::span<const std::byte> source_code,
-                                                                   std::span<const ReflectedBinding*> bindings,
-                                                                   std::span<const ReflectedBinding*> stored,
-                                                                   DiagnosticSink& sink) const final;
-    [[nodiscard]] CookResult<EmittedCodeFacts> readEmittedCodeFacts(std::span<const std::byte> source_code,
-                                                                    DiagnosticSink& sink) const override;
+    [[nodiscard]] CookResult<std::unique_ptr<const ParsedEmittedCode>> parseEmittedCode(std::span<const std::byte> source_code,
+                                                                                         bool validate,
+                                                                                         DiagnosticSink& sink) const final;
+    [[nodiscard]] BindingComparison compareEmittedCode(const ParsedEmittedCode& parsed,
+                                                       std::span<const ReflectedBinding*> bound,
+                                                       std::span<const ReflectedBinding*> stored,
+                                                       DiagnosticSink& sink) const final;
 private:
     spv_context_t* context{ nullptr };
     std::optional<uint32_t> descriptorHeapSet;

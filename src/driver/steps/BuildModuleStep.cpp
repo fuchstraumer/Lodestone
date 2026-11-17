@@ -7,8 +7,10 @@
 #include "compile/SlangCompiler.hpp"
 #include "driver/CookerOptions.hpp"
 #include "driver/CookerSteps.hpp"
+#include "driver/ParallelFor.hpp"
 #include "emit/StageDump.hpp"
 #include "model/CookedLibrary.hpp"
+#include "model/ContentHash.hpp"
 #include "model/DeliveredForm.hpp"
 #include "model/ResolveStage.hpp"
 #include "model/ShaderDataSchema.hpp"
@@ -16,6 +18,7 @@
 #include "permute/PermutationSpace.hpp"
 #include "target/TargetProfile.hpp"
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstddef>
@@ -24,6 +27,7 @@
 #include <format>
 #include <functional>
 #include <iterator>
+#include <memory>
 #include <optional>
 #include <ranges>
 #include <span>
@@ -31,6 +35,7 @@
 #include <string_view>
 #include <utility>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 namespace lodestone
@@ -38,6 +43,57 @@ namespace lodestone
 
 namespace
 {
+    /** One form that the read pass compares with the reflection of its variant. */
+    struct FormRead
+    {
+        const CompiledVariant* Variant{ nullptr };
+        const CompiledEntryPoint* EntryPoint{ nullptr };
+        EntryPointCode* Form{ nullptr };
+        std::string_view FormName;
+    };
+
+    /** What one form read produced: the comparison outcome, and every record that the read and the comparison reported. */
+    struct FormReadResult
+    {
+        CookResult<bool> Matched{ true };
+        RecordingDiagnosticSink Diagnostics;
+    };
+
+    /** The forms of one environment that have the same code bytes. A hash picks the bucket, and a byte comparison decides. */
+    struct CodeGroup
+    {
+        std::span<const std::byte> Code;
+        std::vector<int32_t> Forms;
+    };
+
+    // lists the forms that the validator reads, variant by variant. `out_first_form` gets the index of the first form
+    // of each variant, and one more entry at the end
+    std::vector<FormRead> ListFormReads(std::span<CompiledVariant> variants, std::vector<int32_t>& out_first_form);
+    // the groups are sorted with the largest code first, so the longest reads start first
+    std::vector<CodeGroup> GroupFormsByCode(std::span<const FormRead> reads);
+    // reads each distinct code once, in parallel. Each form then compares its group's read with its own reflection
+    void ReadCodeGroups(const TargetProfile& target,
+                        bool validate,
+                        bool multithread,
+                        std::span<const FormRead> reads,
+                        std::span<const CodeGroup> groups,
+                        std::span<FormReadResult> results);
+    void ReadCodeGroup(const TargetProfile& target,
+                       bool validate,
+                       std::span<const FormRead> reads,
+                       const CodeGroup& group,
+                       std::span<FormReadResult> results);
+    // reports the records of the forms of one variant in order, and stops at the first error. Returns the number of
+    // entry points with a reflection mismatch
+    CookResult<uint32_t> TakeVariantReads(const CompiledVariant& variant,
+                                          std::span<const FormReadResult> results,
+                                          DiagnosticSink& diagnostics);
+    // compares one form with the read of its code. Returns false for a reflection mismatch, which it reports
+    CookResult<bool> CompareParsedForm(const TargetProfile& target,
+                                       bool validate,
+                                       const ParsedEmittedCode& parsed,
+                                       const FormRead& read,
+                                       DiagnosticSink& diagnostics);
     void RecordVariantStatistics(const CompiledVariant& variant, CookStatistics& statistics);
     void ReportEntryPointReflection(const CompiledVariant& variant,
                                     size_t entry_point_index,
@@ -45,20 +101,6 @@ namespace
     void ReportVariantIfRequested(const CookerOptions& options,
                                   const CompiledVariant& variant,
                                   DiagnosticSink& diagnostics);
-    // always reads the cook output facts of each form. With `validate`, also runs the cross-check on the same parse and
-    // returns the mismatch count. A target with no reader fails only when `validate` is set
-    CookResult<uint32_t> ReadEmittedCode(const TargetProfile& target,
-                                         bool validate,
-                                         CompiledVariant& variant,
-                                         DiagnosticSink& diagnostics);
-    // reads one form of one entry point. Returns false for a reflection mismatch, which it reports
-    CookResult<bool> ReadEmittedForm(const TargetProfile& target,
-                                     bool validate,
-                                     const CompiledVariant& variant,
-                                     const CompiledEntryPoint& entry_point,
-                                     EntryPointCode& form,
-                                     std::string_view form_name,
-                                     DiagnosticSink& diagnostics);
     // maps placement pairs to positions in the used bindings. Pairs that do not resolve fail, since a dropped pair
     // would hide a sampler constraint
     CookError ResolveSamplerTexturePairs(const CompiledVariant& variant,
@@ -322,65 +364,155 @@ namespace
         }
     }
 
-    CookResult<uint32_t> ReadEmittedCode(const TargetProfile& target,
-                                         bool validate,
-                                         CompiledVariant& variant,
-                                         DiagnosticSink& diagnostics)
+    std::vector<FormRead> ListFormReads(std::span<CompiledVariant> variants, std::vector<int32_t>& out_first_form)
     {
-        if (target.Validator == nullptr)
+        std::vector<FormRead> reads;
+        out_first_form.reserve(variants.size() + 1u);
+        for (CompiledVariant& variant : variants)
         {
-            if (validate)
+            out_first_form.push_back(static_cast<int32_t>(reads.size()));
+            for (CompiledEntryPoint& entryPoint : variant.EntryPoints)
             {
-                return std::unexpected(CookError::TargetValidatorUnavailable);
+                reads.push_back(FormRead{ .Variant = &variant,
+                                          .EntryPoint = &entryPoint,
+                                          .Form = &entryPoint.Delivered,
+                                          .FormName = "delivered" });
+                if (entryPoint.Base.has_value())
+                {
+                    reads.push_back(FormRead{ .Variant = &variant,
+                                              .EntryPoint = &entryPoint,
+                                              .Form = &*entryPoint.Base,
+                                              .FormName = "base" });
+                }
+            }
+        }
+        out_first_form.push_back(static_cast<int32_t>(reads.size()));
+
+        return reads;
+    }
+
+    std::vector<CodeGroup> GroupFormsByCode(std::span<const FormRead> reads)
+    {
+        std::vector<CodeGroup> groups;
+        std::unordered_map<ContentHashValue, std::vector<size_t>> buckets;
+        buckets.reserve(reads.size());
+
+        for (auto&& [formIndex, read] : std::views::enumerate(reads))
+        {
+            const std::span<const std::byte> code = read.Form->Code;
+            std::vector<size_t>& bucket = buckets[HashBytes(code)];
+            const auto match = std::ranges::find_if(bucket,
+                                                    [&groups, code](size_t group_index)
+                                                    { return std::ranges::equal(groups[group_index].Code, code); });
+            if (match != bucket.end())
+            {
+                groups[*match].Forms.push_back(static_cast<int32_t>(formIndex));
+                continue;
             }
 
+            bucket.push_back(groups.size());
+            groups.push_back(CodeGroup{ .Code = code, .Forms = { static_cast<int32_t>(formIndex) } });
+        }
+
+        std::ranges::stable_sort(groups, std::greater{}, [](const CodeGroup& group) { return group.Code.size(); });
+
+        return groups;
+    }
+
+    void ReadCodeGroups(const TargetProfile& target,
+                        bool validate,
+                        bool multithread,
+                        std::span<const FormRead> reads,
+                        std::span<const CodeGroup> groups,
+                        std::span<FormReadResult> results)
+    {
+        auto readGroup = [&](int32_t group_index)
+        {
+            ReadCodeGroup(target, validate, reads, groups[static_cast<size_t>(group_index)], results);
+        };
+
+        ParallelFor(static_cast<int32_t>(groups.size()), multithread, readGroup);
+    }
+
+    void ReadCodeGroup(const TargetProfile& target,
+                       bool validate,
+                       std::span<const FormRead> reads,
+                       const CodeGroup& group,
+                       std::span<FormReadResult> results)
+    {
+        RecordingDiagnosticSink parseSink;
+        const CookResult<std::unique_ptr<const ParsedEmittedCode>> parsed =
+            target.Validator->ParseEmittedCode(group.Code, validate, parseSink);
+        const RecordingDiagnosticSink& parseRecords = parseSink;
+
+        for (const int32_t formIndex : group.Forms)
+        {
+            FormReadResult& result = results[static_cast<size_t>(formIndex)];
+            for (const Diagnostic& record : parseRecords.Records())
+            {
+                result.Diagnostics.Report(record);
+            }
+
+            result.Matched = parsed ? CompareParsedForm(target,
+                                                        validate,
+                                                        **parsed,
+                                                        reads[static_cast<size_t>(formIndex)],
+                                                        result.Diagnostics)
+                                    : CookResult<bool>{ std::unexpected(parsed.error()) };
+        }
+    }
+
+    CookResult<uint32_t> TakeVariantReads(const CompiledVariant& variant,
+                                          std::span<const FormReadResult> results,
+                                          DiagnosticSink& diagnostics)
+    {
+        // a target with no validator reads nothing
+        if (results.empty())
+        {
             return 0u;
         }
 
         uint32_t mismatchCount = 0u;
-
-        for (CompiledEntryPoint& entryPoint : variant.EntryPoints)
+        size_t position = 0u;
+        for (const CompiledEntryPoint& entryPoint : variant.EntryPoints)
         {
-
-            CookResult<bool> matched =
-                ReadEmittedForm(target, validate, variant, entryPoint, entryPoint.Delivered, "delivered", diagnostics);
-            if (matched && entryPoint.Base.has_value())
+            const size_t formCount = entryPoint.Base.has_value() ? 2u : 1u;
+            bool matched = true;
+            for (const FormReadResult& result : results.subspan(position, formCount))
             {
-                const CookResult<bool> baseMatched =
-                    ReadEmittedForm(target, validate, variant, entryPoint, *entryPoint.Base, "base", diagnostics);
-                matched = baseMatched ? CookResult<bool>{ *matched && *baseMatched } : baseMatched;
+                for (const Diagnostic& record : result.Diagnostics.Records())
+                {
+                    diagnostics.Report(record);
+                }
+
+                if (!result.Matched)
+                {
+                    return std::unexpected(result.Matched.error());
+                }
+                matched = matched && *result.Matched;
             }
 
-            if (!matched)
-            {
-                return std::unexpected(matched.error());
-            }
-
-            mismatchCount += *matched ? 0u : 1u;
-
+            position += formCount;
+            mismatchCount += matched ? 0u : 1u;
         }
 
         return mismatchCount;
     }
 
-    CookResult<bool> ReadEmittedForm(const TargetProfile& target,
-                                     bool validate,
-                                     const CompiledVariant& variant,
-                                     const CompiledEntryPoint& entry_point,
-                                     EntryPointCode& form,
-                                     std::string_view form_name,
-                                     DiagnosticSink& diagnostics)
+    CookResult<bool> CompareParsedForm(const TargetProfile& target,
+                                       bool validate,
+                                       const ParsedEmittedCode& parsed,
+                                       const FormRead& read,
+                                       DiagnosticSink& diagnostics)
     {
+        const CompiledVariant& variant = *read.Variant;
+        const CompiledEntryPoint& entry_point = *read.EntryPoint;
+        EntryPointCode& form = *read.Form;
+
         if (!validate)
         {
-            const CookResult<EmittedCodeFacts> facts = target.Validator->ReadEmittedCodeFacts(form.Code, diagnostics);
-            if (!facts)
-            {
-                return std::unexpected(facts.error());
-            }
-
-            KeepDeclaredBindings(variant.Bindings, form, facts->DeclaredPlacements);
-            const CookError applied = ApplyEmittedCodeFacts(target, variant, entry_point, form, *facts, diagnostics);
+            KeepDeclaredBindings(variant.Bindings, form, parsed.Facts.DeclaredPlacements);
+            const CookError applied = ApplyEmittedCodeFacts(target, variant, entry_point, form, parsed.Facts, diagnostics);
             if (applied != CookError::Success)
             {
                 return std::unexpected(applied);
@@ -398,30 +530,26 @@ namespace
                                                     std::views::transform(extractBinding) |
                                                     std::ranges::to<std::vector>();
 
-        CookResult<BindingComparison> comparison = target.Validator->ValidateEntryPoint(form.Code, used, diagnostics);
-        if (!comparison)
-        {
-            return std::unexpected(comparison.error());
-        }
+        BindingComparison comparison = target.Validator->CompareEmittedCode(parsed, used, diagnostics);
 
         // a reflected binding that the code does not declare is unused, and leaves the visibility below
-        std::erase_if(comparison->Mismatches, [](const BindingMismatch& mismatch)
+        std::erase_if(comparison.Mismatches, [](const BindingMismatch& mismatch)
         {
             return mismatch.Kind == BindingMismatchKind::ReflectedOnly;
         });
 
-        comparison->Mismatches.append_range(
-            CompareVertexInputs(comparison->Emitted.VertexInputs, entry_point.Reflection.Raster.VertexInputs));
+        comparison.Mismatches.append_range(
+            CompareVertexInputs(comparison.Emitted.VertexInputs, entry_point.Reflection.Raster.VertexInputs));
 
-        if (!comparison->Matches())
+        if (!comparison.Matches())
         {
             std::string warningStr = std::format("REFLECTION MISMATCH in {}{} ({}) for target {}, {} form:",
                                                  entry_point.Name,
                                                  entry_point.VariantSuffix,
                                                  variant.VariantDescription,
                                                  target.Name,
-                                                 form_name);
-            for (const BindingMismatch& mismatch : comparison->Mismatches)
+                                                 read.FormName);
+            for (const BindingMismatch& mismatch : comparison.Mismatches)
             {
                 warningStr += '\n';
                 warningStr += FormatBindingMismatch(mismatch);
@@ -432,9 +560,9 @@ namespace
             return false;
         }
 
-        KeepDeclaredBindings(variant.Bindings, form, comparison->Emitted.DeclaredPlacements);
+        KeepDeclaredBindings(variant.Bindings, form, comparison.Emitted.DeclaredPlacements);
 
-        const CookError applied = ApplyEmittedCodeFacts(target, variant, entry_point, form, comparison->Emitted, diagnostics);
+        const CookError applied = ApplyEmittedCodeFacts(target, variant, entry_point, form, comparison.Emitted, diagnostics);
         if (applied != CookError::Success)
         {
             return std::unexpected(applied);
@@ -758,6 +886,7 @@ namespace
                                                                    PhaseTimings& phase_timings)
     {
         const bool keepRawVariants = IsStageDumpRequested(shared_state.Options, StageDumpKind::Raw);
+        const bool reportReflection = shared_state.Options.ReportReflection;
         CookStatistics localStats{};
 
         const std::chrono::steady_clock::time_point compileStart = std::chrono::steady_clock::now();
@@ -765,6 +894,10 @@ namespace
         const std::chrono::steady_clock::time_point compileEnd = std::chrono::steady_clock::now();
         const std::chrono::duration<double, std::milli> compileElapsed = compileEnd - compileStart;
         phase_timings.Stage3_CompileMs += compileElapsed.count();
+
+        // the reflection report shows a variant before the code reads change its bindings, so it is written here and
+        // reported with the variant below
+        std::vector<RecordingDiagnosticSink> reflectionReports(reportReflection ? variant_set.Variants.size() : 0u);
 
         for (auto&& [idx, result] : std::views::enumerate(compileResultsList))
         {
@@ -823,16 +956,70 @@ namespace
                 raw_module.Variants.emplace_back(std::move(*result));
             }
 
-            CompiledVariant& variant = variantResult.value();
+            if (reportReflection)
+            {
+                ReportVariantIfRequested(shared_state.Options, *variantResult, reflectionReports[static_cast<size_t>(idx)]);
+            }
+
+            out_module_variants.emplace_back(std::move(*variantResult));
+        }
+
+        // a target with no validator reads nothing, and fails here only when the cook asks for the comparison
+        const bool validate = shared_state.Options.ValidateAgainstEmittedText;
+        if (target.Validator == nullptr && validate)
+        {
+            return std::unexpected(CookError::TargetValidatorUnavailable);
+        }
+
+        std::vector<int32_t> firstFormOfVariant;
+        std::vector<FormRead> formReads;
+        std::vector<FormReadResult> formResults;
+        if (target.Validator != nullptr)
+        {
+            const std::chrono::steady_clock::time_point readStart = std::chrono::steady_clock::now();
+
+            formReads = ListFormReads(out_module_variants, firstFormOfVariant);
+            const std::vector<CodeGroup> codeGroups = GroupFormsByCode(formReads);
+            formResults = std::vector<FormReadResult>(formReads.size());
+            ReadCodeGroups(target,
+                           validate,
+                           shared_state.Options.MultithreadEntryPointCodegen,
+                           formReads,
+                           codeGroups,
+                           formResults);
+
+            const std::chrono::steady_clock::time_point readEnd = std::chrono::steady_clock::now();
+            const double readMs = std::chrono::duration<double, std::milli>{ readEnd - readStart }.count();
+            phase_timings.CodeReadMs += readMs;
+            phase_timings.Validate_EmittedCodeMs += readMs;
+            phase_timings.CodeReadForms += static_cast<uint32_t>(formReads.size());
+            phase_timings.CodeReadUnique += static_cast<uint32_t>(codeGroups.size());
+            phase_timings.CodeReadRepeats += static_cast<uint32_t>(formReads.size() - codeGroups.size());
+        }
+
+        for (auto&& [idx, variant] : std::views::enumerate(out_module_variants))
+        {
+            const auto& currVariant = variant_set.Variants[static_cast<size_t>(idx)];
             RecordVariantStatistics(variant, localStats);
-            ReportVariantIfRequested(shared_state.Options, variant, *shared_state.Diagnostics);
+            if (reportReflection)
+            {
+                for (const Diagnostic& record : std::as_const(reflectionReports[static_cast<size_t>(idx)]).Records())
+                {
+                    shared_state.Diagnostics->Report(record);
+                }
+            }
 
             const std::chrono::steady_clock::time_point validateStart = std::chrono::steady_clock::now();
 
-            const CookResult<uint32_t> mismatches = ReadEmittedCode(target,
-                                                                    shared_state.Options.ValidateAgainstEmittedText,
-                                                                    variant,
-                                                                    *shared_state.Diagnostics);
+            std::span<const FormReadResult> variantResults;
+            if (target.Validator != nullptr)
+            {
+                const auto firstForm = static_cast<size_t>(firstFormOfVariant[static_cast<size_t>(idx)]);
+                const auto endForm = static_cast<size_t>(firstFormOfVariant[static_cast<size_t>(idx) + 1u]);
+                variantResults = std::span<const FormReadResult>{ formResults }.subspan(firstForm, endForm - firstForm);
+            }
+
+            const CookResult<uint32_t> mismatches = TakeVariantReads(variant, variantResults, *shared_state.Diagnostics);
             if (!mismatches)
             {
                 return std::unexpected(mismatches.error());
@@ -854,7 +1041,7 @@ namespace
             const std::chrono::duration<double, std::milli> validateElapsed = validateEnd - validateStart;
             phase_timings.Validate_EmittedCodeMs += validateElapsed.count();
 
-            if (shared_state.Options.ReportReflection)
+            if (reportReflection)
             {
                 ReportUnreferencedBindings(variant, *shared_state.Diagnostics);
             }
@@ -880,8 +1067,6 @@ namespace
             const std::chrono::steady_clock::time_point internEnd = std::chrono::steady_clock::now();
             const std::chrono::duration<double, std::milli> internElapsed = internEnd - internStart;
             phase_timings.Stage6_InternMs += internElapsed.count();
-
-            out_module_variants.emplace_back(std::move(*variantResult));
         }
 
         return localStats;

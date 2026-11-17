@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <expected>
 #include <format>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -24,6 +25,12 @@ namespace lodestone
 
 namespace
 {
+
+    /** What one read of WGSL keeps for its comparisons: the declared bindings of each entry point, sorted by placement. */
+    struct WgslParsedCode final : ParsedEmittedCode
+    {
+        std::vector<std::vector<tint::inspector::ResourceBinding>> EntryPointBindings;
+    };
 
     /** @brief Allows every extension: the compiler knew what to emit. Invalid WGSL is a parse error, not a mismatch. */
     CookResult<tint::Program> ParseWgsl(std::span<const std::byte> source_code, DiagnosticSink& sink);
@@ -73,10 +80,9 @@ namespace
 WgslValidator::WgslValidator() = default;
 WgslValidator::~WgslValidator() = default;
 
-CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::span<const std::byte> source_code,
-                                                                std::span<const ReflectedBinding*> bindings,
-                                                                [[maybe_unused]] std::span<const ReflectedBinding*> stored,
-                                                                DiagnosticSink& sink) const
+CookResult<std::unique_ptr<const ParsedEmittedCode>> WgslValidator::parseEmittedCode(std::span<const std::byte> source_code,
+                                                                                      [[maybe_unused]] bool validate,
+                                                                                      DiagnosticSink& sink) const
 {
     CookResult<tint::Program> entrypointProgram = ParseWgsl(source_code, sink);
     if (!entrypointProgram)
@@ -85,58 +91,23 @@ CookResult<BindingComparison> WgslValidator::validateEntryPoint(std::span<const 
     }
 
     tint::inspector::Inspector epInspector(*entrypointProgram);
-    using tint::inspector::ResourceBinding;
-    BindingComparison result;
+    auto parsed = std::make_unique<WgslParsedCode>();
+    EmittedCodeFacts& facts = parsed->Facts;
     for (const auto& entrypoint : epInspector.GetEntryPoints())
     {
-        std::vector<ResourceBinding> wgslBindings = epInspector.GetResourceBindings(entrypoint.name);
-
-        auto sortResourceBindings = [](const ResourceBinding& lhs, const ResourceBinding& rhs)
+        std::vector<tint::inspector::ResourceBinding> wgslBindings = epInspector.GetResourceBindings(entrypoint.name);
+        std::ranges::sort(wgslBindings, [](const tint::inspector::ResourceBinding& lhs, const tint::inspector::ResourceBinding& rhs)
         {
-            if (lhs.bind_group != rhs.bind_group)
-            {
-                return lhs.bind_group < rhs.bind_group;
-            }
-            return lhs.binding < rhs.binding;
-        };
+            return std::tie(lhs.bind_group, lhs.binding) < std::tie(rhs.bind_group, rhs.binding);
+        });
 
-        std::ranges::sort(wgslBindings, sortResourceBindings);
-
-        BindingComparison epResult = CompareBindings(wgslBindings, bindings);
-        result.Mismatches.append_range(std::move(epResult.Mismatches));
-        result.Emitted.SamplerTexturePairs.append_range(ReadPairs(epInspector, entrypoint.name));
-        for (const ResourceBinding& binding : wgslBindings)
-        {
-            result.Emitted.DeclaredPlacements.emplace_back(binding.bind_group, binding.binding);
-        }
-    }
-
-    const CookError read = ReadCodeFacts(*entrypointProgram, epInspector, result.Emitted, sink);
-    if (read != CookError::Success)
-    {
-        return std::unexpected(read);
-    }
-    return result;
-}
-
-CookResult<EmittedCodeFacts> WgslValidator::readEmittedCodeFacts(std::span<const std::byte> source_code,
-                                                                 DiagnosticSink& sink) const
-{
-    CookResult<tint::Program> entrypointProgram = ParseWgsl(source_code, sink);
-    if (!entrypointProgram)
-    {
-        return std::unexpected(entrypointProgram.error());
-    }
-
-    tint::inspector::Inspector epInspector(*entrypointProgram);
-    EmittedCodeFacts facts;
-    for (const auto& entrypoint : epInspector.GetEntryPoints())
-    {
         facts.SamplerTexturePairs.append_range(ReadPairs(epInspector, entrypoint.name));
-        for (const tint::inspector::ResourceBinding& binding : epInspector.GetResourceBindings(entrypoint.name))
+        for (const tint::inspector::ResourceBinding& binding : wgslBindings)
         {
             facts.DeclaredPlacements.emplace_back(binding.bind_group, binding.binding);
         }
+
+        parsed->EntryPointBindings.push_back(std::move(wgslBindings));
     }
 
     const CookError read = ReadCodeFacts(*entrypointProgram, epInspector, facts, sink);
@@ -144,7 +115,26 @@ CookResult<EmittedCodeFacts> WgslValidator::readEmittedCodeFacts(std::span<const
     {
         return std::unexpected(read);
     }
-    return facts;
+
+    return std::unique_ptr<const ParsedEmittedCode>{ std::move(parsed) };
+}
+
+BindingComparison WgslValidator::compareEmittedCode(const ParsedEmittedCode& parsed,
+                                                    std::span<const ReflectedBinding*> bound,
+                                                    [[maybe_unused]] std::span<const ReflectedBinding*> stored,
+                                                    [[maybe_unused]] DiagnosticSink& sink) const
+{
+    const auto& code = static_cast<const WgslParsedCode&>(parsed);
+
+    BindingComparison result;
+    for (const std::vector<tint::inspector::ResourceBinding>& wgslBindings : code.EntryPointBindings)
+    {
+        BindingComparison epResult = CompareBindings(wgslBindings, bound);
+        result.Mismatches.append_range(std::move(epResult.Mismatches));
+    }
+    result.Emitted = code.Facts;
+
+    return result;
 }
 
 namespace

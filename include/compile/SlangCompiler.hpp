@@ -2,6 +2,7 @@
 #ifndef LODESTONE_SLANG_COMPILER_HPP
 #define LODESTONE_SLANG_COMPILER_HPP
 #include "CookerErrors.hpp"
+#include "compile/CompileTimings.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/ShimLinkSource.hpp"
 #include "compile/SymbolTable.hpp"
@@ -33,7 +34,6 @@ struct SlangCompilerCreateInfo
     std::vector<std::filesystem::path> IncludeDirectories;
     uint32_t OptimizationLevel{ 0u };
     uint32_t DebugLevel{ 0u };
-    bool MultithreadVariantBuild{ true };
     /** @brief Sessions are expensive, so a small batch on every thread oversubscribes. */
     size_t ExpectedBatchSize{ 0u };
     std::optional<SymbolTable> InheritedSymbolTable;
@@ -47,7 +47,8 @@ struct SlangCompilerCreateInfo
     std::string_view TargetName;
 };
 
-class ThreadPool;
+class CompilePool;
+struct CompileEnvironment;
 
 class SlangCompiler
 {
@@ -59,7 +60,9 @@ public:
     SlangCompiler(SlangCompiler&&) = delete;
     SlangCompiler& operator=(SlangCompiler&&) = delete;
 
-    CookError Initialize(SlangCompilerCreateInfo create_info, DiagnosticSink& sink);
+    /** @brief Runs the bootstrap compile on the calling thread, using the global session of the calling thread
+     * from `pool`. The pool must outlive this compiler. */
+    CookError Initialize(CompilePool& pool, SlangCompilerCreateInfo create_info, DiagnosticSink& sink);
     CookResult<RawModule> PrepareRawModule(const PermutationSpace& space);
     using CompileResultList = std::vector<CookResult<RawVariant>>;
     [[nodiscard]] CompileResultList Compile(const std::vector<VariantDescriptor>& variants,
@@ -74,15 +77,17 @@ public:
     /** @brief Fails when a declaration is invalid. The error is also reported, and the cook must not go on without the axes. */
     [[nodiscard]] CookResult<std::vector<RawAxisDeclaration>> BuildAxisDeclarations() const;
     [[nodiscard]] const SymbolTable& GetSymbolTable() const noexcept;
+    /** @brief Returns the setup timings of the bootstrap and of every batch of this compiler so far. */
+    [[nodiscard]] CompileTimings Timings() const noexcept;
 
 private:
+    mutable CompileTimings setupTimings;
     DiagnosticSink* diagnosticSink{ nullptr };
     SymbolTable symbolTable;
-    std::string shimLinkSource;
-    std::vector<ShimFormatLinkSource> shimFormatSources;
     std::string targetName;
     ShimForms shimForms;
-    std::unique_ptr<ThreadPool> compilePool{ nullptr };
+    CompilePool* pool{ nullptr };
+    std::unique_ptr<CompileEnvironment> environment;
     std::unique_ptr<SlangModuleContext> bootstrapContext{ nullptr };
 };
 

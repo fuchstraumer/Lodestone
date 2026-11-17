@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -57,22 +58,19 @@ namespace
     std::vector<std::string> BuildModuleScopeNames(slang::ISession* session, slang::DeclReflection::Kind kind);
 }
 
+// slang::createGlobalSession serializes the per-thread startup, which is a lock convoy when every thread creates a
+// session. Creating one without the core module and loading the embedded core module skips that. It helps a release
+// cook and hurts a Debug cook.
 constexpr bool k_UseSlangWorkaround = true;
 
 // the builtin module in builtins/ that exports `getDescriptorFromHandle` with the per-descriptor-type lowering
 constexpr std::string_view k_HeapTypedModuleName = "LodestoneHeapTyped";
 
-CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink)
+CookError CreateGlobalSession(Slang::ComPtr<slang::IGlobalSession>& global_session)
 {
-    diagnosticSink = &sink;
-    bufferForm = create_info.Forms.Buffer;
-    language = create_info.Language;
-    heapLowering = create_info.HeapLowering;
-    compilesDeliveredForm = !AreBaseFlags(create_info.OptimizationLevel, create_info.DebugLevel);
-    
     if (k_UseSlangWorkaround)
     {
-        const SlangResult created = slang_createGlobalSessionWithoutCoreModule(SLANG_API_VERSION, globalSession.writeRef());
+        const SlangResult created = slang_createGlobalSessionWithoutCoreModule(SLANG_API_VERSION, global_session.writeRef());
         if (SLANG_FAILED(created))
         {
             return CookError::GlobalSessionCreationFailed;
@@ -80,7 +78,7 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
 
         if (ISlangBlob* coreModuleBlob = slang_getEmbeddedCoreModule())
         {
-            const SlangResult loaded = globalSession->loadCoreModule(coreModuleBlob->getBufferPointer(), coreModuleBlob->getBufferSize());
+            const SlangResult loaded = global_session->loadCoreModule(coreModuleBlob->getBufferPointer(), coreModuleBlob->getBufferSize());
             if (SLANG_FAILED(loaded))
             {
                 return CookError::SlangCoreModuleLoadFailed;
@@ -88,20 +86,34 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
         }
         else
         {
-            const SlangResult built = globalSession->compileCoreModule(0);
+            const SlangResult built = global_session->compileCoreModule(0);
             if (SLANG_FAILED(built))
             {
                 return CookError::SlangCoreModuleBuildFailed;
             }
         }
+
+        return CookError::Success;
     }
-    else
+
+    if (SLANG_FAILED(slang::createGlobalSession(global_session.writeRef())))
     {
-        if (SLANG_FAILED(slang::createGlobalSession(globalSession.writeRef())))
-        {   
-            return CookError::GlobalSessionCreationFailed;
-        }
+        return CookError::GlobalSessionCreationFailed;
     }
+
+    return CookError::Success;
+}
+
+CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_info,
+                                         slang::IGlobalSession* global_session,
+                                         DiagnosticSink& sink)
+{
+    diagnosticSink = &sink;
+    globalSession = global_session;
+    bufferForm = create_info.Forms.Buffer;
+    language = create_info.Language;
+    heapLowering = create_info.HeapLowering;
+    compilesDeliveredForm = !AreBaseFlags(create_info.OptimizationLevel, create_info.DebugLevel);
 
     const std::vector<slang::CompilerOptionEntry> compileOptions =
         MakeCompilerOptions(create_info.OptimizationLevel, create_info.DebugLevel);

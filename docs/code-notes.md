@@ -341,13 +341,26 @@ reads spaces as separators and `#` as comments, so both take a backslash, and Ma
 
 Moved from `CLAUDE.md` on 2026-10-25. Each bullet is one validator of the cook.
 
-- **The reflection cross-check**, after stage 4. `ReadEmittedCode` (in `BuildModuleStep.cpp`) asks the target
-  profile for a validator. The WGSL profile parses the emitted text with Tint (`WgslValidator`) and reads the
+- **The reflection cross-check**, after stage 4. The read pass of `CompileModuleVariants` (in `BuildModuleStep.cpp`)
+  asks the target profile for a validator. The WGSL profile parses the emitted text with Tint (`WgslValidator`) and reads the
   bindings from Tint's inspector, then compares that against the bindings the entry point uses. Tint
   also proves the emitted WGSL parses and resolves, which the old text scanner could not. A mismatch
   increments a counter, and a nonzero counter fails the cook with `CookError::ReflectionMismatch`. A
   target that supplies no validator fails the cook with `TargetValidatorUnavailable`. `--no-validate`
   skips the check, and only on purpose.
+
+  The pass has two parts. `ParseEmittedCode` reads the code bytes alone (Tint for WGSL, `ParseModule` and the fact
+  readers for SPIR-V, plus spirv-val when the cook validates) and returns a `ParsedEmittedCode`: the facts and what the
+  comparison needs. Its inputs are the code bytes, the profile, and the `validate` flag, and these are the whole memo
+  key. The entry point name is not an input, because the code states it. `CompareEmittedCode` then compares one form
+  with the reflection of its variant, and it never touches the code. `GroupFormsByCode` groups the forms of one
+  environment by hash and decides equality by bytes. `ParallelFor` runs one task for each group, and the task reads
+  the code once and compares each form of the group, so a read never outlives its task and nothing needs a lock. Each
+  form has its own result slot. Each form is a different `EntryPointCode` of a different variant, so two tasks never
+  write the same object. Tint parses into a `Program` of its own for each task, and every SPIR-V read uses the one
+  `spv_context_t` of the validator through the `const` entry points of SPIRV-Tools. The reports of a form are recorded
+  in its slot, and the cook replays them in variant order and stops at the first error. The memo lives for one
+  environment. `PhaseTimings::CodeReadUnique` counts the reads.
 
   The same parse also produces data (task L7): the sampler and texture pairs of each entry point. Reflection
   cannot state which sampler a texture is sampled with, so the emitted code is the only source. Tint's inspector

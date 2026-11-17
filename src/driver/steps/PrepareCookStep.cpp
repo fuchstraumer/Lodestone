@@ -50,6 +50,7 @@ CookResult<PreparedCook> PrepareCookStep::operator()(CookerOptions&& input, Diag
     SharedCookState result;
     result.Options = std::move(input);
     result.Diagnostics = &diagnostics;
+    result.Compile = std::make_unique<CompilePool>(result.Options.MultithreadEntryPointCodegen);
 
     // reused whenever we touch the filesystem (the third rail)
     std::error_code filesystemError;

@@ -105,6 +105,8 @@ CompiledVariant MakeVariant(uint64_t index, bool first_axis_value, bool second_a
     variant.VariantSuffix = std::format("_{}_{}", first_axis_value, second_axis_value);
     variant.VariantDescription = std::format("AXIS_A={} AXIS_B={}", first_axis_value, second_axis_value);
     variant.Bindings.push_back(MakeSharedBinding());
+    // the cooker resolves one footprint for each binding
+    variant.Footprints.emplace_back();
     variant.EntryPoints.push_back(
         MakeEntryPoint(k_ActiveEntryPoint, std::format("// AXIS_A is {}\n", first_axis_value)));
     variant.EntryPoints.push_back(MakeEntryPoint(k_InertEntryPoint, "// this text never changes\n"));
@@ -120,6 +122,8 @@ CompiledVariant MakeSingleEntryPointVariant(uint64_t index, bool first_axis_valu
     variant.VariantSuffix = std::format("_{}", first_axis_value);
     variant.VariantDescription = std::format("AXIS_A={}", first_axis_value);
     variant.Bindings.push_back(MakeSharedBinding());
+    // the cooker resolves one footprint for each binding
+    variant.Footprints.emplace_back();
     variant.EntryPoints.push_back(
         MakeEntryPoint(k_ActiveEntryPoint, std::format("// AXIS_A is {}\n", first_axis_value)));
     return variant;
@@ -157,6 +161,8 @@ CompiledVariant MakeConditionalVariant(uint64_t index, bool first_axis_value, bo
     variant.VariantSuffix = std::format("_{}_{}", first_axis_value, second_axis_value);
     variant.VariantDescription = std::format("AXIS_A={} AXIS_B={}", first_axis_value, second_axis_value);
     variant.Bindings.push_back(MakeSharedBinding());
+    // the cooker resolves one footprint for each binding
+    variant.Footprints.emplace_back();
     variant.EntryPoints.push_back(
         MakeEntryPoint(k_ConditionalEntryPoint,
                        second_axis_value ? std::format("// AXIS_A is {}\n", first_axis_value)

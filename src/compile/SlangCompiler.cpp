@@ -1,5 +1,6 @@
 #include "compile/SlangCompiler.hpp"
 #include "CookerErrors.hpp"
+#include "compile/CompilePool.hpp"
 #include "Diagnostics.hpp"
 #include "compile/RawLibrary.hpp"
 #include "compile/ShimLinkSource.hpp"
@@ -15,6 +16,7 @@
 
 
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <expected>
 #include <format>
@@ -35,6 +37,8 @@ namespace lodestone
 namespace
 {
 
+    double MillisecondsSince(std::chrono::steady_clock::time_point start);
+
     // fails when the scalar layout and the std430 layout of the element type differ
     CookError CheckElementPadding(const SlangModuleContext& context,
                                   const RawShimExtern& shim_extern,
@@ -44,63 +48,70 @@ namespace
 
 } // namespace
 
-SlangCompiler::SlangCompiler() noexcept
-    : compilePool{ nullptr },
-      bootstrapContext{ nullptr }
-{
-}
+SlangCompiler::SlangCompiler() noexcept = default;
 
 SlangCompiler::~SlangCompiler() = default;
 
-CookError SlangCompiler::Initialize(SlangCompilerCreateInfo create_info, DiagnosticSink& sink)
+CookError SlangCompiler::Initialize(CompilePool& compile_pool, SlangCompilerCreateInfo create_info, DiagnosticSink& sink)
 {
     diagnosticSink = &sink;
+    pool = &compile_pool;
     targetName = std::string{ create_info.TargetName };
     shimForms = create_info.Forms;
-    compilePool = std::make_unique<ThreadPool>();
+    environment = std::make_unique<CompileEnvironment>();
     bootstrapContext = std::make_unique<SlangModuleContext>();
     if (create_info.InheritedSymbolTable)
     {
         symbolTable = *create_info.InheritedSymbolTable;
     }
 
-    CookError initResult = bootstrapContext->Initialize(create_info, sink);
+    CookResult<slang::IGlobalSession*> globalSession = pool->Threads().AcquireCallerGlobalSession(setupTimings);
+    if (!globalSession)
+    {
+        return globalSession.error();
+    }
+
+    CookError initResult = bootstrapContext->Initialize(create_info, *globalSession, sink);
     if (initResult != CookError::Success)
     {
         return initResult;
     }
 
+    const std::chrono::steady_clock::time_point bootstrapStart = std::chrono::steady_clock::now();
     initResult = bootstrapContext->RunBootstrap();
+    setupTimings.BootstrapCompileMs = MillisecondsSince(bootstrapStart);
     if (initResult != CookError::Success)
     {
         return initResult;
     }
 
+    const std::chrono::steady_clock::time_point serializeStart = std::chrono::steady_clock::now();
     std::vector<SerializedModule> serializedModules = bootstrapContext->SerializeModules();
-    initResult = compilePool->Initialize(std::move(create_info), std::move(serializedModules));
-    if (initResult != CookError::Success)
-    {
-        return initResult;
-    }
+    setupTimings.SerializeModulesMs = MillisecondsSince(serializeStart);
+    environment->CreateInfo = std::move(create_info);
+    environment->SerializedModules = std::move(serializedModules);
 
-    // one writer, after the workers start, so the write overlaps their setup. The workers used to write the cache
-    // too, all at once, while other sessions read it
-    static_cast<void>(WriteModuleCache(compilePool->SerializedModules(), sink));
+    // one writer, so that the workers never write the cache all at once while other sessions read it
+    const std::chrono::steady_clock::time_point cacheStart = std::chrono::steady_clock::now();
+    static_cast<void>(WriteModuleCache(environment->SerializedModules, sink));
+    setupTimings.WriteModuleCacheMs = MillisecondsSince(cacheStart);
 
     // todo-ship: share symbol tables between the compilers of a multi-module build
+    const std::chrono::steady_clock::time_point symbolStart = std::chrono::steady_clock::now();
     const std::string_view moduleName = bootstrapContext->ModuleName();
     const std::vector<std::string>& sourcePaths = bootstrapContext->ModuleSourcePaths();
     for (const auto&& [sourceIndex, sourceStr] : std::views::enumerate(bootstrapContext->ModuleSourceStrings()))
     {
         symbolTable.AddSource(moduleName, sourcePaths[static_cast<size_t>(sourceIndex)], sourceStr);
     }
-    
+    setupTimings.SymbolTableMs = MillisecondsSince(symbolStart);
+
     return initResult;
 }
 
 CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& space)
 {
-    if (compilePool == nullptr || bootstrapContext == nullptr)
+    if (pool == nullptr || bootstrapContext == nullptr)
     {
         return std::unexpected(CookError::CompilerNotInitialized);
     }
@@ -233,14 +244,14 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
         return std::unexpected(formatSources.error());
     }
 
-    shimLinkSource = std::move(linkSource.value());
-    shimFormatSources = std::move(formatSources.value());
+    environment->ShimLinkSource = std::move(linkSource.value());
+    environment->ShimFormatSources = std::move(formatSources.value());
     return module;
 }
 
 SlangCompiler::CompileResultList SlangCompiler::Compile(const std::vector<VariantDescriptor>& variants, DiagnosticSink& sink) const
 {
-    return compilePool->Compile(variants, shimLinkSource, shimFormatSources, sink);
+    return pool->Threads().Compile(*environment, variants, sink, setupTimings);
 }
 
 std::string_view SlangCompiler::ModuleName() const noexcept
@@ -283,8 +294,36 @@ const SymbolTable& SlangCompiler::GetSymbolTable() const noexcept
     return symbolTable;
 }
 
+CompileTimings SlangCompiler::Timings() const noexcept
+{
+    return setupTimings;
+}
+
+CompileTimings& CompileTimings::operator+=(const CompileTimings& other) noexcept
+{
+    BootstrapGlobalSessionMs += other.BootstrapGlobalSessionMs;
+    BootstrapGlobalSessionCount += other.BootstrapGlobalSessionCount;
+    WorkerGlobalSessionMs += other.WorkerGlobalSessionMs;
+    WorkerGlobalSessionCount += other.WorkerGlobalSessionCount;
+    WorkerSetupMs += other.WorkerSetupMs;
+    WorkerSetupCount += other.WorkerSetupCount;
+    WorkerPrepareMs += other.WorkerPrepareMs;
+    WorkerPrepareCriticalPathMs += other.WorkerPrepareCriticalPathMs;
+    IdleWorkerCount += other.IdleWorkerCount;
+    BootstrapCompileMs += other.BootstrapCompileMs;
+    SerializeModulesMs += other.SerializeModulesMs;
+    WriteModuleCacheMs += other.WriteModuleCacheMs;
+    SymbolTableMs += other.SymbolTableMs;
+    return *this;
+}
+
 namespace
 {
+
+    double MillisecondsSince(std::chrono::steady_clock::time_point start)
+    {
+        return std::chrono::duration<double, std::milli>{ std::chrono::steady_clock::now() - start }.count();
+    }
 
     CookError CheckElementPadding(const SlangModuleContext& context,
                                   const RawShimExtern& shim_extern,

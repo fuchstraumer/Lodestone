@@ -13,6 +13,7 @@
 #include <cstring>
 #include <expected>
 #include <format>
+#include <memory>
 #include <optional>
 #include <span>
 #include <spirv-tools/libspirv.h>
@@ -53,9 +54,22 @@ namespace
     std::vector<BindingMismatch> CompareStoredValues(const ParseState& parse_state,
                                                      std::span<const ReflectedBinding*> reflected);
     // finds each device pointer that the code stores in a block and the manifest does not record
-    std::vector<BindingMismatch> CompareDevicePointers(const ParseState& parse_state,
+    std::vector<BindingMismatch> CompareDevicePointers(std::span<const StoredValueLocation> device_pointers,
                                                        std::span<const ReflectedBinding*> bound,
                                                        std::span<const ReflectedBinding*> stored);
+
+    /** What one read of SPIR-V keeps for its comparisons. `State` owns the names that the declared bindings point to,
+     * so an object of this type must never move. */
+    struct SpvParsedCode final : ParsedEmittedCode
+    {
+        ParseState State;
+        // sorted by group and binding, without the descriptor heap
+        std::vector<DeclaredBinding> Declared;
+        std::vector<DeclaredBinding> HeapBindings;
+        std::vector<StoredValueLocation> DevicePointers;
+    };
+
+    void SplitDeclaredBindings(SpvParsedCode& parsed, std::optional<uint32_t> descriptor_heap_set);
 }
 
 SpvValidator::SpvValidator(std::optional<uint32_t> descriptor_heap_set, manifest::DescriptorHeapLowering heap_lowering)
@@ -74,65 +88,56 @@ SpvValidator::~SpvValidator()
     }
 }
 
-CookResult<BindingComparison> SpvValidator::validateEntryPoint(std::span<const std::byte> source_code,
-                                                               std::span<const ReflectedBinding*> bindings,
-                                                               std::span<const ReflectedBinding*> stored,
-                                                               DiagnosticSink& sink) const
+CookResult<std::unique_ptr<const ParsedEmittedCode>> SpvValidator::parseEmittedCode(std::span<const std::byte> source_code,
+                                                                                     bool validate,
+                                                                                     DiagnosticSink& sink) const
 {
-    ParseState state;
-    const CookError parsed = ParseModule(context, source_code, true, state, sink);
-    if (parsed != CookError::Success)
+    auto parsed = std::make_unique<SpvParsedCode>();
+    ParseState& state = parsed->State;
+    const CookError parseError = ParseModule(context, source_code, validate, state, sink);
+    if (parseError != CookError::Success)
     {
-        return std::unexpected(parsed);
+        return std::unexpected(parseError);
     }
     state.DescriptorHeapSet = descriptorHeapSet;
 
-    std::vector<DeclaredBinding> declared = CollectDeclaredBindings(state);
-    std::ranges::sort(declared, {}, [](const DeclaredBinding& binding)
+    if (validate)
     {
-        return std::make_tuple(binding.Group, binding.Binding);
-    });
-
-    // the descriptor heap is not in reflection, so its variables are compared with the heap lowering instead
-    std::vector<BindingMismatch> heapMismatches;
-    if (descriptorHeapSet.has_value())
-    {
-        const auto heapBegin = std::ranges::remove_if(declared, [this](const DeclaredBinding& binding)
-        {
-            return binding.Group == *descriptorHeapSet;
-        });
-        heapMismatches = CompareDescriptorHeap(std::span{ heapBegin.begin(), heapBegin.end() },
-                                               bindings,
-                                               *descriptorHeapSet,
-                                               heapLowering);
-        declared.erase(heapBegin.begin(), heapBegin.end());
+        SplitDeclaredBindings(*parsed, descriptorHeapSet);
+        parsed->DevicePointers = CollectDevicePointerMembers(state);
     }
-
-    BindingComparison comparison = CompareBindings(declared, bindings, sink);
-    comparison.Mismatches.append_range(std::move(heapMismatches));
-    comparison.Mismatches.append_range(CompareStoredValues(state, stored));
-    comparison.Mismatches.append_range(CompareDevicePointers(state, bindings, stored));
 
     CookResult<EmittedCodeFacts> facts = CollectEmittedCodeFacts(state, sink);
     if (!facts)
     {
         return std::unexpected(facts.error());
     }
-    comparison.Emitted = std::move(*facts);
-    return comparison;
+    parsed->Facts = std::move(*facts);
+
+    return std::unique_ptr<const ParsedEmittedCode>{ std::move(parsed) };
 }
 
-CookResult<EmittedCodeFacts> SpvValidator::readEmittedCodeFacts(std::span<const std::byte> source_code,
-                                                                DiagnosticSink& sink) const
+BindingComparison SpvValidator::compareEmittedCode(const ParsedEmittedCode& parsed,
+                                                   std::span<const ReflectedBinding*> bound,
+                                                   std::span<const ReflectedBinding*> stored,
+                                                   DiagnosticSink& sink) const
 {
-    ParseState state;
-    const CookError parsed = ParseModule(context, source_code, false, state, sink);
-    if (parsed != CookError::Success)
+    const auto& code = static_cast<const SpvParsedCode&>(parsed);
+
+    // the descriptor heap is not in reflection, so its variables are compared with the heap lowering instead
+    std::vector<BindingMismatch> heapMismatches;
+    if (descriptorHeapSet.has_value())
     {
-        return std::unexpected(parsed);
+        heapMismatches = CompareDescriptorHeap(code.HeapBindings, bound, *descriptorHeapSet, heapLowering);
     }
-    state.DescriptorHeapSet = descriptorHeapSet;
-    return CollectEmittedCodeFacts(state, sink);
+
+    BindingComparison comparison = CompareBindings(code.Declared, bound, sink);
+    comparison.Mismatches.append_range(std::move(heapMismatches));
+    comparison.Mismatches.append_range(CompareStoredValues(code.State, stored));
+    comparison.Mismatches.append_range(CompareDevicePointers(code.DevicePointers, bound, stored));
+    comparison.Emitted = code.Facts;
+
+    return comparison;
 }
 
 namespace
@@ -399,12 +404,12 @@ namespace
         });
     }
 
-    std::vector<BindingMismatch> CompareDevicePointers(const ParseState& parse_state,
+    std::vector<BindingMismatch> CompareDevicePointers(std::span<const StoredValueLocation> device_pointers,
                                                        std::span<const ReflectedBinding*> bound,
                                                        std::span<const ReflectedBinding*> stored)
     {
         std::vector<BindingMismatch> mismatches;
-        for (const StoredValueLocation& pointer : CollectDevicePointerMembers(parse_state))
+        for (const StoredValueLocation& pointer : device_pointers)
         {
             if (PointerIsRecorded(pointer, bound, stored))
             {
@@ -420,6 +425,27 @@ namespace
         }
 
         return mismatches;
+    }
+
+    void SplitDeclaredBindings(SpvParsedCode& parsed, std::optional<uint32_t> descriptor_heap_set)
+    {
+        std::vector<DeclaredBinding> declared = CollectDeclaredBindings(parsed.State);
+        std::ranges::sort(declared, {}, [](const DeclaredBinding& binding)
+        {
+            return std::make_tuple(binding.Group, binding.Binding);
+        });
+
+        if (descriptor_heap_set.has_value())
+        {
+            // `remove_if` leaves unspecified values in its tail, so the heap variables need a partition
+            const auto heapRange = std::ranges::stable_partition(declared,
+                                                                 [descriptor_heap_set](const DeclaredBinding& binding)
+                                                                 { return binding.Group != *descriptor_heap_set; });
+            parsed.HeapBindings.assign(heapRange.begin(), heapRange.end());
+            declared.erase(heapRange.begin(), heapRange.end());
+        }
+
+        parsed.Declared = std::move(declared);
     }
 
     std::vector<BindingMismatch> CompareDescriptorHeap(std::span<const DeclaredBinding> heap,

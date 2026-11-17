@@ -7,6 +7,12 @@
 #include "ShaderManifest.hpp"
 #include "ShaderManifestIndex.hpp"
 #include "VariantKey.hpp"
+#include "driver/CookerDriver.hpp"
+#include "driver/CookerOptions.hpp"
+#include "driver/CookerSteps.hpp"
+#include "emit/OutputSink.hpp"
+#include "emit/ResourceReport.hpp"
+#include "emit/ShaderManifestEmitter.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -44,6 +50,47 @@ tests::CookedBundle CookAtLevel(const std::filesystem::path& module_path, uint32
         result.Bytes.resize(manifest->second.size());
         std::memcpy(result.Bytes.data(), manifest->second.data(), result.Bytes.size());
     }
+    return result;
+}
+
+/** One cook of a module whose variants share their code, with the read counters that this cook added. */
+struct SharedCodeCook
+{
+    CookError Result{ CookError::Invalid };
+    uint32_t ReflectionMismatches{ 0u };
+    uint32_t Forms{ 0u };
+    uint32_t Unique{ 0u };
+    uint32_t Repeats{ 0u };
+    std::string ResourceReport;
+};
+
+SharedCodeCook CookSharedCode(const std::filesystem::path& module_path, uint32_t level, bool dedupe)
+{
+    CookerOptions options;
+    options.ModulePaths = { module_path };
+    options.TargetNames = { "wgsl", "spirv" };
+    options.OutputPath = "OptimizedLayout";
+    options.OptimizationLevel = level;
+    options.DedupeEnabled = dedupe;
+
+    const PhaseTimings before = GetProcessPhaseTimings();
+    MemoryOutputSink sink;
+    const CookResult<CookStatistics> cooked = RunCook(options, sink);
+    const PhaseTimings after = GetProcessPhaseTimings();
+
+    SharedCodeCook result;
+    result.Result = cooked.has_value() ? CookError::Success : cooked.error();
+    result.ReflectionMismatches = cooked.has_value() ? cooked->ReflectionMismatches : 0u;
+    result.Forms = after.CodeReadForms - before.CodeReadForms;
+    result.Unique = after.CodeReadUnique - before.CodeReadUnique;
+    result.Repeats = after.CodeReadRepeats - before.CodeReadRepeats;
+
+    const auto report = sink.GetArtifacts().find(std::string{ k_ResourceReportFileName });
+    if (report != sink.GetArtifacts().end())
+    {
+        result.ResourceReport.assign(reinterpret_cast<const char*>(report->second.data()), report->second.size());
+    }
+
     return result;
 }
 
@@ -264,6 +311,38 @@ int main(int argc, char** argv)
             runner.Check(instance.Has("Linear"), "Linear is still in the layout");
             runner.Check(instance.WorkgroupBytes != 0u, "workgroup memory is not zero");
         }
+    }
+
+    {
+        // three variants of one entry point, for two targets: six forms at O0, and twelve at O2 with the base form
+        const tests::ScopedSection section = runner.Section("a cook reads each distinct code once");
+        const std::filesystem::path shared = assetDirectory / "SharedCode.slang";
+        const SharedCodeCook plain = CookSharedCode(shared, 0u, true);
+        const SharedCodeCook separate = CookSharedCode(shared, 0u, false);
+        const SharedCodeCook optimizedPlain = CookSharedCode(shared, 2u, true);
+        const SharedCodeCook optimizedSeparate = CookSharedCode(shared, 2u, false);
+
+        runner.CheckEqual(plain.Result, CookError::Success, "the O0 cook succeeds");
+        runner.CheckEqual(plain.Forms, 6u, "O0 reads the delivered form of each variant");
+        runner.CheckEqual(plain.Unique, 2u, "the variants of a target share one code, so O0 reads two");
+        runner.CheckEqual(plain.Repeats, 4u, "the other four forms repeat a code");
+
+        runner.CheckEqual(optimizedPlain.Result, CookError::Success, "the O2 cook succeeds");
+        runner.CheckEqual(optimizedPlain.Forms, 12u, "O2 reads the delivered form and the base form of each variant");
+        runner.Check(optimizedPlain.Unique <= 4u, "each target reads its delivered code and its base code once");
+        runner.CheckEqual(optimizedPlain.Repeats, optimizedPlain.Forms - optimizedPlain.Unique, "a form is a read or a repeat");
+
+        runner.CheckEqual(separate.Result, CookError::Success, "the --no-dedupe O0 cook succeeds");
+        runner.CheckEqual(separate.Forms, plain.Forms, "--no-dedupe reads the same forms");
+        runner.CheckEqual(separate.Unique, plain.Unique, "--no-dedupe reads the same distinct codes");
+        runner.CheckEqual(separate.ReflectionMismatches, plain.ReflectionMismatches, "--no-dedupe finds the same mismatches");
+        runner.Check(!plain.ResourceReport.empty() && separate.ResourceReport == plain.ResourceReport,
+                     "--no-dedupe gives the same resource report at O0");
+
+        runner.CheckEqual(optimizedSeparate.Result, CookError::Success, "the --no-dedupe O2 cook succeeds");
+        runner.CheckEqual(optimizedSeparate.Unique, optimizedPlain.Unique, "--no-dedupe reads the same distinct codes at O2");
+        runner.Check(!optimizedPlain.ResourceReport.empty() && optimizedSeparate.ResourceReport == optimizedPlain.ResourceReport,
+                     "--no-dedupe gives the same resource report at O2");
     }
 
     return runner.Report();

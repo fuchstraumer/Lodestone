@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <expected>
 #include <format>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -115,9 +116,19 @@ namespace
 
 } // namespace
 
-CookResult<BindingComparison> ResolvedLibraryValidator::ValidateEntryPoint(std::span<const std::byte> target_code,
-                                                                           std::span<const ReflectedBinding*> used,
-                                                                           DiagnosticSink& sink) const
+ParsedEmittedCode::~ParsedEmittedCode() = default;
+
+CookResult<std::unique_ptr<const ParsedEmittedCode>> ResolvedLibraryValidator::ParseEmittedCode(
+    std::span<const std::byte> target_code,
+    bool validate,
+    DiagnosticSink& sink) const
+{
+    return parseEmittedCode(target_code, validate, sink);
+}
+
+BindingComparison ResolvedLibraryValidator::CompareEmittedCode(const ParsedEmittedCode& parsed,
+                                                               std::span<const ReflectedBinding*> used,
+                                                               DiagnosticSink& sink) const
 {
     std::vector<const ReflectedBinding*> bound;
     std::vector<const ReflectedBinding*> stored;
@@ -134,13 +145,32 @@ CookResult<BindingComparison> ResolvedLibraryValidator::ValidateEntryPoint(std::
     }
     std::ranges::sort(bound, BoundPlacementLess);
 
-    return validateEntryPoint(target_code, bound, stored, sink);
+    return compareEmittedCode(parsed, bound, stored, sink);
+}
+
+CookResult<BindingComparison> ResolvedLibraryValidator::ValidateEntryPoint(std::span<const std::byte> target_code,
+                                                                           std::span<const ReflectedBinding*> used,
+                                                                           DiagnosticSink& sink) const
+{
+    CookResult<std::unique_ptr<const ParsedEmittedCode>> parsed = parseEmittedCode(target_code, true, sink);
+    if (!parsed)
+    {
+        return std::unexpected(parsed.error());
+    }
+
+    return CompareEmittedCode(**parsed, used, sink);
 }
 
 CookResult<EmittedCodeFacts> ResolvedLibraryValidator::ReadEmittedCodeFacts(std::span<const std::byte> target_code,
                                                                           DiagnosticSink& sink) const
 {
-    return readEmittedCodeFacts(target_code, sink);
+    CookResult<std::unique_ptr<const ParsedEmittedCode>> parsed = parseEmittedCode(target_code, false, sink);
+    if (!parsed)
+    {
+        return std::unexpected(parsed.error());
+    }
+
+    return (*parsed)->Facts;
 }
 
 std::string_view ToString(BindingMismatchKind kind) noexcept

@@ -37,7 +37,11 @@ public:
     SlangModuleContext(const SlangModuleContext&) = delete;
     SlangModuleContext& operator=(const SlangModuleContext&) = delete;
 
-    [[nodiscard]] CookError Initialize(const SlangCompilerCreateInfo& create_info, DiagnosticSink& sink);
+    /** @brief Creates the session of one environment from a global session. The global session belongs to the
+      * calling thread, and a thread must not share it. The context keeps a reference to it. */
+    [[nodiscard]] CookError Initialize(const SlangCompilerCreateInfo& create_info,
+                                       slang::IGlobalSession* global_session,
+                                       DiagnosticSink& sink);
     [[nodiscard]] CookError RunBootstrap();
     [[nodiscard]] CookResult<std::vector<RawAxisDeclaration>> BuildDeclaredAxes() const;
     /** @brief Sorted module-scope variable names, including `__include` fragments. Filters the symbol table's derived
@@ -155,6 +159,9 @@ private:
     bool compilesDeliveredForm{ false };
     DiagnosticSink* diagnosticSink{ nullptr };
 };
+
+/** @brief Creates a global session and loads the core module into it. Call it once for each thread. */
+[[nodiscard]] CookError CreateGlobalSession(Slang::ComPtr<slang::IGlobalSession>& global_session);
 
 /** @brief Writes the bootstrap's modules to the cache, from the calling thread only. A failure is a warning: the cache
  * is an optimization. */

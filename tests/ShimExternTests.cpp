@@ -4,6 +4,7 @@
 #include "Diagnostics.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "compile/RawLibrary.hpp"
+#include "compile/CompilePool.hpp"
 #include "compile/SlangCompiler.hpp"
 #include "permute/PermutationSpace.hpp"
 #include "permute/PermutationAxis.hpp"
@@ -50,12 +51,12 @@ constexpr std::array<ExpectedExtern, 5u> k_Expected{ {
 CookError Prepare(const std::filesystem::path& module_path,
                   const std::filesystem::path& cache_directory,
                   RecordingDiagnosticSink& sink,
+                  CompilePool& pool,
                   SlangCompiler& compiler)
 {
     SlangCompilerCreateInfo createInfo;
     createInfo.ModulePath = module_path;
     createInfo.ModuleCacheDirectory = cache_directory;
-    createInfo.MultithreadVariantBuild = false;
     createInfo.ExpectedBatchSize = 1u;
     createInfo.Language = TargetLanguage::Spirv;
     createInfo.SlangProfileName = "spirv_1_5";
@@ -63,7 +64,7 @@ CookError Prepare(const std::filesystem::path& module_path,
                                   .Texture = AccessModel::Bound,
                                   .Sampler = AccessModel::Bound,
                                   .StorageTexture = AccessModel::Bound };
-    return compiler.Initialize(createInfo, sink);
+    return compiler.Initialize(pool, createInfo, sink);
 }
 
 } // namespace
@@ -77,8 +78,9 @@ int main(int argc, char** argv)
     runner.BeginSection("an extern of a shim interface is read from the source and confirmed by reflection");
     {
         RecordingDiagnosticSink sink;
+        CompilePool pool{ false };
         SlangCompiler compiler;
-        runner.CheckEqual(Prepare(assetDirectory / "ShimExterns.slang", cacheDirectory, sink, compiler), CookError::Success,
+        runner.CheckEqual(Prepare(assetDirectory / "ShimExterns.slang", cacheDirectory, sink, pool, compiler), CookError::Success,
                           "a module with externs and no export loads");
         const PermutationSpace emptySpace{ std::vector<PermutationAxis>{} };
         const CookResult<RawModule> raw = compiler.PrepareRawModule(emptySpace);
@@ -116,8 +118,9 @@ int main(int argc, char** argv)
     runner.BeginSection("a shim extern that reflection does not find fails the cook, naming the line");
     {
         RecordingDiagnosticSink sink;
+        CompilePool pool{ false };
         SlangCompiler compiler;
-        runner.CheckEqual(Prepare(assetDirectory / "ShimExternHidden.slang", cacheDirectory, sink, compiler), CookError::Success,
+        runner.CheckEqual(Prepare(assetDirectory / "ShimExternHidden.slang", cacheDirectory, sink, pool, compiler), CookError::Success,
                           "the module loads");
         const PermutationSpace emptySpace{ std::vector<PermutationAxis>{} };
         const CookResult<RawModule> raw = compiler.PrepareRawModule(emptySpace);
@@ -137,8 +140,9 @@ int main(int argc, char** argv)
     runner.BeginSection("reflection reads ls_storage_format on the line before an extern with no default");
     {
         RecordingDiagnosticSink sink;
+        CompilePool pool{ false };
         SlangCompiler compiler;
-        runner.CheckEqual(Prepare(assetDirectory / "ShimStorageAxis.slang", cacheDirectory, sink, compiler), CookError::Success,
+        runner.CheckEqual(Prepare(assetDirectory / "ShimStorageAxis.slang", cacheDirectory, sink, pool, compiler), CookError::Success,
                           "the module loads");
         std::vector<RawEnumCase> cases;
         std::vector<PermutationValue> values;

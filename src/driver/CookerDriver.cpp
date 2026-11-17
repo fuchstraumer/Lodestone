@@ -54,6 +54,20 @@ namespace
         return std::format("{}_{}_{}.json", module_name, target_name, magic_enum::enum_name(kind));
     }
 
+    /** Adds the setup timings of a compiler to the process timings when the scope of the compiler ends, so that
+     * an error return does not lose them. */
+    class CompilerTimingsReporter
+    {
+    public:
+        explicit CompilerTimingsReporter(const SlangCompiler& _compiler) noexcept;
+        ~CompilerTimingsReporter();
+        CompilerTimingsReporter(const CompilerTimingsReporter&) = delete;
+        CompilerTimingsReporter& operator=(const CompilerTimingsReporter&) = delete;
+
+    private:
+        const SlangCompiler& compiler;
+    };
+
     CookedLibrary MakeEmptyLibrary(const SharedCookState& cook_state);
     CookError EmitLibraryArtifacts(const CookedLibrary& library,
                                    const CookerOptions& options,
@@ -109,6 +123,7 @@ namespace
         }
 
         const PreparedCompiler& preparedModule = *preparedModuleResult;
+        const CompilerTimingsReporter timingsReporter{ *preparedModule.Compiler };
         if (cook_state.Options.WriteDepfile)
         {
             for (const std::string& dependencyPath : preparedModule.Compiler->DependencyFilePaths())
@@ -365,6 +380,15 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
 
 namespace
 {
+
+    CompilerTimingsReporter::CompilerTimingsReporter(const SlangCompiler& _compiler) noexcept :
+      compiler{ _compiler }
+    {}
+
+    CompilerTimingsReporter::~CompilerTimingsReporter()
+    {
+        AddPhaseTimings(PhaseTimings{ .Compile = compiler.Timings() });
+    }
 
     /** A difference means an unordered container's order reached the output. */
     CookResult<CookStatistics> RunCookTwiceAndCompare(CookerOptions options,

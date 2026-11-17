@@ -4,6 +4,7 @@
 #include "CookerErrors.hpp"
 #include "target/TargetProfile.hpp"
 #include <cstddef>
+#include <memory>
 #include <span>
 
 namespace lodestone
@@ -17,12 +18,13 @@ public:
     WgslValidator();
     ~WgslValidator() final;
 protected:
-    [[nodiscard]] CookResult<BindingComparison> validateEntryPoint(std::span<const std::byte> source_code,
-                                                                   std::span<const ReflectedBinding*> bindings,
-                                                                   std::span<const ReflectedBinding*> stored,
-                                                                   DiagnosticSink& sink) const final;
-    [[nodiscard]] CookResult<EmittedCodeFacts> readEmittedCodeFacts(std::span<const std::byte> source_code,
-                                                                    DiagnosticSink& sink) const override;
+    [[nodiscard]] CookResult<std::unique_ptr<const ParsedEmittedCode>> parseEmittedCode(std::span<const std::byte> source_code,
+                                                                                         bool validate,
+                                                                                         DiagnosticSink& sink) const final;
+    [[nodiscard]] BindingComparison compareEmittedCode(const ParsedEmittedCode& parsed,
+                                                       std::span<const ReflectedBinding*> bound,
+                                                       std::span<const ReflectedBinding*> stored,
+                                                       DiagnosticSink& sink) const final;
 };
 
 } // namespace lodestone

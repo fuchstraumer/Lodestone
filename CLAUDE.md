@@ -259,10 +259,10 @@ and nowhere else.**
 | File | Owns | Lifetime |
 |---|---|---|
 | `SlangCompilerTypes` | The enum conversions, `BindingScope`, `RawBindingDraft`, the option table. | Free functions. |
-| `SlangModuleContext` | One global session, one session, the root module, the entry points, the source texts. | One for each thread. |
+| `SlangModuleContext` | One session, the root module, the entry points, the source texts. It uses a global session that it does not own. | One for each thread and each environment. |
 | `SlangVariantCompiler` | Link, target codegen, entry point metadata. Returns `LinkedVariant`. | One for each job. |
 | `SlangReflector` | Every reflection walk. Takes `LinkedVariant`, returns `RawVariant`. | One for each job. |
-| `ThreadPool` | An atomic job index and a latch. Spreads variants across workers. | One for each compiler. |
+| `ThreadPool` | An atomic job index and a latch. Spreads variants across workers. Each thread, and the calling thread, creates one global session and keeps it. A worker prepares its context only after it takes a job. A batch that needs k workers wakes workers 0 to k-1 only, so a cook creates as many worker global sessions as its largest k. | One for each cook. `CompilePool` (`compile/CompilePool.hpp`) wraps it, and `SharedCookState` owns the `CompilePool`. |
 | `EmbeddedFileSystem` | The Slang file system. It serves the builtin modules from memory, and every other path from disk. | One for the process. |
 
 `SlangModuleContext` is defined in two files: `SlangModuleContext.cpp` contains the session, the bootstrap, and
@@ -473,9 +473,9 @@ number would state that every target must supply one. A target supplies a valida
    name one of those defaults, so it must run before the first variant.
    `SlangCompiler::Compile` then runs once for the whole variant set, and returns one
    `CookResult<RawVariant>` for each variant. A `ThreadPool` spreads the variants across workers.
-   Each worker holds one `SlangModuleContext`, and each job runs a `SlangVariantCompiler` and then a
-   `SlangReflector`. Output is `RawVariant`. Every `[ls_*]` argument comes back as the string the
-   author wrote, because evaluating one is stage 4's job.
+   Each worker thread keeps one global session for the whole cook, and makes one `SlangModuleContext` for each
+   batch that gives it a job. Each job runs a `SlangVariantCompiler` and then a `SlangReflector`. Output is
+   `RawVariant`. Every `[ls_*]` argument comes back as the string the author wrote, because evaluating one is stage 4's job.
 4. **Resolve.** `ResolveVariant` in `model/ResolveStage.cpp` reads the `[ls_*]` attributes and evaluates each
    size expression against a `ResolveContext`. Output is `CompiledVariant`.
    **No file under `src/compile/` names a size expression or evaluates a `[ls_*]` attribute, and
@@ -513,13 +513,18 @@ Nine validators run inside that loop. None of them is a stage.
 Each validator is one bullet here. `docs/code-notes.md` section 14 holds the detail of each one: what it reads, what it
 skips, and the Slang workarounds it carries.
 
-- **The reflection cross-check**, after stage 4 (`ReadEmittedCode` in `BuildModuleStep.cpp`). The profile's validator reads
-  the emitted code (Tint for WGSL, `SpvValidator` for SPIR-V) and compares its bindings with reflection. A mismatch fails
+- **The reflection cross-check**, after stage 4 (`CompileModuleVariants` in `BuildModuleStep.cpp`, a read pass after
+  the parallel compile). The profile's validator reads the emitted code (Tint for WGSL, `SpvValidator` for SPIR-V) and
+  compares its bindings with reflection. The read is `ResolvedLibraryValidator::ParseEmittedCode`, and it depends on the
+  code bytes alone, so the pass reads each distinct code of an environment once, in parallel (`ParallelFor`, one task for
+  each distinct code), and compares every form of that code with its own reflection (`CompareEmittedCode`). Each form
+  writes its own result slot, and the records are reported in variant order, so the first error in variant order fails
+  the cook. `--no-dedupe` does not change the pass. A mismatch fails
   the cook with `ReflectionMismatch`. A profile with no validator fails with `TargetValidatorUnavailable`, and
   `--no-validate` skips the check on purpose. The same read gives cook output: the sampler and texture pairs (task L7),
   the push constant block of the entry point constants (task L14), and the source facts. Each vertex input that the code reads must be a reflected
   vertex input with the same type (`CompareVertexInputs`, `BindingMismatchKind::VertexInput`). `--no-validate` still reads them
-  (`ReadEmittedCodeFacts`). **The code decides which bindings an entry point uses** (`KeepDeclaredBindings`): above `--O0`
+  (`ParseEmittedCode` with no comparison). **The code decides which bindings an entry point uses** (`KeepDeclaredBindings`): above `--O0`
   Slang gives SPIR-V to spirv-opt, which removes bindings that Slang's metadata marks used, so a reflected binding that the
   code does not declare leaves the visibility and is not a mismatch. Every other difference still fails. One Slang fault
   has a narrow workaround here, with a canary test: shader-slang/slang#13895 (`IsSlangNonReadableArrayFault`).

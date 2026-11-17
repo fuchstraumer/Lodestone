@@ -2,6 +2,8 @@
 #ifndef LODESTONE_COOKER_STEPS_HPP
 #define LODESTONE_COOKER_STEPS_HPP
 #include "Diagnostics.hpp"
+#include "compile/CompilePool.hpp"
+#include "compile/CompileTimings.hpp"
 #include "driver/CookerOptions.hpp"
 #include "permute/PolicyDocument.hpp"
 #include "target/TargetProfile.hpp"
@@ -40,6 +42,8 @@ struct SharedCookState
     std::vector<std::string> AllModuleNames;
     // views into the Options strings
     std::unordered_map<std::string_view, TargetProfile> TargetProfiles;
+    /** The compile threads and their Slang global sessions, shared by every compiler of the cook. */
+    std::unique_ptr<CompilePool> Compile;
 };
 
 struct PreparedCook
@@ -93,6 +97,16 @@ struct PhaseTimings
     double Validate_CrossProfileMs{ 0.0 };
     double Stage8_EmitMs{ 0.0 };
     uint32_t CooksRun{ 0u };
+    /** Slang setup work. The worker values are CPU time summed over threads, not wall time. */
+    CompileTimings Compile;
+    /** The wall time of the read pass over the emitted code, which is part of `Validate_EmittedCodeMs`. */
+    double CodeReadMs{ 0.0 };
+    /** The forms that the pass compared with reflection. */
+    uint32_t CodeReadForms{ 0u };
+    /** The forms that share the code bytes of an earlier form of the same environment, so they cost no read. */
+    uint32_t CodeReadRepeats{ 0u };
+    /** The reads that the pass made, one for each distinct code of an environment. */
+    uint32_t CodeReadUnique{ 0u };
 
     PhaseTimings& operator+=(const PhaseTimings& other) noexcept;
 };

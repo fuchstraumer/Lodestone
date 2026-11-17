@@ -1,5 +1,6 @@
 #include "driver/CookerSteps.hpp"
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -16,6 +17,30 @@ namespace lodestone
 namespace
 {
     PhaseTimings g_ProcessPhaseTimings{};
+
+    constexpr std::array<double CompileTimings::*, 9> k_CompileMsFields
+    {
+        &CompileTimings::BootstrapGlobalSessionMs,
+        &CompileTimings::WorkerGlobalSessionMs,
+        &CompileTimings::WorkerSetupMs,
+        &CompileTimings::WorkerPrepareMs,
+        &CompileTimings::WorkerPrepareCriticalPathMs,
+        &CompileTimings::BootstrapCompileMs,
+        &CompileTimings::SerializeModulesMs,
+        &CompileTimings::WriteModuleCacheMs,
+        &CompileTimings::SymbolTableMs,
+    };
+
+    constexpr std::array<uint32_t CompileTimings::*, 4> k_CompileCountFields
+    {
+        &CompileTimings::BootstrapGlobalSessionCount,
+        &CompileTimings::WorkerGlobalSessionCount,
+        &CompileTimings::WorkerSetupCount,
+        &CompileTimings::IdleWorkerCount,
+    };
+
+    void AddCompileTimings(CompileTimings& total, const CompileTimings& other) noexcept;
+    CompileTimings LoadCompileTimings(CompileTimings& total) noexcept;
 }
 
 CookStatistics& CookStatistics::operator+=(const CookStatistics& other)
@@ -50,6 +75,11 @@ PhaseTimings& PhaseTimings::operator+=(const PhaseTimings& other) noexcept
     Validate_CrossProfileMs += other.Validate_CrossProfileMs;
     Stage8_EmitMs += other.Stage8_EmitMs;
     CooksRun += other.CooksRun;
+    Compile += other.Compile;
+    CodeReadMs += other.CodeReadMs;
+    CodeReadForms += other.CodeReadForms;
+    CodeReadRepeats += other.CodeReadRepeats;
+    CodeReadUnique += other.CodeReadUnique;
     return *this;
 }
 
@@ -67,7 +97,16 @@ void AddPhaseTimings(const PhaseTimings& timings) noexcept
     std::atomic_ref<double> vCross{ g_ProcessPhaseTimings.Validate_CrossProfileMs };
     std::atomic_ref<double> s8{ g_ProcessPhaseTimings.Stage8_EmitMs };
     std::atomic_ref<uint32_t> cooks{ g_ProcessPhaseTimings.CooksRun };
+    std::atomic_ref<double> codeReadMs{ g_ProcessPhaseTimings.CodeReadMs };
+    std::atomic_ref<uint32_t> codeReadForms{ g_ProcessPhaseTimings.CodeReadForms };
+    std::atomic_ref<uint32_t> codeReadRepeats{ g_ProcessPhaseTimings.CodeReadRepeats };
+    std::atomic_ref<uint32_t> codeReadUnique{ g_ProcessPhaseTimings.CodeReadUnique };
 
+    AddCompileTimings(g_ProcessPhaseTimings.Compile, timings.Compile);
+    codeReadMs.fetch_add(timings.CodeReadMs, std::memory_order_relaxed);
+    codeReadForms.fetch_add(timings.CodeReadForms, std::memory_order_relaxed);
+    codeReadRepeats.fetch_add(timings.CodeReadRepeats, std::memory_order_relaxed);
+    codeReadUnique.fetch_add(timings.CodeReadUnique, std::memory_order_relaxed);
     prep.fetch_add(timings.PrepareCookMs, std::memory_order_relaxed);
     s1.fetch_add(timings.Stage1_DeclareMs, std::memory_order_relaxed);
     s2.fetch_add(timings.Stage2_EnumerateMs, std::memory_order_relaxed);
@@ -96,6 +135,10 @@ PhaseTimings GetProcessPhaseTimings() noexcept
     std::atomic_ref<double> vCross{ g_ProcessPhaseTimings.Validate_CrossProfileMs };
     std::atomic_ref<double> s8{ g_ProcessPhaseTimings.Stage8_EmitMs };
     std::atomic_ref<uint32_t> cooks{ g_ProcessPhaseTimings.CooksRun };
+    std::atomic_ref<double> codeReadMs{ g_ProcessPhaseTimings.CodeReadMs };
+    std::atomic_ref<uint32_t> codeReadForms{ g_ProcessPhaseTimings.CodeReadForms };
+    std::atomic_ref<uint32_t> codeReadRepeats{ g_ProcessPhaseTimings.CodeReadRepeats };
+    std::atomic_ref<uint32_t> codeReadUnique{ g_ProcessPhaseTimings.CodeReadUnique };
 
     return PhaseTimings{
         .PrepareCookMs = prep.load(std::memory_order_relaxed),
@@ -109,7 +152,12 @@ PhaseTimings GetProcessPhaseTimings() noexcept
         .Validate_ModuleRoundTripsMs = vRoundTrip.load(std::memory_order_relaxed),
         .Validate_CrossProfileMs = vCross.load(std::memory_order_relaxed),
         .Stage8_EmitMs = s8.load(std::memory_order_relaxed),
-        .CooksRun = cooks.load(std::memory_order_relaxed)
+        .CooksRun = cooks.load(std::memory_order_relaxed),
+        .Compile = LoadCompileTimings(g_ProcessPhaseTimings.Compile),
+        .CodeReadMs = codeReadMs.load(std::memory_order_relaxed),
+        .CodeReadForms = codeReadForms.load(std::memory_order_relaxed),
+        .CodeReadRepeats = codeReadRepeats.load(std::memory_order_relaxed),
+        .CodeReadUnique = codeReadUnique.load(std::memory_order_relaxed)
     };
 }
 
@@ -166,10 +214,17 @@ void WriteTestTimingCsvRow(std::string_view test_name, double total_test_ms)
                 "prepare_cook_ms,stage1_declare_ms,stage2_enumerate_ms,stage3_compile_ms,"
                 "stage4_resolve_ms,validate_emitted_code_ms,stage6_intern_ms,stage7_freeze_ms,"
                 "validate_module_roundtrips_ms,validate_cross_profile_ms,stage8_emit_ms,"
-                "other_test_ms,total_test_ms\n";
+                "other_test_ms,total_test_ms,"
+                "bootstrap_global_session_ms,bootstrap_global_session_count,"
+                "worker_global_session_ms,worker_global_session_count,"
+                "worker_setup_ms,worker_setup_count,worker_prepare_ms,worker_prepare_critical_path_ms,"
+                "idle_worker_count,bootstrap_compile_ms,serialize_modules_ms,write_module_cache_ms,"
+                "symbol_table_ms,code_read_ms,code_read_forms,code_read_repeats,code_read_unique\n";
     }
 
-    file << std::format("{},{},{},{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}\n",
+    const CompileTimings& compile = timings.Compile;
+    file << std::format("{},{},{},{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},"
+                        "{:.4f},{},{:.4f},{},{:.4f},{},{:.4f},{:.4f},{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{},{},{}\n",
                         compiler,
                         buildConfig,
                         testName,
@@ -186,7 +241,63 @@ void WriteTestTimingCsvRow(std::string_view test_name, double total_test_ms)
                         timings.Validate_CrossProfileMs,
                         timings.Stage8_EmitMs,
                         otherMs,
-                        total_test_ms);
+                        total_test_ms,
+                        compile.BootstrapGlobalSessionMs,
+                        compile.BootstrapGlobalSessionCount,
+                        compile.WorkerGlobalSessionMs,
+                        compile.WorkerGlobalSessionCount,
+                        compile.WorkerSetupMs,
+                        compile.WorkerSetupCount,
+                        compile.WorkerPrepareMs,
+                        compile.WorkerPrepareCriticalPathMs,
+                        compile.IdleWorkerCount,
+                        compile.BootstrapCompileMs,
+                        compile.SerializeModulesMs,
+                        compile.WriteModuleCacheMs,
+                        compile.SymbolTableMs,
+                        timings.CodeReadMs,
+                        timings.CodeReadForms,
+                        timings.CodeReadRepeats,
+                        timings.CodeReadUnique);
+}
+
+namespace
+{
+
+    void AddCompileTimings(CompileTimings& total, const CompileTimings& other) noexcept
+    {
+        for (double CompileTimings::* field : k_CompileMsFields)
+        {
+            std::atomic_ref<double> target{ total.*field };
+            target.fetch_add(other.*field, std::memory_order_relaxed);
+        }
+
+        for (uint32_t CompileTimings::* field : k_CompileCountFields)
+        {
+            std::atomic_ref<uint32_t> target{ total.*field };
+            target.fetch_add(other.*field, std::memory_order_relaxed);
+        }
+    }
+
+    CompileTimings LoadCompileTimings(CompileTimings& total) noexcept
+    {
+        CompileTimings loaded{};
+
+        for (double CompileTimings::* field : k_CompileMsFields)
+        {
+            std::atomic_ref<double> source{ total.*field };
+            loaded.*field = source.load(std::memory_order_relaxed);
+        }
+
+        for (uint32_t CompileTimings::* field : k_CompileCountFields)
+        {
+            std::atomic_ref<uint32_t> source{ total.*field };
+            loaded.*field = source.load(std::memory_order_relaxed);
+        }
+
+        return loaded;
+    }
+
 }
 
 }
