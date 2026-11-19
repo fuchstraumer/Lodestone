@@ -175,12 +175,7 @@ std::vector<ManifestIndex::ScanConstraint> ManifestIndex::convertToScanConstrain
             valueIndices = integralValueIndices(range.AxisIndex, range);
         }
 
-        // the builder reports errors
-        if (valueIndices.empty())
-        {
-            return {};
-        }
-
+        // the builder rejects unknown values, so an empty list is an empty complement, which matches nothing
         scanConstraints.emplace_back(range.AxisIndex, std::move(valueIndices), range.Mode);
     }
 
@@ -191,6 +186,15 @@ std::vector<VariantKey> ManifestIndex::select(std::span<const QueryAxisRange> co
 {
     assert(std::ranges::is_sorted(constraints, std::less<uint32_t>{}, &QueryAxisRange::AxisIndex));
     const std::vector<ScanConstraint> scanConstraints = convertToScanConstraints(constraints);
+    const auto matchesNothing = [](const ScanConstraint& constraint) -> bool
+    {
+        return constraint.AllowedValueIndices.empty();
+    };
+    if (std::ranges::any_of(scanConstraints, matchesNothing))
+    {
+        return {};
+    }
+
     return scan(scanConstraints);
 }
 

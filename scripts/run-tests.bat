@@ -33,7 +33,7 @@ if not exist "%BIN%" (
 set "FAILED=0"
 
 for %%T in ("%BIN%\*Test.exe") do (
-    if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="WorkgroupMemoryCookTest" if /I not "%%~nT"=="CrossModuleCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" if /I not "%%~nT"=="KitchenSinkCookTest" if /I not "%%~nT"=="KitchenSinkOptimizedCookTest" (
+    if /I not "%%~nT"=="EntryPointParamsCookTest" if /I not "%%~nT"=="ParameterBlocksCookTest" if /I not "%%~nT"=="WorkgroupMemoryCookTest" if /I not "%%~nT"=="TexelBufferCookTest" if /I not "%%~nT"=="CrossModuleCookTest" if /I not "%%~nT"=="InterfaceAxisCookTest" if /I not "%%~nT"=="KitchenSinkCookTest" if /I not "%%~nT"=="KitchenSinkOptimizedCookTest" (
         "%%~fT" >nul 2>&1
         if !ERRORLEVEL! neq 0 (
             echo [FAIL] %%~nT
@@ -89,6 +89,15 @@ if !ERRORLEVEL! neq 0 (
     set "FAILED=1"
 ) else (
     echo [ ok ] WorkgroupMemoryCookTest
+)
+
+REM The texel buffer probe. SPIR-V declares Buffer<T> and RWBuffer<T> as images with the dimension Buffer. The wgsl target cannot cook them.
+"%BIN%\TexelBufferCookTest.exe" -o "%REPO%\build\%PRESET%\tests\texel_buffer_output" --target=spirv --verify-deterministic "%REPO%\tests\assets\TexelBuffers.slang" >nul 2>&1
+if !ERRORLEVEL! neq 0 (
+    echo [FAIL] TexelBufferCookTest
+    set "FAILED=1"
+) else (
+    echo [ ok ] TexelBufferCookTest
 )
 
 REM The multi-module KitchenSink cook. Four consumer modules cook together against one policy, for

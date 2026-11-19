@@ -58,6 +58,13 @@ add_lodestone_unit_test(CrossModuleCookTest CookTest.cpp
               --verify-deterministic
               "${PROJECT_SOURCE_DIR}/tests/assets/CrossModule/lib/CmShared.slang"
               "${PROJECT_SOURCE_DIR}/tests/assets/CrossModule/app/CmKernel.slang")
+# Texel buffers: `Buffer<T>` and `RWBuffer<T>` are images with the dimension Buffer in SPIR-V. The cross-check fails the cook
+# when the reader takes them for a texture and a storage texture. The wgsl target cannot cook them: Slang rejects the module.
+add_lodestone_unit_test(TexelBufferCookTest CookTest.cpp
+    TEST_ARGS -o "${CMAKE_CURRENT_BINARY_DIR}/texel_buffer_output"
+              --target=spirv
+              --verify-deterministic
+              "${PROJECT_SOURCE_DIR}/tests/assets/TexelBuffers.slang")
 # The workgroup memory probe: four groupshared variables that pad differently, and one half4 array. The cross-profile
 # validator fails the cook when the two targets read different bytes or a different 16-bit float requirement.
 add_lodestone_unit_test(WorkgroupMemoryCookTest CookTest.cpp
@@ -228,6 +235,9 @@ target_compile_definitions(CookerOptionsTest PRIVATE
 # The harness itself: each helper can fail, and a section that runs no check fails.
 add_lodestone_unit_test(TestHarnessTest TestHarnessTests.cpp)
 add_lodestone_unit_test(ContentInternerTest ContentInternerTests.cpp)
+# The JSON writer of the tools: escapes, and nothing else. It needs no Slang.
+add_lodestone_unit_test(JsonWriterTest JsonWriterTests.cpp)
+target_link_libraries(JsonWriterTest PRIVATE lodestone::json)
 add_lodestone_unit_test(PermutationIndexTest PermutationIndexTests.cpp)
 add_lodestone_unit_test(ShaderManifestRejectTest ShaderManifestRejectTests.cpp)
 if (LODESTONE_ENABLE_WGSL)

@@ -287,6 +287,21 @@ int main()
                  "a read-write storage buffer reflected as read-only fails");
     runner.CheckEqual(KindsOf(accessMismatch), std::vector{ BindingMismatchKind::Kind }, "the record names the field that differs");
 
+    runner.BeginSection("a reflected kind with no WGSL form is a kind mismatch");
+    // WGSL has no combined texture sampler, so the expected Tint type does not exist. The record must still print.
+    std::vector<ReflectedBinding> noWgslForm = MakeAgreeingReflection();
+    noWgslForm[0].Kind = BindingKind::CombinedTextureSampler;
+    std::vector<const ReflectedBinding*> noWgslFormPointers = PointersTo(noWgslForm);
+    const CookResult<BindingComparison> noFormMismatch =
+        validator.ValidateEntryPoint(std::as_bytes(std::span{ k_Wgsl }), noWgslFormPointers, sink);
+    runner.CheckEqual(KindsOf(noFormMismatch), std::vector{ BindingMismatchKind::Kind },
+                      "a combined texture sampler against a WGSL uniform fails as a kind mismatch");
+    if (noFormMismatch.has_value() && !noFormMismatch->Mismatches.empty())
+    {
+        runner.Check(noFormMismatch->Mismatches.front().Reflected.contains("(no WGSL form)"),
+                     "the record says that the reflected kind has no WGSL form");
+    }
+
     runner.BeginSection("the shadow flag distinguishes a depth texture");
     // `ShadowedTexture` is a `texture_depth_2d_array`. Dropping the shadow flag makes the reflected
     // kind resolve to a plain sampled texture, which disagrees with Tint's `kDepthTexture`.

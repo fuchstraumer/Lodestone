@@ -5,6 +5,7 @@
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationAxis.hpp"
 #include "permute/PermutationSpace.hpp"
+#include "permute/PermutationTypes.hpp"
 #include "permute/PermutationValue.hpp"
 #include "permute/PolicyDocument.hpp"
 #include "TestHarness.hpp"
@@ -12,6 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -236,6 +238,34 @@ int main()
         runner.CheckEqual(emptyVariants.value().Variants.size(), 1u, "an empty space gives exactly one variant");
         runner.CheckEqual(emptyVariants.value().SpaceSize, 1, "an empty space has an index range of one");
         runner.CheckEqual(emptyVariants.value().Variants.front().Index, 0, "that one variant takes index zero");
+    }
+
+    runner.BeginSection("interface implementation and enum case order is a strict weak ordering");
+    {
+        const lodestone::RawInterfaceImpl moduleB{ .Module = "B", .TypeName = "x" };
+        const lodestone::RawInterfaceImpl moduleA{ .Module = "A", .TypeName = "y" };
+        runner.Check(moduleA < moduleB, "module A sorts before module B");
+        runner.Check(!(moduleB < moduleA), "module B does not sort before module A, whatever the type names are");
+
+        const lodestone::RawInterfaceImpl sameModuleLater{ .Module = "A", .TypeName = "z" };
+        runner.Check(moduleA < sameModuleLater, "in one module, the type name decides");
+        runner.Check(!(moduleA < moduleA), "no implementation sorts before itself");
+
+        std::vector<lodestone::RawInterfaceImpl> impls{ moduleB, sameModuleLater, moduleA };
+        std::ranges::sort(impls, std::less{});
+        runner.CheckEqual(impls.size(), 3u, "the sort keeps every implementation");
+        runner.CheckEqual(impls[0].TypeName, "y", "A.y sorts first");
+        runner.CheckEqual(impls[1].TypeName, "z", "A.z sorts second");
+        runner.CheckEqual(impls[2].TypeName, "x", "B.x sorts last");
+
+        const lodestone::RawEnumCase caseB{ .Name = "B", .Value = 1 };
+        const lodestone::RawEnumCase caseA{ .Name = "A", .Value = 2 };
+        runner.Check(caseA < caseB, "case A sorts before case B");
+        runner.Check(!(caseB < caseA), "case B does not sort before case A, whatever the values are");
+
+        const lodestone::RawEnumCase caseALater{ .Name = "A", .Value = 3 };
+        runner.Check(caseA < caseALater, "for one name, the value decides");
+        runner.Check(!(caseA < caseA), "no case sorts before itself");
     }
 
     return runner.Report();

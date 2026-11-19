@@ -318,6 +318,60 @@ void TestSourceFacts(lodestone::tests::TestRunner& runner)
                       "a capability name past the string table is rejected");
 }
 
+/** A range or a product in a record is checked without a 32-bit wrap: a first index near the top of the range, and a
+ * table count whose mask product does not fit in 32 bits. */
+void TestWrappingRanges(lodestone::tests::TestRunner& runner)
+{
+    lodestone::RecordingDiagnosticSink manifestDiagnostics;
+    runner.BeginSection("a raster range whose end wraps in 32 bits is rejected");
+    const CookedLibrary library = MakeSmallLibrary();
+    const lodestone::CookResult<std::vector<std::byte>> manifest = EmitShaderManifest(library, manifestDiagnostics);
+    if (!runner.CheckOk(manifest, "the emitter accepts the small library"))
+    {
+        return;
+    }
+
+    const std::vector<std::byte>& bytes = *manifest;
+    const Header header = ReadRecord<Header>(bytes, 0u);
+    const EnvironmentDirectoryEntry entry = ReadRecord<EnvironmentDirectoryEntry>(bytes, header.EnvironmentDirectoryOffset);
+    const EnvironmentHeader environment = ReadRecord<EnvironmentHeader>(bytes, entry.ExtentOffset);
+    if (!runner.Check(environment.Rasters.Count > 0u, "the module has a raster state to damage"))
+    {
+        return;
+    }
+
+    const size_t rasterOffset = entry.ExtentOffset + environment.Rasters.Offset;
+    std::vector<std::byte> vertexWrap = bytes;
+    WriteValue(vertexWrap, rasterOffset + offsetof(lodestone::manifest::RasterState, FirstVertexInput), 0xFFFFFFFFu);
+    WriteValue(vertexWrap, rasterOffset + offsetof(lodestone::manifest::RasterState, VertexInputCount), 1u);
+    runner.CheckEqual(EnvironmentErrorFrom(vertexWrap, 0u), ErrorCode::InvalidRasterVertexInputRange,
+                      "FirstVertexInput 0xFFFFFFFF with a count of 1 is rejected (the table is empty, and the sum wraps to 0)");
+
+    std::vector<std::byte> colorWrap = bytes;
+    WriteValue(colorWrap, rasterOffset + offsetof(lodestone::manifest::RasterState, FirstColorTarget), 0xFFFFFFFFu);
+    WriteValue(colorWrap, rasterOffset + offsetof(lodestone::manifest::RasterState, ColorTargetCount), 1u);
+    runner.CheckEqual(EnvironmentErrorFrom(colorWrap, 0u), ErrorCode::InvalidRasterColorTargetRange,
+                      "FirstColorTarget 0xFFFFFFFF with a count of 1 is rejected (the table is empty, and the sum wraps to 0)");
+
+    runner.BeginSection("a mask table whose size wraps in 32 bits is rejected as a section");
+    // 65 capability names need two mask words. 0x80000000 sources times 2 wraps to 0.
+    std::vector<std::byte> productWrap = bytes;
+    const size_t headerOffset = entry.ExtentOffset;
+    WriteValue(productWrap, headerOffset + offsetof(EnvironmentHeader, CapabilityNames) + offsetof(lodestone::manifest::TableRef, Count), 65u);
+    WriteValue(productWrap, headerOffset + offsetof(EnvironmentHeader, Sources) + offsetof(lodestone::manifest::TableRef, Count), 0x80000000u);
+    const ManifestResult<BundleView> bundle = BundleView::Open(productWrap);
+    if (runner.CheckOk(bundle, "the header region still opens"))
+    {
+        const ManifestResult<EnvironmentView> opened = bundle->OpenEnvironment(0u, 0u);
+        if (runner.Check(!opened.has_value(), "the environment is rejected"))
+        {
+            runner.CheckEqual(opened.error().Code, ErrorCode::SectionOutOfBounds, "the code is SectionOutOfBounds");
+            runner.CheckEqual(opened.error().Table, lodestone::manifest::ShaderManifestTable::SourceCapabilities,
+                              "the first table that fails is the source capability masks, not a later table");
+        }
+    }
+}
+
 /** Two profiles of one variant need the same workgroup memory and the same portable capabilities. The names that only
  * one target spells (`StorageInputOutput16`) are not compared. */
 void TestSourceFactsAcrossProfiles(lodestone::tests::TestRunner& runner)
@@ -838,6 +892,7 @@ int main()
     TestSourceFacts(runner);
     TestSourceFactsAcrossProfiles(runner);
     TestMemberLookup(runner);
+    TestWrappingRanges(runner);
 
     return runner.Report();
 }

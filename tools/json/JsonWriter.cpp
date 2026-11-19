@@ -251,10 +251,10 @@ void JsonWriter::writeEscaped(std::string_view text) noexcept
         default:
             if (static_cast<unsigned char>(character) < 0x20u)
             {
-                char hex[4]{ '0', '0', '0', '0' };
-                std::to_chars(hex + 2u, hex + 4u, static_cast<unsigned char>(character), 16);
-                buffer.append("\\u00");
-                buffer.append(hex + 2u, 2u);
+                constexpr std::string_view hexDigits{ "0123456789abcdef" };
+                const auto code = static_cast<unsigned char>(character);
+                const char escape[6]{ '\\', 'u', '0', '0', hexDigits[code >> 4u], hexDigits[code & 0xFu] };
+                buffer.append(escape, sizeof(escape));
             }
             else
             {

@@ -143,7 +143,7 @@ BindingComparison SpvValidator::compareEmittedCode(const ParsedEmittedCode& pars
 namespace
 {
 
-    /** SPIR-V states shape for images only, and access for storage buffers and images only. */
+    /** SPIR-V states shape for images only, and access for storage buffers, storage images, and texel buffers only. */
     bool ShapeIsStated(BindingKind kind) noexcept
     {
         return (kind == BindingKind::Texture) || (kind == BindingKind::StorageTexture);
@@ -151,7 +151,7 @@ namespace
 
     bool AccessIsStated(BindingKind kind) noexcept
     {
-        return (kind == BindingKind::StorageBuffer) || (kind == BindingKind::StorageTexture);
+        return (kind == BindingKind::StorageBuffer) || (kind == BindingKind::StorageTexture) || (kind == BindingKind::TexelBuffer);
     }
 
     /** SPIR-V joins scopes with dots, and reflection with underscores (todo.md has the scope question). Placement

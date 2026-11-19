@@ -1256,6 +1256,20 @@ int main()
     runner.CheckEqual(twoErrors.Errors().size(), 2u, "each bad Where adds one error");
     runner.CheckError(twoErrors.Keys(), QueryErrorCode::UnknownAxis, "the terminal returns the first error code");
 
+    runner.BeginSection("WhereNoneOf that excludes every value of an axis matches nothing");
+    const std::array<uint32_t, 3> allTiles{ 8u, 16u, 32u };
+    const ManifestQueryBuilder noTile = index.Query().WhereNoneOf("TILE", allTiles);
+    runner.Check(noTile.IsValid(), "excluding every value is a valid query");
+    runner.CheckEqual(KeyCount(noTile), 0u, "an empty complement selects no variant");
+    const std::expected<VariantKey, lodestone::QueryError> noTileSingle = noTile.Single();
+    if (runner.CheckError(noTileSingle, QueryErrorCode::NoVariantForConstraints, "Single reports the empty complement"))
+    {
+        runner.CheckEqual(noTileSingle.error().AxisName, "TILE", "the error names the axis with the empty complement");
+    }
+    const std::array<std::string_view, 3> allQualities{ "Low", "Medium", "High" };
+    runner.CheckEqual(KeyCount(index.Query().Where("DITHER", true).WhereNoneOf("QUALITY", AxisValueDomain::Enum, allQualities)),
+                      0u, "an empty enum complement beside another constraint selects no variant");
+
     // make sure that empty value sets into constraints report back as expected, but still
     // make sure the unknown axis is reported before the empty set
     runner.BeginSection("an empty value set reports EmptyConstraintSet");

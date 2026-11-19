@@ -50,6 +50,8 @@ namespace
     bool TableIsInBounds(TableRef loc, size_t record_size, uint64_t region_size) noexcept;
     bool TableIsInBounds(TableRef64 loc, size_t record_size, uint64_t region_size) noexcept;
     bool GridFitsRegion(uint64_t rows, uint64_t columns, size_t record_size, uint64_t region_size) noexcept;
+    bool RangeFitsCount(uint32_t first, uint32_t count, uint32_t total) noexcept;
+    uint32_t SaturatedProduct(uint32_t factor_a, uint32_t factor_b) noexcept;
     ErrorState ValidateSections(std::span<const Section> sections, uint64_t region_size) noexcept;
     ErrorState ValidateSections(std::span<const Section64> sections, uint64_t region_size) noexcept;
 
@@ -143,6 +145,17 @@ namespace
         }
 
         return rows <= (region_size / record_size) / columns;
+    }
+
+    bool RangeFitsCount(uint32_t first, uint32_t count, uint32_t total) noexcept
+    {
+        return first <= total && count <= total - first;
+    }
+
+    uint32_t SaturatedProduct(uint32_t factor_a, uint32_t factor_b) noexcept
+    {
+        const uint64_t product = static_cast<uint64_t>(factor_a) * factor_b;
+        return static_cast<uint32_t>(std::min<uint64_t>(product, std::numeric_limits<uint32_t>::max()));
     }
 
     ErrorState ValidateSections(std::span<const Section> sections, uint64_t region_size) noexcept
@@ -520,15 +533,17 @@ namespace
 
         const TableRef varKeysLoc{ environment.VariantKeyTableOffset, environment.VariantCount };
         const TableRef varsLoc{ environment.VariantTableOffset, environment.VariantCount };
+        // a product that does not fit a count saturates, so the bounds check fails it
         const TableRef axisMasksLoc{ environment.AxisMaskTableOffset,
-                                     environment.VariantCount * context.AxisMaskWordCount };
+                                     SaturatedProduct(environment.VariantCount, context.AxisMaskWordCount) };
         const TableRef axisRelevanceLoc{ environment.AxisRelevanceTableOffset,
-                                         static_cast<uint32_t>(context.EntryPointCount) * context.AxisMaskWordCount };
+                                         SaturatedProduct(static_cast<uint32_t>(context.EntryPointCount),
+                                                          context.AxisMaskWordCount) };
         const TableRef footprintAxesLoc{ environment.FootprintAxisTableOffset,
-                                         environment.Bindings.Count * context.AxisMaskWordCount };
+                                         SaturatedProduct(environment.Bindings.Count, context.AxisMaskWordCount) };
         const TableRef sourceCapabilitiesLoc{ environment.SourceCapabilityTableOffset,
-                                              environment.Sources.Count *
-                                                  MaskWordCountForAxes(environment.CapabilityNames.Count) };
+                                              SaturatedProduct(environment.Sources.Count,
+                                                               MaskWordCountForAxes(environment.CapabilityNames.Count)) };
         const std::array<Section, 25u> sections
         {
             Section{ ShaderManifestTable::CapabilityNames, environment.CapabilityNames, sizeof(uint32_t) },
@@ -1128,14 +1143,14 @@ namespace
         for (int32_t i = 0; i < std::ssize(rasterSpan); ++i)
         {
             const RasterState& raster = rasterSpan[i];
-            if (raster.FirstVertexInput + raster.VertexInputCount > environment.VertexInputs.Count)
+            if (!RangeFitsCount(raster.FirstVertexInput, raster.VertexInputCount, environment.VertexInputs.Count))
             {
                 return { .Code = ErrorCode::InvalidRasterVertexInputRange,
                          .Table = ShaderManifestTable::Rasters,
                          .RecordIndex = static_cast<uint32_t>(i) };
             }
 
-            if (raster.FirstColorTarget + raster.ColorTargetCount > environment.ColorTargets.Count)
+            if (!RangeFitsCount(raster.FirstColorTarget, raster.ColorTargetCount, environment.ColorTargets.Count))
             {
                 return { .Code = ErrorCode::InvalidRasterColorTargetRange,
                          .Table = ShaderManifestTable::Rasters,

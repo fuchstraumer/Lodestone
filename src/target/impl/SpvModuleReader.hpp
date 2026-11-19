@@ -82,6 +82,8 @@ struct IdRecord
     ResourceShape Shape{ ResourceShape::Invalid };
     // OpTypeImage "Sampled": 0 decided at runtime, 1 sampled, 2 storage
     uint8_t SampledMode{ 0u };
+    // OpTypeImage with the dimension Buffer: a texel buffer, whatever its sampled mode
+    bool TexelBuffer{ false };
     uint32_t SampledType{ 0u };
     uint32_t Format{ 0u };
     uint32_t FirstMember{ 0u };

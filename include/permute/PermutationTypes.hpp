@@ -3,6 +3,7 @@
 #define LODESTONE_PERMUTATION_TYPES_HPP
 #include <cstdint>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace lodestone
@@ -31,14 +32,7 @@ struct RawInterfaceImpl
 
     constexpr bool operator<(const RawInterfaceImpl& other) const noexcept
     {
-        if (Module < other.Module)
-        {
-            return true;
-        }
-        else
-        {
-            return TypeName < other.TypeName;
-        }
+        return std::tie(Module, TypeName) < std::tie(other.Module, other.TypeName);
     }
 };
 
@@ -54,14 +48,7 @@ struct RawEnumCase
 
     constexpr bool operator<(const RawEnumCase& other) const noexcept
     {
-        if (Name < other.Name)
-        {
-            return true;
-        }
-        else
-        {
-            return Value < other.Value;
-        }
+        return std::tie(Name, Value) < std::tie(other.Name, other.Value);
     }
 };
 

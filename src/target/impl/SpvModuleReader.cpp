@@ -121,6 +121,9 @@ namespace
     /** Classifies a variable through its pointer type. Only variables with a DescriptorSet are bindings. */
     DeclaredBinding ClassifyVariable(const ParseState& parse_state, const IdRecord& variable);
 
+    /** @brief Returns the binding kind of an OpTypeImage: a texel buffer, a storage texture, or a sampled texture. */
+    BindingKind KindOfImage(const IdRecord& image) noexcept;
+
     /** Returns the variable at the end of a chain of loads, access chains, and copies, or 0. One step per id bounds
      * the walk on a malformed module. */
     uint32_t TraceToVariable(const ParseState& parse_state, uint32_t id);
@@ -830,9 +833,10 @@ namespace
         case spv::Dim::SubpassData:
             record.Shape |= ResourceShape::TextureSubpass;
             break;
-        case spv::Dim::Rect:
-            [[fallthrough]];
         case spv::Dim::Buffer:
+            record.TexelBuffer = true;
+            break;
+        case spv::Dim::Rect:
             [[fallthrough]];
         default:
             break;
@@ -1198,6 +1202,16 @@ namespace
         }
     }
 
+    BindingKind KindOfImage(const IdRecord& image) noexcept
+    {
+        if (image.TexelBuffer)
+        {
+            return BindingKind::TexelBuffer;
+        }
+
+        return (image.SampledMode == 2u) ? BindingKind::StorageTexture : BindingKind::Texture;
+    }
+
     DeclaredBinding ClassifyVariable(const ParseState& parse_state, const IdRecord& variable)
     {
         DeclaredBinding declared{ .Group = variable.Group, .Binding = variable.Binding, .Name = variable.Name };
@@ -1241,12 +1255,17 @@ namespace
                 declared.Kind = BindingKind::CombinedTextureSampler;
                 break;
             case spv::Op::OpTypeImage:
-                declared.Kind = (element->SampledMode == 2u) ? BindingKind::StorageTexture : BindingKind::Texture;
+                declared.Kind = KindOfImage(*element);
                 declared.Shape = element->Shape;
                 declared.Access = variable.Access;
                 if (declared.Kind == BindingKind::StorageTexture)
                 {
                     declared.StorageFormat = TextureFormatFromSpirv(static_cast<spv::ImageFormat>(element->Format));
+                }
+                else if (declared.Kind == BindingKind::TexelBuffer && element->SampledMode == 1u)
+                {
+                    // a uniform texel buffer is never written, and SPIR-V has no decoration that says so
+                    declared.Access = ResourceAccess::ReadOnly;
                 }
                 break;
             default:
