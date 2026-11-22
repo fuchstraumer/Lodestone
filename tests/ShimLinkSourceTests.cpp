@@ -53,7 +53,7 @@ constexpr ShimForms k_BoundForms{ .Buffer = AccessModel::Bound,
 CookError ErrorOf(const std::vector<RawShimExtern>& externs, const ShimForms& forms)
 {
     RecordingDiagnosticSink sink;
-    const CookResult<std::string> source = MakeShimLinkSource(externs, forms, "Probe", "bound", sink);
+    const CookResult<std::string> source = MakeShimLinkSource(externs, forms, TargetLanguage::Spirv, "Probe", "bound", sink);
     return source.has_value() ? CookError::Success : source.error();
 }
 
@@ -91,7 +91,7 @@ CookError FormatErrorOf(const std::vector<RawShimExtern>& externs, const Permuta
 {
     RecordingDiagnosticSink sink;
     const CookResult<std::vector<ShimFormatLinkSource>> sources =
-        MakeShimFormatLinkSources(externs, space, k_BoundForms, "Probe", sink);
+        MakeShimFormatLinkSources(externs, space, k_BoundForms, TargetLanguage::Spirv, "Probe", sink);
     return sources.has_value() ? CookError::Success : sources.error();
 }
 
@@ -110,7 +110,7 @@ int main()
         MakeExtern("Linear", "ISamplerRef", "", {}),
         MakeExtern("Scratch", "IReadWriteBuffer", " Light ", { "Lighting" }),
     };
-    const CookResult<std::string> source = MakeShimLinkSource(externs, k_BoundForms, "Probe", "bound", sink);
+    const CookResult<std::string> source = MakeShimLinkSource(externs, k_BoundForms, TargetLanguage::Spirv, "Probe", "bound", sink);
     runner.CheckOk(source, "a table with every Bound cell links");
     if (runner.CheckOk(source, "one import for each distinct module, none for a builtin type, and the exports in source order"))
     {
@@ -125,7 +125,7 @@ int main()
                           "one import for each distinct module, none for a builtin type, and the exports in source order");
     }
 
-    const CookResult<std::string> none = MakeShimLinkSource({}, k_BoundForms, "Probe", "bound", sink);
+    const CookResult<std::string> none = MakeShimLinkSource({}, k_BoundForms, TargetLanguage::Spirv, "Probe", "bound", sink);
     runner.Check(none.has_value() && none->empty(), "a module with no shim externs has no link source");
 
     runner.BeginSection("an empty cell and malformed type arguments fail, each with its own error");
@@ -164,11 +164,11 @@ int main()
     std::vector<RawShimExtern> withFormats = externs;
     withFormats.insert(withFormats.begin() + 1, MakeFormatExtern("Dst", "LEVEL_FORMAT"));
     withFormats.push_back(MakeFormatExtern("Half", "LEVEL_FORMAT"));
-    const CookResult<std::string> fixedSource = MakeShimLinkSource(withFormats, k_BoundForms, "Probe", "bound", sink);
+    const CookResult<std::string> fixedSource = MakeShimLinkSource(withFormats, k_BoundForms, TargetLanguage::Spirv, "Probe", "bound", sink);
     runner.Check(fixedSource.has_value() && source.has_value() && *fixedSource == *source,
                  "the fixed module does not change when format externs join it");
     const std::vector<RawShimExtern> formatOnly{ MakeFormatExtern("Dst", "LEVEL_FORMAT") };
-    const CookResult<std::string> onlyFormats = MakeShimLinkSource(formatOnly, k_BoundForms, "Probe", "bound", sink);
+    const CookResult<std::string> onlyFormats = MakeShimLinkSource(formatOnly, k_BoundForms, TargetLanguage::Spirv, "Probe", "bound", sink);
     runner.Check(onlyFormats.has_value() && onlyFormats->empty(), "a module with format externs only has no fixed module");
 
     // Rgba16Float and R32Float, as a policy subset or an ls_axis_values list leaves them
@@ -176,7 +176,7 @@ int main()
     formatAxes.push_back(MakeEnumAxis("LEVEL_FORMAT", "StorageFormat", "LodestoneShims", "", { 2u, 3u }));
     const PermutationSpace formatSpace{ std::move(formatAxes) };
     const CookResult<std::vector<ShimFormatLinkSource>> formatSources =
-        MakeShimFormatLinkSources(withFormats, formatSpace, k_BoundForms, "Probe", sink);
+        MakeShimFormatLinkSources(withFormats, formatSpace, k_BoundForms, TargetLanguage::Spirv, "Probe", sink);
     if (runner.CheckOk(formatSources, "one link module for each value of the axis"))
     {
         runner.CheckEqual(formatSources->size(), 2u, "one link module for each value of the axis");
@@ -206,7 +206,7 @@ int main()
     const CookResult<TargetProfile> modern = FindTargetProfile("spirv-modern-mutable");
     if (runner.CheckOk(modern, "the build has a spirv-modern-mutable profile"))
     {
-        const CookResult<std::string> modernSource = MakeShimLinkSource(externs, modern->Forms, "Probe", "spirv-modern-mutable", sink);
+        const CookResult<std::string> modernSource = MakeShimLinkSource(externs, modern->Forms, TargetLanguage::Spirv, "Probe", "spirv-modern-mutable", sink);
         if (runner.CheckOk(modernSource, "every cell of spirv-modern-mutable has an implementation"))
         {
             runner.CheckEqual(*modernSource,
@@ -220,7 +220,7 @@ int main()
                               "buffers link the Pointer form, and the texture and the sampler the Handle form");
         }
         const CookResult<std::vector<ShimFormatLinkSource>> modernFormats =
-            MakeShimFormatLinkSources(withFormats, formatSpace, modern->Forms, "Probe", sink);
+            MakeShimFormatLinkSources(withFormats, formatSpace, modern->Forms, TargetLanguage::Spirv, "Probe", sink);
         if (runner.CheckOk(modernFormats, "the format modules of spirv-modern-mutable link") && !modernFormats->empty())
         {
             runner.CheckEqual(modernFormats->front().Source,
@@ -232,6 +232,30 @@ int main()
         runner.CheckEqual(SingleForm(modern->Forms), AccessModel::Invalid, "spirv-modern-mutable has no single form for every class");
         runner.Check(modern->DescriptorHeapSet == std::optional<uint32_t>{ 3u }, "spirv-modern-mutable puts the descriptor heap in set 3");
     }
+
+    runner.BeginSection("the 64-bit accumulator links a different Bound implementation for WGSL and for SPIR-V");
+    const std::vector<RawShimExtern> accumulatorExterns{ MakeExtern("Sums", "IAtomicAccumulator64", "", {}) };
+    const CookResult<std::string> accumulatorWgsl =
+        MakeShimLinkSource(accumulatorExterns, k_BoundForms, TargetLanguage::Wgsl, "Probe", "wgsl", sink);
+    if (runner.CheckOk(accumulatorWgsl, "the accumulator links for WGSL"))
+    {
+        runner.CheckEqual(*accumulatorWgsl,
+                          "import LodestoneShims;\n"
+                          "export struct Sums : IAtomicAccumulator64 = BoundAccumulator64Words;\n",
+                          "WGSL links the two-word form, which names no 64-bit type");
+    }
+    const CookResult<std::string> accumulatorSpirv =
+        MakeShimLinkSource(accumulatorExterns, k_BoundForms, TargetLanguage::Spirv, "Probe", "spirv", sink);
+    if (runner.CheckOk(accumulatorSpirv, "the accumulator links for SPIR-V"))
+    {
+        runner.CheckEqual(*accumulatorSpirv,
+                          "import LodestoneShims;\n"
+                          "export struct Sums : IAtomicAccumulator64 = BoundAccumulator64;\n",
+                          "SPIR-V links the 64-bit atomic");
+    }
+    runner.CheckEqual(ErrorOf({ MakeExtern("Sums", "IAtomicAccumulator64", "uint", { "" }) }, k_BoundForms),
+                      CookError::ShimExternInvalid,
+                      "an accumulator takes no type argument");
 
     runner.BeginSection("the two modern profiles share the forms and the heap set, and differ in the heap lowering");
     const CookResult<TargetProfile> typed = FindTargetProfile("spirv-modern-typed");

@@ -8,6 +8,7 @@
 #include "VariantKey.hpp"
 #include "driver/CookerDriver.hpp"
 #include "driver/CookerOptions.hpp"
+#include "emit/ArtifactNames.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 #include "target/StorageFormatTable.hpp"
@@ -51,7 +52,7 @@ CookOutcome Cook(const std::filesystem::path& module_path, std::string_view targ
     const CookResult<CookStatistics> cooked = RunCook(options, sink, diagnostics);
     CookOutcome outcome{ .Result = cooked.has_value() ? CookError::Success : cooked.error(),
                          .Records = std::move(diagnostics.Records()) };
-    const auto manifest = sink.GetArtifacts().find(std::string{ k_ManifestFileName });
+    const auto manifest = sink.GetArtifacts().find(MakeArtifactName(k_DefaultOutputName, k_ManifestSuffix));
     if (manifest != sink.GetArtifacts().end())
     {
         outcome.Bytes.resize(manifest->second.size());
@@ -88,6 +89,15 @@ std::optional<manifest::ResolvedResource> FindResource(const manifest::LayoutRan
 bool InstanceNeedsCapabilityContaining(const manifest::EnvironmentView& environment,
                                        const manifest::EntryPointInstanceView& instance,
                                        std::string_view fragment);
+
+struct AccumulatorDevice
+{
+    bool Int64Atomics{ false };
+};
+
+bool AccumulatorDeviceSupports(void* user, std::string_view capability_name);
+
+void CheckAccumulator64(tests::TestRunner& runner, const std::filesystem::path& asset_directory, std::string_view target);
 
 struct ExpectedValue
 {
@@ -469,7 +479,7 @@ int main(int argc, char** argv)
             PrintErrors(CookOutcome{ .Records = std::move(diagnostics.Records()) });
         }
 
-        const auto manifestFile = sink.GetArtifacts().find(std::string{ k_ManifestFileName });
+        const auto manifestFile = sink.GetArtifacts().find(MakeArtifactName(k_DefaultOutputName, k_ManifestSuffix));
         if (runner.Check(manifestFile != sink.GetArtifacts().end(), "the cook wrote a manifest"))
         {
             std::vector<std::byte> bytes(manifestFile->second.size());
@@ -548,11 +558,112 @@ int main(int argc, char** argv)
                      std::format("{}: PlainCS records none", target));
     }
 
+    runner.BeginSection("a 64-bit accumulator shim is an 8-byte element on every profile, with 64-bit capabilities on SPIR-V only");
+    for (const std::string_view target : { "wgsl", "spirv", "spirv-modern-mutable", "spirv-modern-typed" })
+    {
+        CheckAccumulator64(runner, assetDirectory, target);
+    }
+
     return runner.Report();
 }
 
 namespace
 {
+
+bool AccumulatorDeviceSupports(void* user, std::string_view capability_name)
+{
+    const bool needsInt64Atomics = capability_name == "Int64Atomics";
+
+    return !needsInt64Atomics || static_cast<const AccumulatorDevice*>(user)->Int64Atomics;
+}
+
+void CheckAccumulator64(tests::TestRunner& runner, const std::filesystem::path& asset_directory, std::string_view target)
+{
+    const CookOutcome cooked = Cook(asset_directory / "ShimAccumulator64.slang", target);
+    if (!runner.CheckEqual(cooked.Result, CookError::Success, std::format("ShimAccumulator64 cooks for {}", target)))
+    {
+        PrintErrors(cooked);
+        return;
+    }
+
+    const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(cooked.Bytes);
+    const manifest::ManifestResult<manifest::EnvironmentView> environment =
+        bundle.has_value() ? bundle->OpenEnvironment(0u, 0u) : std::unexpected(bundle.error());
+    if (!runner.CheckOk(environment, std::format("the environment opens for {}", target)))
+    {
+        return;
+    }
+
+    const bool wgsl = target == "wgsl";
+    const bool pointerForm = target.starts_with("spirv-modern");
+    for (const std::string_view entryName : { "AccumulateCS", "ClearCS", "ReadCS" })
+    {
+        const manifest::ManifestResult<uint32_t> entry = bundle->Module(0u).FindEntryPointIndex(entryName);
+        if (!runner.CheckOk(entry, std::format("{}: {} exists", target, entryName)))
+        {
+            continue;
+        }
+
+        const manifest::EntryPointInstanceView instance = environment->VariantAt(0u).EntryPoint(*entry);
+        const std::optional<manifest::ResolvedResource> totals = FindResource(instance.Layout(), "params_Totals", "data");
+        if (runner.Check(totals.has_value(), std::format("{}: {} has the accumulator in its layout", target, entryName)))
+        {
+            runner.CheckEqual(totals->Kind(), BindingKind::StorageBuffer, std::format("{}: {}: a storage buffer", target, entryName));
+            runner.CheckEqual(totals->Access(), ResourceAccess::ReadWrite, std::format("{}: {}: read-write", target, entryName));
+            runner.CheckEqual(totals->ElementStride(), 8u, std::format("{}: {}: the element stride is 8", target, entryName));
+            runner.CheckEqual(totals->Placement(),
+                              pointerForm ? PlacementKind::Pointer : PlacementKind::Bound,
+                              std::format("{}: {}: the form of the profile", target, entryName));
+        }
+
+        bool hasInt64 = false;
+        for (uint32_t index = 0u; index < environment->CapabilityNames().size(); ++index)
+        {
+            hasInt64 = hasInt64 || (environment->CapabilityName(index) == "Int64" && instance.RequiresCapability(index));
+        }
+
+        const bool hasInt64Atomics = InstanceNeedsCapabilityContaining(*environment, instance, "Int64Atomics");
+        runner.CheckEqual(hasInt64 && hasInt64Atomics,
+                          !wgsl,
+                          std::format("{}: {} needs Int64 and Int64Atomics on SPIR-V and neither on WGSL", target, entryName));
+        runner.Check(wgsl || hasInt64Atomics, std::format("{}: {} records Int64Atomics", target, entryName));
+
+        if (wgsl)
+        {
+            const std::string_view code = instance.Source();
+            const bool has64BitType = code.contains("i64") || code.contains("u64") || code.contains("int64");
+            runner.Check(!has64BitType, std::format("wgsl: the code of {} names no 64-bit type", entryName));
+            runner.Check(entryName != "AccumulateCS" || code.contains("atomicAdd"),
+                         "wgsl: AccumulateCS adds with the atomic of one 32-bit word");
+        }
+
+        const manifest::DeviceLimits limits{ .MaxWorkgroupMemoryBytes = 65536u,
+                                             .MaxInvocationsPerWorkgroup = 1024u,
+                                             .MaxWorkgroupSizeX = 1024u,
+                                             .MaxWorkgroupSizeY = 1024u,
+                                             .MaxWorkgroupSizeZ = 64u,
+                                             .MaxPushConstantBytes = 256u };
+        for (const bool deviceHasInt64Atomics : { false, true })
+        {
+            AccumulatorDevice device{ .Int64Atomics = deviceHasInt64Atomics };
+            std::vector<uint64_t> masks(environment->MakeDeviceCapabilities(&AccumulatorDeviceSupports, &device, {}));
+            environment->MakeDeviceCapabilities(&AccumulatorDeviceSupports, &device, masks);
+
+            const manifest::DeviceFit fit = instance.Fit(masks, limits);
+            const bool shouldFit = wgsl || deviceHasInt64Atomics;
+            runner.CheckEqual(fit.Fits(),
+                              shouldFit,
+                              std::format("{}: {} {} on a device {} Int64Atomics",
+                                          target,
+                                          entryName,
+                                          shouldFit ? "fits" : "does not fit",
+                                          deviceHasInt64Atomics ? "with" : "without"));
+            runner.CheckEqual(fit.Reason,
+                              shouldFit ? manifest::DeviceMismatch::None : manifest::DeviceMismatch::MissingCapability,
+                              std::format("{}: {} gives the reason for the device fit", target, entryName));
+        }
+    }
+}
 
 bool InstanceNeedsCapabilityContaining(const manifest::EnvironmentView& environment,
                                        const manifest::EntryPointInstanceView& instance,

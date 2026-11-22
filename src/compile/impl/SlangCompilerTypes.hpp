@@ -333,8 +333,10 @@ constexpr const char* k_AllWarningsAsErrors = "all";
 constexpr const char* k_DisabledWarnings = "31010,41012,31106,31107";
 
 // the two warning level rows must stay in this order. Slang keeps the first value of a repeated option, so the
-// options that MakeCompilerOptions appends (optimization, debug information) must have no row here
-constexpr std::array<CompilerOptionRow, 8u> k_CompilerOptionRows
+// options that MakeCompilerOptions appends (optimization, debug information) must have no row here. The floating
+// point mode has none either: `Linkage::addTarget` overwrites it with `TargetDesc::floatingPointMode`. A fixed row here
+// was ignored for that reason, so the old "fast" mode was Slang's default mode
+constexpr std::array<CompilerOptionRow, 7u> k_CompilerOptionRows
 {
     CompilerOptionRow
     { 
@@ -359,12 +361,6 @@ constexpr std::array<CompilerOptionRow, 8u> k_CompilerOptionRows
         .Name = slang::CompilerOptionName::WarningsAsErrors,
         .Kind = slang::CompilerOptionValueKind::String,
         .StringValue = k_AllWarningsAsErrors
-    },
-    CompilerOptionRow
-    {
-        .Name = slang::CompilerOptionName::FloatingPointMode,
-        .Kind = slang::CompilerOptionValueKind::Int,
-        .IntValue = SLANG_FLOATING_POINT_MODE_FAST
     },
     CompilerOptionRow
     {
@@ -401,6 +397,20 @@ constexpr SlangOptimizationLevel ToSlangOptimizationLevel(uint32_t level) noexce
         return SLANG_OPTIMIZATION_LEVEL_MAXIMAL;
     default:
         return SLANG_OPTIMIZATION_LEVEL_NONE;
+    }
+}
+
+constexpr SlangFloatingPointMode ToSlangFloatingPointMode(manifest::FloatingPointMode mode) noexcept
+{
+    switch (mode)
+    {
+    case manifest::FloatingPointMode::Default:
+        return SLANG_FLOATING_POINT_MODE_DEFAULT;
+    case manifest::FloatingPointMode::Precise:
+        return SLANG_FLOATING_POINT_MODE_PRECISE;
+    case manifest::FloatingPointMode::Fast:
+    default:
+        return SLANG_FLOATING_POINT_MODE_FAST;
     }
 }
 

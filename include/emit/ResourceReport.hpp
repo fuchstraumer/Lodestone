@@ -18,8 +18,6 @@ namespace lodestone
 
 class DiagnosticSink;
 
-inline constexpr std::string_view k_ResourceReportFileName = "ShaderLibrary.resources.txt";
-
 /** One scope and name, joined over every variant and entry point that reads it. */
 struct ResourceReportEntry
 {

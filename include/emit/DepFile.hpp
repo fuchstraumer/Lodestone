@@ -9,8 +9,6 @@
 namespace lodestone
 {
 
-inline constexpr std::string_view k_DepfileName = "ShaderLibrary.d";
-
 /** The caller gives sorted, unique, absolute paths with `/`, so that the bytes are deterministic. */
 [[nodiscard]] std::string GenerateDepfile(std::string_view target, std::span<const std::string> prerequisites);
 

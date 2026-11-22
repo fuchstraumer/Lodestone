@@ -406,8 +406,10 @@ Three things are required: `-o`, at least one `--target=`, and at least one modu
 | `--policy-file <path>` | The policy file. |
 | `--O0` to `--O3` | The Slang optimization level. The default is 0. |
 | `--g0` to `--g3` | The Slang debug information level. The default is 0. |
+| `--fp-mode=<mode>` | The Slang floating point mode: `fast`, `default`, or `precise`. The default is `fast`. `precise` stops the compiler from fusing float arithmetic. The manifest records the mode. |
+| `--output-name=<stem>` | The file name stem of the artifacts. The default is `ShaderLibrary`. Two cooks with different stems can share one output directory. |
 | `--cache-dir <dir>` | A folder for precompiled Slang modules. |
-| `--depfile` | Write `ShaderLibrary.d`. |
+| `--depfile` | Write `<stem>.d`. |
 | `--dump-stage=<name>` | Write one pipeline stage as JSON. |
 | `--dump-sources` | Write each compiled source to a folder, for Tint, `spirv-dis`, or `spirv-val`. |
 | `--quiet` | Do not write the reflection report for each variant. |
@@ -430,6 +432,8 @@ If an import fails, add an `--include-dir`. Do not depend on the module cache.
 #### The output
 
 The output directory contains:
+
+In the list below, `ShaderLibrary` is the stem. Use `--output-name` to change it.
 
 - `ShaderLibrary.ldmanifest`: the manifest. The renderer reads only this file.
 - `ShaderLibrary.dedupe.txt`: the duplicate report. Read it to find axes that cost variants and change nothing.

@@ -5,6 +5,7 @@
 #include "ShaderManifestIndex.hpp"
 #include "driver/CookerDriver.hpp"
 #include "driver/CookerOptions.hpp"
+#include "emit/ArtifactNames.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 
@@ -26,7 +27,7 @@ using namespace lodestone;
 std::vector<std::byte> ManifestBytes(const MemoryOutputSink& sink)
 {
     const std::map<std::string, std::string>& artifacts = sink.GetArtifacts();
-    const auto manifest = artifacts.find(std::string{ k_ManifestFileName });
+    const auto manifest = artifacts.find(MakeArtifactName(k_DefaultOutputName, k_ManifestSuffix));
     if (manifest == artifacts.end())
     {
         return {};

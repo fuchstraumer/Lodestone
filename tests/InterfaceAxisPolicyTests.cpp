@@ -7,6 +7,7 @@
 #include "ShaderManifestLayout.hpp"
 #include "driver/CookerDriver.hpp"
 #include "driver/CookerOptions.hpp"
+#include "emit/ArtifactNames.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 #include "emit/StageDump.hpp"
@@ -69,7 +70,7 @@ PolicyCook CookPolicy(const std::filesystem::path& module_path,
     result.Records = diagnostics.Records();
     for (const auto& [name, text] : sink.GetArtifacts())
     {
-        if (name == k_ManifestFileName)
+        if (name == MakeArtifactName(k_DefaultOutputName, k_ManifestSuffix))
         {
             result.Bytes.resize(text.size());
             std::memcpy(result.Bytes.data(), text.data(), result.Bytes.size());

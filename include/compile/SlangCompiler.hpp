@@ -34,6 +34,8 @@ struct SlangCompilerCreateInfo
     std::vector<std::filesystem::path> IncludeDirectories;
     uint32_t OptimizationLevel{ 0u };
     uint32_t DebugLevel{ 0u };
+    /** @brief Applies to both forms of the cook. */
+    manifest::FloatingPointMode FloatingPointMode{ manifest::FloatingPointMode::Fast };
     /** @brief Sessions are expensive, so a small batch on every thread oversubscribes. */
     size_t ExpectedBatchSize{ 0u };
     std::optional<SymbolTable> InheritedSymbolTable;
@@ -88,6 +90,7 @@ private:
     SymbolTable symbolTable;
     std::string targetName;
     ShimForms shimForms;
+    TargetLanguage shimLanguage{ TargetLanguage::Invalid };
     CompilePool* pool{ nullptr };
     std::unique_ptr<CompileEnvironment> environment;
     std::unique_ptr<SlangModuleContext> bootstrapContext{ nullptr };

@@ -5,6 +5,7 @@
 #include "ShaderManifest.hpp"
 #include "driver/CookerDriver.hpp"
 #include "driver/CookerOptions.hpp"
+#include "emit/ArtifactNames.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 
@@ -81,7 +82,7 @@ int main(int argc, char** argv)
     runner.CheckOk(cooked, "buffer, texture, and sampler shims in a block, and a shim in an entry point uniform");
 
     const std::map<std::string, std::string>& artifacts = sink.GetArtifacts();
-    const auto manifestArtifact = artifacts.find(std::string{ k_ManifestFileName });
+    const auto manifestArtifact = artifacts.find(MakeArtifactName(k_DefaultOutputName, k_ManifestSuffix));
     if (!cooked.has_value() || manifestArtifact == artifacts.end())
     {
         return runner.Report();

@@ -61,10 +61,12 @@ when the option is ON. Every test links the cooker, so `LODESTONE_BUILD_TESTS` f
 tests ON with the cooker OFF fail the configure.
 
 `lodestone_add_shader_cook(<name> OUTPUT_DIR <dir> TARGETS <profile>... MODULES <file>... [POLICY_FILE <file>]
-[HOST_TYPES <include>] [OPTIONS <arg>...])` (in `cmake/LodestoneShaderCook.cmake`) runs one cook as a build step, with `--depfile`, so
+[OUTPUT_NAME <stem>] [HOST_TYPES <include>] [OPTIONS <arg>...])` (in `cmake/LodestoneShaderCook.cmake`) runs one cook as a build step, with `--depfile`, so
 an edit to any file a module reads re-cooks. It runs the `lodestone_cooker_console` target, or the host cooker
 that `LODESTONE_COOKER_EXECUTABLE` names. A build with no cooker (Emscripten) must set that variable. The
-target property `LODESTONE_MANIFEST` gives the manifest path. `HOST_TYPES <include>` turns on the host header
+target property `LODESTONE_MANIFEST` gives the manifest path. `OUTPUT_NAME <stem>` sets the stem of every artifact file
+name (`--output-name`), so two cooks can share one `OUTPUT_DIR`. Without it the stem is `ShaderLibrary`, no `--output-name` is passed, and
+the paths do not change. The manifest, depfile, and host header paths, and the two target properties, follow the stem. `HOST_TYPES <include>` turns on the host header
 (`--host-types`, with `--host-namespace` set to the cook name, which must be a C++ identifier). The header is a byproduct of the
 cook step, and the target property `LODESTONE_HOST_HEADER` gives its path. A consumer target depends on the cook with
 `add_dependencies`. The console builds whenever the cooker does. The presets `ninja-clang-cl-client` and `ninja-msvc-client` turn the cooker off:
@@ -133,7 +135,7 @@ contents. `Check` returns its condition, so the check can guard the checks that 
 check fails, so a guard that fails cannot hide the checks behind it. To read the diagnostics of a cook, pass a
 `RecordingDiagnosticSink` to the three-argument `RunCook`.
 
-Fifty-seven test targets exist: forty-nine unit tests and eight cook tests. `tests/README.md` lists what each one proves. Read it before you add or change a test, and add a row there for each new target.
+Sixty-one test targets exist: fifty-three unit tests and eight cook tests. `tests/README.md` lists what each one proves. Read it before you add or change a test, and add a row there for each new target.
 
 Each cook test writes into its own output directory. The bundle and the dedup report hold every module
 of one cook, so a module added to a cook changes those files.
@@ -160,11 +162,15 @@ itself. A function in the cooker library that can report takes a `DiagnosticSink
 
 `ParseCommandLine` in `src/driver/CookerOptions.cpp` parses the flags, and `GetUsageText` prints them:
 `--output/-o`, `--cache-dir`, `--include-dir/-I <path>` (repeatable),
-`--O0` to `--O3`, `--g0` to `--g3` (Slang's debug information level), `--target=<name>`, `--no-validate`, `--quiet`,
+`--O0` to `--O3`, `--g0` to `--g3` (Slang's debug information level), `--fp-mode=<fast|default|precise>` (Slang's floating
+point mode, `fast` without the flag; it applies to the base form too, because it changes what the code computes; an unknown value is
+`FloatingPointModeInvalid`), `--output-name=<stem>` (the stem of every artifact file name, `ShaderLibrary` without the flag, `k_DefaultOutputName`;
+a stem that is empty, `.`, `..`, or has `/`, `\`, or `:` is `OutputNameInvalid`; a cook removes the artifacts of its own stem only, and
+`MakeArtifactName` in `emit/ArtifactNames.hpp` builds each name; stage dumps and source folders keep their names), `--target=<name>`, `--no-validate`, `--quiet`,
 `--single-threaded`, `--no-dedupe`, `--root-from-source`, `--verify-deterministic`, `--dump-stage=<name>`, `--dump-sources`,
 `--host-types=<include>`, `--host-namespace=<name>`, and `--depfile`. `--host-types` and `--host-namespace` take their value
 after `=`, and each needs the other (`HostNamespaceMissing`; a namespace that is not a C++ identifier or a `::` path of
-identifiers is `HostNamespaceInvalid`). `--depfile` writes `ShaderLibrary.d`, a Makefile-form depfile that names every file Slang
+identifiers is `HostNamespaceInvalid`). `--depfile` writes `<stem>.d`, a Makefile-form depfile that names every file Slang
 read, `import` and `__include` included. `--dump-sources` writes every unique compiled source to a subfolder
 `<module>_<target>_sources`, beside a `SourceTable.json` that names each variant by its axis description
 and its source hashes. Each file holds the target code only (`.wgsl` or `.spv`), so Tint, `spirv-dis`,
@@ -207,7 +213,7 @@ argument, and a pointer its element stride from the pointee. The access in a `Pt
 layout (shader-slang/slang#13188), so the cooker computes the std430 stride itself (`model/BufferLayout`), and `SpvValidator` compares
 it with the `ArrayStride` of the pointer type in the code. A shim buffer element whose scalar layout differs from its std430 layout
 has implicit padding (a `float3` followed by a `float2`, for example). It fails the cook on every profile with
-`ShimElementImplicitPadding`, from `PrepareRawModule`, and the author adds the padding member. `IAtomicBuffer<T>` is the buffer row with atomic elements: Bound `RWStructuredBuffer<Atomic<T>>`, Pointer `Ptr<Atomic<T>, Access.ReadWrite, ...>`, stride 4. `IShimAtomicScalar` (implemented by `int` and `uint` only) restricts `T`, because Slang seals `IBitAtomicable`. `AtomicAddWaveAggregated` is a free function in the same module, so only an entry point that calls it records the subgroup capabilities. An array of Pointer or Handle shims, and one in a storage buffer element, fail with
+`ShimElementImplicitPadding`, from `PrepareRawModule`, and the author adds the padding member. `IAtomicBuffer<T>` is the buffer row with atomic elements: Bound `RWStructuredBuffer<Atomic<T>>`, Pointer `Ptr<Atomic<T>, Access.ReadWrite, ...>`, stride 4. `IShimAtomicScalar` (implemented by `int` and `uint` only) restricts `T`, because Slang seals `IBitAtomicable`. `AtomicAddWaveAggregated` is a free function in the same module, so only an entry point that calls it records the subgroup capabilities. `IAtomicAccumulator64` is a 64-bit accumulator (`Add`, `Sub`, `Store`, `Load`, no return value from `Add` and `Sub`). Its values are `Wide64`, two `uint` words, because Slang emits `i64` into WGSL with no error as soon as a shader holds an `int64_t`. The element is 8 bytes on every profile. SPIR-V Bound is `RWStructuredBuffer<Atomic<int64_t>>` and Pointer is `Ptr<Atomic<int64_t>, ...>` (capabilities `Int64` and `Int64Atomics`). WGSL Bound (`BoundAccumulator64Words`, the `BoundWgsl` cell of the table, chosen by `ShimImplName` with a `TargetLanguage`) is two `atomic<u32>` words with a carry from the low word, and `Accumulator64ModelTest` proves that arithmetic on the CPU. `Load` and `Store` are exact only while no `Add` or `Sub` runs on that element, and groupshared 64-bit atomics are not covered. An array of Pointer or Handle shims, and one in a storage buffer element, fail with
 `ShimStoredValueUnsupported`. A stored value is visible to an entry point when its container is: a used uniform buffer, or the
 entry point's own push constants. `ResolvedLibraryValidator::ValidateEntryPoint` gives a validator the bound bindings,
 sorted, and the stored values apart. `SpvValidator` compares the descriptor heap set with the mutable descriptor lowering
@@ -497,11 +503,11 @@ number would state that every target must supply one. A target supplies a valida
 8. **Emit.** `EmitLibraryArtifacts` (in `src/driver/CookerDriver.cpp`) runs once, after every (module,
    target) pair has cooked. It reads one `CookedLibrary`, a grid of `CookedModule` values ordered by
    profile and then by module, and writes through the `OutputSink`:
-   - one binary manifest bundle for the whole cook, `ShaderLibrary.ldmanifest`, plus `VerifyManifestRoundTrip`
-   - `ShaderLibrary.dedupe.txt`, from `GenerateDedupeReport`
-   - `ShaderLibrary.resources.txt`, from `BuildResourceReport` and `FormatResourceReport`, read from the written
+   - one binary manifest bundle for the whole cook, `<stem>.ldmanifest` (the stem is `--output-name`, `ShaderLibrary` by default), plus `VerifyManifestRoundTrip`
+   - `<stem>.dedupe.txt`, from `GenerateDedupeReport`
+   - `<stem>.resources.txt`, from `BuildResourceReport` and `FormatResourceReport`, read from the written
      manifest bytes through the client views
-   - `ShaderLibrary.host.hpp`, from `EmitHostHeader`, only with `--host-types`. It reads the host type tables, the
+   - `<stem>.host.hpp`, from `EmitHostHeader`, only with `--host-types`. It reads the host type tables, the
      resource lists, and the visibility lists of the `CookedLibrary`: one C++ struct for each distinct layout
      (`detail::<Name>_<k>`, with explicit padding and `static_assert` of every size and offset), `<Name><CookProfile,
      LayoutRule>` to select one by profile and layout rule, binding name constants for each entry point (a
@@ -721,10 +727,10 @@ keeps the axis addresses.
 
 The cook writes one output form, the binary manifest bundle, from the `CookedLibrary`. The C++
 header/source emitter is gone. `-o` names an output **directory**, and every artifact goes inside it:
-one `ShaderLibrary.ldmanifest` for the whole cook, one `ShaderLibrary.dedupe.txt`, one
-`ShaderLibrary.resources.txt`, and, when `--dump-stage` asks, the stage-dump JSON files. A cook removes the
-manifest, the two reports, and the depfile of an earlier cook before it starts, so a failed cook leaves none of
-them, and the file sink writes each artifact to a temporary file and renames it into place.
+one `<stem>.ldmanifest` for the whole cook, one `<stem>.dedupe.txt`, one
+`<stem>.resources.txt`, and, when `--dump-stage` asks, the stage-dump JSON files. The stem is `--output-name`, and
+`ShaderLibrary` without it. A cook removes the manifest, the two reports, and the depfile of an earlier cook with its
+own stem before it starts, so a failed cook leaves none of them, and the file sink writes each artifact to a temporary file and renames it into place.
 
 The bundle has three scopes, and the reader has one view type for each.
 
@@ -763,6 +769,7 @@ What each version added (details in `client/FORMAT.md`):
 - 18: the cook's `--O` and `--g` levels (`Profile::OptimizationLevel`, `Profile::DebugLevel`), the base form's hash for each entry point instance (`EntryPointInstance::BaseHash`), and the descriptor heap (`Profile::HeapLowering`, `Profile::DescriptorHeapSet`).
 - 19: `DescriptorHeapLowering::PerDescriptorType`, for the profile `spirv-modern-typed`, and the `k_TypedHeap*Binding` constants.
 - 20: the footprint axis mask also holds the axes that change a binding's byte size (C17), so `DescribeCreation` gives a uniform block that follows an axis `ShaderPerVariant`.
+- 21: the cook's `--fp-mode` (`Profile::FloatingPointMode`, a `FloatingPointMode` of Fast, Default, or Precise).
 
 Read `client/FORMAT.md` before you change the manifest format or the client views.
 

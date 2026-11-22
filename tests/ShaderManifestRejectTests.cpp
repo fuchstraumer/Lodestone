@@ -595,6 +595,15 @@ int main()
     runner.CheckEqual(BundleErrorFrom(badLevel), ErrorCode::InvalidProfileCodeFlags,
                       "a debug level above 3 is rejected when the bundle opens");
 
+    const size_t firstModeOffset = header.Profiles.Offset + offsetof(lodestone::manifest::Profile, FloatingPointMode);
+    for (const uint8_t badMode : { uint8_t{ 0u }, uint8_t{ 4u } })
+    {
+        std::vector<std::byte> badFloatingPointMode = valid;
+        WriteValue(badFloatingPointMode, firstModeOffset, badMode);
+        runner.CheckEqual(BundleErrorFrom(badFloatingPointMode), ErrorCode::InvalidProfileCodeFlags,
+                          "a floating point mode outside fast to precise is rejected when the bundle opens");
+    }
+
     const size_t firstLoweringOffset = header.Profiles.Offset + offsetof(lodestone::manifest::Profile, HeapLowering);
     std::vector<std::byte> badLowering = valid;
     WriteValue(badLowering, firstLoweringOffset, uint8_t{ 7u });

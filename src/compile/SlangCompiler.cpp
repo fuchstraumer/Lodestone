@@ -58,6 +58,7 @@ CookError SlangCompiler::Initialize(CompilePool& compile_pool, SlangCompilerCrea
     pool = &compile_pool;
     targetName = std::string{ create_info.TargetName };
     shimForms = create_info.Forms;
+    shimLanguage = create_info.Language;
     environment = std::make_unique<CompileEnvironment>();
     bootstrapContext = std::make_unique<SlangModuleContext>();
     if (create_info.InheritedSymbolTable)
@@ -218,7 +219,8 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
         }
 
         // implicit padding fails on every profile, so a renderer writes one buffer for all of them
-        if (shimInterface->Class == ShimResourceClass::Buffer && arguments.size() == shimInterface->TypeParameterCount)
+        if (shimInterface->Class == ShimResourceClass::Buffer && !arguments.empty() &&
+            arguments.size() == shimInterface->TypeParameterCount)
         {
             const CookError paddingError =
                 CheckElementPadding(*bootstrapContext, shimExtern, where, arguments.front(), *diagnosticSink);
@@ -232,14 +234,14 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
     }
 
     CookResult<std::string> linkSource =
-        MakeShimLinkSource(module.ShimExterns, shimForms, module.Name, targetName, *diagnosticSink);
+        MakeShimLinkSource(module.ShimExterns, shimForms, shimLanguage, module.Name, targetName, *diagnosticSink);
     if (!linkSource)
     {
         return std::unexpected(linkSource.error());
     }
     
     CookResult<std::vector<ShimFormatLinkSource>> formatSources =
-        MakeShimFormatLinkSources(module.ShimExterns, space, shimForms, module.Name, *diagnosticSink);
+        MakeShimFormatLinkSources(module.ShimExterns, space, shimForms, shimLanguage, module.Name, *diagnosticSink);
     if (!formatSources)
     {
         return std::unexpected(formatSources.error());

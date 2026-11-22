@@ -1,6 +1,7 @@
 #include "TestHarness.hpp"
 
 #include "CookerErrors.hpp"
+#include "ShaderManifestFormat.hpp"
 #include "driver/CookerOptions.hpp"
 
 #include <chrono>
@@ -12,6 +13,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 // The command line is an ingestion surface: everything after ParseCommandLine trusts what it returns. Each rule here
@@ -212,6 +214,50 @@ int main()
     runner.CheckError(Parse({ "-o", output, "--target=wgsl", "--host-types=", "--host-namespace=a", "a.slang" }),
                       CookError::MalformedArgument,
                       "an empty include");
+
+    runner.BeginSection("the floating point mode defaults to fast, and each name reads back");
+    const CookResult<CookerOptions> noFpMode = Parse({ "-o", output, "--target=wgsl", "a.slang" });
+    if (runner.CheckOk(noFpMode, "no --fp-mode"))
+    {
+        runner.CheckEqual(noFpMode->FloatingPointMode, manifest::FloatingPointMode::Fast, "the mode defaults to fast");
+    }
+    const std::pair<std::string_view, manifest::FloatingPointMode> fpModes[]{
+        { "--fp-mode=fast", manifest::FloatingPointMode::Fast },
+        { "--fp-mode=default", manifest::FloatingPointMode::Default },
+        { "--fp-mode=precise", manifest::FloatingPointMode::Precise } };
+    for (const auto& [flag, mode] : fpModes)
+    {
+        const CookResult<CookerOptions> parsed = Parse({ "-o", output, "--target=wgsl", flag, "a.slang" });
+        if (runner.CheckOk(parsed, flag))
+        {
+            runner.CheckEqual(parsed->FloatingPointMode, mode, flag);
+        }
+    }
+    for (const std::string_view invalid : { "--fp-mode=", "--fp-mode=Fast", "--fp-mode=strict", "--fp-mode=precise " })
+    {
+        runner.CheckError(Parse({ "-o", output, "--target=wgsl", invalid, "a.slang" }),
+                          CookError::FloatingPointModeInvalid,
+                          std::format("'{}' is not a floating point mode", invalid));
+    }
+
+    runner.BeginSection("the output name defaults to ShaderLibrary, and a bad stem is rejected");
+    const CookResult<CookerOptions> noOutputName = Parse({ "-o", output, "--target=wgsl", "a.slang" });
+    if (runner.CheckOk(noOutputName, "no --output-name"))
+    {
+        runner.CheckEqual(noOutputName->OutputName, "ShaderLibrary", "the default stem");
+    }
+    const CookResult<CookerOptions> named = Parse({ "-o", output, "--target=wgsl", "--output-name=Water.v2", "a.slang" });
+    if (runner.CheckOk(named, "a valid stem"))
+    {
+        runner.CheckEqual(named->OutputName, "Water.v2", "the stem reads back, and a dot is allowed");
+    }
+    for (const std::string_view invalid : { "", ".", "..", "a/b", "a\\b", "C:x", "a:", "/a", "..\\a" })
+    {
+        const std::string flag = std::format("--output-name={}", invalid);
+        runner.CheckError(Parse({ "-o", output, "--target=wgsl", flag, "a.slang" }),
+                          CookError::OutputNameInvalid,
+                          std::format("'{}' is not an output name", invalid));
+    }
 
     std::filesystem::remove_all(scratch);
     return runner.Report();

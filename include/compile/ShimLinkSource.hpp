@@ -32,6 +32,7 @@ std::vector<std::string_view> SplitShimTypeArguments(std::string_view type_argum
  * `ShimExternInvalid` for invalid externs.*/
 CookResult<std::string> MakeShimLinkSource(std::span<const RawShimExtern> externs,
                                            const ShimForms& forms,
+                                           TargetLanguage language,
                                            std::string_view module_name,
                                            std::string_view profile_name,
                                            DiagnosticSink& sink);
@@ -41,6 +42,7 @@ CookResult<std::vector<ShimFormatLinkSource>> MakeShimFormatLinkSources(
     std::span<const RawShimExtern> externs,
     const PermutationSpace& space,
     const ShimForms& forms,
+    TargetLanguage language,
     std::string_view module_name,
     DiagnosticSink& sink);
 

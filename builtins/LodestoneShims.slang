@@ -84,6 +84,18 @@ public interface IAtomicBuffer<T : IShimAtomicScalar>
     T CompareExchange(uint index, T compare_value, T value);
 }
 
+int64_t Wide64ToInt64(Wide64 value)
+{
+    return int64_t((uint64_t(value.high) << 32) | uint64_t(value.low));
+}
+
+Wide64 Wide64FromInt64(int64_t value)
+{
+    const uint64_t bits = uint64_t(value);
+
+    return Wide64.Make(uint(bits & 0xFFFFFFFFull), uint(bits >> 32));
+}
+
 // Adds a value for each lane with one atomic for each wave, and returns what Add returns for that lane. The prefix sum
 // gives each lane its offset into the wave's share. `index` must be the same on every lane that calls it, because the first
 // active lane adds the wave's total there. This needs the subgroup capabilities, and only an entry point that calls it
@@ -102,6 +114,65 @@ public uint AtomicAddWaveAggregated<B : IAtomicBuffer<uint>>(B buffer, uint inde
     uint waveBase = WaveReadLaneFirst(firstLaneOld);
 
     return waveBase + laneOffset;
+}
+
+// A 64-bit integer as two 32-bit words. WGSL has no 64-bit integer type, and Slang emits `i64` into WGSL without an error
+// when a shader holds an int64_t, so the interface of a 64-bit shim must not name one. The words are the little-endian halves
+// of the two's complement value, which makes one type serve int64_t and uint64_t.
+public struct Wide64
+{
+    public uint low;
+    public uint high;
+
+    public static Wide64 Make(uint low_word, uint high_word)
+    {
+        Wide64 result;
+        result.low = low_word;
+        result.high = high_word;
+        return result;
+    }
+
+    // Sign extends, so FromInt(-1) is the 64-bit value -1.
+    public static Wide64 FromInt(int value)
+    {
+        return Make(uint(value), value < 0 ? 0xFFFFFFFFu : 0u);
+    }
+
+    public static Wide64 FromUInt(uint value)
+    {
+        return Make(value, 0u);
+    }
+
+    // Two's complement negation. A zero low word carries into the high word.
+    public Wide64 Negated()
+    {
+        return Make(~low + 1u, ~high + (low == 0u ? 1u : 0u));
+    }
+
+    // The signed value, rounded to float. A negative value converts as the negation of its magnitude: the sum of two floats of
+    // opposite signs would cancel the low word of a small negative value to zero.
+    public float ToFloat()
+    {
+        const bool negative = int(high) < 0;
+        const Wide64 magnitude = negative ? Negated() : this;
+        const float value = float(magnitude.high) * 4294967296.0f + float(magnitude.low);
+
+        return negative ? -value : value;
+    }
+}
+
+// A 64-bit integer accumulator in a buffer: many threads add signed values, and a later dispatch reads the sum. Wrap-around
+// is modulo 2^64. Add and Sub return nothing, because the emulated form on WGSL cannot give an exact old value. Load and
+// Store are exact only while no Add or Sub runs on that element, which means after a barrier or in a later dispatch: the
+// emulated form reads and writes the two words with two atomic operations. Store is for clearing. An element is 8 bytes on
+// every profile, little-endian, so a host reads one buffer layout everywhere. Workgroup (groupshared) 64-bit atomics are not
+// covered. SPIR-V profiles need the Int64 and Int64Atomics capabilities, and WGSL needs no feature.
+public interface IAtomicAccumulator64
+{
+    void Add(uint index, Wide64 value);
+    void Sub(uint index, Wide64 value);
+    void Store(uint index, Wide64 value);
+    Wide64 Load(uint index);
 }
 
 public interface ITexture2DRef
@@ -251,6 +322,76 @@ public struct BoundAtomicBuffer<T : IShimAtomicScalar> : IAtomicBuffer<T>
     public T CompareExchange(uint index, T compare_value, T value)
     {
         return data[index].compareExchange(compare_value, value);
+    }
+}
+
+// The Bound form on SPIR-V: one 64-bit atomic for each element.
+public struct BoundAccumulator64 : IAtomicAccumulator64
+{
+    RWStructuredBuffer<Atomic<int64_t>> data;
+
+    [ForceInline]
+    public void Add(uint index, Wide64 value)
+    {
+        data[index].add(Wide64ToInt64(value));
+    }
+
+    [ForceInline]
+    public void Sub(uint index, Wide64 value)
+    {
+        data[index].sub(Wide64ToInt64(value));
+    }
+
+    [ForceInline]
+    public void Store(uint index, Wide64 value)
+    {
+        data[index].store(Wide64ToInt64(value));
+    }
+
+    [ForceInline]
+    public Wide64 Load(uint index)
+    {
+        return Wide64FromInt64(data[index].load());
+    }
+}
+
+// The Bound form on WGSL: an element is an array of two atomic words, low then high, which has the layout of a little-endian
+// int64_t. The low word adds first, and its carry goes to the high word. A reader that runs at the same time as an Add can see
+// the low word with no carry. An array element, unlike a struct of two words, adds no host type that only this profile has. No
+// 64-bit type appears in this struct or in any function that it calls.
+public struct BoundAccumulator64Words : IAtomicAccumulator64
+{
+    RWStructuredBuffer<Atomic<uint>[2]> data;
+
+    [ForceInline]
+    public void Add(uint index, Wide64 value)
+    {
+        const uint oldLow = data[index][0].add(value.low);
+        const uint carry = (oldLow + value.low) < oldLow ? 1u : 0u;
+
+        data[index][1].add(value.high + carry);
+    }
+
+    [ForceInline]
+    public void Sub(uint index, Wide64 value)
+    {
+        Add(index, value.Negated());
+    }
+
+    [ForceInline]
+    public void Store(uint index, Wide64 value)
+    {
+        data[index][0].store(value.low);
+        data[index][1].store(value.high);
+    }
+
+    [ForceInline]
+    public Wide64 Load(uint index)
+    {
+        const uint low = data[index][0].load();
+        const uint high = data[index][1].load();
+
+        return Wide64.Make(low, high);
     }
 }
 
@@ -406,6 +547,37 @@ public struct PointerAtomicBuffer<T : IShimAtomicScalar> : IAtomicBuffer<T>
     public T CompareExchange(uint index, T compare_value, T value)
     {
         return data[index].compareExchange(compare_value, value);
+    }
+}
+
+// The Pointer form: one 64-bit atomic for each element, at the std430 stride of 8.
+public struct PointerAccumulator64 : IAtomicAccumulator64
+{
+    [ls_shim_value]
+    Ptr<Atomic<int64_t>, Access.ReadWrite, AddressSpace.Device, Std430DataLayout> data;
+
+    [ForceInline]
+    public void Add(uint index, Wide64 value)
+    {
+        data[index].add(Wide64ToInt64(value));
+    }
+
+    [ForceInline]
+    public void Sub(uint index, Wide64 value)
+    {
+        data[index].sub(Wide64ToInt64(value));
+    }
+
+    [ForceInline]
+    public void Store(uint index, Wide64 value)
+    {
+        data[index].store(Wide64ToInt64(value));
+    }
+
+    [ForceInline]
+    public Wide64 Load(uint index)
+    {
+        return Wide64FromInt64(data[index].load());
     }
 }
 

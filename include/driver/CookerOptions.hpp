@@ -2,6 +2,8 @@
 #ifndef LODESTONE_OPTIONS_HPP
 #define LODESTONE_OPTIONS_HPP
 #include "CookerErrors.hpp"
+#include "emit/ArtifactNames.hpp"
+#include "ShaderManifestFormat.hpp"
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -42,6 +44,10 @@ struct CookerOptions
     std::vector<std::filesystem::path> ModulePaths;
     uint32_t OptimizationLevel{ 0u };
     uint32_t DebugLevel{ 0u };
+    /** Applies to the base form as well, because it changes what the code computes. */
+    manifest::FloatingPointMode FloatingPointMode{ manifest::FloatingPointMode::Fast };
+    /** The stem of every artifact file name, except the stage dumps and the source dump folders. */
+    std::string OutputName{ k_DefaultOutputName };
     std::vector<std::string> TargetNames;
     bool ValidateAgainstEmittedText{ true };
     bool ReportReflection{ false };

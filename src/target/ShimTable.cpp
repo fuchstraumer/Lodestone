@@ -12,7 +12,7 @@ namespace lodestone
 namespace
 {
     // a buffer device address addresses buffers only, so textures have no Pointer form, and buffers use no Handle
-    constexpr std::array<ShimInterface, 6u> k_ShimInterfaces
+    constexpr std::array<ShimInterface, 7u> k_ShimInterfaces
     {
         ShimInterface
         { 
@@ -54,6 +54,23 @@ namespace
             .Bound = "BoundAtomicBuffer",
             .Handle = {},
             .Pointer = "PointerAtomicBuffer",
+            .ImplementationTakesFormat = false,
+            .Resource = ShimResource
+            {
+                .Kind = BindingKind::StorageBuffer,
+                .Shape = ResourceShape::StructuredBuffer,
+                .Access = ResourceAccess::ReadWrite
+            },
+        },
+        ShimInterface
+        {
+            .Name = "IAtomicAccumulator64",
+            .Class = ShimResourceClass::Buffer,
+            .TypeParameterCount = 0u,
+            .Bound = "BoundAccumulator64",
+            .BoundWgsl = "BoundAccumulator64Words",
+            .Handle = {},
+            .Pointer = "PointerAccumulator64",
             .ImplementationTakesFormat = false,
             .Resource = ShimResource
             {
@@ -137,6 +154,16 @@ std::string_view ShimImplName(const ShimInterface& shim_interface, AccessModel a
         break;
     }
     return {};
+}
+
+std::string_view ShimImplName(const ShimInterface& shim_interface, AccessModel access, TargetLanguage language) noexcept
+{
+    if (access == AccessModel::Bound && language == TargetLanguage::Wgsl && !shim_interface.BoundWgsl.empty())
+    {
+        return shim_interface.BoundWgsl;
+    }
+
+    return ShimImplName(shim_interface, access);
 }
 
 const ShimInterface* FindShimInterfaceByImplementation(std::string_view implementation, AccessModel& out_access) noexcept

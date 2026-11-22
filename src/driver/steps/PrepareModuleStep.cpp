@@ -25,6 +25,7 @@ CookResult<PreparedCompiler> PrepareModuleStep::operator()(const SharedCookState
     createInfo.IncludeDirectories = shared_state.Options.IncludeDirectories;
     createInfo.OptimizationLevel = shared_state.Options.OptimizationLevel;
     createInfo.DebugLevel = shared_state.Options.DebugLevel;
+    createInfo.FloatingPointMode = shared_state.Options.FloatingPointMode;
     createInfo.WorkersLoadRootFromSource = shared_state.Options.RootFromSource;
     
     CookResult<TargetProfile> targetProfileResult = FindTargetProfile(target_name);

@@ -10,6 +10,7 @@
 #include "driver/CookerDriver.hpp"
 #include "driver/CookerOptions.hpp"
 #include "driver/CookerSteps.hpp"
+#include "emit/ArtifactNames.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 #include <utility>
@@ -56,7 +57,7 @@ inline CookedBundle CookForTargets(std::vector<std::filesystem::path> module_pat
     CookedBundle result;
     const CookResult<CookStatistics> cooked = RunCook(options, sink);
     result.Result = cooked.has_value() ? CookError::Success : cooked.error();
-    const auto manifest = sink.GetArtifacts().find(std::string{ k_ManifestFileName });
+    const auto manifest = sink.GetArtifacts().find(MakeArtifactName(k_DefaultOutputName, k_ManifestSuffix));
     if (manifest != sink.GetArtifacts().end())
     {
         result.Bytes.resize(manifest->second.size());

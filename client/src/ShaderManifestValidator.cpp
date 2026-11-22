@@ -356,6 +356,14 @@ namespace
                          .Detail = profile.OptimizationLevel > 3u ? profile.OptimizationLevel : profile.DebugLevel };
             }
 
+            if (profile.FloatingPointMode < FloatingPointMode::Fast || profile.FloatingPointMode > FloatingPointMode::Precise)
+            {
+                return { .Code = ErrorCode::InvalidProfileCodeFlags,
+                         .Table = ShaderManifestTable::Profiles,
+                         .RecordIndex = static_cast<uint32_t>(i),
+                         .Detail = static_cast<uint32_t>(profile.FloatingPointMode) };
+            }
+
             const bool noHeap = profile.HeapLowering == DescriptorHeapLowering::None;
             if (profile.HeapLowering > DescriptorHeapLowering::PerDescriptorType || (noHeap && profile.DescriptorHeapSet != 0u))
             {

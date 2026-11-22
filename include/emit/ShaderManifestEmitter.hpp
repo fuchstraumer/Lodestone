@@ -11,8 +11,6 @@
 namespace lodestone
 {
 
-inline constexpr std::string_view k_ManifestFileName = "ShaderLibrary.ldmanifest";
-
 /** The reader maps 64-bit fields in place, so keep the bytes 8-byte aligned if you move them. */
 [[nodiscard]] CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& library,
                                                                     DiagnosticSink& sink);

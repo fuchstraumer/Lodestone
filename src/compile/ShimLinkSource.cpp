@@ -63,6 +63,7 @@ std::vector<std::string_view> SplitShimTypeArguments(std::string_view type_argum
 
 CookResult<std::string> MakeShimLinkSource(std::span<const RawShimExtern> externs,
                                            const ShimForms& forms,
+                                           TargetLanguage language,
                                            std::string_view module_name,
                                            std::string_view profile_name,
                                            DiagnosticSink& sink)
@@ -85,7 +86,7 @@ CookResult<std::string> MakeShimLinkSource(std::span<const RawShimExtern> extern
         }
 
         const AccessModel access = ShimFormOf(forms, shimInterface->Class);
-        const std::string_view implName = ShimImplName(*shimInterface, access);
+        const std::string_view implName = ShimImplName(*shimInterface, access, language);
         if (implName.empty())
         {
             return std::unexpected(ReportError(sink,
@@ -166,6 +167,7 @@ CookResult<std::string> MakeShimLinkSource(std::span<const RawShimExtern> extern
 CookResult<std::vector<ShimFormatLinkSource>> MakeShimFormatLinkSources(std::span<const RawShimExtern> externs,
                                                                         const PermutationSpace& space,
                                                                         const ShimForms& forms,
+                                                                        TargetLanguage language,
                                                                         std::string_view module_name,
                                                                         DiagnosticSink& sink)
 {
@@ -236,7 +238,7 @@ CookResult<std::vector<ShimFormatLinkSource>> MakeShimFormatLinkSources(std::spa
                 source += std::format("export struct {} : {} = {}<{}>;\n",
                                       shimExtern.Name,
                                       shimExtern.Interface,
-                                      ShimImplName(*shimInterface, ShimFormOf(forms, shimInterface->Class)),
+                                      ShimImplName(*shimInterface, ShimFormOf(forms, shimInterface->Class), language),
                                       format->SlangType);
             }
             sources.push_back(ShimFormatLinkSource{ .AxisName = first->FormatAxis,

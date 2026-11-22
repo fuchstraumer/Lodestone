@@ -11,6 +11,7 @@
 #include "driver/steps/PreparePermutationSpaceStep.hpp"
 #include "driver/steps/BuildModuleStep.hpp"
 #include "driver/steps/FinalizeModuleStep.hpp"
+#include "emit/ArtifactNames.hpp"
 #include "emit/DedupeReport.hpp"
 #include "emit/DepFile.hpp"
 #include "emit/HostHeaderEmitter.hpp"
@@ -25,6 +26,7 @@
 #include "ShaderManifestFormat.hpp"
 #include "target/TargetProfile.hpp"
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
@@ -47,8 +49,6 @@ namespace lodestone
 
 namespace
 {
-    constexpr std::string_view k_DedupeReportFileName = "ShaderLibrary.dedupe.txt";
-
     std::string BuildDumpFileName(std::string_view module_name, std::string_view target_name, StageDumpKind kind)
     {
         return std::format("{}_{}_{}.json", module_name, target_name, magic_enum::enum_name(kind));
@@ -354,8 +354,10 @@ CookResult<CookStatistics> RunCookOnce(CookerOptions options,
         const auto [duplicatesBegin, duplicatesEnd] = std::ranges::unique(dependencyPaths);
         dependencyPaths.erase(duplicatesBegin, duplicatesEnd);
 
-        const std::string target = NormalizeDependencyPath(cookState.Options.OutputPath / k_ManifestFileName);
-        const CookError depfileError = sink.WriteArtifact(k_DepfileName, GenerateDepfile(target, dependencyPaths));
+        const std::string target = NormalizeDependencyPath(
+            cookState.Options.OutputPath / MakeArtifactName(cookState.Options.OutputName, k_ManifestSuffix));
+        const std::string depfileName = MakeArtifactName(cookState.Options.OutputName, k_DepfileSuffix);
+        const CookError depfileError = sink.WriteArtifact(depfileName, GenerateDepfile(target, dependencyPaths));
         if (!depfileError)
         {
             return std::unexpected(depfileError);
@@ -478,6 +480,7 @@ namespace
                                                           .CodeFactsRead = profile.Validator != nullptr,
                                                           .OptimizationLevel = cook_state.Options.OptimizationLevel,
                                                           .DebugLevel = cook_state.Options.DebugLevel,
+                                                          .FloatingPointMode = cook_state.Options.FloatingPointMode,
                                                           .HeapLowering = profile.HeapLowering,
                                                           .DescriptorHeapSet = profile.DescriptorHeapSet.value_or(0u) });
         }
@@ -503,7 +506,7 @@ namespace
             return roundTripError;
         }
 
-        const CookError manifestWriteError = sink.WriteArtifact(k_ManifestFileName, *manifest);
+        const CookError manifestWriteError = sink.WriteArtifact(MakeArtifactName(options.OutputName, k_ManifestSuffix), *manifest);
         if (!manifestWriteError)
         {
             return manifestWriteError;
@@ -516,13 +519,15 @@ namespace
         }
 
         const CookError reportWriteError =
-            sink.WriteArtifact(k_ResourceReportFileName, FormatResourceReport(resourceReport.value()));
+            sink.WriteArtifact(MakeArtifactName(options.OutputName, k_ResourceReportSuffix),
+                               FormatResourceReport(resourceReport.value()));
         if (!reportWriteError)
         {
             return reportWriteError;
         }
 
-        const CookError dedupeWriteError = sink.WriteArtifact(k_DedupeReportFileName, GenerateDedupeReport(library));
+        const CookError dedupeWriteError = sink.WriteArtifact(MakeArtifactName(options.OutputName, k_DedupeReportSuffix),
+                           GenerateDedupeReport(library));
         if (!dedupeWriteError)
         {
             return dedupeWriteError;
@@ -542,7 +547,7 @@ namespace
             return hostHeader.error();
         }
 
-        return sink.WriteArtifact(k_HostHeaderFileName, *hostHeader);
+        return sink.WriteArtifact(MakeArtifactName(options.OutputName, k_HostHeaderSuffix), *hostHeader);
     }
 } // namespace
 
@@ -554,16 +559,17 @@ CookResult<CookStatistics> RunCook(CookerOptions options, OutputSink& sink)
 
 CookResult<CookStatistics> RunCook(CookerOptions options, OutputSink& sink, DiagnosticSink& diagnostics)
 {
-    const std::string_view artifactNames[4]
+    const std::array<std::string, 4u> artifactNames
     {
-        k_ManifestFileName,
-        k_DedupeReportFileName,
-        k_ResourceReportFileName,
-        k_DepfileName
+        MakeArtifactName(options.OutputName, k_ManifestSuffix),
+        MakeArtifactName(options.OutputName, k_DedupeReportSuffix),
+        MakeArtifactName(options.OutputName, k_ResourceReportSuffix),
+        MakeArtifactName(options.OutputName, k_DepfileSuffix)
     };
 
-    // a failed cook must leave no stale manifest for a reader to take as its output
-    for (const std::string_view artifactName : artifactNames)
+    // a failed cook must leave no stale manifest for a reader to take as its output. Only the artifacts of this
+    // output name are removed, so cooks with other names can share the folder
+    for (const std::string& artifactName : artifactNames)
     {
         if (sink.RemoveArtifact(artifactName) != CookError::Success)
         {

@@ -61,6 +61,15 @@ std::string MakeAgreementSource(std::span<const ShimInterface> table)
                 continue;
             }
 
+            if (access == AccessModel::Bound && !row.BoundWgsl.empty())
+            {
+                // the WGSL cell is a second cell of the same row, and it must agree as well
+                source += std::format("struct CheckWgsl{0}<T : {1}> {{}};\ntypealias CellWgsl{0} = CheckWgsl{0}<{2}>;\n",
+                                      cell,
+                                      Spell(row.Name, row.TypeParameterCount, TypeArgumentOf(row.Name)),
+                                      Spell(row.BoundWgsl, row.TypeParameterCount, TypeArgumentOf(row.Name)));
+            }
+
             if (row.ImplementationTakesFormat)
             {
                 // one cell for each accepted format
@@ -113,7 +122,7 @@ int main()
 
     runner.BeginSection("the table holds the interfaces of the shim module, and the Bound form is complete");
     const std::span<const ShimInterface> table = GetShimInterfaces();
-    runner.CheckEqual(table.size(), 6u, "six interfaces: three buffers, a texture, a sampler, and a write-only storage texture");
+    runner.CheckEqual(table.size(), 7u, "seven interfaces: four buffers, a texture, a sampler, and a write-only storage texture");
     bool boundComplete = true;
     for (const ShimInterface& row : table)
     {
@@ -147,6 +156,23 @@ int main()
     runner.CheckEqual(FindShimInterface("IWriteBuffer"), nullptr, notFoundClaim);
     runner.CheckEqual(FindShimInterface(""), nullptr, notFoundClaim);
     runner.Check(ShimImplName(*readBuffer, AccessModel::Invalid).empty(), "an invalid access model has no cell");
+
+    const ShimInterface* accumulator = FindShimInterface("IAtomicAccumulator64");
+    if (runner.Check(accumulator != nullptr, "IAtomicAccumulator64 is in the table"))
+    {
+        runner.CheckEqual(ShimImplName(*accumulator, AccessModel::Bound, TargetLanguage::Spirv),
+                          "BoundAccumulator64",
+                          "the Bound cell of SPIR-V is the 64-bit atomic");
+        runner.CheckEqual(ShimImplName(*accumulator, AccessModel::Bound, TargetLanguage::Wgsl),
+                          "BoundAccumulator64Words",
+                          "the Bound cell of WGSL is the two-word emulation");
+        runner.CheckEqual(ShimImplName(*accumulator, AccessModel::Pointer, TargetLanguage::Wgsl),
+                          "PointerAccumulator64",
+                          "a language changes the Bound cell only");
+    }
+    runner.CheckEqual(ShimImplName(*readBuffer, AccessModel::Bound, TargetLanguage::Wgsl),
+                      "BoundReadBuffer",
+                      "a row with no WGSL cell uses its Bound cell for WGSL");
 
     const std::filesystem::path directory = std::filesystem::temp_directory_path() / "LodestoneShimTableTest";
     std::filesystem::remove_all(directory);

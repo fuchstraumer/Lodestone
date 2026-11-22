@@ -291,6 +291,7 @@ CookResult<std::vector<std::byte>> EmitShaderManifest(const CookedLibrary& libra
                                               .Flags = flags,
                                               .OptimizationLevel = static_cast<uint8_t>(profile.OptimizationLevel),
                                               .DebugLevel = static_cast<uint8_t>(profile.DebugLevel),
+                                              .FloatingPointMode = profile.FloatingPointMode,
                                               .DescriptorHeapSet = profile.DescriptorHeapSet });
     }
 

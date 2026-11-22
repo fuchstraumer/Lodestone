@@ -98,6 +98,7 @@ set(LODESTONE_DRIVER_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/steps/PreparePermutationSpaceStep.cpp")
 
 set(LODESTONE_EMIT_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/ArtifactNames.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/DedupeReport.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/DepFile.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/HostHeaderEmitter.hpp"
@@ -106,6 +107,7 @@ set(LODESTONE_EMIT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/ShaderManifestEmitter.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/ShaderManifestVerify.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/emit/StageDump.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/ArtifactNames.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/DedupeReport.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/DepFile.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/emit/HostHeaderEmitter.cpp"

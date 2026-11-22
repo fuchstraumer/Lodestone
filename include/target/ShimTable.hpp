@@ -38,6 +38,8 @@ struct ShimInterface
     /** @brief The number of type arguments of the interface and of each implementation. */
     uint32_t TypeParameterCount{ 0u };
     std::string_view Bound;
+    /** @brief The Bound implementation for WGSL, when it differs from `Bound`. Empty when both languages share one. */
+    std::string_view BoundWgsl;
     std::string_view Handle;
     std::string_view Pointer;
     /** @brief The implementations take the Slang type of a storage format (`RGBA16F`) as their only type argument, and the
@@ -53,6 +55,9 @@ const ShimInterface* FindShimInterface(std::string_view name) noexcept;
 
 /** @brief Empty when the cell has no implementation. */
 std::string_view ShimImplName(const ShimInterface& shim_interface, AccessModel access) noexcept;
+
+/** @brief `ShimImplName`, except that the Bound cell of `TargetLanguage::Wgsl` is `BoundWgsl` when that is not empty. */
+std::string_view ShimImplName(const ShimInterface& shim_interface, AccessModel access, TargetLanguage language) noexcept;
 
 /** @brief Null when no Handle or Pointer cell names `implementation`, such as `HandleTexture2D`. */
 const ShimInterface* FindShimInterfaceByImplementation(std::string_view implementation, AccessModel& out_access) noexcept;

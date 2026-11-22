@@ -57,6 +57,8 @@ enum class CookError : uint16_t
     NoTargetSpecified = 65,
     HostNamespaceMissing = 66, // `--host-types` has no `--host-namespace`, or `--host-namespace` has no `--host-types`
     HostNamespaceInvalid = 67, // `--host-namespace` is not a C++ identifier or a `::` path of identifiers
+    FloatingPointModeInvalid = 68, // `--fp-mode` is not `fast`, `default`, or `precise`
+    OutputNameInvalid = 69, // `--output-name` is empty, is `.` or `..`, or contains `/`, `\`, or `:`
 
     PermutationSpaceNotFound = 80,
     PermutationValueNotInAxis = 81,

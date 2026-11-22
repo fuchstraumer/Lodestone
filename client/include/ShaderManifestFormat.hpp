@@ -13,7 +13,7 @@ namespace lodestone::manifest
 {
 
 inline constexpr uint32_t k_ShaderManifestMagic = 0x48535856u;
-inline constexpr uint32_t k_ShaderManifestVersion = 20u;
+inline constexpr uint32_t k_ShaderManifestVersion = 21u;
 
 // NOLINTBEGIN(readability-enum-initial-value, performance-enum-size)
 enum class ErrorCode : uint32_t
@@ -221,6 +221,16 @@ enum class DescriptorHeapLowering : uint8_t
     PerDescriptorType = 2,
 };
 
+/** @brief Slang's floating point mode for the cook. `Precise` stops the compiler from fusing or reordering float
+ * arithmetic, so a renderer can tell which profiles computed with contraction. */
+enum class FloatingPointMode : uint8_t
+{
+    Invalid = 0,
+    Fast = 1,
+    Default = 2,
+    Precise = 3,
+};
+
 inline constexpr uint32_t k_MutableHeapSamplerBinding = 0u;
 inline constexpr uint32_t k_MutableHeapCombinedImageSamplerBinding = 1u;
 // textures, storage textures, texel buffers, storage buffers, and uniform buffers
@@ -249,7 +259,10 @@ struct alignas(8) Profile
     // the cook's `--O` and `--g` levels, which made the code in this profile
     uint8_t OptimizationLevel{ 0u };
     uint8_t DebugLevel{ 0u };
-    uint16_t Reserved2{ 0u };
+    // the cook's `--fp-mode`, which changes what the code computes
+    // qualified, because a member of this name would otherwise change the meaning of the type name
+    manifest::FloatingPointMode FloatingPointMode{ manifest::FloatingPointMode::Invalid };
+    uint8_t Reserved2{ 0u };
     // 0 when `HeapLowering` is `None`
     uint32_t DescriptorHeapSet{ 0u };
     uint32_t Reserved3{ 0u };

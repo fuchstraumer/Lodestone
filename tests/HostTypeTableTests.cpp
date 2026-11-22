@@ -15,6 +15,7 @@
 #include "driver/steps/PreparePermutationSpaceStep.hpp"
 #include "ShaderManifest.hpp"
 #include "ShaderManifestLayout.hpp"
+#include "emit/ArtifactNames.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 #include "model/CookedLibrary.hpp"
@@ -762,7 +763,7 @@ void CheckFlatArrayCountOfLinkTimeConstant(tests::TestRunner& runner, const std:
     std::vector<std::byte> bytes;
     for (const auto& [name, text] : sink.GetArtifacts())
     {
-        if (name == k_ManifestFileName)
+        if (name == MakeArtifactName(k_DefaultOutputName, k_ManifestSuffix))
         {
             bytes.resize(text.size());
             std::memcpy(bytes.data(), text.data(), bytes.size());

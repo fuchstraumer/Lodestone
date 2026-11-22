@@ -6,6 +6,7 @@
 #include "driver/CookerDriver.hpp"
 #include "driver/CookerOptions.hpp"
 #include "driver/CookerSteps.hpp"
+#include "emit/ArtifactNames.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 
@@ -280,7 +281,7 @@ int main(int argc, char** argv)
     const std::filesystem::path outputDirectory = std::filesystem::temp_directory_path() / "LodestoneStaleManifestTest";
     std::filesystem::remove_all(outputDirectory);
     std::filesystem::create_directories(outputDirectory);
-    const std::filesystem::path manifestPath = outputDirectory / k_ManifestFileName;
+    const std::filesystem::path manifestPath = outputDirectory / MakeArtifactName(k_DefaultOutputName, k_ManifestSuffix);
     {
         std::ofstream stale{ manifestPath, std::ios::binary };
         stale << "a manifest of an earlier cook";

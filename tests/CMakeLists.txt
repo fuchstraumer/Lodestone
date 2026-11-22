@@ -179,6 +179,9 @@ target_compile_definitions(ShimModuleTest PRIVATE
 # The shim table agrees with the shim module (decision D6, phase F step F2.2): every cell names a type that exists, takes the
 # right arity, and conforms to its interface, and a table that disagrees fails. It cooks through Slang four times.
 add_lodestone_unit_test(ShimTableTest ShimTableTests.cpp)
+# The arithmetic of the WGSL 64-bit accumulator (IAtomicAccumulator64), as a CPU model of two 32-bit atomic steps in random
+# interleavings. It needs no Slang and no GPU.
+add_lodestone_unit_test(Accumulator64ModelTest Accumulator64ModelTests.cpp)
 # Shim externs (phase F step F2.3): the symbol table reads `extern struct X : IReadBuffer<T>` from the source, reflection confirms it,
 # and the extern stays out of the axis space. It starts two bootstrap compiles, so it takes about one second.
 add_lodestone_unit_test(ShimExternTest ShimExternTests.cpp)
@@ -210,6 +213,15 @@ target_compile_definitions(ShimArrayTest PRIVATE
 # A branch that spirv-opt removes (O2): the cook takes the used bindings from the emitted code, and the cross-profile checks accept
 # a layout and workgroup memory that only the optimized profile shrinks. It cooks through Slang four times.
 add_lodestone_unit_test(OptimizedLayoutTest OptimizedLayoutTests.cpp)
+# --fp-mode reaches Slang for both forms of the cook: precise mode decorates float arithmetic NoContraction in the SPIR-V, fast
+# mode does not, and the manifest profile records the mode. It cooks through Slang six times.
+add_lodestone_unit_test(FloatingPointModeTest FloatingPointModeTests.cpp)
+target_compile_definitions(FloatingPointModeTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/FloatMode")
+# --output-name: two cooks with different names share one folder, and a failed cook removes the artifacts of its own name only.
+add_lodestone_unit_test(OutputNameTest OutputNameTests.cpp)
+target_compile_definitions(OutputNameTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/FloatMode")
 target_compile_definitions(OptimizedLayoutTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/OptimizedLayout")
 # Shim resources in the Pointer and Handle forms, cooked for both modern profiles: each stored value
@@ -257,7 +269,7 @@ add_lodestone_unit_test(BufferLayoutTest BufferLayoutTests.cpp)
 add_lodestone_unit_test(HostTypeTableTest HostTypeTableTests.cpp)
 target_compile_definitions(HostTypeTableTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/HostTypes")
-# The generated host header (slice H3): two build-time cooks write ShaderLibrary.host.hpp, and the test includes both, so
+# The generated host header (slice H3): two build-time cooks write <stem>.host.hpp, and the test includes both, so
 # the static asserts of the header compare the host compiler with Slang. At run time the test compares the generated types
 # with the member records of the manifests. The shim cook needs the modern profile for its stored values. Each cook keeps
 # its own module cache folder, because the cooks can run beside the tests.
@@ -271,6 +283,7 @@ lodestone_add_shader_cook(HostHeaderCook
     OPTIONS --quiet --cache-dir "${CMAKE_CURRENT_BINARY_DIR}/host_header_cook_cache")
 lodestone_add_shader_cook(HostHeaderShimCook
     OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/host_header_shim_cook"
+    OUTPUT_NAME HostHeaderShim
     TARGETS wgsl spirv-modern-mutable
     MODULES "${PROJECT_SOURCE_DIR}/tests/assets/Shims/ShimMaterial.slang"
     HOST_TYPES "HostHeaderTestTypes.hpp"

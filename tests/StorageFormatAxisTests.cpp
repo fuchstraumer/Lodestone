@@ -8,6 +8,7 @@
 #include "VariantKey.hpp"
 #include "driver/CookerDriver.hpp"
 #include "driver/CookerOptions.hpp"
+#include "emit/ArtifactNames.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 #include "target/StorageFormatTable.hpp"
@@ -166,7 +167,7 @@ void DownsampleCS(uint3 id : SV_DispatchThreadID)
         options.OutputPath = "StorageFormatAxisUnformatted";
         MemoryOutputSink sink;
         const bool cooked = RunCook(options, sink).has_value();
-        const auto manifest = sink.GetArtifacts().find(std::string{ k_ManifestFileName });
+        const auto manifest = sink.GetArtifacts().find(MakeArtifactName(k_DefaultOutputName, k_ManifestSuffix));
         std::vector<std::byte> bytes;
         if (manifest != sink.GetArtifacts().end())
         {

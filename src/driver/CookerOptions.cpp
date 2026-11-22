@@ -1,5 +1,6 @@
 #include "driver/CookerOptions.hpp"
 #include "CookerErrors.hpp"
+#include "emit/ArtifactNames.hpp"
 #include "emit/HostHeaderEmitter.hpp"
 #include "target/TargetProfile.hpp"
 
@@ -35,6 +36,10 @@ namespace
         "  --target=<name> output target profile (required). Repeat it for more than one. Names: wgsl, spirv, spirv-modern-mutable, spirv-modern-typed\n"
         "  --O<level>      slang optimization level: 0-3, defaults to 0\n"
         "  --g<level>      slang debug level: 0-3, defaults to 0\n"
+        "  --fp-mode=<mode> floating point mode of Slang: fast, default, or precise. Defaults to fast. Precise\n"
+        "                  stops the compiler from fusing or reordering float arithmetic\n"
+        "  --output-name=<stem> file name stem of the artifacts. Defaults to ShaderLibrary. A cook removes only\n"
+        "                  the artifacts of its own stem, so cooks with other stems can share a folder\n"
         "  --no-validate   skip cross-checking reflection against the emitted text\n"
         "  --quiet         suppress the per-variant reflection report\n"
         "  --cache-dir     directory for precompiled slang modules\n"
@@ -50,8 +55,8 @@ namespace
         "  --dump-sources  write the shader sources to the dump files\n"
         "  --policy-file <path> policy file to use. Repeat it to merge more than one file. A key that two files\n"
         "                  both set is an error\n"
-        "  --depfile       write ShaderLibrary.d, a depfile that names every source file the cook read\n"
-        "  --host-types=<include> write ShaderLibrary.host.hpp, the C++ mirrors of the shader structs. The header\n"
+        "  --depfile       write <stem>.d, a depfile that names every source file the cook read\n"
+        "  --host-types=<include> write <stem>.host.hpp, the C++ mirrors of the shader structs. The header\n"
         "                  includes <include>, which must define float2 to float4x4, int2 to int4, uint2 to uint4,\n"
         "                  and half to half4. The cooker does not read that file\n"
         "  --host-namespace=<name> the C++ namespace of the host header. Required with --host-types\n";
@@ -62,6 +67,8 @@ namespace
     constexpr std::string_view k_StageDumpPrefix = "--dump-stage=";
     constexpr std::string_view k_HostTypesPrefix = "--host-types=";
     constexpr std::string_view k_HostNamespacePrefix = "--host-namespace=";
+    constexpr std::string_view k_FloatingPointModePrefix = "--fp-mode=";
+    constexpr std::string_view k_OutputNamePrefix = "--output-name=";
     constexpr std::string_view k_AllStageDumpsName = "all";
 
     /** One table for both the flag spelling and the artifact name, so the two cannot drift. */
@@ -283,7 +290,50 @@ namespace
         return CookError::Success;
     }
 
-    const std::array<ValueFlag, 6u> k_ValueFlags
+    struct FloatingPointModeName
+    {
+        manifest::FloatingPointMode Mode;
+        std::string_view Name;
+    };
+
+    constexpr std::array<FloatingPointModeName, 3u> k_FloatingPointModeNames
+    {
+        FloatingPointModeName{ .Mode = manifest::FloatingPointMode::Fast, .Name = "fast" },
+        FloatingPointModeName{ .Mode = manifest::FloatingPointMode::Default, .Name = "default" },
+        FloatingPointModeName{ .Mode = manifest::FloatingPointMode::Precise, .Name = "precise" }
+    };
+
+    CookError ApplyFloatingPointMode(CookerOptions& options, std::string_view value)
+    {
+        const auto modeName = std::ranges::find(k_FloatingPointModeNames, value, &FloatingPointModeName::Name);
+        if (modeName == std::end(k_FloatingPointModeNames))
+        {
+            std::println(stderr,
+                         "[lodestone][cooker_options] No floating point mode named '{}'. Valid options: fast default precise",
+                         value);
+            return CookError::FloatingPointModeInvalid;
+        }
+
+        options.FloatingPointMode = modeName->Mode;
+        return CookError::Success;
+    }
+
+    CookError ApplyOutputName(CookerOptions& options, std::string_view value)
+    {
+        if (!IsValidOutputName(value))
+        {
+            std::println(stderr,
+                         "[lodestone][cooker_options] The output name '{}' is not valid. It must not be empty or '.' or '..', "
+                         "and must not contain '/', '\\', or ':'",
+                         value);
+            return CookError::OutputNameInvalid;
+        }
+
+        options.OutputName = std::string{ value };
+        return CookError::Success;
+    }
+
+    const std::array<ValueFlag, 8u> k_ValueFlags
     {
         ValueFlag{ .Prefix = k_StageDumpPrefix, .Apply = &ApplyDumpStageArgument },
         // rejected here, so every name in CookerOptions is one FindTargetProfile accepts
@@ -291,7 +341,9 @@ namespace
         ValueFlag{ .Prefix = k_OptimizationPrefix, .Apply = &ApplyDesiredOptimizationLevel },
         ValueFlag{ .Prefix = k_DebugPrefix, .Apply = &ApplyDebugLevel },
         ValueFlag{ .Prefix = k_HostTypesPrefix, .Apply = &ApplyHostTypesOption },
-        ValueFlag{ .Prefix = k_HostNamespacePrefix, .Apply = &ApplyHostNamespaceOption }
+        ValueFlag{ .Prefix = k_HostNamespacePrefix, .Apply = &ApplyHostNamespaceOption },
+        ValueFlag{ .Prefix = k_FloatingPointModePrefix, .Apply = &ApplyFloatingPointMode },
+        ValueFlag{ .Prefix = k_OutputNamePrefix, .Apply = &ApplyOutputName }
     };
 
     const ValueFlag* FindValueFlag(std::string_view argument) noexcept

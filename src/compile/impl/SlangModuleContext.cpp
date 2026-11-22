@@ -157,6 +157,8 @@ CookError SlangModuleContext::Initialize(const SlangCompilerCreateInfo& create_i
 
     slang::TargetDesc target{};
     target.format = ToSlangCompileTarget(create_info.Language);
+    // a session option would not do: Linkage::addTarget overwrites it with this field
+    target.floatingPointMode = ToSlangFloatingPointMode(create_info.FloatingPointMode);
     // with no index, the heap takes the next free set, which can differ between the variants of one module
     std::vector<slang::CompilerOptionEntry> deliveredOptions;
     if (create_info.DescriptorHeapSet.has_value())

@@ -127,6 +127,7 @@ void WriteProfiles(lodestone::JsonWriter& writer, const manifest::BundleView& bu
         writer.KeyString("codeFormat", magic_enum::enum_name(profile.CodeFormat));
         writer.KeyUInt("optimizationLevel", profile.OptimizationLevel);
         writer.KeyUInt("debugLevel", profile.DebugLevel);
+        writer.KeyString("floatingPointMode", magic_enum::enum_name(profile.FloatingPointMode));
         writer.KeyString("heapLowering", magic_enum::enum_name(profile.HeapLowering));
         writer.KeyUInt("descriptorHeapSet", profile.DescriptorHeapSet);
         writer.EndObject();

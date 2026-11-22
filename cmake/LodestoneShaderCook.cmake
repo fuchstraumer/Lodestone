@@ -6,12 +6,17 @@
 #       MODULES <file.slang>...
 #       [POLICY_FILE <file.toml>...]      # merged in the order given; a key that two files set is an error
 #       [INCLUDE_DIRS <dir>...]           # searched for imported modules, after the folder of each module
-#       [HOST_TYPES <include>]            # also write ShaderLibrary.host.hpp. <include> is the text of the #include
+#       [OUTPUT_NAME <stem>]              # file name stem of the artifacts, ShaderLibrary by default
+#       [HOST_TYPES <include>]            # also write <stem>.host.hpp. <include> is the text of the #include
 #                                         # that the header uses for float2 to float4x4 and friends
 #       [OPTIONS <cooker argument>...])   # passed to the cooker as written, for example --quiet
 #
 # This adds a custom target <name>. Use add_dependencies to make the consuming target depend on it. The
 # target property LODESTONE_MANIFEST stores the path of the cooked manifest.
+#
+# OUTPUT_NAME is the stem of every artifact file name (<stem>.ldmanifest, <stem>.dedupe.txt, <stem>.d, and
+# <stem>.host.hpp). Two cooks with different stems can share one OUTPUT_DIR. Without it the stem is ShaderLibrary, and
+# the cook passes no --output-name.
 #
 # HOST_TYPES turns on the host header: the C++ mirrors of the shader structs and the binding names. The cook name
 # is the C++ namespace of the header, so it must be a C++ identifier. The target property LODESTONE_HOST_HEADER
@@ -31,7 +36,7 @@ set(LODESTONE_COOKER_EXECUTABLE "" CACHE FILEPATH
     "A host lodestone_cooker_console executable. Required when this build has no cooker, as in a cross build.")
 
 function(lodestone_add_shader_cook NAME)
-    cmake_parse_arguments(PARSE_ARGV 1 COOK "" "OUTPUT_DIR;HOST_TYPES" "TARGETS;MODULES;POLICY_FILE;OPTIONS;INCLUDE_DIRS")
+    cmake_parse_arguments(PARSE_ARGV 1 COOK "" "OUTPUT_DIR;HOST_TYPES;OUTPUT_NAME" "TARGETS;MODULES;POLICY_FILE;OPTIONS;INCLUDE_DIRS")
     if (COOK_UNPARSED_ARGUMENTS)
         message(FATAL_ERROR "lodestone_add_shader_cook(${NAME}): unknown arguments: ${COOK_UNPARSED_ARGUMENTS}")
     endif()
@@ -57,6 +62,11 @@ function(lodestone_add_shader_cook NAME)
                             "so the name must be a C++ identifier.")
     endif()
 
+    set(OUTPUT_STEM "ShaderLibrary")
+    if (COOK_OUTPUT_NAME)
+        set(OUTPUT_STEM "${COOK_OUTPUT_NAME}")
+    endif()
+
     # resolve relative paths against the calling directory, the same way add_custom_command does
     cmake_path(ABSOLUTE_PATH COOK_OUTPUT_DIR BASE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" NORMALIZE)
     set(MODULE_PATHS "")
@@ -66,6 +76,9 @@ function(lodestone_add_shader_cook NAME)
     endforeach()
 
     set(COOK_ARGUMENTS -o "${COOK_OUTPUT_DIR}" --depfile)
+    if (COOK_OUTPUT_NAME)
+        list(APPEND COOK_ARGUMENTS "--output-name=${COOK_OUTPUT_NAME}")
+    endif()
     foreach (PROFILE IN LISTS COOK_TARGETS)
         list(APPEND COOK_ARGUMENTS "--target=${PROFILE}")
     endforeach()
@@ -81,18 +94,18 @@ function(lodestone_add_shader_cook NAME)
     endforeach ()
     set(HOST_HEADER_PATH "")
     if (COOK_HOST_TYPES)
-        set(HOST_HEADER_PATH "${COOK_OUTPUT_DIR}/ShaderLibrary.host.hpp")
+        set(HOST_HEADER_PATH "${COOK_OUTPUT_DIR}/${OUTPUT_STEM}.host.hpp")
         list(APPEND COOK_ARGUMENTS "--host-types=${COOK_HOST_TYPES}" "--host-namespace=${NAME}")
     endif()
     list(APPEND COOK_ARGUMENTS ${COOK_OPTIONS} ${MODULE_PATHS})
 
-    set(MANIFEST_PATH "${COOK_OUTPUT_DIR}/ShaderLibrary.ldmanifest")
+    set(MANIFEST_PATH "${COOK_OUTPUT_DIR}/${OUTPUT_STEM}.ldmanifest")
     add_custom_command(
-        OUTPUT "${MANIFEST_PATH}" "${COOK_OUTPUT_DIR}/ShaderLibrary.dedupe.txt"
+        OUTPUT "${MANIFEST_PATH}" "${COOK_OUTPUT_DIR}/${OUTPUT_STEM}.dedupe.txt"
         BYPRODUCTS ${HOST_HEADER_PATH}
         COMMAND "${COOKER_COMMAND}" ${COOK_ARGUMENTS}
         DEPENDS ${INPUT_DEPENDENCIES} ${COOKER_DEPENDENCY}
-        DEPFILE "${COOK_OUTPUT_DIR}/ShaderLibrary.d"
+        DEPFILE "${COOK_OUTPUT_DIR}/${OUTPUT_STEM}.d"
         COMMENT "Cooking shaders: ${NAME}"
         VERBATIM
         COMMAND_EXPAND_LISTS)

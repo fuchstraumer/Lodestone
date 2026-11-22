@@ -12,6 +12,7 @@
 #include "compile/SlangCompiler.hpp"
 #include "driver/CookerDriver.hpp"
 #include "driver/CookerOptions.hpp"
+#include "emit/ArtifactNames.hpp"
 #include "emit/OutputSink.hpp"
 #include "emit/ShaderManifestEmitter.hpp"
 #include "target/StorageFormatTable.hpp"
@@ -113,7 +114,7 @@ int main(int argc, char** argv)
     const CookResult<CookStatistics> cooked = RunCook(options, sink);
     runner.CheckOk(cooked, "a texture of each format cooks for both targets, with both cross-checks");
 
-    const auto manifestArtifact = sink.GetArtifacts().find(std::string{ k_ManifestFileName });
+    const auto manifestArtifact = sink.GetArtifacts().find(MakeArtifactName(k_DefaultOutputName, k_ManifestSuffix));
     if (cooked.has_value() && manifestArtifact != sink.GetArtifacts().end())
     {
         std::vector<std::byte> bytes(manifestArtifact->second.size());
@@ -157,7 +158,7 @@ int main(int argc, char** argv)
     const CookResult<CookStatistics> shimCooked = RunCook(shimOptions, shimSink);
     runner.CheckOk(shimCooked, "a shim texture of each format cooks for both targets, with both cross-checks");
 
-    const auto shimArtifact = shimSink.GetArtifacts().find(std::string{ k_ManifestFileName });
+    const auto shimArtifact = shimSink.GetArtifacts().find(MakeArtifactName(k_DefaultOutputName, k_ManifestSuffix));
     if (shimCooked.has_value() && shimArtifact != shimSink.GetArtifacts().end())
     {
         std::vector<std::byte> bytes(shimArtifact->second.size());
@@ -200,7 +201,7 @@ int main(int argc, char** argv)
     const CookResult<CookStatistics> axisCooked = RunCook(axisOptions, axisSink);
     runner.CheckOk(axisCooked, "every value of the format axis cooks for both targets, with both cross-checks");
 
-    const auto axisArtifact = axisSink.GetArtifacts().find(std::string{ k_ManifestFileName });
+    const auto axisArtifact = axisSink.GetArtifacts().find(MakeArtifactName(k_DefaultOutputName, k_ManifestSuffix));
     if (axisCooked.has_value() && axisArtifact != axisSink.GetArtifacts().end())
     {
         std::vector<std::byte> bytes(axisArtifact->second.size());

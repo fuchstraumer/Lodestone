@@ -13,8 +13,6 @@ namespace lodestone
 
 class DiagnosticSink;
 
-inline constexpr std::string_view k_HostHeaderFileName = "ShaderLibrary.host.hpp";
-
 /** @brief Returns true when the text is a C++ identifier, or a `::` path of them, and no segment is a keyword. */
 [[nodiscard]] bool IsValidHostNamespace(std::string_view text) noexcept;
 

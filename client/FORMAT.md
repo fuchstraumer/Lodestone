@@ -193,3 +193,11 @@ set when axis k changes the byte size of the binding, for example a uniform bloc
 interface axis. `DescribeCreation` reads the mask for a uniform buffer too, so its `Size` is `ShaderPerVariant` when
 an axis changes the byte size, and `Shader` otherwise. `VerifyFootprintAxes` still checks the element count and the
 extent only, because no size attribute can name the byte size of a uniform block.
+
+## Version 21
+
+Format version 21 records the cook's `--fp-mode`. `Profile::FloatingPointMode` is a `FloatingPointMode` (`Fast`, `Default`,
+or `Precise`), which Slang's floating point option made in the code of the profile. Unlike the levels of version 18, the mode
+changes what the code computes, so the base form of the cook uses the same mode. A cook with no flag is `Fast`. `Open` rejects
+a value outside `Fast` to `Precise` (`InvalidProfileCodeFlags`). The field takes the first byte of the old `Reserved2`, so the
+`Profile` record stays 24 bytes.
