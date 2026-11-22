@@ -191,8 +191,7 @@ ManifestResult<BundleView> BundleView::Open(std::span<const std::byte> bytes) no
 
     BundleView view;
     view.bytes = bytes;
-    //NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    view.header = reinterpret_cast<const Header*>(bytes.data());
+    view.header = manifest::detail::StartRecords<Header>(bytes.data(), 1u);
     view.strings = Map<StringRef>(bytes, parsed.Strings);
     view.axes = Map<Axis>(bytes, parsed.Axes);
     view.axisValues = Map<AxisValueType>(bytes, parsed.AxesValues);
@@ -524,6 +523,14 @@ ShaderCodeFormat EnvironmentView::CodeFormat() const noexcept
     return ProfileRecord().CodeFormat;
 }
 
+std::span<const std::byte> EnvironmentView::SourceBytes(uint32_t source_index) const noexcept
+{
+    assert(source_index < sources.size());
+    const SourceRef& reference = sources[source_index];
+    return std::span<const std::byte>{ reinterpret_cast<const std::byte*>(sourceBlob.data() + reference.Offset),
+                                       reference.Length };
+}
+
 std::string_view EnvironmentView::Source(uint32_t source_index) const noexcept
 {
     assert(source_index < sources.size());
@@ -537,8 +544,9 @@ std::span<const uint32_t> EnvironmentView::SpirvWords(uint32_t source_index) con
     assert(source_index < sources.size());
     assert(CodeFormat() == ShaderCodeFormat::Spirv);
     const SourceRef& reference = sources[source_index];
-    return std::span<const uint32_t>{ reinterpret_cast<const uint32_t*>(sourceBlob.data() + reference.Offset),
-                                      reference.Length / sizeof(uint32_t) };
+    const size_t wordCount = reference.Length / sizeof(uint32_t);
+    const std::byte* words = reinterpret_cast<const std::byte*>(sourceBlob.data() + reference.Offset);
+    return std::span<const uint32_t>{ manifest::detail::StartRecords<uint32_t>(words, wordCount), wordCount };
 }
 
 std::span<const VariantKey> EnvironmentView::VariantKeys() const noexcept

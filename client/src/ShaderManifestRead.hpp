@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <span>
 #include <type_traits>
 #include <utility>
@@ -96,18 +97,32 @@ namespace lodestone::manifest::detail
     inline constexpr size_t k_AxisMaskWordBits = std::numeric_limits<uint64_t>::digits;
     
 // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+    /** Starts the lifetime of `count` records in the bytes, so that a read through the typed pointer is defined.
+     * The caller has checked the alignment. A library with no `start_lifetime_as` relies on the implicit object
+     * creation of the buffer that holds the bytes. */
+    template<typename RecordType> requires(std::is_trivially_copyable_v<RecordType> && !std::is_pointer_v<RecordType>)
+    inline const RecordType* StartRecords(const std::byte* data, size_t count) noexcept
+    {
+#if defined(__cpp_lib_start_lifetime_as)
+        return std::start_lifetime_as_array<RecordType>(data, count);
+#else
+        static_cast<void>(count);
+        return reinterpret_cast<const RecordType*>(data);
+#endif
+    }
+
     template<typename RecordType> requires(std::is_trivially_copyable_v<RecordType> && !std::is_pointer_v<RecordType>)
     inline std::span<const RecordType> Map(std::span<const std::byte> bytes, TableRef table_ref) noexcept
     {
-        return std::span<const RecordType>{ reinterpret_cast<const RecordType*>(bytes.data() + table_ref.Offset),
-                                            static_cast<size_t>(table_ref.Count) };
+        const size_t count = static_cast<size_t>(table_ref.Count);
+        return std::span<const RecordType>{ StartRecords<RecordType>(bytes.data() + table_ref.Offset, count), count };
     }
     
     template<typename RecordType> requires(std::is_trivially_copyable_v<RecordType> && !std::is_pointer_v<RecordType>)
     inline std::span<const RecordType> Map(std::span<const std::byte> bytes, TableRef64 table_ref) noexcept
     {
-        return std::span<const RecordType>{ reinterpret_cast<const RecordType*>(bytes.data() + table_ref.Offset),
-                                            static_cast<size_t>(table_ref.Count) };
+        const size_t count = static_cast<size_t>(table_ref.Count);
+        return std::span<const RecordType>{ StartRecords<RecordType>(bytes.data() + table_ref.Offset, count), count };
     }
 // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
 

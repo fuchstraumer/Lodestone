@@ -106,6 +106,7 @@ public:
     [[nodiscard]] const Profile& ProfileRecord() const noexcept;
     [[nodiscard]] std::string_view String(uint32_t string_index) const noexcept;
     [[nodiscard]] ShaderCodeFormat CodeFormat() const noexcept;
+    [[nodiscard]] std::span<const std::byte> SourceBytes(uint32_t source_index) const noexcept;
     [[nodiscard]] std::string_view Source(uint32_t source_index) const noexcept;
     [[nodiscard]] std::span<const uint32_t> SpirvWords(uint32_t source_index) const noexcept;
 

@@ -331,6 +331,7 @@ private:
 class EntryPointInstanceView
 {
 public:
+    [[nodiscard]] std::span<const std::byte> SourceBytes() const noexcept;
     [[nodiscard]] std::string_view Source() const noexcept;
     [[nodiscard]] std::span<const uint32_t> SpirvWords() const noexcept;
     [[nodiscard]] ShaderStageKind Stage() const noexcept;

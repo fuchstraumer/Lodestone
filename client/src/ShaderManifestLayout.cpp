@@ -429,6 +429,11 @@ ShaderStageKind EntryPointInstanceView::Stage() const noexcept
     return static_cast<ShaderStageKind>(entryPoints[entryPoint].Stage);
 }
 
+std::span<const std::byte> EntryPointInstanceView::SourceBytes() const noexcept
+{
+    return environment->SourceBytes(entryPointInstance->Source);
+}
+
 std::string_view EntryPointInstanceView::Source() const noexcept
 {
     return environment->Source(entryPointInstance->Source);
