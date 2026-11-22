@@ -69,6 +69,8 @@ private:
         std::vector<RawBindingDraft>& out_drafts) const;
     [[nodiscard]] CookResult<BindingScope> entryPointScope(slang::EntryPointReflection* entry_point_layout,
                                                            std::string_view entry_point_name) const;
+    [[nodiscard]] CookError readResourceAnnotations(slang::VariableReflection* attribute_variable,
+                                                    RawBindingDraft& draft) const;
     [[nodiscard]] CookError readSingleStringAttribute(slang::VariableReflection* leaf_variable,
                                                       const char* attribute_name,
                                                       std::string_view binding_name,

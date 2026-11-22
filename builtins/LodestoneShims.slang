@@ -215,6 +215,7 @@ extension float4 : IStorageTexelFromFloat4
 
 public struct BoundReadBuffer<T> : IReadBuffer<T>
 {
+    [ls_shim_resource]
     StructuredBuffer<T> data;
 
     [ForceInline]
@@ -226,6 +227,7 @@ public struct BoundReadBuffer<T> : IReadBuffer<T>
 
 public struct BoundReadWriteBuffer<T> : IReadWriteBuffer<T>
 {
+    [ls_shim_resource]
     RWStructuredBuffer<T> data;
 
     [ForceInline]
@@ -244,6 +246,7 @@ public struct BoundReadWriteBuffer<T> : IReadWriteBuffer<T>
 public struct BoundAtomicBuffer<T : IShimAtomicScalar> : IAtomicBuffer<T>
     where T : IBitAtomicable
 {
+    [ls_shim_resource]
     RWStructuredBuffer<Atomic<T>> data;
 
     [ForceInline]
@@ -328,6 +331,7 @@ public struct BoundAtomicBuffer<T : IShimAtomicScalar> : IAtomicBuffer<T>
 // The Bound form on SPIR-V: one 64-bit atomic for each element.
 public struct BoundAccumulator64 : IAtomicAccumulator64
 {
+    [ls_shim_resource]
     RWStructuredBuffer<Atomic<int64_t>> data;
 
     [ForceInline]
@@ -361,6 +365,7 @@ public struct BoundAccumulator64 : IAtomicAccumulator64
 // 64-bit type appears in this struct or in any function that it calls.
 public struct BoundAccumulator64Words : IAtomicAccumulator64
 {
+    [ls_shim_resource]
     RWStructuredBuffer<Atomic<uint>[2]> data;
 
     [ForceInline]
@@ -397,6 +402,7 @@ public struct BoundAccumulator64Words : IAtomicAccumulator64
 
 public struct BoundTexture2D : ITexture2DRef
 {
+    [ls_shim_resource]
     Texture2D<float4> texture;
 
     [ForceInline]
@@ -408,6 +414,7 @@ public struct BoundTexture2D : ITexture2DRef
 
 public struct BoundSampler : ISamplerRef
 {
+    [ls_shim_resource]
     SamplerState sampler;
 
     [ForceInline]
@@ -421,6 +428,7 @@ public struct BoundSampler : ISamplerRef
 public struct BoundWriteStorageTexture2D<F : ITexelElement> : IWriteStorageTexture2D
     where F.DataType : IStorageTexelFromFloat4
 {
+    [ls_shim_resource]
     WTexture2D<F> texture;
 
     [ForceInline]

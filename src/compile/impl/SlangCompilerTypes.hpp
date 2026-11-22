@@ -271,6 +271,8 @@ struct StoredValueLeaf
     uint32_t ByteOffset{ 0u };
     slang::TypeLayoutReflection* Member{ nullptr };
     slang::TypeReflection* Implementation{ nullptr };
+    /** The field of the shim type. The author's `ls_resource_*` and size attributes are on this variable. */
+    slang::VariableReflection* ShimField{ nullptr };
 };
 
 /** One parameter block. `UniformSize` is zero for a block of resources alone, which has no constant buffer. */

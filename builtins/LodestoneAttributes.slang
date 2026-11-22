@@ -101,6 +101,13 @@ public struct ls_shim_valueAttribute
 {
 };
 
+/** Marks the member of a Bound shim implementation that is the resource, so that reflection reads the `ls_resource_*`
+  * and size attributes from the shim field that contains it. Only `LodestoneShims` uses it. */
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct ls_shim_resourceAttribute
+{
+};
+
 [__AttributeUsage(_AttributeTargets.Struct)]
 public struct ls_axis_interfaceAttribute
 {
