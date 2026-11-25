@@ -135,7 +135,7 @@ contents. `Check` returns its condition, so the check can guard the checks that 
 check fails, so a guard that fails cannot hide the checks behind it. To read the diagnostics of a cook, pass a
 `RecordingDiagnosticSink` to the three-argument `RunCook`.
 
-Sixty-one test targets exist: fifty-three unit tests and eight cook tests. `tests/README.md` lists what each one proves. Read it before you add or change a test, and add a row there for each new target.
+Sixty-two test targets exist: fifty-four unit tests and eight cook tests. `tests/README.md` lists what each one proves. Read it before you add or change a test, and add a row there for each new target.
 
 Each cook test writes into its own output directory. The bundle and the dedup report hold every module
 of one cook, so a module added to a cook changes those files.
@@ -203,7 +203,7 @@ records the form of each class (`Profile::Forms`, format 17), and the heap (`Pro
 `Profile::DescriptorHeapSet`, formats 18 and 19). The old name `spirv-modern` is an unknown target. A name in the policy file can
 name a profile.
 
-A Pointer or Handle member stores a value in a block: `[ls_shim_value]` marks it in `builtins/LodestoneShims.slang`, because
+A Bound shim implementation marks its resource member with `[ls_shim_resource]`. The author writes `ls_resource_role`, `ls_resource_tags`, and the size attributes on the field of shim type, and reflection reads them from that field (`CollectScopeNames`, and `appendStoredValueDrafts` for the Pointer and Handle forms), so every profile gives one shim the same attributes. An attribute on a field of a plain user struct does not reach the resources inside it. A Pointer or Handle member stores a value in a block: `[ls_shim_value]` marks it in `builtins/LodestoneShims.slang`, because
 reflection gives a descriptor handle as a plain `uint2` and a pointer with no resource type. The reflector finds the marked
 member in the ordinary data of a parameter block, a `ConstantBuffer`, or the entry point constants, and writes one binding
 with a `StoredValuePlacement` (the form, the container, the container's group and binding, and the byte offset). The shim
