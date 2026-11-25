@@ -392,9 +392,9 @@ void CheckShimCook(tests::TestRunner& runner)
     if (located.has_value())
     {
         const manifest::LayoutRange layout = InstanceOf(*located).Layout();
-        const std::optional<manifest::ResolvedResource> points = FindResource(layout, "data");
-        const std::optional<manifest::ResolvedResource> surface = FindResource(layout, "texture");
-        const std::optional<manifest::ResolvedResource> filter = FindResource(layout, "sampler");
+        const std::optional<manifest::ResolvedResource> points = FindResource(layout, "Points");
+        const std::optional<manifest::ResolvedResource> surface = FindResource(layout, "Surface");
+        const std::optional<manifest::ResolvedResource> filter = FindResource(layout, "Filter");
         if (runner.Check(points.has_value() && surface.has_value() && filter.has_value(), "the shim resources are bindings"))
         {
             runner.CheckEqual(static_cast<size_t>(points->ValueOffset()), offsetof(Stored, Points), "the address of the buffer");
@@ -405,11 +405,11 @@ void CheckShimCook(tests::TestRunner& runner)
 
     runner.BeginSection("a shim buffer that one profile stores as a value is a binding of every variant on the others");
     // the unqualified name compiles only when the constant is in the entry point namespace, and not in SomeVariants
-    constexpr std::string_view pointsBuffer = shim_cook::ShimMaterial::BlockCS::data;
-    runner.CheckEqual(pointsBuffer, std::string_view{ "data" }, "the constant of the shim buffer");
+    constexpr std::string_view pointsBuffer = shim_cook::ShimMaterial::BlockCS::Points;
+    runner.CheckEqual(pointsBuffer, std::string_view{ "Points" }, "the constant of the shim buffer is the field of the author");
     const std::string shimHeader = ReadFileText(LODESTONE_HOST_HEADER_SHIM);
     runner.Check(!shimHeader.contains("SomeVariants"), "no binding of the shim cook is in SomeVariants");
-    runner.Check(shimHeader.contains("// not a binding on profiles: spirv-modern-mutable\ninline constexpr std::string_view data{"),
+    runner.Check(shimHeader.contains("// not a binding on profiles: spirv-modern-mutable\ninline constexpr std::string_view Points{"),
                  "the comment names the profile where the shim is a stored value");
     runner.Check(!shimHeader.contains("entryPointParams"), "no constant names the container of the constants");
 

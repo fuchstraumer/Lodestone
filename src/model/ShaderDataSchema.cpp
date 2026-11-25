@@ -488,6 +488,7 @@ uint64_t HashReflectedBinding(const ReflectedBinding& binding) noexcept
     thread_local StreamingHash compositeHasher;
     compositeHasher.Reset();
     compositeHasher.Append(std::string_view{ binding.Name });
+    compositeHasher.Append(std::string_view{ binding.ShimMember });
     compositeHasher.Append(static_cast<uint64_t>(binding.Placement.index()));
     // xxHash3 avalanches well, so widening every field to 64 bits once is enough
     const uint64_t scalarValues[]

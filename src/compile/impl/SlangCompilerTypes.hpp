@@ -265,8 +265,12 @@ struct RawBindingDraft
 /** One member that `[ls_shim_value]` marks: the descriptor handle or the buffer device address of a shim. */
 struct StoredValueLeaf
 {
-    /** The fields from the root of the block to the shim, joined with underscores as Slang joins scopes. */
+    /** The fields from the root of the block to the shim field, joined with underscores as Slang joins scopes. The shim
+     * field is not part of it. */
     std::string Scope;
+    /** The name of the shim field, which is the name of the binding. */
+    std::string ShimFieldName;
+    /** The name of the marked member. */
     std::string Name;
     uint32_t ByteOffset{ 0u };
     slang::TypeLayoutReflection* Member{ nullptr };

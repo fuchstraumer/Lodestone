@@ -111,10 +111,10 @@ struct ExpectedValue
 
 // each shim of a block takes 16 bytes in the std140 layout, and the push constants take 8
 constexpr ExpectedValue k_Expected[] = {
-    { "BlockCS", "material_Points", "data", PlacementKind::Pointer, StoredValueContainer::UniformBuffer, 0u },
-    { "BlockCS", "material_Surface", "texture", PlacementKind::Handle, StoredValueContainer::UniformBuffer, 16u },
-    { "BlockCS", "material_Filter", "sampler", PlacementKind::Handle, StoredValueContainer::UniformBuffer, 32u },
-    { "EntryCS", "entryPointParams_scratch", "data", PlacementKind::Pointer, StoredValueContainer::PushConstants, 0u },
+    { "BlockCS", "material", "Points", PlacementKind::Pointer, StoredValueContainer::UniformBuffer, 0u },
+    { "BlockCS", "material", "Surface", PlacementKind::Handle, StoredValueContainer::UniformBuffer, 16u },
+    { "BlockCS", "material", "Filter", PlacementKind::Handle, StoredValueContainer::UniformBuffer, 32u },
+    { "EntryCS", "entryPointParams", "scratch", PlacementKind::Pointer, StoredValueContainer::PushConstants, 0u },
 };
 
 } // namespace
@@ -219,9 +219,9 @@ int main(int argc, char** argv)
             {
                 const manifest::ResolvedResource texture = instance.Layout()[pairs[0].Texture];
                 const manifest::ResolvedResource sampler = instance.Layout()[pairs[0].Sampler];
-                runner.CheckEqual(texture.ScopeName(), "material_Surface", "the texture is the handle in material.Surface");
+                runner.CheckEqual(texture.Name(), "Surface", "the texture is the handle in material.Surface");
                 runner.CheckEqual(texture.Placement(), PlacementKind::Handle, "the texture side is a Handle");
-                runner.CheckEqual(sampler.ScopeName(), "material_Filter", "the sampler is the handle in material.Filter");
+                runner.CheckEqual(sampler.Name(), "Filter", "the sampler is the handle in material.Filter");
                 runner.CheckEqual(sampler.Placement(), PlacementKind::Handle, "the sampler side is a Handle");
             }
         }
@@ -249,7 +249,7 @@ int main(int argc, char** argv)
                 continue;
             }
             const std::optional<manifest::ResolvedResource> target =
-                FindResource(storageEnvironment->VariantAt(*variant).EntryPoint(0u).Layout(), "level_target", "texture");
+                FindResource(storageEnvironment->VariantAt(*variant).EntryPoint(0u).Layout(), "level", "target");
             if (runner.Check(target.has_value(), std::format("{}: the storage handle is in the layout", format.EnumCase)))
             {
                 runner.CheckEqual(target->Placement(), PlacementKind::Handle, std::format("{}: a Handle", format.EnumCase));
@@ -378,7 +378,7 @@ int main(int argc, char** argv)
         }
 
         const std::optional<manifest::ResolvedResource> vertices =
-            FindResource(paddedEnvironment->VariantAt(0u).EntryPoint(0u).Layout(), "geometry_vertices", "data");
+            FindResource(paddedEnvironment->VariantAt(0u).EntryPoint(0u).Layout(), "geometry", "vertices");
         if (runner.Check(vertices.has_value(), std::format("{}: the vertex buffer is in the layout", target)))
         {
             runner.CheckEqual(vertices->ElementStride(), 64u, std::format("{}: the element stride is 64", target));
@@ -514,7 +514,7 @@ int main(int argc, char** argv)
         }
 
         const std::optional<manifest::ResolvedResource> totals =
-            FindResource(atomicEnvironment->VariantAt(0u).EntryPoint(0u).Layout(), "params_Totals", "data");
+            FindResource(atomicEnvironment->VariantAt(0u).EntryPoint(0u).Layout(), "params", "Totals");
         if (runner.Check(totals.has_value(), std::format("{}: the atomic buffer is in the layout", target)))
         {
             const bool pointerForm = target.starts_with("spirv-modern");
@@ -605,7 +605,7 @@ void CheckAccumulator64(tests::TestRunner& runner, const std::filesystem::path& 
         }
 
         const manifest::EntryPointInstanceView instance = environment->VariantAt(0u).EntryPoint(*entry);
-        const std::optional<manifest::ResolvedResource> totals = FindResource(instance.Layout(), "params_Totals", "data");
+        const std::optional<manifest::ResolvedResource> totals = FindResource(instance.Layout(), "params", "Totals");
         if (runner.Check(totals.has_value(), std::format("{}: {} has the accumulator in its layout", target, entryName)))
         {
             runner.CheckEqual(totals->Kind(), BindingKind::StorageBuffer, std::format("{}: {}: a storage buffer", target, entryName));

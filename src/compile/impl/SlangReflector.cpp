@@ -114,12 +114,14 @@ std::string JoinScopeName(std::string_view prefix, const char* name);
 bool HasShimResourceMember(slang::IGlobalSession* global_session, slang::TypeLayoutReflection* layout);
 
 /** Fills `out_names` with the scope name of each binding range. For a range inside a Bound shim, `out_variables`
- * receives the shim field, which is the variable that carries the author's attributes. Other ranges stay null. */
+ * receives the shim field, which is the variable that carries the author's attributes, and `out_names` receives the
+ * scope that contains the shim field. Other ranges get a null variable and the scope of their own field. */
 void CollectScopeNames(slang::IGlobalSession* global_session,
                        slang::TypeLayoutReflection* layout,
                        const std::string& prefix,
                        SlangInt base,
                        slang::VariableReflection* shim_field,
+                       const std::string& shim_scope,
                        std::vector<std::string>& out_names,
                        std::vector<slang::VariableReflection*>& out_variables);
 
@@ -630,11 +632,13 @@ CookError SlangReflector::collectStructMembers(slang::TypeLayoutReflection* stru
             }
 
             StoredValueLeaf value;
-            for (slang::VariableLayoutReflection* field : leaf.Path.first(leaf.Path.size() - 1u))
+            for (slang::VariableLayoutReflection* field : leaf.Path.first(leaf.Path.size() - 2u))
             {
                 value.Scope = JoinScopeName(value.Scope, field->getName());
             }
 
+            const char* shimFieldName = leaf.Path[leaf.Path.size() - 2u]->getName();
+            value.ShimFieldName = shimFieldName != nullptr ? shimFieldName : std::string{};
             value.Name = variable->getName() != nullptr ? variable->getName() : std::string{};
             value.ByteOffset = leaf.Offset;
             value.Member = leaf.Type;
@@ -1023,7 +1027,7 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
 
     std::vector<std::string> scopeNames(static_cast<size_t>(bindingRangeCount), scope.Name);
     std::vector<slang::VariableReflection*> shimFields(static_cast<size_t>(bindingRangeCount), nullptr);
-    CollectScopeNames(globalSession, containing_layout, scope.Name, 0, nullptr, scopeNames, shimFields);
+    CollectScopeNames(globalSession, containing_layout, scope.Name, 0, nullptr, std::string{}, scopeNames, shimFields);
 
     for (SlangInt rangeIndex = 0; rangeIndex < bindingRangeCount; ++rangeIndex)
     {
@@ -1075,8 +1079,18 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
         const bool globalContainer = leafName == nullptr && bindingType == slang::BindingType::ConstantBuffer;
 
         RawBindingDraft draft;
-        draft.Binding.Name = globalContainer ? std::string{ k_GlobalScopeName }
-                                             : (leafName != nullptr ? std::string{ leafName } : std::string{});
+        slang::VariableReflection* shimField = shimFields[static_cast<size_t>(rangeIndex)];
+        const char* shimFieldName = shimField != nullptr ? shimField->getName() : nullptr;
+        if (shimFieldName != nullptr)
+        {
+            draft.Binding.Name = std::string{ shimFieldName };
+            draft.Binding.ShimMember = leafName != nullptr ? std::string{ leafName } : std::string{};
+        }
+        else
+        {
+            draft.Binding.Name = globalContainer ? std::string{ k_GlobalScopeName }
+                                                 : (leafName != nullptr ? std::string{ leafName } : std::string{});
+        }
         draft.Binding.ScopeName = std::move(scopeNames[static_cast<size_t>(rangeIndex)]);
         draft.Binding.Placement = BoundPlacement{ .Group = scope.Base.Group + *spaceOffset,
                                                   .Binding = scope.Base.Binding + *indexOffset };
@@ -1122,7 +1136,6 @@ CookError SlangReflector::collectBindingRangeDrafts(slang::TypeLayoutReflection*
             }
         }
 
-        slang::VariableReflection* shimField = shimFields[static_cast<size_t>(rangeIndex)];
         const CookError annotationsError =
             readResourceAnnotations(shimField != nullptr ? shimField : leafVariable, draft);
         if (!annotationsError)
@@ -1219,7 +1232,8 @@ CookError SlangReflector::appendStoredValueDrafts(std::span<const StoredValueLea
         }
 
         RawBindingDraft draft;
-        draft.Binding.Name = value.Name;
+        draft.Binding.Name = value.ShimFieldName;
+        draft.Binding.ShimMember = value.Name;
         draft.Binding.ScopeName = JoinScopeName(scope_name, value.Scope.c_str());
         draft.Binding.Placement = StoredValuePlacement{ .Kind = PlacementKindFromAccessModel(form),
                                                         .Container = container,
@@ -1888,7 +1902,7 @@ void ReportUnresolvedLocation(DiagnosticSink& sink, std::string_view range_kind,
 
 std::string JoinScopeName(std::string_view prefix, const char* name)
 {
-    if (name == nullptr)
+    if (name == nullptr || *name == ' ')
     {
         return std::string{ prefix };
     }
@@ -1920,6 +1934,7 @@ void CollectScopeNames(slang::IGlobalSession* global_session,
                        const std::string& prefix,
                        SlangInt base,
                        slang::VariableReflection* shim_field,
+                       const std::string& shim_scope,
                        std::vector<std::string>& out_names,
                        std::vector<slang::VariableReflection*>& out_variables)
 {
@@ -1944,9 +1959,11 @@ void CollectScopeNames(slang::IGlobalSession* global_session,
         {
             // the outermost shim field wins, and a plain user struct passes nothing down
             slang::VariableReflection* innerShimField = shim_field;
+            std::string innerShimScope = shim_scope;
             if (innerShimField == nullptr && HasShimResourceMember(global_session, fieldLayout))
             {
                 innerShimField = field->getVariable();
+                innerShimScope = prefix;
             }
 
             CollectScopeNames(global_session,
@@ -1954,6 +1971,7 @@ void CollectScopeNames(slang::IGlobalSession* global_session,
                               JoinScopeName(prefix, field->getName()),
                               fieldBase,
                               innerShimField,
+                              innerShimScope,
                               out_names,
                               out_variables);
             continue;
@@ -1963,7 +1981,7 @@ void CollectScopeNames(slang::IGlobalSession* global_session,
             std::min<SlangInt>(fieldBase + fieldRangeCount, static_cast<SlangInt>(out_names.size()));
         std::fill(out_names.begin() + static_cast<std::ptrdiff_t>(fieldBase),
                   out_names.begin() + static_cast<std::ptrdiff_t>(last),
-                  prefix);
+                  shim_field != nullptr ? shim_scope : prefix);
         std::fill(out_variables.begin() + static_cast<std::ptrdiff_t>(fieldBase),
                   out_variables.begin() + static_cast<std::ptrdiff_t>(last),
                   shim_field);

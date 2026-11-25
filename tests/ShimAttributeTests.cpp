@@ -40,13 +40,13 @@ struct ExpectedAnnotations
 
 // the Holder field has a tag, and its inner resource gets none: a plain user struct passes nothing down
 constexpr std::array<ExpectedAnnotations, 7u> k_Expected{ {
-    { "params_Items", "data", ResourceRoleFlags::IndexData, "Aliased:Indices", 16u, 0u, 0u },
-    { "params_Tally", "data", ResourceRoleFlags::None, "Aliased:Counters", 4u, 0u, 0u },
-    { "params_Surface", "texture", ResourceRoleFlags::None, "Surface", 0u, 64u, 32u },
-    { "params_Filter", "sampler", ResourceRoleFlags::None, "Filter", 0u, 0u, 0u },
+    { "params", "Items", ResourceRoleFlags::IndexData, "Aliased:Indices", 16u, 0u, 0u },
+    { "params", "Tally", ResourceRoleFlags::None, "Aliased:Counters", 4u, 0u, 0u },
+    { "params", "Surface", ResourceRoleFlags::None, "Surface", 0u, 64u, 32u },
+    { "params", "Filter", ResourceRoleFlags::None, "Filter", 0u, 0u, 0u },
     { "params_Plain", "Inner", ResourceRoleFlags::None, "", 0u, 0u, 0u },
-    { "params_Untagged", "data", ResourceRoleFlags::None, "", 0u, 0u, 0u },
-    { "GlobalTotals", "data", ResourceRoleFlags::None, "Global:Totals", 2u, 0u, 0u },
+    { "params", "Untagged", ResourceRoleFlags::None, "", 0u, 0u, 0u },
+    { "", "GlobalTotals", ResourceRoleFlags::None, "Global:Totals", 2u, 0u, 0u },
 } };
 
 constexpr std::array<std::string_view, 4u> k_Targets{ "wgsl", "spirv", "spirv-modern-mutable", "spirv-modern-typed" };

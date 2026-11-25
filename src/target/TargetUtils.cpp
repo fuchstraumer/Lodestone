@@ -1,6 +1,5 @@
 #include "target/TargetUtils.hpp"
 #include "model/ShaderDataSchema.hpp"
-#include <format>
 #include <string>
 #include <string_view>
 
@@ -23,14 +22,24 @@ std::string_view StripSlangNameMangling(std::string_view mangled_name) noexcept
     return mangled_name;
 }
 
+std::string_view EmittedMemberName(const ReflectedBinding& binding) noexcept
+{
+    return binding.ShimMember.empty() ? std::string_view{ binding.Name } : std::string_view{ binding.ShimMember };
+}
+
 std::string MakeScopedName(const ReflectedBinding& binding)
 {
-    if (binding.ScopeName.empty())
+    std::string scoped = binding.ScopeName;
+    scoped += scoped.empty() ? "" : "_";
+    scoped += binding.Name;
+
+    if (!binding.ShimMember.empty())
     {
-        return binding.Name;
+        scoped += "_";
+        scoped += binding.ShimMember;
     }
 
-    return std::format("{}_{}", binding.ScopeName, binding.Name);
+    return scoped;
 }
 
 }

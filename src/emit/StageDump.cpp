@@ -161,6 +161,11 @@ namespace
         writer.BeginObject();
         writer.KeyString("name", binding.Name);
         writer.KeyString("scope", binding.ScopeName);
+        if (!binding.ShimMember.empty())
+        {
+            // a binding that is not a shim resource keeps its earlier keys, so that the known-good dumps do not change
+            writer.KeyString("shimMember", binding.ShimMember);
+        }
         const StoredValuePlacement* stored = GetStoredValuePlacement(binding.Placement);
         if (stored != nullptr)
         {
@@ -636,6 +641,10 @@ namespace
             writer.KeyUInt("index", i);
             writer.KeyString("name", binding.Name);
             writer.KeyString("scope", binding.ScopeName);
+            if (!binding.ShimMember.empty())
+            {
+                writer.KeyString("shimMember", binding.ShimMember);
+            }
             WriteRawPlacement(writer, binding.Placement);
             writer.KeyString("kind", magic_enum::enum_name(binding.Kind));
             writer.KeyUInt("elementStride", binding.ElementStride);

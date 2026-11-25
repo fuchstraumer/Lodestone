@@ -68,6 +68,10 @@ struct RawBinding
 {
     std::string Name;
     std::string ScopeName;
+    /** The name of the member inside a shim struct that the resource is declared as (`data`, `texture`), which is the
+     * name that emitted code uses. Empty when the binding is not a shim resource. For a shim resource, `Name` is the
+     * field that the author wrote, and `ScopeName` is the scope that contains that field. */
+    std::string ShimMember;
     RawPlacement Placement;
     BindingKind Kind{ BindingKind::Invalid };
 

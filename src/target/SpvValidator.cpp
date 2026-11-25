@@ -195,9 +195,10 @@ namespace
         }
 
         const std::string_view declaredName = StripSlangNameMangling(LastNameSegment(declared.Name));
-        if (declaredName != reflected.Name)
+        const std::string_view reflectedName = EmittedMemberName(reflected);
+        if (declaredName != reflectedName)
         {
-            record(BindingMismatchKind::Name, std::string{ declaredName }, reflected.Name);
+            record(BindingMismatchKind::Name, std::string{ declaredName }, std::string{ reflectedName });
         }
 
         if (declared.Kind != reflected.Kind)
@@ -331,7 +332,7 @@ namespace
             {
                 reason = std::format("no member of the container starts at byte {}", stored->ByteOffset);
             }
-            else if (member->Name != binding->Name)
+            else if (member->Name != EmittedMemberName(*binding))
             {
                 reason = std::format("the member at byte {} is named '{}'", stored->ByteOffset, member->Name);
             }

@@ -35,12 +35,12 @@ struct ExpectedBinding
     uint32_t Binding;
 };
 
-// the shim implementations name their resource by the member they hold, and the scope is the path to the shim
+// a shim resource is named by the field that the author wrote, and the scope is the path to that field
 constexpr std::array<ExpectedBinding, 4u> k_BlockBindings{ {
     { "", "Output", BindingKind::StorageBuffer, 0u, 0u },
-    { "material_Points", "data", BindingKind::StorageBuffer, 1u, 1u },
-    { "material_Albedo", "texture", BindingKind::Texture, 1u, 2u },
-    { "material_Linear", "sampler", BindingKind::Sampler, 1u, 3u },
+    { "material", "Points", BindingKind::StorageBuffer, 1u, 1u },
+    { "material", "Albedo", BindingKind::Texture, 1u, 2u },
+    { "material", "Linear", BindingKind::Sampler, 1u, 3u },
 } };
 
 std::optional<manifest::ResolvedResource> FindResource(const manifest::LayoutRange& layout,
@@ -118,7 +118,7 @@ int main(int argc, char** argv)
                      "the ordinary data beside the shims is the uniform buffer of the block");
 
         const manifest::LayoutRange entry = environment->VariantAt(0u).EntryPoint(1u).Layout();
-        const std::optional<manifest::ResolvedResource> scratch = FindResource(entry, "entryPointParams_Scratch", "data");
+        const std::optional<manifest::ResolvedResource> scratch = FindResource(entry, "entryPointParams", "Scratch");
         runner.Check(scratch.has_value() && scratch->Kind() == BindingKind::StorageBuffer &&
                          scratch->Access() == ResourceAccess::ReadWrite,
                      "a shim in an entry point uniform is a read and write storage buffer");

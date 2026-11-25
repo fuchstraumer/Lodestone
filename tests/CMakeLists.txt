@@ -234,6 +234,11 @@ target_compile_definitions(ShimPlacementTest PRIVATE
 add_lodestone_unit_test(ShimAttributeTest ShimAttributeTests.cpp)
 target_compile_definitions(ShimAttributeTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/Shims")
+# The name of a shim resource, cooked for all four profiles: each resource has the name of the field that the author wrote,
+# and not the name of the member inside the shim, and the profiles agree.
+add_lodestone_unit_test(ShimNameTest ShimNameTests.cpp)
+target_compile_definitions(ShimNameTest PRIVATE
+    LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/Shims")
 # A canary for shader-slang/slang#13789: it fails when Slang fixes the issue, so the workaround cannot outlive it.
 add_lodestone_unit_test(SlangMetadataCanaryTest SlangMetadataCanaryTests.cpp)
 # A canary for shader-slang/slang#13895, the missing NonReadable on an array of write-only storage images: it fails when Slang decorates the array,
