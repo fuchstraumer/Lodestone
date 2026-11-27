@@ -104,6 +104,14 @@ namespace
                                base.CodeFacts.WorkgroupMemoryBytes);
         }
 
+        const WorkgroupSize& size = delivered.Workgroup;
+        const WorkgroupSize& baseSize = base.Workgroup;
+        if (size.X != baseSize.X || size.Y != baseSize.Y || size.Z != baseSize.Z)
+        {
+            return std::format("a workgroup size of {}x{}x{}, and the base has {}x{}x{}",
+                               size.X, size.Y, size.Z, baseSize.X, baseSize.Y, baseSize.Z);
+        }
+
         // `Binding` is a position in each form's own used bindings, so only the delivery and the size compare
         const EntryPointConstants& constants = delivered.Constants;
         if (constants.Delivery != EntryPointConstantsDelivery::None &&

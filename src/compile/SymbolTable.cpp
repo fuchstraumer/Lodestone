@@ -53,6 +53,23 @@ namespace lodestone
         /** @brief Reads `extern struct <Name> : <Interface> = <Default>;`. The name follows `struct`. */
         std::optional<ExternConstantDeclaration> ExtractExternTypeDefault(std::string_view line, size_t assignment_index);
 
+        /** @brief The arguments of a `numthreads` attribute, and the text that follows the attribute. */
+        struct NumThreadsAttribute
+        {
+            std::array<std::string_view, 3> Arguments;
+            std::string_view Rest;
+        };
+
+        /** @brief Reads `numthreads(X, Y, Z)` and the `]` that closes the attribute. Nothing when the line does not
+         * contain the whole attribute. */
+        std::optional<NumThreadsAttribute> ExtractNumThreads(std::string_view line);
+
+        /** @brief Returns the text after any leading attributes in square brackets. */
+        std::string_view SkipAttributes(std::string_view text) noexcept;
+
+        /** @brief Returns the name of the function that a declaration line starts, or nothing when the line has none. */
+        std::string_view ExtractFunctionName(std::string_view declaration) noexcept;
+
         constexpr bool IsIdentifierStartCharacter(char character) noexcept
         {
             return (character >= 'A' && character <= 'Z') ||
@@ -168,6 +185,9 @@ namespace lodestone
         ExternConstSet& externTypeDefaults = externTypeDefaultMap[module_name];
         std::vector<DerivedConstantDeclaration>& derivedConstants = derivedConstantMap[module_name];
         std::vector<ExternStructDeclaration>& externStructs = externStructMap[module_name];
+        std::vector<NumThreadsDeclaration>& numThreads = numThreadsMap[module_name];
+        std::optional<std::array<std::string_view, 3>> pendingNumThreads;
+        uint32_t pendingNumThreadsLine = 0u;
         size_t lineStart = 0u;
         uint32_t lineNumber = 0u;
         bool inBlockComment = false;
@@ -184,6 +204,31 @@ namespace lodestone
             std::string_view line = StripComments(source_code.substr(lineStart, lineEnd - lineStart), inBlockComment);
             lineStart = lineEnd + 1;
             ++lineNumber;
+
+            // the attribute is usually on the line before the function, so the arguments wait for the name
+            std::string_view declarationText = line;
+            if (line.contains("numthreads"))
+            {
+                if (const std::optional<NumThreadsAttribute> attribute = ExtractNumThreads(line))
+                {
+                    pendingNumThreads = attribute->Arguments;
+                    pendingNumThreadsLine = lineNumber;
+                    declarationText = attribute->Rest;
+                }
+            }
+
+            if (pendingNumThreads.has_value())
+            {
+                const std::string_view functionName = ExtractFunctionName(SkipAttributes(declarationText));
+                if (!functionName.empty())
+                {
+                    numThreads.push_back(NumThreadsDeclaration{ .EntryPoint = functionName,
+                                                                .Arguments = *pendingNumThreads,
+                                                                .SourcePath = source_path,
+                                                                .SourceLine = pendingNumThreadsLine });
+                    pendingNumThreads.reset();
+                }
+            }
 
             // a declaration with no default has no `=`, so the extractor reads the header up to the first `=`, `;`, or `{`
             if (line.contains("extern"))
@@ -278,6 +323,17 @@ namespace lodestone
             return iter->second;
         }
         
+        return {};
+    }
+
+    std::span<const NumThreadsDeclaration> SymbolTable::NumThreadsForModule(std::string_view module_name) const
+    {
+        const auto iter = numThreadsMap.find(module_name);
+        if (iter != numThreadsMap.end())
+        {
+            return iter->second;
+        }
+
         return {};
     }
 
@@ -491,6 +547,106 @@ namespace lodestone
                                             .TypeArguments = typeArguments,
                                             .SourcePath = source_path,
                                             .SourceLine = source_line };
+        }
+
+        std::optional<NumThreadsAttribute> ExtractNumThreads(std::string_view line)
+        {
+            constexpr std::string_view k_Keyword = "numthreads";
+            size_t keywordIndex = line.find(k_Keyword);
+            while (keywordIndex != std::string_view::npos && keywordIndex > 0u &&
+                   IsIdentifierCharacter(line[keywordIndex - 1u]))
+            {
+                keywordIndex = line.find(k_Keyword, keywordIndex + 1u);
+            }
+
+            if (keywordIndex == std::string_view::npos)
+            {
+                return std::nullopt;
+            }
+
+            const size_t openIndex = line.find_first_not_of(" \t", keywordIndex + k_Keyword.size());
+            if (openIndex == std::string_view::npos || line[openIndex] != '(')
+            {
+                return std::nullopt;
+            }
+
+            std::array<std::string_view, 3> arguments{ "1", "1", "1" };
+            size_t argumentCount = 0u;
+            size_t depth = 0u;
+            size_t argumentStart = openIndex + 1u;
+            size_t closeIndex = std::string_view::npos;
+            for (size_t index = openIndex; index < line.size(); ++index)
+            {
+                const char character = line[index];
+                if (character == '(' || character == '[')
+                {
+                    ++depth;
+                }
+                else if (character == ')' || character == ']')
+                {
+                    --depth;
+                }
+
+                const bool endsArgument = (depth == 1u && character == ',') || depth == 0u;
+                if (!endsArgument)
+                {
+                    continue;
+                }
+
+                if (argumentCount == arguments.size())
+                {
+                    return std::nullopt;
+                }
+
+                arguments[argumentCount] = TrimWhitespace(line.substr(argumentStart, index - argumentStart));
+                ++argumentCount;
+                argumentStart = index + 1u;
+                if (depth == 0u)
+                {
+                    closeIndex = index;
+                    break;
+                }
+            }
+
+            if (closeIndex == std::string_view::npos || arguments[0].empty())
+            {
+                return std::nullopt;
+            }
+
+            const size_t attributeEnd = line.find(']', closeIndex);
+            const std::string_view rest = attributeEnd == std::string_view::npos ? std::string_view{} : line.substr(attributeEnd + 1u);
+
+            return NumThreadsAttribute{ .Arguments = arguments, .Rest = rest };
+        }
+
+        std::string_view SkipAttributes(std::string_view text) noexcept
+        {
+            text = TrimWhitespace(text);
+            while (text.starts_with('['))
+            {
+                const size_t close = text.find(']');
+                if (close == std::string_view::npos)
+                {
+                    return {};
+                }
+
+                text = TrimWhitespace(text.substr(close + 1u));
+            }
+
+            return text;
+        }
+
+        std::string_view ExtractFunctionName(std::string_view declaration) noexcept
+        {
+            const size_t openIndex = declaration.find('(');
+            if (openIndex == std::string_view::npos || openIndex == 0u)
+            {
+                return {};
+            }
+
+            const std::string_view name = ExtractIdentifier(declaration, openIndex);
+
+            return IsValidIdentifier(name) ? name : std::string_view{};
         }
 
         std::optional<ExternConstantDeclaration> ExtractExternTypeDefault(std::string_view line, size_t assignment_index)

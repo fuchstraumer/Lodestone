@@ -279,9 +279,10 @@ add_lodestone_unit_test(BufferLayoutTest BufferLayoutTests.cpp)
 add_lodestone_unit_test(HostTypeTableTest HostTypeTableTests.cpp)
 target_compile_definitions(HostTypeTableTest PRIVATE
     LODESTONE_TEST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/HostTypes")
-# The generated host header (slice H3): two build-time cooks write <stem>.host.hpp, and the test includes both, so
-# the static asserts of the header compare the host compiler with Slang. At run time the test compares the generated types
-# with the member records of the manifests. The shim cook needs the modern profile for its stored values. Each cook keeps
+# The generated host header (slice H3): two build-time cooks write <stem>.host.hpp and <stem>.host.inl, and the test
+# includes both headers, so the static asserts of the inline file compare the host compiler with Slang. At run time the test
+# compares the generated types, binding lists, and comment blocks with the manifests, and cooks a module whose binding name
+# collides with a generated name. The shim cook needs the modern profile for its stored values. Each cook keeps
 # its own module cache folder, because the cooks can run beside the tests.
 lodestone_add_shader_cook(HostHeaderCook
     OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/host_header_cook"
@@ -289,6 +290,7 @@ lodestone_add_shader_cook(HostHeaderCook
     MODULES "${PROJECT_SOURCE_DIR}/tests/assets/HostTypes/HostTypes.slang"
             "${PROJECT_SOURCE_DIR}/tests/assets/HostTypes/HostTypesHalf.slang"
             "${PROJECT_SOURCE_DIR}/tests/assets/HostTypes/HostTypesVariants.slang"
+            "${PROJECT_SOURCE_DIR}/tests/assets/HostTypes/HostTypesThreads.slang"
     HOST_TYPES "HostHeaderTestTypes.hpp"
     OPTIONS --quiet --cache-dir "${CMAKE_CURRENT_BINARY_DIR}/host_header_cook_cache")
 lodestone_add_shader_cook(HostHeaderShimCook
@@ -309,7 +311,8 @@ target_compile_definitions(HostHeaderTest PRIVATE
     LODESTONE_HOST_HEADER_MAIN="${HOST_HEADER_COOK_HEADER}"
     LODESTONE_HOST_MANIFEST_MAIN="${HOST_HEADER_COOK_MANIFEST}"
     LODESTONE_HOST_HEADER_SHIM="${HOST_HEADER_SHIM_HEADER}"
-    LODESTONE_HOST_MANIFEST_SHIM="${HOST_HEADER_SHIM_MANIFEST}")
+    LODESTONE_HOST_MANIFEST_SHIM="${HOST_HEADER_SHIM_MANIFEST}"
+    LODESTONE_HOST_ASSET_DIR="${PROJECT_SOURCE_DIR}/tests/assets/HostTypes")
 add_lodestone_unit_test(StageDumpTest StageDumpTests.cpp)
 add_lodestone_unit_test(DedupeInfluenceTest DedupeInfluenceTests.cpp)
 add_lodestone_unit_test(PermutationConstraintTest PermutationConstraintTests.cpp)

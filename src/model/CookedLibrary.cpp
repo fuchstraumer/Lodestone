@@ -342,7 +342,7 @@ CookError AppendVariantToModule(InternedModule& module,
 
         const InternResult raster = module.RasterInterner.Intern(entryPoint.Reflection.Raster, origin);
         record.RasterIndices.push_back(raster.Index);
-        record.Workgroups.push_back(entryPoint.Reflection.Workgroup);
+        record.Workgroups.push_back(entryPoint.Delivered.Workgroup);
     }
 
     module.Variants.emplace_back(std::move(record));
@@ -640,7 +640,11 @@ CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library, Diagnost
 
             const uint32_t portable = PortableCapabilities(profile.CodeFormat, facts.CapabilityNames);
             const uint32_t baselinePortable = PortableCapabilities(baselineProfile.CodeFormat, baselineFacts.CapabilityNames);
-            if (facts.WorkgroupMemoryBytes == baselineFacts.WorkgroupMemoryBytes && portable == baselinePortable)
+            const WorkgroupSize& size = shared.Variant.Workgroups[entryPointIndex];
+            const WorkgroupSize& baselineSize = shared.BaselineVariant.Workgroups[entryPointIndex];
+            const bool sizesEqual = size.X == baselineSize.X && size.Y == baselineSize.Y && size.Z == baselineSize.Z;
+            if (facts.WorkgroupMemoryBytes == baselineFacts.WorkgroupMemoryBytes && portable == baselinePortable &&
+                sizesEqual)
             {
                 continue;
             }
@@ -648,16 +652,22 @@ CookError VerifySourceFactsAcrossProfiles(const CookedLibrary& library, Diagnost
             return ReportError(sink,
                                CookError::SourceFactsTargetMismatch,
                                std::format("source facts: module '{}' variant [{}] entry point '{}' needs {} bytes of workgroup "
-                                           "memory and portable capabilities {:#x} in profile '{}', and {} bytes and {:#x} "
-                                           "in profile '{}'",
+                                           "memory, portable capabilities {:#x}, and a workgroup size of {}x{}x{} in profile '{}', "
+                                           "and {} bytes, {:#x}, and {}x{}x{} in profile '{}'",
                                            library.ModuleNames[shared.Module],
                                            shared.Variant.Description,
                                            shared.Environment.EntryPoints[entryPointIndex].Name,
                                            facts.WorkgroupMemoryBytes,
                                            portable,
+                                           size.X,
+                                           size.Y,
+                                           size.Z,
                                            library.Profiles[shared.Profile].TargetName,
                                            baselineFacts.WorkgroupMemoryBytes,
                                            baselinePortable,
+                                           baselineSize.X,
+                                           baselineSize.Y,
+                                           baselineSize.Z,
                                            library.Profiles[shared.BaselineProfile].TargetName));
         }
         return CookError::Success;

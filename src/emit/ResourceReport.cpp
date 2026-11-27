@@ -207,16 +207,32 @@ namespace
         return joined;
     }
 
-    std::string DescribeField(std::string_view name, CreationSource source, const ResourceReportEntry& entry, bool sized)
+    enum class FieldDetail : uint8_t
+    {
+        Invalid = 0,
+        None,
+        Footprint,
+        LayerCount,
+    };
+
+    std::string DescribeField(std::string_view name,
+                              CreationSource source,
+                              const ResourceReportEntry& entry,
+                              FieldDetail detail)
     {
         std::string text = std::format("{}: {}", name, SourceName(source));
-        if (!sized)
+        if (detail == FieldDetail::None)
         {
             return text;
         }
         if (source == CreationSource::ShaderPerVariant)
         {
             text += std::format(" ({})", JoinNames(entry.FootprintAxes));
+        }
+        else if (detail == FieldDetail::LayerCount)
+        {
+            // the layer count is the third extent, which the extent field already prints
+            return text;
         }
         else if (source == CreationSource::Shader && entry.ElementCount != 0u)
         {
@@ -308,27 +324,27 @@ std::string FormatResourceReport(const ResourceReport& report)
                                 JoinNames(entry.EntryPoints));
 
             const CreationFields& fields = entry.Fields;
-            const std::array<std::tuple<std::string_view, CreationSource, bool>, 10u> rows{ {
-                { "size", fields.Size, true },
-                { "usage", fields.Usage, false },
-                { "dimension", fields.Dimension, false },
-                { "format", fields.Format, false },
-                { "extent", fields.Extent, true },
-                { "layers", fields.ArrayLayers, false },
-                { "mips", fields.MipLevels, false },
-                { "samples", fields.SampleCount, false },
-                { "sampler", fields.SamplerState, false },
-                { "count", fields.BindingCount, false },
+            const std::array<std::tuple<std::string_view, CreationSource, FieldDetail>, 10u> rows{ {
+                { "size", fields.Size, FieldDetail::Footprint },
+                { "usage", fields.Usage, FieldDetail::None },
+                { "dimension", fields.Dimension, FieldDetail::None },
+                { "format", fields.Format, FieldDetail::None },
+                { "extent", fields.Extent, FieldDetail::Footprint },
+                { "layers", fields.ArrayLayers, FieldDetail::LayerCount },
+                { "mips", fields.MipLevels, FieldDetail::None },
+                { "samples", fields.SampleCount, FieldDetail::None },
+                { "sampler", fields.SamplerState, FieldDetail::None },
+                { "count", fields.BindingCount, FieldDetail::None },
             } };
 
             std::string line;
-            for (const auto& [fieldName, source, sized] : rows)
+            for (const auto& [fieldName, source, detail] : rows)
             {
                 if (source == CreationSource::NotApplicable)
                 {
                     continue;
                 }
-                line += std::format("{}{}", line.empty() ? "" : ", ", DescribeField(fieldName, source, entry, sized));
+                line += std::format("{}{}", line.empty() ? "" : ", ", DescribeField(fieldName, source, entry, detail));
             }
             text += std::format("    {}\n", line);
         }

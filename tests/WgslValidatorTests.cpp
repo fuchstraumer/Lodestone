@@ -7,7 +7,10 @@
 #include "target/WgslValidator.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
+#include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -261,6 +264,23 @@ int main()
         runner.CheckEqual(workgroupFacts->WorkgroupMemoryBytes, 144u,
                           "the workgroup memory is Dawn's sum, and equals the SPIR-V reader's sum for the same variables");
     }
+
+    runner.BeginSection("the workgroup size is the workgroup_size of the compute entry point");
+    const auto sizeOf = [&](std::string_view text) -> std::array<uint32_t, 3u>
+    {
+        const CookResult<EmittedCodeFacts> facts = validator.ReadEmittedCodeFacts(std::as_bytes(std::span{ text }), sink);
+        if (!facts.has_value() || !facts->Workgroup.has_value())
+        {
+            return {};
+        }
+
+        return { facts->Workgroup->X, facts->Workgroup->Y, facts->Workgroup->Z };
+    };
+    runner.CheckEqual(sizeOf(k_Wgsl), (std::array<uint32_t, 3u>{ 64u, 1u, 1u }), "workgroup_size(64, 1, 1)");
+    runner.CheckEqual(sizeOf(k_WgslStorageTexture), (std::array<uint32_t, 3u>{ 4u, 4u, 4u }), "workgroup_size(4, 4, 4)");
+    runner.CheckEqual(sizeOf(k_WgslWorkgroup), (std::array<uint32_t, 3u>{ 64u, 1u, 1u }), "a size with one dimension has 1 for the rest");
+    runner.Check(match.has_value() && match->Emitted.Workgroup.has_value() && match->Emitted.Workgroup->X == 64u,
+                 "the validate path reads the same size as the read path");
 
     runner.BeginSection("a kind mismatch fails the cross-check");
     // A uniform block that reflection calls a storage buffer still emits valid WGSL. WebGPU rejects

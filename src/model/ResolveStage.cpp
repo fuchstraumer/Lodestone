@@ -172,7 +172,8 @@ namespace
                                    .UsedBindingIndices = entryPoint.Reflection.UsedBindingIndices,
                                    .Constants = entryPoint.Reflection.Constants,
                                    .SamplerTexturePairs = {},
-                                   .CodeFacts = {} };
+                                   .CodeFacts = {},
+                                   .Workgroup = entryPoint.Reflection.Workgroup };
         };
         
         entryPoint.Delivered = makeForm(raw_entry_point.TargetCode);

@@ -11,6 +11,7 @@
 #include "VariantKey.hpp"
 #include "permute/PermutationAssignment.hpp"
 #include "permute/PermutationSpace.hpp"
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -31,6 +32,9 @@ struct LibraryEntryPoint
 {
     std::string Name;
     ShaderStageKind Stage{ ShaderStageKind::Invalid };
+    /** The arguments of `numthreads` as the author wrote them. Empty when the source has no readable attribute. Only the
+     * host header reads this. */
+    std::array<std::string, 3> WorkgroupExpressions;
 };
 
 enum class CodeForm : uint8_t

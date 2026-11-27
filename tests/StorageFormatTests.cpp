@@ -174,15 +174,18 @@ int main(int argc, char** argv)
                 continue;
             }
 
-            std::map<std::string, manifest::ResolvedResource> byScope;
+            std::map<std::string, manifest::ResolvedResource> byName;
             for (const manifest::ResolvedResource resource : environment->VariantAt(0u).EntryPoint(0u).Layout())
             {
-                byScope.emplace(std::string{ resource.ScopeName() }, resource);
+                if (resource.ScopeName() == "levels")
+                {
+                    byName.emplace(std::string{ resource.Name() }, resource);
+                }
             }
             for (const StorageFormatInfo& info : table)
             {
-                const auto entry = byScope.find(std::format("levels_{}", info.EnumCase));
-                runner.Check(entry != byScope.end() && entry->second.Kind() == BindingKind::StorageTexture &&
+                const auto entry = byName.find(std::string{ info.EnumCase });
+                runner.Check(entry != byName.end() && entry->second.Kind() == BindingKind::StorageTexture &&
                                  entry->second.Access() == ResourceAccess::WriteOnly &&
                                  entry->second.StorageFormat() == info.Format,
                              std::format("profile {}: {} is a write-only storage texture of its format", profile, info.EnumCase));

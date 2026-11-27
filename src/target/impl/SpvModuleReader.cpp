@@ -8,6 +8,7 @@
 #include "CookerErrors.hpp"
 #include "Diagnostics.hpp"
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -567,6 +568,44 @@ CookResult<std::optional<uint32_t>> ReadPushConstantExtent(const ParseState& par
     return std::optional<uint32_t>{};
 }
 
+CookResult<std::optional<WorkgroupSize>> ReadWorkgroupSize(const ParseState& parse_state, DiagnosticSink& sink)
+{
+    const EntryPointInfo& entryPoint = parse_state.EntryPoint;
+    if (entryPoint.Stage != ShaderStageKind::Compute)
+    {
+        return std::optional<WorkgroupSize>{};
+    }
+
+    std::array<uint32_t, 3u> sizes{ entryPoint.LocalSizeX, entryPoint.LocalSizeY, entryPoint.LocalSizeZ };
+    if (entryPoint.LocalSizeFromIds)
+    {
+        for (uint32_t& size : sizes)
+        {
+            const IdRecord& constant = parse_state.Ids[size];
+            if (constant.Constant != ConstantKind::Constant)
+            {
+                return std::unexpected(ReportError(sink,
+                                                   CookError::TargetValidationEntryPointInvalid,
+                                                   std::format("the workgroup size of '{}' is not a constant (id {})",
+                                                               entryPoint.Name,
+                                                               size)));
+            }
+
+            size = static_cast<uint32_t>(constant.ConstantBits);
+        }
+    }
+
+    if (std::ranges::contains(sizes, 0u))
+    {
+        return std::unexpected(ReportError(sink,
+                                           CookError::TargetValidationEntryPointInvalid,
+                                           std::format("the compute entry point '{}' has no workgroup size",
+                                                       entryPoint.Name)));
+    }
+
+    return WorkgroupSize{ .X = sizes[0], .Y = sizes[1], .Z = sizes[2] };
+}
+
 CookResult<EmittedCodeFacts> CollectEmittedCodeFacts(const ParseState& parse_state, DiagnosticSink& sink)
 {
     CookResult<std::vector<SamplerTexturePlacement>> pairs = CollectSamplerTexturePairs(parse_state, sink);
@@ -587,8 +626,15 @@ CookResult<EmittedCodeFacts> CollectEmittedCodeFacts(const ParseState& parse_sta
         return std::unexpected(workgroupBytes.error());
     }
 
+    CookResult<std::optional<WorkgroupSize>> workgroupSize = ReadWorkgroupSize(parse_state, sink);
+    if (!workgroupSize)
+    {
+        return std::unexpected(workgroupSize.error());
+    }
+
     EmittedCodeFacts facts{ .SamplerTexturePairs = std::move(*pairs), .PushConstantExtent = *pushExtent };
     facts.EntryPointName = parse_state.EntryPoint.Name;
+    facts.Workgroup = *workgroupSize;
     for (const DeclaredBinding& binding : CollectDeclaredBindings(parse_state))
     {
         facts.DeclaredPlacements.emplace_back(binding.Group, binding.Binding);

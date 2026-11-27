@@ -87,6 +87,12 @@ std::set<std::pair<std::string, std::string>> NamesOf(const manifest::LayoutRang
     std::set<std::pair<std::string, std::string>> names;
     for (const manifest::ResolvedResource resource : layout)
     {
+        // a profile that stores a shim as a value adds the uniform buffer that contains it
+        if (resource.Kind() == BindingKind::UniformBuffer)
+        {
+            continue;
+        }
+
         names.emplace(std::string{ resource.ScopeName() }, std::string{ resource.Name() });
     }
 
@@ -141,7 +147,7 @@ int main(int argc, char** argv)
         namesOfProfile.push_back(NamesOf(layout));
     }
 
-    runner.BeginSection("the four profiles agree on the scope and the name of every resource");
+    runner.BeginSection("the four profiles agree on the scope and the name of every resource that is not a container");
     for (const auto& names : namesOfProfile)
     {
         runner.Check(names == namesOfProfile.front(), "a profile has the same scopes and names as the first profile");

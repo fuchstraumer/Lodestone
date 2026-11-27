@@ -11,7 +11,7 @@ class DiagnosticSink;
 struct CompiledVariant;
 
 /** @brief Checks that each entry point's delivered form needs no more than its base form: used bindings, sampler pairs,
- * capability names (less the names debug information adds), workgroup memory, and entry point constants. */
+ * capability names (less the names debug information adds), workgroup memory, workgroup size, and entry point constants. */
 CookError VerifyDeliveredForm(const CompiledVariant& variant, std::string_view target_name, DiagnosticSink& sink);
 
 } // namespace lodestone

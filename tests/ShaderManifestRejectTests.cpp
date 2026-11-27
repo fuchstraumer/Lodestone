@@ -420,6 +420,15 @@ void TestSourceFactsAcrossProfiles(lodestone::tests::TestRunner& runner)
                           lodestone::CookError::SourceFactsTargetMismatch,
                  "a subgroup operation that only one profile reads fails the cook");
 
+    CookedLibrary otherSize = makeLibrary(wgslFacts, spirvFacts);
+    for (lodestone::LibraryVariant& variant : otherSize.Environments[1]->Variants)
+    {
+        variant.Workgroups[0].X = variant.Workgroups[0].X * 2u;
+    }
+    runner.CheckEqual(lodestone::VerifySourceFactsAcrossProfiles(otherSize, crossProfileDiagnostics),
+                          lodestone::CookError::SourceFactsTargetMismatch,
+                 "a workgroup size that differs between profiles fails the cook");
+
     CookedLibrary unread = makeLibrary(wgslFacts, otherBytes);
     unread.Profiles[1].CodeFactsRead = false;
     runner.CheckEqual(lodestone::VerifySourceFactsAcrossProfiles(unread, crossProfileDiagnostics), lodestone::CookError::Success,

@@ -2,6 +2,7 @@
 #ifndef LODESTONE_SHADER_SYMBOL_TABLE_HPP
 #define LODESTONE_SHADER_SYMBOL_TABLE_HPP
 #include "TransparentHash.hpp"
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <span>
@@ -44,6 +45,16 @@ namespace lodestone
         uint32_t SourceLine{ 0u };
     };
 
+    /** @brief The argument text of the `[numthreads(X, Y, Z)]` attribute of one function. Views into the source. An
+     * argument that the attribute leaves out is `1`. */
+    struct NumThreadsDeclaration
+    {
+        std::string_view EntryPoint;
+        std::array<std::string_view, 3> Arguments;
+        std::string_view SourcePath;
+        uint32_t SourceLine{ 0u };
+    };
+
     struct ExternConstHash
     {
         std::size_t operator()(const ExternConstantDeclaration& decl) const noexcept
@@ -69,6 +80,9 @@ namespace lodestone
         [[nodiscard]] std::span<const ExternStructDeclaration> ExternStructsForModule(std::string_view module_name) const;
         /** @brief In source order. A name can repeat, and the caller decides which are module scope. */
         [[nodiscard]] std::span<const DerivedConstantDeclaration> DerivedConstantsForModule(std::string_view module_name) const;
+        /** @brief In source order. Every function with a `[numthreads(...)]` attribute whose arguments end on the line
+         * of the attribute. A name can repeat, and the caller decides which are entry points. */
+        [[nodiscard]] std::span<const NumThreadsDeclaration> NumThreadsForModule(std::string_view module_name) const;
     private:
         using TokenSet = std::unordered_set<std::string_view>;
         std::unordered_map<std::string_view, TokenSet, TransparentStringHash, std::equal_to<>> tokenMap;
@@ -77,6 +91,7 @@ namespace lodestone
         std::unordered_map<std::string_view, ExternConstSet> externTypeDefaultMap;
         std::unordered_map<std::string_view, std::vector<DerivedConstantDeclaration>> derivedConstantMap;
         std::unordered_map<std::string_view, std::vector<ExternStructDeclaration>> externStructMap;
+        std::unordered_map<std::string_view, std::vector<NumThreadsDeclaration>> numThreadsMap;
     };
 }
 

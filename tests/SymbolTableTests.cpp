@@ -9,6 +9,7 @@
 using lodestone::SymbolTable;
 using lodestone::ExternConstantDeclaration;
 using lodestone::DerivedConstantDeclaration;
+using lodestone::NumThreadsDeclaration;
 using lodestone::tests::TestRunner;
 
 namespace
@@ -296,6 +297,75 @@ void TestExternConstExtraction(TestRunner& runner)
     runner.Check(DeclarationMatches(identifiersExterns, "SPACED", "42"), "The extracted declaration should match the source.");
 }
 
+const NumThreadsDeclaration* FindNumThreads(std::span<const NumThreadsDeclaration> declarations, std::string_view entry_point)
+{
+    const auto iter = std::ranges::find(declarations, entry_point, &NumThreadsDeclaration::EntryPoint);
+
+    return iter == declarations.end() ? nullptr : &*iter;
+}
+
+void CheckArguments(TestRunner& runner,
+                    std::span<const NumThreadsDeclaration> declarations,
+                    std::string_view entry_point,
+                    std::string_view x,
+                    std::string_view y,
+                    std::string_view z)
+{
+    const NumThreadsDeclaration* declaration = FindNumThreads(declarations, entry_point);
+    if (runner.Check(declaration != nullptr, std::string{ entry_point } + " has a numthreads declaration"))
+    {
+        runner.CheckEqual(declaration->Arguments[0], x, std::string{ entry_point } + " x argument");
+        runner.CheckEqual(declaration->Arguments[1], y, std::string{ entry_point } + " y argument");
+        runner.CheckEqual(declaration->Arguments[2], z, std::string{ entry_point } + " z argument");
+    }
+}
+
+// The argument text of numthreads is kept per function, as written, whatever the layout of the attributes around it.
+void TestNumThreadsExtraction(TestRunner& runner)
+{
+    runner.BeginSection("numthreads argument text");
+
+    constexpr std::string_view k_Source = R"(
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void Literal(uint3 id : SV_DispatchThreadID) {}
+
+[numthreads(IFFT_FUSED_THREADS, 1, 1)] [shader("compute")]
+void Named(uint3 id : SV_DispatchThreadID) {}
+
+[shader("compute")] [numthreads( min(TILE, 8) * 2 , TILE , 1 )] void SameLine(uint3 id : SV_DispatchThreadID) {}
+
+[numthreads(8)]
+[shader("compute")]
+void ShortList(uint3 id : SV_DispatchThreadID) {}
+
+// [numthreads(1, 1, 1)]
+/* [numthreads(2, 2, 2)] */
+[shader("compute")]
+void NoAttribute(uint3 id : SV_DispatchThreadID) {}
+
+[numthreads(1, 1,
+            1)]
+void TwoLines(uint3 id : SV_DispatchThreadID) {}
+
+struct numthreadsCount { uint value; };
+)";
+
+    SymbolTable table;
+    table.AddSource("Threads", k_TestSourcePath, k_Source);
+
+    const std::span<const NumThreadsDeclaration> declarations = table.NumThreadsForModule("Threads");
+    runner.CheckEqual(declarations.size(), size_t{ 4u }, "four functions have a numthreads attribute that ends on its line");
+
+    CheckArguments(runner, declarations, "Literal", "64", "1", "1");
+    CheckArguments(runner, declarations, "Named", "IFFT_FUSED_THREADS", "1", "1");
+    CheckArguments(runner, declarations, "SameLine", "min(TILE, 8) * 2", "TILE", "1");
+    CheckArguments(runner, declarations, "ShortList", "8", "1", "1");
+    runner.Check(FindNumThreads(declarations, "NoAttribute") == nullptr, "a comment declares nothing");
+    runner.Check(FindNumThreads(declarations, "TwoLines") == nullptr, "an attribute that ends on another line is not read");
+    runner.CheckEqual(table.NumThreadsForModule("Unknown").size(), size_t{ 0u }, "an unknown module has none");
+}
+
 } // namespace
 
 int main()
@@ -310,5 +380,6 @@ int main()
     TestExternTypeDefaultExtraction(runner);
     TestDerivedConstantExtraction(runner);
     TestDeclarationKeywordTokens(runner);
+    TestNumThreadsExtraction(runner);
     return runner.Report();
 }

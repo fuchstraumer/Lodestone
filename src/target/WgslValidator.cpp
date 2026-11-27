@@ -43,6 +43,11 @@ namespace
                             EmittedCodeFacts& facts,
                             DiagnosticSink& sink);
 
+    /** @brief Returns the size of the compute entry point, nothing without one, and fails for a size that is not a plain
+     * constant. */
+    CookResult<std::optional<WorkgroupSize>> ReadWorkgroupSize(tint::inspector::Inspector& inspector,
+                                                               DiagnosticSink& sink);
+
     /** @brief Returns the inputs with a location of each vertex entry point, sorted by location. */
     std::vector<EmittedVertexInput> ReadVertexInputs(tint::inspector::Inspector& inspector);
 
@@ -179,6 +184,13 @@ namespace
         facts.CapabilityNames.erase(repeated.begin(), repeated.end());
         facts.VertexInputs = ReadVertexInputs(inspector);
 
+        CookResult<std::optional<WorkgroupSize>> workgroupSize = ReadWorkgroupSize(inspector, sink);
+        if (!workgroupSize)
+        {
+            return workgroupSize.error();
+        }
+        facts.Workgroup = *workgroupSize;
+
         const bool compute = std::ranges::any_of(inspector.GetEntryPoints(),
                                                  [](const tint::inspector::EntryPoint& entry_point)
                                                  { return entry_point.stage == tint::inspector::PipelineStage::kCompute; });
@@ -203,6 +215,33 @@ namespace
         }
         facts.WorkgroupMemoryBytes = static_cast<uint32_t>(workgroup.Get().storage_size);
         return CookError::Success;
+    }
+
+    CookResult<std::optional<WorkgroupSize>> ReadWorkgroupSize(tint::inspector::Inspector& inspector,
+                                                               DiagnosticSink& sink)
+    {
+        for (const tint::inspector::EntryPoint& entryPoint : inspector.GetEntryPoints())
+        {
+            if (entryPoint.stage != tint::inspector::PipelineStage::kCompute)
+            {
+                continue;
+            }
+
+            // Tint gives no size for an override expression, which Slang never emits
+            if (!entryPoint.workgroup_size.has_value())
+            {
+                return std::unexpected(ReportError(sink,
+                                                   CookError::TargetValidationEntryPointInvalid,
+                                                   std::format("the workgroup size of '{}' is not a constant",
+                                                               entryPoint.name)));
+            }
+
+            const tint::inspector::WorkgroupSize& size = *entryPoint.workgroup_size;
+
+            return WorkgroupSize{ .X = size.x, .Y = size.y, .Z = size.z };
+        }
+
+        return std::optional<WorkgroupSize>{};
     }
 
     std::vector<EmittedVertexInput> ReadVertexInputs(tint::inspector::Inspector& inspector)

@@ -216,6 +216,10 @@ CookResult<std::vector<SamplerTexturePlacement>> CollectSamplerTexturePairs(cons
 /** Returns the end of the last member of the push constant block, or no value without a block. */
 CookResult<std::optional<uint32_t>> ReadPushConstantExtent(const ParseState& parse_state, DiagnosticSink& sink);
 CookResult<uint32_t> ReadWorkgroupMemoryBytes(const ParseState& parse_state, DiagnosticSink& sink);
+
+/** Returns the `LocalSize` of a compute entry point, or the values of the constants that `LocalSizeId` names. Returns
+ * nothing for another stage, and fails when a size is not a plain constant. */
+CookResult<std::optional<WorkgroupSize>> ReadWorkgroupSize(const ParseState& parse_state, DiagnosticSink& sink);
 /** Returns the vertex inputs that a vertex entry point reads, sorted by location. Other stages return none. A built-in
  * and a variable without a location are not vertex inputs. */
 std::vector<EmittedVertexInput> CollectVertexInputs(const ParseState& parse_state);

@@ -257,13 +257,16 @@ struct EntryPointCode
     EntryPointConstants Constants;
     std::vector<SamplerTexturePair> SamplerTexturePairs;
     SourceCodeFacts CodeFacts;
+    /** Reflection's size until the reader replaces it with the size in the code. Reflection reports 0 for a dimension
+     * that it cannot fold, so only a form that the reader has read holds the real size. */
+    WorkgroupSize Workgroup;
 };
 
 struct CompiledEntryPoint
 {
     std::string Name;
     std::string VariantSuffix;
-    /** Reflection only. The reader edits the forms, never this. */
+    /** Reflection only. The reader edits the forms, never this. `Reflection.Workgroup` can hold 0. */
     EntryPointReflection Reflection;
     /** This is the code that will be delivered in the manifest. */
     EntryPointCode Delivered;

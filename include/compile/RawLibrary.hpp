@@ -7,6 +7,7 @@
 #include "ResourceFlags.hpp"
 #include "ShaderLibraryTypes.hpp"
 #include "target/ShimTable.hpp"
+#include <array>
 #include <cstdint>
 #include <cstddef>
 #include <optional>
@@ -144,6 +145,14 @@ struct RawDerivedConstant
     uint32_t SourceLine{ 0u };
 };
 
+/** @brief The argument text of the `numthreads` attribute of one entry point, as the author wrote it. Stage 3 reads it
+ * from the source text, because reflection only returns the folded numbers. */
+struct RawNumThreadsText
+{
+    std::string EntryPoint;
+    std::array<std::string, 3> Arguments;
+};
+
 /** @brief An `extern struct` whose interface is in the shim table. The profile decides which implementation links.
   *
   * Shim externs are those that allow us to lower shader resources - textures, buffers, etc - into profile/target
@@ -174,6 +183,8 @@ struct RawModule
     std::vector<std::string> EntryPointNames;
     std::vector<ExternConstantDefault> ExternDefaults;
     std::vector<RawDerivedConstant> DerivedConstants;
+    /** In source order, for the entry points of the module that have a `numthreads` attribute. */
+    std::vector<RawNumThreadsText> NumThreads;
     std::vector<RawShimExtern> ShimExterns;
     std::vector<RawVariant> Variants;
 };

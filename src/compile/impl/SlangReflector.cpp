@@ -1902,7 +1902,7 @@ void ReportUnresolvedLocation(DiagnosticSink& sink, std::string_view range_kind,
 
 std::string JoinScopeName(std::string_view prefix, const char* name)
 {
-    if (name == nullptr || *name == ' ')
+    if (name == nullptr || *name == '\0')
     {
         return std::string{ prefix };
     }

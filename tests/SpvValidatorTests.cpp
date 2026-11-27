@@ -9,6 +9,7 @@
 #include "spirv-tools/libspirv.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -502,10 +503,11 @@ std::string MakeHandleFixture(std::string_view body)
     return text;
 }
 
-ReflectedBinding MakeHandleValue(std::string_view name, BindingKind kind, uint32_t byte_offset)
+ReflectedBinding MakeHandleValue(std::string_view name, std::string_view member, BindingKind kind, uint32_t byte_offset)
 {
     ReflectedBinding reflected;
     reflected.Name = std::string{ name };
+    reflected.ShimMember = std::string{ member };
     reflected.Placement = lodestone::StoredValuePlacement{ .Kind = lodestone::PlacementKind::Handle,
                                                            .Container = lodestone::StoredValueContainer::UniformBuffer,
                                                            .Block = lodestone::BoundPlacement{ .Group = 1u, .Binding = 0u },
@@ -520,8 +522,8 @@ std::vector<ReflectedBinding> MakeHandleReflection()
     std::vector<ReflectedBinding> reflected;
     reflected.push_back(MakeReflected("material", 1u, 0u, BindingKind::UniformBuffer, ResourceShape::Invalid,
                                       ResourceAccess::ReadOnly));
-    reflected.push_back(MakeHandleValue("texture", BindingKind::Texture, 0u));
-    reflected.push_back(MakeHandleValue("sampler", BindingKind::Sampler, 16u));
+    reflected.push_back(MakeHandleValue("Surface", "texture", BindingKind::Texture, 0u));
+    reflected.push_back(MakeHandleValue("Filter", "sampler", BindingKind::Sampler, 16u));
     return reflected;
 }
 
@@ -849,6 +851,57 @@ int main()
                       64u + 32u,
                       "a ColMajor matrix strides its columns");
 
+    runner.BeginSection("the workgroup size is the LocalSize of the compute entry point");
+    const auto sizeOf = [&](const std::string& text) -> std::optional<lodestone::WorkgroupSize>
+    {
+        const std::vector<std::byte> code = Assemble(text);
+        const CookResult<EmittedCodeFacts> facts = validator.ReadEmittedCodeFacts(code, sink);
+        return facts.has_value() ? facts->Workgroup : std::nullopt;
+    };
+    const auto sizeText = [](const std::optional<lodestone::WorkgroupSize>& size)
+    {
+        return size.has_value() ? std::array<uint32_t, 3u>{ size->X, size->Y, size->Z } : std::array<uint32_t, 3u>{};
+    };
+    runner.CheckEqual(sizeText(sizeOf(std::string{ k_ShadeCs })), (std::array<uint32_t, 3u>{ 64u, 1u, 1u }),
+                      "LocalSize 64 1 1 reads back");
+    runner.CheckEqual(sizeText(sizeOf(Replace(std::string{ k_ShadeCs }, "LocalSize 64 1 1", "LocalSize 128 2 4"))),
+                      (std::array<uint32_t, 3u>{ 128u, 2u, 4u }),
+                      "each dimension is its own value");
+
+    // LocalSizeId names a constant for each dimension
+    std::string byIds = Replace(std::string{ k_ShadeCs }, "OpExecutionMode %ShadeCS LocalSize 64 1 1", "OpExecutionModeId %ShadeCS LocalSizeId %size_x %size_y %size_z");
+    byIds = Replace(byIds, "    %float_0 = OpConstant %float 0", R"(    %float_0 = OpConstant %float 0
+     %size_x = OpConstant %uint 96
+     %size_y = OpConstant %uint 2
+     %size_z = OpConstant %uint 1)");
+    runner.CheckEqual(sizeText(sizeOf(byIds)), (std::array<uint32_t, 3u>{ 96u, 2u, 1u }),
+                      "LocalSizeId reads the value of each constant");
+
+    runner.BeginSection("the workgroup size of the code is compared with reflection");
+    const std::optional<lodestone::WorkgroupSize> codeSize = lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u };
+    runner.Check(lodestone::CompareWorkgroupSize(codeSize, lodestone::WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u }).empty(),
+                 "equal sizes agree");
+    runner.Check(lodestone::CompareWorkgroupSize(codeSize, lodestone::WorkgroupSize{ .X = 0u, .Y = 1u, .Z = 1u }).empty(),
+                 "a dimension that reflection cannot fold (0) agrees with any value, and the code decides it");
+    runner.Check(lodestone::CompareWorkgroupSize(codeSize, lodestone::WorkgroupSize{ .X = 0u, .Y = 0u, .Z = 0u }).empty(),
+                 "reflection can fail to fold every dimension");
+    runner.Check(lodestone::CompareWorkgroupSize(std::nullopt, lodestone::WorkgroupSize{ .X = 8u, .Y = 8u, .Z = 8u }).empty(),
+                 "a code with no size has nothing to compare");
+
+    const std::vector<lodestone::BindingMismatch> differs =
+        lodestone::CompareWorkgroupSize(codeSize, lodestone::WorkgroupSize{ .X = 32u, .Y = 1u, .Z = 1u });
+    runner.CheckEqual(differs.size(), size_t{ 1u }, "a nonzero reflected dimension that differs is one mismatch");
+    if (differs.size() == 1u)
+    {
+        runner.CheckEqual(differs[0].Kind, BindingMismatchKind::Workgroup, "the kind is Workgroup");
+        runner.CheckEqual(differs[0].Emitted, std::string{ "64x1x1" }, "the mismatch has the size in the code");
+        runner.CheckEqual(differs[0].Reflected, std::string{ "32x1x1" }, "the mismatch has the size of reflection");
+        runner.Check(lodestone::FormatBindingMismatch(differs[0]).contains("the code has 64x1x1 and reflection has 32x1x1"),
+                     "the message names both sizes");
+    }
+    runner.Check(!lodestone::CompareWorkgroupSize(codeSize, lodestone::WorkgroupSize{ .X = 64u, .Y = 2u, .Z = 1u }).empty(),
+                 "a differing dimension that is not the first fails too");
+
     runner.BeginSection("the capability names and the workgroup memory come from the module");
     const std::vector<std::byte> workgroupCs = Assemble(k_WorkgroupCs);
     runner.Check(!workgroupCs.empty(), "the workgroup fixture assembles");
@@ -1060,11 +1113,17 @@ int main()
     runner.Check(storedMismatch(insideMember), "a stored value at a byte where no member starts is a mismatch");
 
     std::vector<ReflectedBinding> otherName = MakeHandleReflection();
-    otherName[1].Name = "other";
-    runner.Check(storedMismatch(otherName), "a stored value of another name than the member is a mismatch");
+    otherName[1].ShimMember = "other";
+    runner.Check(storedMismatch(otherName), "a stored value of another member name than the member in the code is a mismatch");
+
+    // the author's field name is not a member of the container struct that holds the value
+    std::vector<ReflectedBinding> fieldNameOnly = MakeHandleReflection();
+    fieldNameOnly[1].ShimMember.clear();
+    runner.Check(storedMismatch(fieldNameOnly), "a stored value with no member name compares the field name, which is a mismatch"
+                                                " here");
 
     std::vector<ReflectedBinding> notAHandle = MakeHandleReflection();
-    notAHandle[1].Name = "Scale";
+    notAHandle[1].ShimMember = "Scale";
     std::get<lodestone::StoredValuePlacement>(notAHandle[1].Placement).ByteOffset = 32u;
     runner.Check(storedMismatch(notAHandle), "a Handle stored value on a member that is not a uint2 is a mismatch");
 

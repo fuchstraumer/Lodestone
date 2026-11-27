@@ -14,6 +14,7 @@ inline constexpr std::string_view k_ManifestSuffix = ".ldmanifest";
 inline constexpr std::string_view k_DedupeReportSuffix = ".dedupe.txt";
 inline constexpr std::string_view k_ResourceReportSuffix = ".resources.txt";
 inline constexpr std::string_view k_HostHeaderSuffix = ".host.hpp";
+inline constexpr std::string_view k_HostInlineSuffix = ".host.inl";
 inline constexpr std::string_view k_DepfileSuffix = ".d";
 
 /** @brief Returns true when the text is a file name stem: not empty, not `.` or `..`, and with no `/`, `\` or `:`. */

@@ -540,6 +540,8 @@ namespace
 
         comparison.Mismatches.append_range(
             CompareVertexInputs(comparison.Emitted.VertexInputs, entry_point.Reflection.Raster.VertexInputs));
+        comparison.Mismatches.append_range(
+            CompareWorkgroupSize(comparison.Emitted.Workgroup, entry_point.Reflection.Workgroup));
 
         if (!comparison.Matches())
         {
@@ -693,6 +695,12 @@ namespace
             .CapabilityNames = WithoutGuaranteedCapabilities(target, facts.CapabilityNames),
             .WorkgroupMemoryBytes = facts.WorkgroupMemoryBytes
         };
+
+        // the code decides the size: reflection reports 0 for an expression of link-time constants
+        if (facts.Workgroup.has_value())
+        {
+            form.Workgroup = *facts.Workgroup;
+        }
 
         const CookError resolved = ResolveSamplerTexturePairs(variant,
                                                               entry_point,
@@ -1053,7 +1061,14 @@ namespace
                 interned_module.EntryPoints.reserve(variant.EntryPoints.size());
                 for (const CompiledEntryPoint& entryPoint : variant.EntryPoints)
                 {
-                    interned_module.EntryPoints.emplace_back(entryPoint.Name, entryPoint.Reflection.Stage);
+                    LibraryEntryPoint& libraryEntryPoint =
+                        interned_module.EntryPoints.emplace_back(entryPoint.Name, entryPoint.Reflection.Stage);
+                    const auto numThreads =
+                        std::ranges::find(raw_module.NumThreads, entryPoint.Name, &RawNumThreadsText::EntryPoint);
+                    if (numThreads != raw_module.NumThreads.end())
+                    {
+                        libraryEntryPoint.WorkgroupExpressions = numThreads->Arguments;
+                    }
                 }
             }
 

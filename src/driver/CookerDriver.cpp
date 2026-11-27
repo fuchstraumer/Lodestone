@@ -540,14 +540,22 @@ namespace
 
         // the cook does not remove an earlier host header, and the sink keeps the timestamp of one whose text is
         // unchanged. A failed cook leaves the old header beside no manifest, so a consumer fails on the manifest.
-        const CookResult<std::string> hostHeader =
-            EmitHostHeader(library, options.HostTypesInclude, options.HostNamespace, diagnostics);
-        if (!hostHeader)
+        const std::string inlineName = MakeArtifactName(options.OutputName, k_HostInlineSuffix);
+        const CookResult<HostHeaderFiles> hostFiles =
+            EmitHostHeader(library, options.HostTypesInclude, options.HostNamespace, inlineName, diagnostics);
+        if (!hostFiles)
         {
-            return hostHeader.error();
+            return hostFiles.error();
         }
 
-        return sink.WriteArtifact(MakeArtifactName(options.OutputName, k_HostHeaderSuffix), *hostHeader);
+        // the inline file comes first, so that a header on disk never names an inline file that does not exist
+        const CookError inlineWriteError = sink.WriteArtifact(inlineName, hostFiles->Inline);
+        if (!inlineWriteError)
+        {
+            return inlineWriteError;
+        }
+
+        return sink.WriteArtifact(MakeArtifactName(options.OutputName, k_HostHeaderSuffix), hostFiles->Header);
     }
 } // namespace
 

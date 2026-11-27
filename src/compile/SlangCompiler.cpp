@@ -144,6 +144,19 @@ CookResult<RawModule> SlangCompiler::PrepareRawModule(const PermutationSpace& sp
                                                               .SourceLine = declaration.SourceLine });
     }
 
+    for (const NumThreadsDeclaration& declaration : symbolTable.NumThreadsForModule(ModuleName()))
+    {
+        if (!std::ranges::contains(module.EntryPointNames, declaration.EntryPoint))
+        {
+            continue;
+        }
+
+        module.NumThreads.push_back(RawNumThreadsText{ .EntryPoint = std::string{ declaration.EntryPoint },
+                                                       .Arguments = { std::string{ declaration.Arguments[0] },
+                                                                      std::string{ declaration.Arguments[1] },
+                                                                      std::string{ declaration.Arguments[2] } } });
+    }
+
     // the symbol table reads the text and reflection confirms the type exists, so each is a second opinion for the other
     const std::vector<std::string> moduleScopeStructs = bootstrapContext->BuildModuleScopeStructNames();
     // reflection only: the attribute is usually on the line before the extern

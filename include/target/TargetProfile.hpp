@@ -96,6 +96,9 @@ struct EmittedCodeFacts
     uint32_t WorkgroupMemoryBytes{ 0u };
     /** Vertex stage only. Sorted by location, with one record for each location that the code reads. */
     std::vector<EmittedVertexInput> VertexInputs;
+    /** Compute stage only: the workgroup size that the code declares (`LocalSize`, or `@workgroup_size`). No value for
+     * another stage. */
+    std::optional<WorkgroupSize> Workgroup;
 };
 
 /** The part of one binding on which the emitted code and reflection disagree. */
@@ -123,6 +126,9 @@ enum class BindingMismatchKind : uint8_t
     /** The code reads a vertex input that reflection does not record, or reads it with another type. `Binding` holds
      * the location, and `Emitted` and `Reflected` hold the types as text. */
     VertexInput,
+    /** Reflection reports a nonzero workgroup size, and the code declares another. `Emitted` and `Reflected` hold the
+     * sizes as text. */
+    Workgroup,
 };
 
 std::string_view ToString(BindingMismatchKind kind) noexcept;
@@ -144,6 +150,12 @@ struct BindingMismatch
 
 /** One line of the reflection mismatch warning, with no line break. */
 std::string FormatBindingMismatch(const BindingMismatch& mismatch);
+
+/** @brief Compares the workgroup size of the code with reflection, for a compute entry point. Slang reports 0 for a
+ * dimension that it cannot fold, such as an expression of link-time constants, and the code then decides that dimension.
+ * A nonzero reflected dimension must equal the code. Returns no mismatch when the code declares no size. */
+std::vector<BindingMismatch> CompareWorkgroupSize(const std::optional<WorkgroupSize>& emitted,
+                                                  const WorkgroupSize& reflected);
 
 struct BindingComparison
 {

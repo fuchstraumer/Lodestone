@@ -9,6 +9,7 @@
 #include <expected>
 #include <format>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -201,6 +202,8 @@ std::string_view ToString(BindingMismatchKind kind) noexcept
         return "stored value";
     case BindingMismatchKind::VertexInput:
         return "vertex input";
+    case BindingMismatchKind::Workgroup:
+        return "workgroup size";
     default:
         return "Invalid";
     }
@@ -229,6 +232,8 @@ std::string FormatBindingMismatch(const BindingMismatch& mismatch)
                            mismatch.Binding,
                            mismatch.Emitted.empty() ? "nothing" : mismatch.Emitted,
                            mismatch.Reflected.empty() ? "nothing" : mismatch.Reflected);
+    case BindingMismatchKind::Workgroup:
+        return std::format("  workgroup size: the code has {} and reflection has {}", mismatch.Emitted, mismatch.Reflected);
     default:
         return std::format("  group {} binding {} {}: {} differs, the code has {} and reflection has {}",
                            mismatch.Group,
@@ -238,6 +243,31 @@ std::string FormatBindingMismatch(const BindingMismatch& mismatch)
                            mismatch.Emitted,
                            mismatch.Reflected);
     }
+}
+
+std::vector<BindingMismatch> CompareWorkgroupSize(const std::optional<WorkgroupSize>& emitted,
+                                                  const WorkgroupSize& reflected)
+{
+    if (!emitted.has_value())
+    {
+        return {};
+    }
+
+    const auto agrees = [](uint32_t emitted_size, uint32_t reflected_size)
+    {
+        return reflected_size == 0u || reflected_size == emitted_size;
+    };
+
+    const bool matches = agrees(emitted->X, reflected.X) && agrees(emitted->Y, reflected.Y) &&
+                         agrees(emitted->Z, reflected.Z);
+    if (matches)
+    {
+        return {};
+    }
+
+    return { BindingMismatch{ .Kind = BindingMismatchKind::Workgroup,
+                              .Emitted = std::format("{}x{}x{}", emitted->X, emitted->Y, emitted->Z),
+                              .Reflected = std::format("{}x{}x{}", reflected.X, reflected.Y, reflected.Z) } };
 }
 
 std::string_view ToString(AccessModel model) noexcept

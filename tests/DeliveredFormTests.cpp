@@ -23,6 +23,7 @@ EntryPointCode MakeBase()
     base.SamplerTexturePairs = { SamplerTexturePair{ .Texture = 0u, .Sampler = 1u } };
     base.CodeFacts.CapabilityNames = { "Float16" };
     base.CodeFacts.WorkgroupMemoryBytes = 256u;
+    base.Workgroup = WorkgroupSize{ .X = 64u, .Y = 1u, .Z = 1u };
 
     return base;
 }
@@ -95,6 +96,11 @@ void TestRejected(TestRunner& runner)
     moreMemory.CodeFacts.WorkgroupMemoryBytes = 512u;
     runner.CheckEqual(Verify(MakeVariant(moreMemory, MakeBase())), CookError::DeliveredFormExceedsBase,
                       "more workgroup memory than the base fails");
+
+    EntryPointCode otherSize = MakeBase();
+    otherSize.Workgroup.X = 32u;
+    runner.CheckEqual(Verify(MakeVariant(otherSize, MakeBase())), CookError::DeliveredFormExceedsBase,
+                      "a workgroup size that differs from the base fails, a smaller one too");
 
     EntryPointCode constants = MakeBase();
     constants.Constants = EntryPointConstants{ .Delivery = EntryPointConstantsDelivery::PushConstant, .ByteSize = 16u };

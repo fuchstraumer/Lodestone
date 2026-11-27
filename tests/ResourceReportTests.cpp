@@ -323,6 +323,106 @@ void CheckUniformByteSize(tests::TestRunner& runner, const PermutationSpace& spa
                  "the text names the axis of a block size that varies");
 }
 
+constexpr uint32_t k_FixedLayers = 0u;
+constexpr uint32_t k_VariantLayers = 1u;
+constexpr uint32_t k_UnstatedLayers = 2u;
+constexpr uint32_t k_OneLayer = 3u;
+
+// four array textures. SIZE changes the layer count of the second one, from 4 to 8
+CookedModule BuildArrayModule(const PermutationSpace& space)
+{
+    CookedModule module;
+    module.Name = "ArrayModule";
+    module.Space = &space;
+    module.EntryPoints.push_back(LibraryEntryPoint{ .Name = "LayerCS", .Stage = ShaderStageKind::Compute });
+    lodestone::tests::AddFixtureSource(module, tests::BytesOf("// one source for every variant"), lodestone::SourceCodeFacts{});
+
+    const ResourceShape arrayShape = ResourceShape::Texture2D | ResourceShape::ArrayFlag;
+    module.Resources = { MakeBinding("FixedLayers", 0u, BindingKind::Texture, arrayShape),
+                         MakeBinding("VariantLayers", 1u, BindingKind::Texture, arrayShape),
+                         MakeBinding("UnstatedLayers", 2u, BindingKind::Texture, arrayShape),
+                         MakeBinding("OneLayer", 3u, BindingKind::Texture, arrayShape) };
+    module.ResourceLists.push_back(ResourceList{ k_FixedLayers, k_VariantLayers, k_UnstatedLayers, k_OneLayer });
+    module.Delivered.VisibilityLists.push_back(VisibilityList{ 0u, 1u, 2u, 3u });
+
+    for (const uint32_t layers : { 4u, 8u })
+    {
+        module.FootprintLists.push_back(
+            FootprintList{ TextureFootprint{ .ExtentX = 64u, .ExtentY = 64u, .ExtentZ = 4u, .Expression = "64" },
+                           TextureFootprint{ .ExtentX = 64u, .ExtentY = 64u, .ExtentZ = layers, .Expression = "64" },
+                           std::monostate{},
+                           TextureFootprint{ .ExtentX = 64u, .ExtentY = 64u, .ExtentZ = 1u, .Expression = "64" } });
+    }
+    tests::AddDefaultInstanceTables(module);
+
+    const std::array instances{ tests::ComputeInstance(0u, 0u) };
+    for (const VariantChoice& choice : k_EveryVariant)
+    {
+        LibraryVariant variant = tests::MakeFixtureVariant(
+            space,
+            module.Variants.size(),
+            PermutationAssignment{
+                PermutationBinding{ .Axis = &space.Axes()[0], .Value = PermutationValue{ choice.Size } },
+                PermutationBinding{ .Axis = &space.Axes()[1], .Value = PermutationValue{ choice.Debug } } },
+            instances);
+        variant.FootprintListIndex = choice.Size ? 1u : 0u;
+        variant.ResourceListIndex = 0u;
+        module.VariantKeys.push_back(space.ComputeVariantKey(variant.Canonical));
+        module.Variants.push_back(std::move(variant));
+    }
+    module.SpaceSize = 4u;
+    return module;
+}
+
+void CheckArrayLayers(tests::TestRunner& runner, const PermutationSpace& space)
+{
+    runner.BeginSection("the layer count of an array texture comes from its third extent");
+    const std::vector<std::byte> bytes = EmitBytes(BuildArrayModule(space));
+    const manifest::ManifestResult<manifest::BundleView> bundle = manifest::BundleView::Open(bytes);
+    if (!runner.CheckOk(bundle, "the manifest opens, and its round trip passes"))
+    {
+        return;
+    }
+    const manifest::ManifestResult<manifest::EnvironmentView> environment = bundle->OpenEnvironment(0u, 0u);
+    if (!runner.CheckOk(environment, "the environment opens"))
+    {
+        return;
+    }
+
+    const manifest::LayoutRange layout = environment->VariantAt(0u).EntryPoint(0u).Layout();
+    runner.CheckEqual(layout.Size(), 4u, "the entry point reads four array textures");
+    if (layout.Size() != 4u)
+    {
+        return;
+    }
+
+    const CreationFields fixed = manifest::DescribeCreation(layout[k_FixedLayers]);
+    runner.CheckEqual(fixed.ArrayLayers, CreationSource::Shader, "a layer count that no axis changes is from the shader");
+    runner.CheckEqual(fixed.Extent, CreationSource::Shader, "the extent of that texture is from the shader");
+
+    const CreationFields variant = manifest::DescribeCreation(layout[k_VariantLayers]);
+    runner.CheckEqual(variant.ArrayLayers, CreationSource::ShaderPerVariant,
+                      "a layer count that an axis changes is from the shader for each variant");
+
+    const CreationFields unstated = manifest::DescribeCreation(layout[k_UnstatedLayers]);
+    runner.CheckEqual(unstated.ArrayLayers, CreationSource::Cpu, "an array texture with no extent attribute needs its layers from the renderer");
+    runner.CheckEqual(unstated.Extent, CreationSource::Cpu, "an array texture with no extent attribute needs its extent from the renderer");
+
+    const CreationFields oneLayer = manifest::DescribeCreation(layout[k_OneLayer]);
+    runner.CheckEqual(oneLayer.ArrayLayers, CreationSource::Cpu,
+                      "a layer count of 1 reads as not stated, because ls_extent_2d also leaves 1");
+
+    lodestone::StderrDiagnosticSink sink;
+    const CookResult<ResourceReport> report = BuildResourceReport(bytes, sink);
+    if (!runner.CheckOk(report, "the report reads the manifest") || report->Environments.empty())
+    {
+        return;
+    }
+    const std::string text = FormatResourceReport(*report);
+    runner.Check(text.contains("layers: per-variant (SIZE)"), "the text names the axis of a layer count that varies");
+    runner.Check(text.contains("layers: shader,"), "the text marks a layer count that the shader states");
+}
+
 void CheckManifest(tests::TestRunner& runner, const PermutationSpace& space)
 {
     lodestone::StderrDiagnosticSink manifestDiagnostics;
@@ -440,6 +540,7 @@ int main()
     CheckMeasurement(runner, space);
     CheckValidator(runner, space);
     CheckUniformByteSize(runner, space);
+    CheckArrayLayers(runner, space);
     CheckManifest(runner, space);
     return runner.Report();
 }

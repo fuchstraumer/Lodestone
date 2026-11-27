@@ -149,6 +149,7 @@ enum class CookError : uint16_t
     HostTypeLayoutConflict = 189, // one host struct name and layout rule has two layouts, across variants, modules, or profiles
     HostTypeNameCollision = 190, // two names of a host header map to one C++ identifier
     HostTypeNotEmittable = 191, // a host struct has a member that no host type can mirror
+    HostBindingNameCollision = 192, // two generated names of one host header namespace map to one C++ identifier
 
     SystemError = 200,
     DirectoryDoesNotExist = 201,
